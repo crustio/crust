@@ -1,13 +1,14 @@
 use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
-	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
+	AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
 	SudoConfig, IndicesConfig, SystemConfig, WASM_BINARY, Signature
 };
-use sp_consensus_aura::sr25519::{AuthorityId as AuraId};
+use sp_consensus_babe::{AuthorityId as BabeId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
 use sc_service;
 use sp_runtime::traits::{Verify, IdentifyAccount};
 
+const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server
 //const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
@@ -41,11 +42,14 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Helper function to generate an authority key for Aura
-pub fn get_authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
+
+/// Helper function to generate stash, controller and session key from seed
+pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, GrandpaId, BabeId) {
 	(
-		get_from_seed::<AuraId>(s),
-		get_from_seed::<GrandpaId>(s),
+		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
+		get_account_id_from_seed::<sr25519::Public>(seed),
+		get_from_seed::<GrandpaId>(seed),
+		get_from_seed::<BabeId>(seed),
 	)
 }
 
@@ -69,9 +73,9 @@ impl Alternative {
 				true),
 				vec![],
 				None,
+				Some(DEFAULT_PROTOCOL_ID),
 				None,
-				None,
-				None
+				Default::default(),
 			),
 			Alternative::LocalTestnet => ChainSpec::from_genesis(
 				"Local Testnet",
@@ -98,9 +102,9 @@ impl Alternative {
 				true),
 				vec![],
 				None,
+				Some(DEFAULT_PROTOCOL_ID),
 				None,
-				None,
-				None
+				Default::default()
 			),
 		})
 	}
@@ -114,7 +118,7 @@ impl Alternative {
 	}
 }
 
-fn testnet_genesis(initial_authorities: Vec<(AuraId, GrandpaId)>,
+fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, BabeId)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool) -> GenesisConfig {
@@ -133,11 +137,11 @@ fn testnet_genesis(initial_authorities: Vec<(AuraId, GrandpaId)>,
 		sudo: Some(SudoConfig {
 			key: root_key,
 		}),
-		aura: Some(AuraConfig {
-			authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+		babe: Some(BabeConfig {
+			authorities: initial_authorities.iter().map(|x| (x.3.clone(), 1)).collect(),
 		}),
 		grandpa: Some(GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
 		}),
 	}
 }

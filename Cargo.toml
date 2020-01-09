@@ -66,7 +66,7 @@ git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
-[dependencies.sc-consensus-aura]
+[dependencies.sc-consensus-babe]
 git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '0.8'
@@ -96,7 +96,7 @@ git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '0.8'
 
-[dependencies.sp-consensus-aura]
+[dependencies.sp-consensus-babe]
 git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '0.8'

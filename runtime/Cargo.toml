@@ -1,9 +1,16 @@
-[dependencies.aura]
+[dependencies.babe]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
-package = 'pallet-aura'
+package = 'pallet-babe'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
+
+[dependencies.babe-primitives]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'sp-consensus-babe'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '0.8'
 
 [dependencies.balances]
 default-features = false
@@ -70,12 +77,6 @@ version = '2.0.0'
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
-
-[dependencies.sp-consensus-aura]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-rev = '3e651110aa06aa835790df63410a29676243fc54'
-version = '0.8'
 
 [dependencies.sp-core]
 default-features = false
@@ -161,7 +162,8 @@ version = '2.0.0'
 [features]
 default = ['std']
 std = [
-    'aura/std',
+    'babe/std',
+    'babe-primitives/std',
     'balances/std',
     'codec/std',
     'frame-executive/std',
@@ -173,7 +175,6 @@ std = [
     'serde',
     'sp-api/std',
     'sp-block-builder/std',
-    'sp-consensus-aura/std',
     'sp-core/std',
     'sp-inherents/std',
     'sp-io/std',

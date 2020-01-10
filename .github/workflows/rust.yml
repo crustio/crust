@@ -7,6 +7,10 @@ on:
       - feature/*
       - zikun/*
 
+strategy:
+  matrix:
+    compiler: clang
+
 jobs:
   build:
     name: Build Crust

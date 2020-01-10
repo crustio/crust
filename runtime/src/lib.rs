@@ -11,55 +11,36 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use sp_std::prelude::*;
 use sp_core::OpaqueMetadata;
 use sp_runtime::{
-	ApplyExtrinsicResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
-	impl_opaque_keys, MultiSignature
+	ApplyExtrinsicResult, create_runtime_str, generic,
+	impl_opaque_keys, Percent, Permill, Perbill, RuntimeDebug,
 };
-use sp_runtime::traits::{
-	NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto, IdentifyAccount
-};
+use sp_runtime::traits::{NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, SignedExtension, OpaqueKeys, ConvertInto, Convert, SaturatedConversion};
+use sp_runtime::curve::PiecewiseLinear;
+use sp_runtime::transaction_validity::{TransactionValidity, InvalidTransaction, TransactionValidityError};
+
 use sp_api::impl_runtime_apis;
 use grandpa::{fg_primitives, AuthorityList as GrandpaAuthorityList};
 use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
+use sp_staking::SessionIndex;
 
+#[cfg(feature = "std")]
+pub use staking::StakerStatus;
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
-pub use sp_runtime::{Permill, Perbill};
 pub use frame_support::{
 	StorageValue, construct_runtime, parameter_types,
-	traits::Randomness,
+	traits::{ Randomness, Currency},
 	weights::Weight,
 };
 
-/// An index to a block.
-pub type BlockNumber = u32;
-
-/// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
-pub type Signature = MultiSignature;
-
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
-pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
-
-/// The type for looking up accounts. We don't expect more than 4 billion of them, but you
-/// never know...
-pub type AccountIndex = u32;
-
-/// Balance of an account.
-pub type Balance = u128;
-
-/// Index of a transaction in the chain.
-pub type Index = u32;
-
-/// A hash of some data used by the chain.
-pub type Hash = sp_core::H256;
-
-/// Digest item type.
-pub type DigestItem = generic::DigestItem<Hash>;
+/// Constant values used within the runtime.
+pub mod constants;
+use constants::{*, time::*, currency::*};
 
 /// Used for the module template in `./template.rs`
 mod template;
@@ -81,12 +62,12 @@ pub mod opaque {
 	pub type BlockId = generic::BlockId<Block>;
 
 	pub type SessionHandlers = (Grandpa, Babe);
+}
 
-	impl_opaque_keys! {
-		pub struct SessionKeys {
-			pub grandpa: Grandpa,
-			pub babe: Babe,
-		}
+impl_opaque_keys! {
+	pub struct SessionKeys {
+		pub grandpa: Grandpa,
+		pub babe: Babe,
 	}
 }
 
@@ -99,34 +80,6 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 };
-
-/// Constants for Babe.
-
-/// Since BABE is probabilistic this is the average expected block time that
-/// we are targetting. Blocks will be produced at a minimum duration defined
-/// by `SLOT_DURATION`, but some slots will not be allocated to any
-/// authority and hence no block will be produced. We expect to have this
-/// block time on average following the defined slot duration and the value
-/// of `c` configured for BABE (where `1 - c` represents the probability of
-/// a slot being empty).
-/// This value is only used indirectly to define the unit constants below
-/// that are expressed in blocks. The rest of the code should use
-/// `SLOT_DURATION` instead (like the timestamp module for calculating the
-/// minimum period).
-/// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
-
-pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
-
-pub const EPOCH_DURATION_IN_BLOCKS: u32 = 10 * MINUTES;
-
-// These time units are defined in number of blocks.
-pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
-pub const HOURS: BlockNumber = MINUTES * 60;
-pub const DAYS: BlockNumber = HOURS * 24;
-
-// 1 in 4 blocks (on average, not counting collisions) will be primary babe blocks.
-pub const PRIMARY_PROBABILITY: (u64, u64) = (1, 4);
 
 /// The version infromation used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -190,6 +143,8 @@ parameter_types! {
 impl babe::Trait for Runtime {
 	type EpochDuration = EpochDuration;
 	type ExpectedBlockTime = ExpectedBlockTime;
+
+	// session module is the trigger
 	type EpochChangeTrigger = babe::ExternalTrigger;
 }
 
@@ -233,6 +188,202 @@ impl authorship::Trait for Runtime {
 }*/
 
 parameter_types! {
+	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
+}
+
+impl session::Trait for Runtime {
+	type Event = Event;
+	type ValidatorId = AccountId;
+	type ValidatorIdOf = staking::StashOf<Self>;
+	type ShouldEndSession = Babe;
+	type OnSessionEnding = Staking;
+	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
+	type Keys = SessionKeys;
+	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+	type SelectInitialValidators = Staking;
+}
+
+impl session::historical::Trait for Runtime {
+	type FullIdentification = staking::Exposure<AccountId, Balance>;
+	type FullIdentificationOf = staking::ExposureOf<Runtime>;
+}
+
+pallet_staking_reward_curve::build! {
+	const REWARD_CURVE: PiecewiseLinear<'static> = curve!(
+		min_inflation: 0_025_000,
+		max_inflation: 0_100_000,
+		ideal_stake: 0_500_000,
+		falloff: 0_050_000,
+		max_piece_count: 40,
+		test_precision: 0_005_000,
+	);
+}
+
+parameter_types! {
+	// Six sessions in an era (6 hours).
+	pub const SessionsPerEra: SessionIndex = 6;
+	// 28 eras for unbonding (7 days).
+	pub const BondingDuration: staking::EraIndex = 28;
+	// 28 eras in which slashes can be cancelled (7 days).
+	pub const SlashDeferDuration: staking::EraIndex = 28;
+	pub const RewardCurve: &'static PiecewiseLinear<'static> = &REWARD_CURVE;
+}
+
+// TODO: add vote logic here
+/// Simple structure that exposes how u64 currency can be represented as... u64.
+pub struct CurrencyToVoteHandler;
+impl Convert<u64, u64> for CurrencyToVoteHandler {
+	fn convert(x: u64) -> u64 { x }
+}
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+	fn convert(x: u128) -> u128 { x }
+}
+impl Convert<u128, u64> for CurrencyToVoteHandler {
+	fn convert(x: u128) -> u64 { x.saturated_into() }
+}
+
+impl staking::Trait for Runtime {
+	type Currency = Balances;
+	type Time = Timestamp;
+
+	// TODO: add vote logic here
+	type CurrencyToVote = CurrencyToVoteHandler;
+	type RewardRemainder = /*Treasury*/();
+	type Event = Event;
+	type Slash = ();
+	type Reward = /*Treasury*/();
+	type SessionsPerEra = SessionsPerEra;
+	type BondingDuration = BondingDuration;
+	type SlashDeferDuration = SlashDeferDuration;
+
+	// A majority of the council can cancel the slash.
+	type SlashCancelOrigin = /*collective::EnsureProportionAtLeast<_1, _2, AccountId, CouncilCollective>*/system::EnsureRoot<Self::AccountId>;
+	type SessionInterface = Self;
+	type RewardCurve = RewardCurve;
+}
+
+// TODO: add staking and other pallets
+/*
+parameter_types! {
+	pub const LaunchPeriod: BlockNumber = 7 * DAYS;
+	pub const VotingPeriod: BlockNumber = 7 * DAYS;
+	pub const EmergencyVotingPeriod: BlockNumber = 3 * HOURS;
+	pub const MinimumDeposit: Balance = 1 * DOLLARS;
+	pub const EnactmentPeriod: BlockNumber = 8 * DAYS;
+	pub const CooloffPeriod: BlockNumber = 7 * DAYS;
+	// One cent: $10,000 / MB
+	pub const PreimageByteDeposit: Balance = 10 * MILLICENTS;
+}
+
+impl democracy::Trait for Runtime {
+	type Proposal = Call;
+	type Event = Event;
+	type Currency = Balances;
+	type EnactmentPeriod = EnactmentPeriod;
+	type LaunchPeriod = LaunchPeriod;
+	type VotingPeriod = VotingPeriod;
+	type MinimumDeposit = MinimumDeposit;
+	/// A straight majority of the council can decide what their next motion is.
+	type ExternalOrigin = collective::EnsureProportionAtLeast<_1, _2, AccountId, CouncilCollective>;
+	/// A majority can have the next scheduled referendum be a straight majority-carries vote.
+	type ExternalMajorityOrigin = collective::EnsureProportionAtLeast<_1, _2, AccountId, CouncilCollective>;
+	/// A unanimous council can have the next scheduled referendum be a straight default-carries
+	/// (NTB) vote.
+	type ExternalDefaultOrigin = collective::EnsureProportionAtLeast<_1, _1, AccountId, CouncilCollective>;
+	/// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
+	/// be tabled immediately and with a shorter voting/enactment period.
+	type FastTrackOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, TechnicalCollective>;
+	type EmergencyVotingPeriod = EmergencyVotingPeriod;
+	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
+	type CancellationOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, CouncilCollective>;
+	// Any single technical committee member may veto a coming council proposal, however they can
+	// only do it once and it lasts only for the cooloff period.
+	type VetoOrigin = collective::EnsureMember<AccountId, TechnicalCollective>;
+	type CooloffPeriod = CooloffPeriod;
+	type PreimageByteDeposit = PreimageByteDeposit;
+	type Slash = Treasury;
+}
+
+type CouncilCollective = collective::Instance1;
+impl collective::Trait<CouncilCollective> for Runtime {
+	type Origin = Origin;
+	type Proposal = Call;
+	type Event = Event;
+}
+
+parameter_types! {
+	pub const CandidacyBond: Balance = 1 * DOLLARS;
+	pub const VotingBond: Balance = 5 * CENTS;
+	/// Daily council elections.
+	pub const TermDuration: BlockNumber = 24 * HOURS;
+	pub const DesiredMembers: u32 = 13;
+	pub const DesiredRunnersUp: u32 = 7;
+}
+
+impl elections_phragmen::Trait for Runtime {
+	type Event = Event;
+	type Currency = Balances;
+	type ChangeMembers = Council;
+
+	// TODO: add currency vote here
+	type CurrencyToVote = CurrencyToVote;
+	type CandidacyBond = CandidacyBond;
+	type VotingBond = VotingBond;
+	type LoserCandidate = Treasury;
+	type BadReport = Treasury;
+	type KickedMember = Treasury;
+	type DesiredMembers = DesiredMembers;
+	type DesiredRunnersUp = DesiredRunnersUp;
+	type TermDuration = TermDuration;
+}
+
+type TechnicalCollective = collective::Instance2;
+impl collective::Trait<TechnicalCollective> for Runtime {
+	type Origin = Origin;
+	type Proposal = Call;
+	type Event = Event;
+}
+
+impl membership::Trait<membership::Instance1> for Runtime {
+	type Event = Event;
+	type AddOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
+	type RemoveOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
+	type SwapOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
+	type ResetOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
+	type MembershipInitialized = TechnicalCommittee;
+	type MembershipChanged = TechnicalCommittee;
+}
+
+parameter_types! {
+	pub const ProposalBond: Permill = Permill::from_percent(5);
+	pub const ProposalBondMinimum: Balance = 20 * DOLLARS;
+	pub const SpendPeriod: BlockNumber = 6 * DAYS;
+	pub const Burn: Permill = Permill::from_percent(0);
+
+	pub const TipCountdown: BlockNumber = 1 * DAYS;
+	pub const TipFindersFee: Percent = Percent::from_percent(20);
+	pub const TipReportDepositBase: Balance = 1 * DOLLARS;
+	pub const TipReportDepositPerByte: Balance = 1 * CENTS;
+}
+
+impl treasury::Trait for Runtime {
+	type Currency = Balances;
+	type ApproveOrigin = collective::EnsureProportionAtLeast<_3, _5, AccountId, CouncilCollective>;
+	type RejectOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
+	type Tippers = ElectionsPhragmen;
+	type TipCountdown = TipCountdown;
+	type TipFindersFee = TipFindersFee;
+	type TipReportDepositBase = TipReportDepositBase;
+	type TipReportDepositPerByte = TipReportDepositPerByte;
+	type Event = Event;
+	type ProposalRejection = Treasury;
+	type ProposalBond = ProposalBond;
+	type ProposalBondMinimum = ProposalBondMinimum;
+	type SpendPeriod = SpendPeriod;
+	type Burn = Burn;
+}*/
+
+parameter_types! {
 	pub const ExistentialDeposit: u128 = 500;
 	pub const TransferFee: u128 = 0;
 	pub const CreationFee: u128 = 0;
@@ -242,7 +393,7 @@ impl balances::Trait for Runtime {
 	/// The type for recording an account's balance.
 	type Balance = Balance;
 	/// What to do if an account's free balance gets zeroed.
-	type OnFreeBalanceZero = ();
+	type OnFreeBalanceZero = Staking;
 	/// What to do if a new account is created.
 	type OnNewAccount = Indices;
 	/// The ubiquitous event type.
@@ -286,6 +437,7 @@ construct_runtime!(
 	{
 		// Basic stuff; balances is uncallable initially.
 		System: system::{Module, Call, Storage, Config, Event},
+		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
 
 		// Must be before session.
 		Babe: babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
@@ -298,10 +450,19 @@ construct_runtime!(
 
 		// Consensus support
 		Grandpa: grandpa::{Module, Call, Storage, Config, Event},
+		Staking: staking,
+		Session: session::{Module, Call, Storage, Event, Config<T>},
+
+		// TODO: Governance stuff; uncallable initially.
+		/*Democracy: democracy::{Module, Call, Storage, Config, Event<T>},
+		Council: collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
+		TechnicalCommittee: collective::<Instance2>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
+		ElectionsPhragmen: elections_phragmen::{Module, Call, Storage, Event<T>},
+		TechnicalMembership: membership::<Instance1>::{Module, Call, Storage, Event<T>, Config<T>},
+		Treasury: treasury::{Module, Call, Storage, Event<T>},*/
 
 		// Used for the module template in `./template.rs`
 		TemplateModule: template::{Module, Call, Storage, Event<T>},
-		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
 	}
 );
 
@@ -409,7 +570,7 @@ impl_runtime_apis! {
 
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-			opaque::SessionKeys::generate(seed)
+			SessionKeys::generate(seed)
 		}
 	}
 

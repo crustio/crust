@@ -10,4 +10,4 @@ if [ -z $CI_PROJECT_NAME ] ; then
 fi
 
 # do not need wasm for the alpha version
-# rustup target add wasm32-unknown-unknown --toolchain nightly
+rustup target add wasm32-unknown-unknown --toolchain nightly

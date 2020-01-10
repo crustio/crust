@@ -25,6 +25,27 @@ features = ['derive']
 package = 'parity-scale-codec'
 version = '1.0.0'
 
+[dependencies.collective]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-collective'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.democracy]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-democracy'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.elections-phragmen]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-elections-phragmen'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.frame-executive]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -36,6 +57,19 @@ default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
+
+[dependencies.membership]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-membership'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.treasury]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-treasury'
+branch = 'polkadot-master'
 
 [dependencies.grandpa]
 default-features = false
@@ -113,6 +147,12 @@ git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
+[dependencies.sp-staking]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.sp-std]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -145,6 +185,26 @@ package = 'frame-system'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
+[dependencies.session]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-session'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.staking]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-staking'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.pallet-staking-reward-curve]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.timestamp]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -166,8 +226,12 @@ std = [
     'babe-primitives/std',
     'balances/std',
     'codec/std',
+    'collective/std',
+    'elections-phragmen/std',
+    'democracy/std',
     'frame-executive/std',
     'frame-support/std',
+    'membership/std',
     'grandpa/std',
     'indices/std',
     'randomness-collective-flip/std',
@@ -181,12 +245,17 @@ std = [
     'sp-offchain/std',
     'sp-runtime/std',
     'sp-session/std',
+    'sp-staking/std',
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
     'sudo/std',
+    'staking/std',
+    'session/std',
+    'staking/std',
     'system/std',
     'timestamp/std',
+    'treasury/std',
     'transaction-payment/std',
 ]
 

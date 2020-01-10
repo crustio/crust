@@ -1,0 +1,25 @@
+name: Build Crust
+
+on: 
+  push:
+    branches: 
+      - master
+      - feature/*
+      - zikun/*
+
+jobs:
+  build:
+    name: Build Crust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          target: wasm32-unknown-unknown
+          override: true
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build

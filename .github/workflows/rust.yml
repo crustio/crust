@@ -10,12 +10,12 @@ on:
 jobs:
   build:
     name: Build Crust
-    runs-on: ubuntu-18.04-clang-9
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable-x86_64-unknown-linux-gnu
           target: wasm32-unknown-unknown
           override: true
       - name: Cargo build

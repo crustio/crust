@@ -7,14 +7,10 @@ on:
       - feature/*
       - zikun/*
 
-strategy:
-  matrix:
-    compiler: clang
-
 jobs:
   build:
     name: Build Crust
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04-clang-9
     steps:
       - uses: actions/checkout@master
       - uses: actions-rs/toolchain@v1

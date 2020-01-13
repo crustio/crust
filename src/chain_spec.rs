@@ -134,7 +134,7 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 	_enable_println: bool) -> GenesisConfig {
 
 	const ENDOWMENT: u128 = 1_000_000 * CRUS;
-	const STASH: u128 = 100 * CRUS;
+	const STASH: u128 = 10_000 * CRUS;
 
 	GenesisConfig {
 		system: Some(SystemConfig {
@@ -160,13 +160,13 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 		staking: Some(StakingConfig {
 			current_era: 0,
 			validator_count: 50,
-			minimum_validator_count: 4,
+			minimum_validator_count: 2,
 			stakers: initial_authorities
 				.iter()
 				.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
 				.collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
-			force_era: Forcing::ForceNone,
+			force_era: Forcing::NotForcing,
 			slash_reward_fraction: Perbill::from_percent(10),
 			.. Default::default()
 		}),

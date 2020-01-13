@@ -221,7 +221,7 @@ pallet_staking_reward_curve::build! {
 
 parameter_types! {
 	// Six sessions in an era (6 hours).
-	pub const SessionsPerEra: SessionIndex = 6;
+	pub const SessionsPerEra: SessionIndex = 2;
 	// 28 eras for unbonding (7 days).
 	pub const BondingDuration: staking::EraIndex = 28;
 	// 28 eras in which slashes can be cancelled (7 days).
@@ -250,8 +250,8 @@ impl staking::Trait for Runtime {
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type RewardRemainder = /*Treasury*/();
 	type Event = Event;
-	type Slash = ();
-	type Reward = /*Treasury*/();
+	type Slash = /*Treasury*/();
+	type Reward = ();
 	type SessionsPerEra = SessionsPerEra;
 	type BondingDuration = BondingDuration;
 	type SlashDeferDuration = SlashDeferDuration;

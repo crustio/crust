@@ -7,25 +7,34 @@
 
 /// For more guidance on Substrate modules, see the example module
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
-
 use frame_support::{decl_module, decl_storage, decl_event, dispatch::DispatchResult};
 use system::ensure_signed;
+use sp_std::vec::Vec;
+use crate::AccountId;
+
+#[cfg(feature = "std")]
+use serde::{self, Serialize, Deserialize};
+
+#[cfg(feature = "std")]
+#[derive(Serialize, Deserialize, Debug)]
+struct TeeIdentity {
+	pub_key: String,
+	account_id: AccountId,
+	validator_pub_key: String,
+	validator_account_id: AccountId,
+	sig: String,
+}
 
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
-	// TODO: Add other types and constants required configure this module.
-
 	/// The overarching event type.
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 // This module's storage items.
 decl_storage! {
-	trait Store for Module<T: Trait> as TemplateModule {
-		// Just a dummy storage item.
-		// Here we are declaring a StorageValue, `Something` as a Option<u32>
-		// `get(fn something)` is the default getter which returns either the stored `u32` or `None` if nothing stored
-		Something get(fn something): Option<u32>;
+	trait Store for Module<T: Trait> as TeeModule {
+		TeeIdentities get(tee_identities): map T::AccountId => Vec<u8>;
 	}
 }
 
@@ -37,19 +46,16 @@ decl_module! {
 		// this is needed only if you are using events in your module
 		fn deposit_event() = default;
 
-		// Just a dummy entry point.
-		// function that can be called by the external world as an extrinsics call
-		// takes a parameter of the type `AccountId`, stores it and emits an event
-		pub fn do_something(origin, something: u32) -> DispatchResult {
-			// TODO: You only need this if you want to check it was signed.
+		pub fn store_tee_identity(origin, tee_identity: Vec<u8>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			// TODO: add validation logic
 
-			// TODO: Code to execute when something calls this.
-			// For example: the following line stores the passed in u32 in the storage
-			Something::put(something);
+			// let tee_identity_struct: TeeIdentity = serde_json::from_str(&from_utf8(&tee_identity).unwrap()).unwrap();
 
-			// here we are raising the Something event
-			Self::deposit_event(RawEvent::SomethingStored(something, who));
+            // Store the tee identity
+            TeeIdentities::<T>::insert(who.clone(), &tee_identity);
+
+			Self::deposit_event(RawEvent::TeeIdentityStored(tee_identity, who));
 			Ok(())
 		}
 	}
@@ -57,10 +63,7 @@ decl_module! {
 
 decl_event!(
 	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
-		// Just a dummy event.
-		// Event `Something` is declared with a parameter of the type `u32` and `AccountId`
-		// To emit this event, we call the deposit funtion, from our runtime funtions
-		SomethingStored(u32, AccountId),
+		TeeIdentityStored(Vec<u8>, AccountId),
 	}
 );
 
@@ -111,7 +114,7 @@ mod tests {
 	impl Trait for Test {
 		type Event = ();
 	}
-	type TemplateModule = Module<Test>;
+	type TeeModule = Module<Test>;
 
 	// This function basically just builds a genesis storage key/value store according to
 	// our desired mockup.
@@ -122,11 +125,15 @@ mod tests {
 	#[test]
 	fn it_works_for_default_value() {
 		new_test_ext().execute_with(|| {
-			// Just a dummy test for the dummy funtion `do_something`
-			// calling the `do_something` function with a value 42
-			assert_ok!(TemplateModule::do_something(Origin::signed(1), 42));
-			// asserting that the stored value is equal to what we stored
-			assert_eq!(TemplateModule::something(), Some(42));
+			let test_tee_identity =
+			"{\
+			 \"pub_key\":\"pub\",\
+			 \"account_id\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\
+			 \"validator_pub_key\":\"pub_v\",\
+			 \"validator_account_id\":\"account_v\",\
+			 \"sig\":\"sig\"\
+			 }";
+			assert_ok!(TeeModule::store_tee_identity(Origin::signed(1), test_tee_identity.as_bytes().to_vec()));
 		});
 	}
 }

@@ -1,3 +1,10 @@
+[dependencies.authorship]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-authorship'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.babe]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -75,6 +82,13 @@ branch = 'polkadot-master'
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'pallet-grandpa'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.im-online]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-im-online'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
@@ -233,6 +247,7 @@ std = [
     'frame-support/std',
     'membership/std',
     'grandpa/std',
+    'im-online/std',
     'indices/std',
     'randomness-collective-flip/std',
     'safe-mix/std',

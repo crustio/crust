@@ -1,9 +1,23 @@
-[dependencies.aura]
+[dependencies.authorship]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
-package = 'pallet-aura'
+package = 'pallet-authorship'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
+
+[dependencies.babe]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-babe'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.babe-primitives]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'sp-consensus-babe'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '0.8'
 
 [dependencies.balances]
 default-features = false
@@ -18,6 +32,27 @@ features = ['derive']
 package = 'parity-scale-codec'
 version = '1.0.0'
 
+[dependencies.collective]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-collective'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.democracy]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-democracy'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.elections-phragmen]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-elections-phragmen'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.frame-executive]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -30,10 +65,30 @@ git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
+[dependencies.membership]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-membership'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.treasury]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-treasury'
+branch = 'polkadot-master'
+
 [dependencies.grandpa]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'pallet-grandpa'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.im-online]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-im-online'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
@@ -71,12 +126,6 @@ default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 
-[dependencies.sp-consensus-aura]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-rev = '3e651110aa06aa835790df63410a29676243fc54'
-version = '0.8'
-
 [dependencies.sp-core]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -107,6 +156,12 @@ rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
 [dependencies.sp-session]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.sp-staking]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
@@ -144,6 +199,26 @@ package = 'frame-system'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
+[dependencies.session]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-session'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.staking]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-staking'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.pallet-staking-reward-curve]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.timestamp]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -161,31 +236,41 @@ version = '2.0.0'
 [features]
 default = ['std']
 std = [
-    'aura/std',
+    'babe/std',
+    'babe-primitives/std',
     'balances/std',
     'codec/std',
+    'collective/std',
+    'elections-phragmen/std',
+    'democracy/std',
     'frame-executive/std',
     'frame-support/std',
+    'membership/std',
     'grandpa/std',
+    'im-online/std',
     'indices/std',
     'randomness-collective-flip/std',
     'safe-mix/std',
     'serde',
     'sp-api/std',
     'sp-block-builder/std',
-    'sp-consensus-aura/std',
     'sp-core/std',
     'sp-inherents/std',
     'sp-io/std',
     'sp-offchain/std',
     'sp-runtime/std',
     'sp-session/std',
+    'sp-staking/std',
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
     'sudo/std',
+    'staking/std',
+    'session/std',
+    'staking/std',
     'system/std',
     'timestamp/std',
+    'treasury/std',
     'transaction-payment/std',
 ]
 

@@ -1,13 +1,17 @@
 use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
-	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, IndicesConfig, SystemConfig, WASM_BINARY, Signature
+	BalancesConfig, GenesisConfig, SudoConfig, IndicesConfig,
+	SystemConfig, WASM_BINARY, SessionConfig, StakingConfig,
+	SessionKeys, ImOnlineId, StakerStatus
 };
-use sp_consensus_aura::sr25519::{AuthorityId as AuraId};
+use crust_runtime::constants::{*, currency::CRUS};
+use sp_consensus_babe::{AuthorityId as BabeId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
 use sc_service;
-use sp_runtime::traits::{Verify, IdentifyAccount};
+use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
+use pallet_staking::Forcing;
 
+const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server
 //const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
@@ -41,12 +45,24 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Helper function to generate an authority key for Aura
-pub fn get_authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
+
+/// Helper function to generate stash, controller and session key from seed
+pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId) {
 	(
-		get_from_seed::<AuraId>(s),
-		get_from_seed::<GrandpaId>(s),
+		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
+		get_account_id_from_seed::<sr25519::Public>(seed),
+		get_from_seed::<GrandpaId>(seed),
+		get_from_seed::<BabeId>(seed),
+		get_from_seed::<ImOnlineId>(seed)
 	)
+}
+
+fn session_keys(
+	grandpa: GrandpaId,
+	babe: BabeId,
+	im_online: ImOnlineId
+) -> SessionKeys {
+	SessionKeys { grandpa, babe, im_online }
 }
 
 impl Alternative {
@@ -69,9 +85,9 @@ impl Alternative {
 				true),
 				vec![],
 				None,
+				Some(DEFAULT_PROTOCOL_ID),
 				None,
-				None,
-				None
+				Default::default(),
 			),
 			Alternative::LocalTestnet => ChainSpec::from_genesis(
 				"Local Testnet",
@@ -98,9 +114,9 @@ impl Alternative {
 				true),
 				vec![],
 				None,
+				Some(DEFAULT_PROTOCOL_ID),
 				None,
-				None,
-				None
+				Default::default()
 			),
 		})
 	}
@@ -114,10 +130,14 @@ impl Alternative {
 	}
 }
 
-fn testnet_genesis(initial_authorities: Vec<(AuraId, GrandpaId)>,
+fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool) -> GenesisConfig {
+
+	const ENDOWMENT: u128 = 1_000_000 * CRUS;
+	const STASH: u128 = 20_000 * CRUS;
+
 	GenesisConfig {
 		system: Some(SystemConfig {
 			code: WASM_BINARY.to_vec(),
@@ -127,17 +147,33 @@ fn testnet_genesis(initial_authorities: Vec<(AuraId, GrandpaId)>,
 			ids: endowed_accounts.clone(),
 		}),
 		balances: Some(BalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|k|(k, 1 << 60)).collect(),
+			balances: endowed_accounts.iter().cloned().map(|k|(k, ENDOWMENT)).collect(),
 			vesting: vec![],
 		}),
 		sudo: Some(SudoConfig {
 			key: root_key,
 		}),
-		aura: Some(AuraConfig {
-			authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+		session: Some(SessionConfig {
+			keys: initial_authorities.iter().map(|x| (
+				x.0.clone(),
+				session_keys(x.2.clone(), x.3.clone(), x.4.clone()),
+			)).collect::<Vec<_>>(),
 		}),
-		grandpa: Some(GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+		staking: Some(StakingConfig {
+			current_era: 0,
+			validator_count: 50,
+			minimum_validator_count: 2,
+			stakers: initial_authorities
+				.iter()
+				.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
+				.collect(),
+			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
+			force_era: Forcing::NotForcing,
+			slash_reward_fraction: Perbill::from_percent(10),
+			.. Default::default()
 		}),
+		babe: Some(Default::default()),
+		grandpa: Some(Default::default()),
+		im_online: Some(Default::default())
 	}
 }

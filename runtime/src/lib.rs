@@ -12,11 +12,14 @@ use sp_std::prelude::*;
 use sp_core::OpaqueMetadata;
 use sp_runtime::{
 	ApplyExtrinsicResult, create_runtime_str, generic,
-	impl_opaque_keys, Percent, Permill, Perbill, RuntimeDebug,
+	impl_opaque_keys, Perbill,
 };
-use sp_runtime::traits::{NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, SignedExtension, OpaqueKeys, ConvertInto, Convert, SaturatedConversion};
+use sp_runtime::traits::{
+	NumberFor, BlakeTwo256, Block as BlockT, StaticLookup,
+	OpaqueKeys, ConvertInto, Convert, SaturatedConversion
+};
 use sp_runtime::curve::PiecewiseLinear;
-use sp_runtime::transaction_validity::{TransactionValidity, InvalidTransaction, TransactionValidityError};
+use sp_runtime::transaction_validity::TransactionValidity;
 
 use sp_api::impl_runtime_apis;
 use grandpa::{fg_primitives, AuthorityList as GrandpaAuthorityList};
@@ -37,10 +40,12 @@ pub use frame_support::{
 	traits::{ Randomness, Currency},
 	weights::Weight,
 };
+pub use im_online::sr25519::AuthorityId as ImOnlineId;
+use system::offchain::TransactionSubmitter;
 
 /// Constant values used within the runtime.
 pub mod constants;
-use constants::{*, time::*, currency::*};
+use constants::{*, time::*};
 
 /// Used for the module template in `./template.rs`
 mod template;
@@ -68,6 +73,7 @@ impl_opaque_keys! {
 	pub struct SessionKeys {
 		pub grandpa: Grandpa,
 		pub babe: Babe,
+		pub im_online: ImOnline,
 	}
 }
 
@@ -148,6 +154,21 @@ impl babe::Trait for Runtime {
 	type EpochChangeTrigger = babe::ExternalTrigger;
 }
 
+type SubmitTransaction = TransactionSubmitter<ImOnlineId, Runtime, UncheckedExtrinsic>;
+
+parameter_types! {
+	pub const SessionDuration: BlockNumber = EPOCH_DURATION_IN_BLOCKS as _;
+}
+
+impl im_online::Trait for Runtime {
+	type AuthorityId = ImOnlineId;
+	type Event = Event;
+	type Call = Call;
+	type SubmitTransaction = SubmitTransaction;
+	type SessionDuration = SessionDuration;
+	type ReportUnresponsiveness = /*Offences*/();
+}
+
 impl grandpa::Trait for Runtime {
 	type Event = Event;
 }
@@ -175,7 +196,7 @@ impl timestamp::Trait for Runtime {
 	type MinimumPeriod = MinimumPeriod;
 }
 
-/*parameter_types! {
+parameter_types! {
 	pub const UncleGenerations: u32 = 0;
 }
 
@@ -185,7 +206,7 @@ impl authorship::Trait for Runtime {
 	type UncleGenerations = UncleGenerations;
 	type FilterUncle = ();
 	type EventHandler = (Staking, ImOnline);
-}*/
+}
 
 parameter_types! {
 	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
@@ -262,7 +283,7 @@ impl staking::Trait for Runtime {
 	type RewardCurve = RewardCurve;
 }
 
-// TODO: add staking and other pallets
+// TODO: self-governance stuff
 /*
 parameter_types! {
 	pub const LaunchPeriod: BlockNumber = 7 * DAYS;
@@ -449,11 +470,14 @@ construct_runtime!(
 		Sudo: sudo,
 
 		// Consensus support
-		Grandpa: grandpa::{Module, Call, Storage, Config, Event},
+		Authorship: authorship::{Module, Call, Storage},
 		Staking: staking,
+		Grandpa: grandpa::{Module, Call, Storage, Config, Event},
 		Session: session::{Module, Call, Storage, Event, Config<T>},
+		ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
 
 		// TODO: Governance stuff; uncallable initially.
+		// Do not need right now, will add in the future
 		/*Democracy: democracy::{Module, Call, Storage, Config, Event<T>},
 		Council: collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
 		TechnicalCommittee: collective::<Instance2>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},

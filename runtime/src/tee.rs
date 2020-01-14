@@ -1,16 +1,9 @@
-/// A runtime module template with necessary imports
-
-/// Feel free to remove or edit this file as needed.
-/// If you change the name of this file, make sure to update its references in runtime/src/lib.rs
-/// If you remove this file, you can remove those references
-
-
-/// For more guidance on Substrate modules, see the example module
-/// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 use frame_support::{decl_module, decl_storage, decl_event, dispatch::DispatchResult};
 use system::ensure_signed;
 use sp_std::vec::Vec;
-use crate::AccountId;
+
+/// Constant values used within the runtime.
+use crate::constants::AccountId;
 
 #[cfg(feature = "std")]
 use serde::{self, Serialize, Deserialize};
@@ -42,7 +35,7 @@ pub trait Trait: system::Trait {
 
 // This module's storage items.
 decl_storage! {
-	trait Store for Module<T: Trait> as TeeModule {
+	trait Store for Module<T: Trait> as Tee {
 		TeeIdentities get(tee_identities): map T::AccountId => Option<Vec<u8>>;
 		WorkReports get(work_reports): map T::AccountId => Option<Vec<u8>>;
 	}
@@ -144,7 +137,7 @@ mod tests {
         type Event = ();
     }
 
-    type TeeModule = Module<Test>;
+    type Tee = Module<Test>;
 
     // This function basically just builds a genesis storage key/value store according to
     // our desired mockup.
@@ -162,8 +155,8 @@ mod tests {
 			 \"validator_account_id\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\
 			 \"sig\":\"sig\"\
 			 }";
-            assert_ok!(TeeModule::store_tee_identity(Origin::signed(1), tee_identity.as_bytes().to_vec()));
-			let tee_identity_out = TeeModule::tee_identities(1).unwrap();
+            assert_ok!(Tee::store_tee_identity(Origin::signed(1), tee_identity.as_bytes().to_vec()));
+			let tee_identity_out = Tee::tee_identities(1).unwrap();
 			assert_eq!(tee_identity, sp_std::str::from_utf8(&tee_identity_out).unwrap());
         });
     }
@@ -177,8 +170,8 @@ mod tests {
 			 \"workload\":1000000,\
 			 \"sig\":\"sig\"\
 			 }";
-			assert_ok!(TeeModule::store_work_report(Origin::signed(1), work_report.as_bytes().to_vec()));
-			let work_report_out = TeeModule::work_reports(1).unwrap();
+			assert_ok!(Tee::store_work_report(Origin::signed(1), work_report.as_bytes().to_vec()));
+			let work_report_out = Tee::work_reports(1).unwrap();
 			assert_eq!(work_report, sp_std::str::from_utf8(&work_report_out).unwrap());
 		});
 	}

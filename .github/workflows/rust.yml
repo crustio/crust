@@ -1,0 +1,26 @@
+name: Build Crust
+
+on: 
+  push:
+    branches: 
+      - master
+      - feature/*
+
+jobs:
+  build:
+    name: Build Crust
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get remove -y clang-6.0 libclang-common-6.0-dev libclang1-6.0 libllvm6.0
+      - run: sudo apt update && sudo apt install -y cmake pkg-config libssl-dev git gcc build-essential clang libclang-dev
+      - uses: actions/checkout@master
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2019-12-20-x86_64-unknown-linux-gnu
+          target: wasm32-unknown-unknown
+          override: true
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: build

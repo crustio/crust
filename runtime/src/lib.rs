@@ -485,9 +485,9 @@ construct_runtime!(
 		// Consensus support
 		Authorship: authorship::{Module, Call, Storage},
 		Staking: staking,
+		Session: session::{Module, Call, Storage, Event, Config<T>},
 		FinalityTracker: finality_tracker::{Module, Call, Inherent},
 		Grandpa: grandpa::{Module, Call, Storage, Config, Event},
-		Session: session::{Module, Call, Storage, Event, Config<T>},
 		ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
 		AuthorityDiscovery: authority_discovery::{Module, Call, Config},
 

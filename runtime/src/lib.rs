@@ -41,6 +41,7 @@ pub use frame_support::{
 	weights::Weight,
 };
 pub use im_online::sr25519::AuthorityId as ImOnlineId;
+pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 use system::offchain::TransactionSubmitter;
 
 /// Constant values used within the runtime.
@@ -65,8 +66,6 @@ pub mod opaque {
 	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 	/// Opaque block identifier type.
 	pub type BlockId = generic::BlockId<Block>;
-
-	pub type SessionHandlers = (Grandpa, Babe);
 }
 
 impl_opaque_keys! {
@@ -74,6 +73,7 @@ impl_opaque_keys! {
 		pub grandpa: Grandpa,
 		pub babe: Babe,
 		pub im_online: ImOnline,
+		pub authority_discovery: AuthorityDiscovery,
 	}
 }
 
@@ -154,6 +154,8 @@ impl babe::Trait for Runtime {
 	type EpochChangeTrigger = babe::ExternalTrigger;
 }
 
+impl authority_discovery::Trait for Runtime {}
+
 type SubmitTransaction = TransactionSubmitter<ImOnlineId, Runtime, UncheckedExtrinsic>;
 
 parameter_types! {
@@ -171,6 +173,17 @@ impl im_online::Trait for Runtime {
 
 impl grandpa::Trait for Runtime {
 	type Event = Event;
+}
+
+parameter_types! {
+	pub const WindowSize: BlockNumber = finality_tracker::DEFAULT_WINDOW_SIZE.into();
+	pub const ReportLatency: BlockNumber = finality_tracker::DEFAULT_REPORT_LATENCY.into();
+}
+
+impl finality_tracker::Trait for Runtime {
+	type OnFinalizationStalled = ();
+	type WindowSize = WindowSize;
+	type ReportLatency = ReportLatency;
 }
 
 impl indices::Trait for Runtime {
@@ -472,9 +485,11 @@ construct_runtime!(
 		// Consensus support
 		Authorship: authorship::{Module, Call, Storage},
 		Staking: staking,
+		FinalityTracker: finality_tracker::{Module, Call, Inherent},
 		Grandpa: grandpa::{Module, Call, Storage, Config, Event},
 		Session: session::{Module, Call, Storage, Event, Config<T>},
 		ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
+		AuthorityDiscovery: authority_discovery::{Module, Call, Config},
 
 		// TODO: Governance stuff; uncallable initially.
 		// Do not need right now, will add in the future
@@ -589,6 +604,12 @@ impl_runtime_apis! {
 				randomness: Babe::randomness(),
 				secondary_slots: true,
 			}
+		}
+	}
+
+	impl authority_discovery_primitives::AuthorityDiscoveryApi<Block> for Runtime {
+		fn authorities() -> Vec<AuthorityDiscoveryId> {
+			AuthorityDiscovery::authorities()
 		}
 	}
 

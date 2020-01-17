@@ -5,6 +5,20 @@ package = 'pallet-authorship'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
+[dependencies.authority-discovery]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-authority-discovery'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.authority-discovery-primitives]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'sp-authority-discovery'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
 [dependencies.babe]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -62,6 +76,13 @@ version = '2.0.0'
 [dependencies.frame-support]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.finality-tracker]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-finality-tracker'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
@@ -236,6 +257,8 @@ version = '2.0.0'
 [features]
 default = ['std']
 std = [
+    'authority-discovery-primitives/std',
+    'authority-discovery/std',
     'babe/std',
     'babe-primitives/std',
     'balances/std',
@@ -247,6 +270,7 @@ std = [
     'frame-support/std',
     'membership/std',
     'grandpa/std',
+    'finality-tracker/std',
     'im-online/std',
     'indices/std',
     'randomness-collective-flip/std',

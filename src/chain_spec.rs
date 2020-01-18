@@ -2,7 +2,8 @@ use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
 	BalancesConfig, GenesisConfig, SudoConfig, IndicesConfig,
 	SystemConfig, WASM_BINARY, SessionConfig, StakingConfig,
-	SessionKeys, ImOnlineId, StakerStatus
+	AuthorityDiscoveryConfig, SessionKeys, ImOnlineId, AuthorityDiscoveryId,
+	StakerStatus
 };
 use crust_runtime::constants::{*, currency::CRUS};
 use sp_consensus_babe::{AuthorityId as BabeId};
@@ -47,22 +48,24 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 
 
 /// Helper function to generate stash, controller and session key from seed
-pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId) {
+pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId) {
 	(
 		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
 		get_account_id_from_seed::<sr25519::Public>(seed),
 		get_from_seed::<GrandpaId>(seed),
 		get_from_seed::<BabeId>(seed),
-		get_from_seed::<ImOnlineId>(seed)
+		get_from_seed::<ImOnlineId>(seed),
+		get_from_seed::<AuthorityDiscoveryId>(seed),
 	)
 }
 
 fn session_keys(
 	grandpa: GrandpaId,
 	babe: BabeId,
-	im_online: ImOnlineId
+	im_online: ImOnlineId,
+	authority_discovery: AuthorityDiscoveryId
 ) -> SessionKeys {
-	SessionKeys { grandpa, babe, im_online }
+	SessionKeys { grandpa, babe, im_online, authority_discovery }
 }
 
 impl Alternative {
@@ -130,7 +133,7 @@ impl Alternative {
 	}
 }
 
-fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId)>,
+fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool) -> GenesisConfig {
@@ -156,12 +159,12 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 		session: Some(SessionConfig {
 			keys: initial_authorities.iter().map(|x| (
 				x.0.clone(),
-				session_keys(x.2.clone(), x.3.clone(), x.4.clone()),
+				session_keys(x.2.clone(), x.3.clone(), x.4.clone(), x.5.clone()),
 			)).collect::<Vec<_>>(),
 		}),
 		staking: Some(StakingConfig {
 			current_era: 0,
-			validator_count: 50,
+			validator_count: 4,
 			minimum_validator_count: 2,
 			stakers: initial_authorities
 				.iter()
@@ -174,6 +177,9 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 		}),
 		babe: Some(Default::default()),
 		grandpa: Some(Default::default()),
-		im_online: Some(Default::default())
+		im_online: Some(Default::default()),
+		authority_discovery: Some(AuthorityDiscoveryConfig {
+			keys: vec![],
+		})
 	}
 }

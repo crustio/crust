@@ -1,30 +1,36 @@
-use frame_support::{decl_module, decl_storage, decl_event, dispatch::DispatchResult};
+use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
 use system::ensure_signed;
 use sp_std::vec::Vec;
-
-/// Constant values used within the runtime.
-use crate::constants::AccountId;
-
-#[cfg(feature = "std")]
-use serde::{self, Serialize, Deserialize};
+use sp_std::str;
+use codec::{Encode, Decode};
 
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Debug)]
-struct TeeIdentity {
-    pub_key: String,
-    account_id: AccountId,
-    validator_pub_key: String,
-    validator_account_id: AccountId,
-    sig: String,
+use serde::{Deserialize, Serialize};
+
+/// Define TEE basic elements
+type PubKey = Vec<u8>;
+type Signature = Vec<u8>;
+type MerkleRoot = Vec<u8>;
+
+// TODO: add timestamp
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct Identity<T> {
+    pub_key: PubKey,
+    account_id: T,
+    validator_pub_key: PubKey,
+    validator_account_id: T,
+    sig: Signature,
 }
 
-#[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Debug)]
-struct TeeWorkReport{
-	pub_key: String,
-	empty_root: String,
+// TODO: add timestamp
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct WorkReport{
+	pub_key: PubKey,
+	empty_root: MerkleRoot,
 	workload: u64,
-	sig: String,
+	sig: Signature,
 }
 
 /// The module's configuration trait.
@@ -36,8 +42,8 @@ pub trait Trait: system::Trait {
 // This module's storage items.
 decl_storage! {
 	trait Store for Module<T: Trait> as Tee {
-		TeeIdentities get(tee_identities): map T::AccountId => Option<Vec<u8>>;
-		WorkReports get(work_reports): map T::AccountId => Option<Vec<u8>>;
+		TeeIdentities get(tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
+		WorkReports get(work_reports): map T::AccountId => Option<WorkReport>;
 	}
 }
 
@@ -49,42 +55,55 @@ decl_module! {
 		// this is needed only if you are using events in your module
 		fn deposit_event() = default;
 
-		pub fn store_tee_identity(origin, tee_identity: Vec<u8>) -> DispatchResult {
-			// TODO: add validation logic
-			let who = ensure_signed(origin)?;
+		fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
+		    let who = ensure_signed(origin)?;
 
-            if !TeeIdentities::<T>::exists(&who) || TeeIdentities::<T>::get(&who).unwrap() != tee_identity {
+            let applier = &identity.account_id;
+            let validator = &identity.validator_account_id;
+
+            // 1. TODO: Extract sig_hash from sig using v_pub_key
+            // 2. TODO: Ensure identity report is legal
+
+            // 3. Ensure who is applier
+            ensure!(&who == applier, "Tee applier must be the extrinsic sender");
+
+            // 4. If TeeIdentities contains v_account_id
+            ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
+
+            // 5. Applier is new add or needs to be updated
+            if !<TeeIdentities<T>>::exists(validator) || <TeeIdentities<T>>::get(validator).unwrap() != identity {
                 // Store the tee identity
-                TeeIdentities::<T>::insert(who.clone(), &tee_identity);
+                <TeeIdentities<T>>::insert(validator, &identity);
 
-			    // Emit event
-			    Self::deposit_event(RawEvent::TeeIdentityStored(tee_identity, who));
+                // Emit event
+                Self::deposit_event(RawEvent::RegisterIdentity(who, identity));
             }
 
-			Ok(())
+            Ok(())
 		}
 
-		pub fn store_work_report(origin, work_report: Vec<u8>) -> DispatchResult {
-			// TODO: add validation logic
-			let who = ensure_signed(origin)?;
+		fn report_works(origin, work_report: WorkReport) -> DispatchResult {
+		    // TODO: add validation logic
+            let who = ensure_signed(origin)?;
 
-			if !WorkReports::<T>::exists(&who) || WorkReports::<T>::get(&who).unwrap() != work_report {
-			    // Store the tee identity
-                WorkReports::<T>::insert(who.clone(), &work_report);
 
-			    // Emit event
-			    Self::deposit_event(RawEvent::WorkReportStored(work_report, who));
-			}
+            if !WorkReports::<T>::exists(&who) || WorkReports::<T>::get(&who).unwrap() != work_report {
+                // Store the tee identity
+                <WorkReports<T>>::insert(&who, &work_report);
 
-			Ok(())
+                // Emit event
+                Self::deposit_event(RawEvent::ReportWorks(who, work_report));
+            }
+
+            Ok(())
 		}
 	}
 }
 
 decl_event!(
 	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
-		TeeIdentityStored(Vec<u8>, AccountId),
-		WorkReportStored(Vec<u8>, AccountId),
+		RegisterIdentity(AccountId, Identity<AccountId>),
+		ReportWorks(AccountId, WorkReport),
 	}
 );
 
@@ -96,8 +115,12 @@ mod tests {
     use sp_core::H256;
     use frame_support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight};
     use sp_runtime::{
-        traits::{BlakeTwo256, IdentityLookup}, testing::Header, Perbill,
+        traits::{BlakeTwo256, IdentityLookup}, testing::Header, Perbill
     };
+    use sp_core::crypto::AccountId32;
+    use keyring::Sr25519Keyring;
+
+    type AccountId = AccountId32;
 
     impl_outer_origin! {
 		pub enum Origin for Test {}
@@ -121,7 +144,7 @@ mod tests {
         type BlockNumber = u64;
         type Hash = H256;
         type Hashing = BlakeTwo256;
-        type AccountId = u64;
+        type AccountId = AccountId;
         type Lookup = IdentityLookup<Self::AccountId>;
         type Header = Header;
         type Event = ();
@@ -142,26 +165,43 @@ mod tests {
     // This function basically just builds a genesis storage key/value store according to
     // our desired mockup.
     fn new_test_ext() -> sp_io::TestExternalities {
-        system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+        let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+        let tee_ids = [
+            Sr25519Keyring::Alice.to_account_id()
+        ];
+
+        GenesisConfig::<Test> {
+            tee_identities: tee_ids
+                .iter()
+                .map(|x| (x.clone(), Default::default()))
+                .collect()
+        }.assimilate_storage(&mut t).unwrap();
+
+        t.into()
     }
 
     #[test]
     fn test_for_store_tee_identity() {
         new_test_ext().execute_with(|| {
-            let tee_identity = "{\
-			 \"pub_key\":\"pub\",\
-			 \"account_id\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\
-			 \"validator_pub_key\":\"pub_v\",\
-			 \"validator_account_id\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\
-			 \"sig\":\"sig\"\
-			 }";
-            assert_ok!(Tee::store_tee_identity(Origin::signed(1), tee_identity.as_bytes().to_vec()));
-			let tee_identity_out = Tee::tee_identities(1).unwrap();
-			assert_eq!(tee_identity, sp_std::str::from_utf8(&tee_identity_out).unwrap());
+            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+
+            let id = Identity {
+                pub_key: "pub_key".as_bytes().to_vec(),
+                account_id: account.clone(),
+                validator_pub_key: "v_pub_key".as_bytes().to_vec(),
+                validator_account_id: account.clone(),
+                sig: "sig".as_bytes().to_vec()
+            };
+
+            assert_ok!(Tee::register_identity(Origin::signed(account.clone()), id.clone()));
+
+            let id_registered = Tee::tee_identities(account.clone()).unwrap();
+
+			assert_eq!(id.clone(), id_registered);
         });
     }
 
-	#[test]
+	/*#[test]
 	fn test_for_store_tee_work_report() {
 		new_test_ext().execute_with(|| {
 			let work_report = "{\
@@ -174,5 +214,5 @@ mod tests {
 			let work_report_out = Tee::work_reports(1).unwrap();
 			assert_eq!(work_report, sp_std::str::from_utf8(&work_report_out).unwrap());
 		});
-	}
+	}*/
 }

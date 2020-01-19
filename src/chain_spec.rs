@@ -2,8 +2,8 @@ use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
 	BalancesConfig, GenesisConfig, SudoConfig, IndicesConfig,
 	SystemConfig, WASM_BINARY, SessionConfig, StakingConfig,
-	AuthorityDiscoveryConfig, SessionKeys, ImOnlineId, AuthorityDiscoveryId,
-	StakerStatus
+	AuthorityDiscoveryConfig, SessionKeys, ImOnlineId,
+	AuthorityDiscoveryId, TeeConfig, StakerStatus
 };
 use crust_runtime::constants::{*, currency::CRUS};
 use sp_consensus_babe::{AuthorityId as BabeId};
@@ -180,6 +180,12 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 		im_online: Some(Default::default()),
 		authority_discovery: Some(AuthorityDiscoveryConfig {
 			keys: vec![],
+		}),
+		tee: Some(TeeConfig {
+			tee_identities: endowed_accounts
+				.iter()
+				.map(|x| (x.clone(), Default::default()))
+				.collect()
 		})
 	}
 }

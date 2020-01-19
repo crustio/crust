@@ -501,7 +501,7 @@ construct_runtime!(
 		Treasury: treasury::{Module, Call, Storage, Event<T>},*/
 
 		// Used for the module tee in `./tee.rs`
-		Tee: tee::{Module, Call, Storage, Event<T>},
+		Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
 

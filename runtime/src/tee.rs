@@ -71,9 +71,9 @@ decl_module! {
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
             // 5. Applier is new add or needs to be updated
-            if !<TeeIdentities<T>>::exists(validator) || <TeeIdentities<T>>::get(validator).unwrap() != identity {
+            if !<TeeIdentities<T>>::exists(applier) || <TeeIdentities<T>>::get(applier).unwrap() != identity {
                 // Store the tee identity
-                <TeeIdentities<T>>::insert(validator, &identity);
+                <TeeIdentities<T>>::insert(applier, &identity);
 
                 // Emit event
                 Self::deposit_event(RawEvent::RegisterIdentity(who, identity));
@@ -181,23 +181,43 @@ mod tests {
     }
 
     #[test]
-    fn test_for_store_tee_identity() {
+    fn test_for_register_identity_success() {
         new_test_ext().execute_with(|| {
-            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+            // Alice is validator in genesis block
+            let applier: AccountId32 = Sr25519Keyring::Bob.to_account_id();
+            let validator: AccountId32 = Sr25519Keyring::Alice.to_account_id();
 
             let id = Identity {
-                pub_key: "pub_key".as_bytes().to_vec(),
-                account_id: account.clone(),
-                validator_pub_key: "v_pub_key".as_bytes().to_vec(),
-                validator_account_id: account.clone(),
-                sig: "sig".as_bytes().to_vec()
+                pub_key: "pub_key_bob".as_bytes().to_vec(),
+                account_id: applier.clone(),
+                validator_pub_key: "pub_key_alice".as_bytes().to_vec(),
+                validator_account_id: validator.clone(),
+                sig: "sig_alice".as_bytes().to_vec()
             };
 
-            assert_ok!(Tee::register_identity(Origin::signed(account.clone()), id.clone()));
+            assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
 
-            let id_registered = Tee::tee_identities(account.clone()).unwrap();
+            let id_registered = Tee::tee_identities(applier.clone()).unwrap();
 
 			assert_eq!(id.clone(), id_registered);
+        });
+    }
+
+    #[test]
+    fn test_for_register_identity_failed() {
+        new_test_ext().execute_with(|| {
+            // Bob is not validator before
+            let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
+
+            let id = Identity {
+                pub_key: "pub_key_bob".as_bytes().to_vec(),
+                account_id: account.clone(),
+                validator_pub_key: "pub_key_bob".as_bytes().to_vec(),
+                validator_account_id: account.clone(),
+                sig: "sig_bob".as_bytes().to_vec()
+            };
+
+            assert!(Tee::register_identity(Origin::signed(account.clone()), id.clone()).is_err());
         });
     }
 

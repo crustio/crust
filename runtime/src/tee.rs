@@ -83,17 +83,16 @@ decl_module! {
 		}
 
 		fn report_works(origin, work_report: WorkReport) -> DispatchResult {
-		    // TODO: add validation logic
             let who = ensure_signed(origin)?;
 
+            // 1. Ensure reporter is verified
+            ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
-            if !WorkReports::<T>::exists(&who) || WorkReports::<T>::get(&who).unwrap() != work_report {
-                // Store the tee identity
-                <WorkReports<T>>::insert(&who, &work_report);
+            // 2. Upsert works
+            <WorkReports<T>>::insert(&who, &work_report);
 
-                // Emit event
-                Self::deposit_event(RawEvent::ReportWorks(who, work_report));
-            }
+            // 3. Emit event
+            Self::deposit_event(RawEvent::ReportWorks(who, work_report));
 
             Ok(())
 		}
@@ -221,18 +220,35 @@ mod tests {
         });
     }
 
-	/*#[test]
-	fn test_for_store_tee_work_report() {
+	#[test]
+	fn test_for_report_works_success() {
 		new_test_ext().execute_with(|| {
-			let work_report = "{\
-			 \"pub_key\":\"pub\",\
-			 \"empty_root\":\"XXXXXXXXXX\",\
-			 \"workload\":1000000,\
-			 \"sig\":\"sig\"\
-			 }";
-			assert_ok!(Tee::store_work_report(Origin::signed(1), work_report.as_bytes().to_vec()));
-			let work_report_out = Tee::work_reports(1).unwrap();
-			assert_eq!(work_report, sp_std::str::from_utf8(&work_report_out).unwrap());
+            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+
+            let works = WorkReport {
+                pub_key: "pub_key_alice".as_bytes().to_vec(),
+                empty_root: "merkle_root_alice".as_bytes().to_vec(),
+                workload: 1000,
+                sig: "sig_key_alice".as_bytes().to_vec()
+            };
+
+			assert_ok!(Tee::report_works(Origin::signed(account), works));
 		});
-	}*/
+	}
+
+    #[test]
+    fn test_for_report_works_failed() {
+        new_test_ext().execute_with(|| {
+            let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
+
+            let works = WorkReport {
+                pub_key: "pub_key_bob".as_bytes().to_vec(),
+                empty_root: "merkle_root_bob".as_bytes().to_vec(),
+                workload: 2000,
+                sig: "sig_key_bob".as_bytes().to_vec()
+            };
+
+            assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        });
+    }
 }

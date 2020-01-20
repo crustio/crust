@@ -71,7 +71,7 @@ decl_module! {
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
             // 5. Applier is new add or needs to be updated
-            if !<TeeIdentities<T>>::exists(validator) || <TeeIdentities<T>>::get(validator).unwrap() != identity {
+            if !<TeeIdentities<T>>::exists(applier) || <TeeIdentities<T>>::get(applier).unwrap() != identity {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
 

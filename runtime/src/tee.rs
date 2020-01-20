@@ -67,10 +67,13 @@ decl_module! {
             // 3. Ensure who is applier
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
-            // 4. If TeeIdentities contains v_account_id
+            // 4. applier cannot be validator
+            ensure!(&applier != &validator, "You cannot verify yourself");
+
+            // 5. If TeeIdentities contains v_account_id
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
-            // 5. Applier is new add or needs to be updated
+            // 6. Applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
@@ -214,6 +217,24 @@ mod tests {
                 validator_pub_key: "pub_key_bob".as_bytes().to_vec(),
                 validator_account_id: account.clone(),
                 sig: "sig_bob".as_bytes().to_vec()
+            };
+
+            assert!(Tee::register_identity(Origin::signed(account.clone()), id.clone()).is_err());
+        });
+    }
+
+    #[test]
+    fn test_for_register_identity_for_self() {
+        new_test_ext().execute_with(|| {
+            // Bob is not validator before
+            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+
+            let id = Identity {
+                pub_key: "pub_key_self".as_bytes().to_vec(),
+                account_id: account.clone(),
+                validator_pub_key: "pub_key_self".as_bytes().to_vec(),
+                validator_account_id: account.clone(),
+                sig: "sig_self".as_bytes().to_vec()
             };
 
             assert!(Tee::register_identity(Origin::signed(account.clone()), id.clone()).is_err());

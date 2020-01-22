@@ -16,15 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Cache cargo toolchain
-        id: cache
+        id: cache-toolchain
         uses: actions/cache@v1
         with:
           path: ~/.rustup/toolchains
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-toolchain-${{ hashFiles('**/Cargo.toml') }}
+      - name: Cache target directory
+        id: cache-target
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target2-${{ hashFiles('**/Cargo.toml') }}
       - run: sudo apt-get remove -y clang-6.0 libclang-common-6.0-dev libclang1-6.0 libllvm6.0
       - run: sudo apt update && sudo apt install -y cmake pkg-config libssl-dev git gcc build-essential clang libclang-dev
       - uses: actions-rs/toolchain@v1
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
         with:
           toolchain: nightly-2019-12-20-x86_64-unknown-linux-gnu
           target: wasm32-unknown-unknown

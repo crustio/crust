@@ -98,7 +98,7 @@ decl_module! {
             Self::deposit_event(RawEvent::ReportWorks(who, work_report));
 
             Ok(())
-		}
+        }
 	}
 }
 

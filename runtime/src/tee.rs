@@ -27,9 +27,12 @@ pub struct Identity<T> {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct WorkReport{
-	pub_key: PubKey,
+    pub_key: PubKey,
+    block_height: u64,
+    block_hash: Vec<u8>,
 	empty_root: MerkleRoot,
-	workload: u64,
+    empty_workload: u64,
+    meaningful_workload: u64,
 	sig: Signature,
 }
 
@@ -61,8 +64,10 @@ decl_module! {
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
 
-            // 1. TODO: Extract sig_hash from sig using v_pub_key
-            // 2. TODO: Ensure identity report is legal
+            // TODO: 1. Extract sig_hash from sig using v_pub_key
+            // TODO: 2. Ensure identity report is legal
+            // TODO: 3. One public key can only be used for one account，
+            // TODO: 4. Check relationship between validator's public and validator's account
 
             // 3. Ensure who is applier
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
@@ -86,6 +91,10 @@ decl_module! {
 		}
 
 		fn report_works(origin, work_report: WorkReport) -> DispatchResult {
+		    // TODO: 1. validate block information to determine real-time report
+		    // TODO: 2. Tee applier must be the extrinsic sender (can find public key, which is used in 3)
+		    // TODO: 3. validate public key to determine identity Information
+		    // TODO: 4. validate signature
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
@@ -248,8 +257,11 @@ mod tests {
 
             let works = WorkReport {
                 pub_key: "pub_key_alice".as_bytes().to_vec(),
+                block_height: 50,
+                block_hash: "block_hash".as_bytes().to_vec(),
                 empty_root: "merkle_root_alice".as_bytes().to_vec(),
-                workload: 1000,
+                empty_workload: 1000,
+                meaningful_workload: 1000,
                 sig: "sig_key_alice".as_bytes().to_vec()
             };
 
@@ -264,8 +276,12 @@ mod tests {
 
             let works = WorkReport {
                 pub_key: "pub_key_bob".as_bytes().to_vec(),
+
+                block_height: 50,
+                block_hash: "block_hash".as_bytes().to_vec(),
                 empty_root: "merkle_root_bob".as_bytes().to_vec(),
-                workload: 2000,
+                empty_workload: 2000,
+                meaningful_workload: 2000,
                 sig: "sig_key_bob".as_bytes().to_vec()
             };
 

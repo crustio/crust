@@ -64,21 +64,26 @@ decl_module! {
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
 
-            // TODO: 1. Extract sig_hash from sig using v_pub_key
-            // TODO: 2. Ensure identity report is legal
-            // TODO: 3. One public key can only be used for one account，
-            // TODO: 4. Check relationship between validator's public and validator's account
-
-            // 3. Ensure who is applier
+            /// First: do the identity verification
+            // 1. Ensure who is applier
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
-            // 4. applier cannot be validator
+            // 2. applier cannot be validator
+            // TODO: pub_key and validator_pub_key needs to be different
             ensure!(&applier != &validator, "You cannot verify yourself");
 
-            // 5. If TeeIdentities contains v_account_id
+            // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
-            // 6. Applier is new add or needs to be updated
+            /// Then: do the tee report verification
+            // 4. Judge identity sig is legal
+            let is_identity_legal = Self::is_identity_legal(&identity);
+
+            // 5. Ensure sig_hash == report_hash
+            ensure!(is_identity_legal, "Tee report signature is illegal");
+
+            /// Last: store new/updated applier
+            // 6. applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
@@ -109,6 +114,18 @@ decl_module! {
             Ok(())
         }
 	}
+}
+
+impl<T: Trait> Module<T> {
+    pub fn is_identity_legal(id: Identity<T::AccountId>) -> bool {
+        // Extract sig_hash from sig using v_pub_key
+        let sig_hash = "123";
+
+        // Get hash(pk+account_id+v_pk+v_account_id) = report_hash
+        let report_hash = "234";
+
+        sig_hash == reporty_hash
+    }
 }
 
 decl_event!(

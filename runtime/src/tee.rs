@@ -5,8 +5,6 @@ use sp_std::str;
 use codec::{Encode, Decode};
 
 #[cfg(feature = "std")]
-use hex;
-#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::AccountId32;
 
@@ -117,18 +115,11 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // TODO: move to utility
-    pub fn byte_128_to_64(v128: &Vec<u8>) -> Vec<u8> {
-        // TODO: change panic error into recovery error
-        let v128_hex_str = str::from_utf8(v128).expect("128 bytes array cannot convert into hex string");
-        hex::decode(v128_hex_str).expect("hex string cannot convert into 64 bytes array")
-    }
-
     pub fn is_identity_legal(id: &Identity<T::AccountId>) -> Result<bool, DispatchError> {
         // 1. Transfer 128 {pub_key, sig} bytes into 64 bytes
-        let applier_pk = Self::byte_128_to_64(&id.pub_key);
-        let validator_pk = Self::byte_128_to_64(&id.validator_pub_key);
-        let id_sig = Self::byte_128_to_64(&id.sig);
+        let applier_pk = &id.pub_key;
+        let validator_pk = &id.validator_pub_key;
+        let id_sig = &id.sig;
 
         // 2. Change account_id into byte array
         let applier_id = &id.account_id.encode();
@@ -172,8 +163,6 @@ mod tests {
     use keyring::Sr25519Keyring;
     use hex::{FromHex, ToHex};
     use std::vec::Vec;
-    use sp_core::sr25519::Public;
-    use sp_runtime::traits::IdentifyAccount;
 
     type AccountId = AccountId32;
 
@@ -320,13 +309,13 @@ mod tests {
             };
 
             // 1. Transfer 128 {pub_key, sig} bytes into 64 bytes
-            let applier_pk = Tee::byte_128_to_64(&id.pub_key);
-            let validator_pk = Tee::byte_128_to_64(&id.validator_pub_key);
-            let id_sig = Tee::byte_128_to_64(&id.sig);
+            let applier_pk = &id.pub_key;
+            let validator_pk = &id.validator_pub_key;
+            let id_sig = &id.sig;
 
             // 2. Change account_id into byte array
-            let applier_id = &id.account_id.encode();
-            let validator_id = &id.validator_account_id.encode();
+            let applier_id = &id.account_id.to_ss58check().as_bytes().to_vec();
+            let validator_id = &id.validator_account_id.to_ss58check().as_bytes().to_vec();
 
             // 3. Concat identity byte arrays by defined sequence
             // {
@@ -341,7 +330,7 @@ mod tests {
             //let ecdsa_sig = EcdsaSig::from_der(id_sig).unwrap();
             //let ecdsa_pk =
 
-            println!("{:?}, {:?}, {:?}", &id.account_id.to_string(), applier_id, aa);
+            println!("{:?}, {:?}", &id.account_id.encode(), applier_id);
 
             assert!(Tee::is_identity_legal(&id).unwrap());
         });

@@ -1,18 +1,20 @@
-use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
+use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::{DispatchResult, DispatchError} };
 use system::ensure_signed;
 use sp_std::vec::Vec;
 use sp_std::str;
 use codec::{Encode, Decode};
 
 #[cfg(feature = "std")]
+use hex;
+#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
+use sp_core::crypto::AccountId32;
 
 /// Define TEE basic elements
 type PubKey = Vec<u8>;
 type Signature = Vec<u8>;
 type MerkleRoot = Vec<u8>;
 
-// TODO: add timestamp
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Identity<T> {
@@ -23,7 +25,6 @@ pub struct Identity<T> {
     sig: Signature,
 }
 
-// TODO: add timestamp
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct WorkReport{
@@ -63,26 +64,25 @@ decl_module! {
 
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
+            let applier_pk = &identity.pub_key;
+            let validator_pr = &identity.validator_pub_key;
 
-            /// First: do the identity verification
             // 1. Ensure who is applier
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
             // 2. applier cannot be validator
-            // TODO: pub_key and validator_pub_key needs to be different
             ensure!(&applier != &validator, "You cannot verify yourself");
+            ensure!(&applier_pk != &validator_pr, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
-            /// Then: do the tee report verification
             // 4. Judge identity sig is legal
-            let is_identity_legal = Self::is_identity_legal(&identity);
+            let is_identity_legal = Self::is_identity_legal(&identity)?;
 
             // 5. Ensure sig_hash == report_hash
             ensure!(is_identity_legal, "Tee report signature is illegal");
 
-            /// Last: store new/updated applier
             // 6. applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
                 // Store the tee identity
@@ -117,14 +117,37 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    pub fn is_identity_legal(id: Identity<T::AccountId>) -> bool {
-        // Extract sig_hash from sig using v_pub_key
-        let sig_hash = "123";
+    // TODO: move to utility
+    pub fn byte_128_to_64(v128: &Vec<u8>) -> Vec<u8> {
+        // TODO: change panic error into recovery error
+        let v128_hex_str = str::from_utf8(v128).expect("128 bytes array cannot convert into hex string");
+        hex::decode(v128_hex_str).expect("hex string cannot convert into 64 bytes array")
+    }
 
-        // Get hash(pk+account_id+v_pk+v_account_id) = report_hash
-        let report_hash = "234";
+    pub fn is_identity_legal(id: &Identity<T::AccountId>) -> Result<bool, DispatchError> {
+        // 1. Transfer 128 {pub_key, sig} bytes into 64 bytes
+        let applier_pk = Self::byte_128_to_64(&id.pub_key);
+        let validator_pk = Self::byte_128_to_64(&id.validator_pub_key);
+        let id_sig = Self::byte_128_to_64(&id.sig);
 
-        sig_hash == reporty_hash
+        // 2. Change account_id into byte array
+        let applier_id = &id.account_id.encode();
+        let validator_id = &id.validator_account_id.encode();
+
+        // 3. Concat identity byte arrays by defined sequence
+        // {
+        //    pub_key: PubKey,
+        //    account_id: T,
+        //    validator_pub_key: PubKey,
+        //    validator_account_id: T
+        // }
+        let data = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
+
+        // 4. Construct ecdsa Signature
+        //let ecdsa_sig = EcdsaSig::from_der(id_sig).unwrap();
+        //let ecdsa_pk =
+
+        Ok(true)
     }
 }
 
@@ -145,8 +168,12 @@ mod tests {
     use sp_runtime::{
         traits::{BlakeTwo256, IdentityLookup}, testing::Header, Perbill
     };
-    use sp_core::crypto::AccountId32;
+    use sp_core::crypto::{AccountId32, Ss58Codec};
     use keyring::Sr25519Keyring;
+    use hex::{FromHex, ToHex};
+    use std::vec::Vec;
+    use sp_core::sr25519::Public;
+    use sp_runtime::traits::IdentifyAccount;
 
     type AccountId = AccountId32;
 
@@ -267,6 +294,59 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_for_verify_sig_success() {
+        new_test_ext().execute_with(|| {
+            // Alice is validator in genesis block
+            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+            let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
+
+            let pk = Vec::from_hex("35306435343964323066653962326663373866313539323362\
+            33656332663962376163326434306262363136303830656564613038343\
+            566366339356466353561616332363133386231616361366365636539306163\
+            3538313864336138353438333735343263643037666235343062323031323036\
+            62313437303565373162").expect("Invalid hex");
+            let sig = Vec::from_hex("3662613630353964343764633738346435376338\
+            326432656135323731306162653632623939353866653734333938613031333838\
+            3931373961656332626134663030363066353061633662383364376635396337346\
+            16663336366653632623835303166356366656336343661386165626438396265313432323535653538").expect("Invalid hex");
+
+            let id = Identity {
+                pub_key: pk.clone(),
+                account_id: applier.clone(),
+                validator_pub_key: pk.clone(),
+                validator_account_id: validator.clone(),
+                sig: sig.clone()
+            };
+
+            // 1. Transfer 128 {pub_key, sig} bytes into 64 bytes
+            let applier_pk = Tee::byte_128_to_64(&id.pub_key);
+            let validator_pk = Tee::byte_128_to_64(&id.validator_pub_key);
+            let id_sig = Tee::byte_128_to_64(&id.sig);
+
+            // 2. Change account_id into byte array
+            let applier_id = &id.account_id.encode();
+            let validator_id = &id.validator_account_id.encode();
+
+            // 3. Concat identity byte arrays by defined sequence
+            // {
+            //    pub_key: PubKey,
+            //    account_id: T,
+            //    validator_pub_key: PubKey,
+            //    validator_account_id: T
+            // }
+            let data = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
+
+            // 4. Construct ecdsa Signature
+            //let ecdsa_sig = EcdsaSig::from_der(id_sig).unwrap();
+            //let ecdsa_pk =
+
+            println!("{:?}, {:?}, {:?}", &id.account_id.to_string(), applier_id, aa);
+
+            assert!(Tee::is_identity_legal(&id).unwrap());
+        });
+    }
+
 	#[test]
 	fn test_for_report_works_success() {
 		new_test_ext().execute_with(|| {
@@ -293,7 +373,6 @@ mod tests {
 
             let works = WorkReport {
                 pub_key: "pub_key_bob".as_bytes().to_vec(),
-
                 block_height: 50,
                 block_hash: "block_hash".as_bytes().to_vec(),
                 empty_root: "merkle_root_bob".as_bytes().to_vec(),

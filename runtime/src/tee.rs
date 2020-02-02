@@ -6,7 +6,6 @@ use codec::{Encode, Decode};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
-use sp_core::crypto::AccountId32;
 
 /// Define TEE basic elements
 type PubKey = Vec<u8>;
@@ -161,8 +160,13 @@ mod tests {
     };
     use sp_core::crypto::{AccountId32, Ss58Codec};
     use keyring::Sr25519Keyring;
-    use hex::{FromHex, ToHex};
+    use hex;
     use std::vec::Vec;
+    use signatory_ring::ecdsa::p256::{PublicKey, Verifier};
+    use signatory::{
+        ecdsa::curve::nistp256::FixedSignature,
+        signature::{Signature as _, Verifier as _},
+    };
 
     type AccountId = AccountId32;
 
@@ -287,18 +291,13 @@ mod tests {
     fn test_for_verify_sig_success() {
         new_test_ext().execute_with(|| {
             // Alice is validator in genesis block
-            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+            let applier: AccountId = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX").expect("valid ss58 address");
             let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
 
-            let pk = Vec::from_hex("35306435343964323066653962326663373866313539323362\
-            33656332663962376163326434306262363136303830656564613038343\
-            566366339356466353561616332363133386231616361366365636539306163\
-            3538313864336138353438333735343263643037666235343062323031323036\
-            62313437303565373162").expect("Invalid hex");
-            let sig = Vec::from_hex("3662613630353964343764633738346435376338\
-            326432656135323731306162653632623939353866653734333938613031333838\
-            3931373961656332626134663030363066353061633662383364376635396337346\
-            16663336366653632623835303166356366656336343661386165626438396265313432323535653538").expect("Invalid hex");
+            let pk = hex::decode("aa57e79045d6f24c74eb8f99e35f45c836f374860cf\
+            20bb2014d98b2f7318a7034f345951d988ca7761c8111a22c150df89429a074eb661aa20ae7b4ee52ec01").expect("Invalid hex");
+            let sig = hex::decode("8583b094b65946adc31d28b77bb681cbeccf46d529f4\
+            8941b9d595076515c84bc3e15d5a43cbc0a63dabd30351d9e9d60a875d7739b78b7ed98db09895b0652c").expect("Invalid hex");
 
             let id = Identity {
                 pub_key: pk.clone(),
@@ -308,10 +307,20 @@ mod tests {
                 sig: sig.clone()
             };
 
-            // 1. Transfer 128 {pub_key, sig} bytes into 64 bytes
-            let applier_pk = &id.pub_key;
-            let validator_pk = &id.validator_pub_key;
-            let id_sig = &id.sig;
+            /*let v128_to_v64 = |v128: &Vec<u8>| -> Vec<u8> {
+                let v128_hex_str = str::from_utf8(v128).expect("128 bytes array cannot convert into hex string");
+                hex::decode(v128_hex_str).expect("hex string cannot convert into 64 bytes array")
+            };*/
+
+            // For test
+            // 1.
+            let mut applier_pk: Vec<u8> = vec![4];
+            applier_pk.extend(&id.pub_key);
+
+            let mut validator_pk: Vec<u8> = vec![4];
+            validator_pk.extend(&id.validator_pub_key);
+
+            let sig_id= &id.sig;
 
             // 2. Change account_id into byte array
             let applier_id = &id.account_id.to_ss58check().as_bytes().to_vec();
@@ -324,13 +333,20 @@ mod tests {
             //    validator_pub_key: PubKey,
             //    validator_account_id: T
             // }
-            let data = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
+            let data: Vec<u8> = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
 
-            // 4. Construct ecdsa Signature
-            //let ecdsa_sig = EcdsaSig::from_der(id_sig).unwrap();
-            //let ecdsa_pk =
+            // 4. Construct sig and pub_key
+            /*let mut pk65 = vec![4];
+            pk65.extend(validator_pk);*/
 
-            println!("{:?}, {:?}", &id.account_id.encode(), applier_id);
+            let p256_pk = PublicKey::from_bytes(&validator_pk).expect("public key illegal");
+            let p256_sig = FixedSignature::from_bytes(sig_id.as_slice()).expect("sig illegal");
+
+            let p256_v = Verifier::from(&p256_pk);
+
+            let rst = p256_v.verify(data.as_slice(), &p256_sig);
+
+            assert!(rst.is_ok());
 
             assert!(Tee::is_identity_legal(&id).unwrap());
         });

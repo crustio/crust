@@ -318,3 +318,4 @@ keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substra
 hex = "0.4.0"
 signatory = "0.18.0"
 signatory-ring = "0.18.0"
+byteorder = "1"

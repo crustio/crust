@@ -1,8 +1,9 @@
-use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
+use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult };
 use system::ensure_signed;
 use sp_std::vec::Vec;
 use sp_std::str;
 use codec::{Encode, Decode};
+use crate::tee_api;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,6 @@ type PubKey = Vec<u8>;
 type Signature = Vec<u8>;
 type MerkleRoot = Vec<u8>;
 
-// TODO: add timestamp
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Identity<T> {
@@ -23,7 +23,6 @@ pub struct Identity<T> {
     sig: Signature,
 }
 
-// TODO: add timestamp
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct WorkReport{
@@ -63,22 +62,23 @@ decl_module! {
 
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
+            let applier_pk = &identity.pub_key;
+            let validator_pr = &identity.validator_pub_key;
 
-            // TODO: 1. Extract sig_hash from sig using v_pub_key
-            // TODO: 2. Ensure identity report is legal
-            // TODO: 3. One public key can only be used for one account，
-            // TODO: 4. Check relationship between validator's public and validator's account
-
-            // 3. Ensure who is applier
+            // 1. Ensure who is applier
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
-            // 4. applier cannot be validator
+            // 2. applier cannot be validator
             ensure!(&applier != &validator, "You cannot verify yourself");
+            ensure!(&applier_pk != &validator_pr, "You cannot verify yourself");
 
-            // 5. If TeeIdentities contains v_account_id
+            // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
-            // 6. Applier is new add or needs to be updated
+            // 4. Verify sig
+            ensure!(Self::is_identity_legal(&identity), "Tee report signature is illegal");
+
+            // 5. applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
@@ -111,6 +111,12 @@ decl_module! {
 	}
 }
 
+impl<T: Trait> Module<T> {
+    pub fn is_identity_legal(id: &Identity<T::AccountId>) -> bool {
+        tee_api::crypto::verify_identity(&id.pub_key, &id.validator_pub_key, &id.sig)
+    }
+}
+
 decl_event!(
 	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
 		RegisterIdentity(AccountId, Identity<AccountId>),
@@ -128,8 +134,9 @@ mod tests {
     use sp_runtime::{
         traits::{BlakeTwo256, IdentityLookup}, testing::Header, Perbill
     };
-    use sp_core::crypto::AccountId32;
+    use sp_core::crypto::{AccountId32, Ss58Codec};
     use keyring::Sr25519Keyring;
+    use hex;
 
     type AccountId = AccountId32;
 
@@ -250,6 +257,50 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_for_verify_sig_success() {
+        new_test_ext().execute_with(|| {
+            // Alice is validator in genesis block
+            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+            let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
+
+            let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
+            let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54b").expect("Invalid hex");
+
+            let id = Identity {
+                pub_key: pk.clone(),
+                account_id: applier.clone(),
+                validator_pub_key: pk.clone(),
+                validator_account_id: validator.clone(),
+                sig: sig.clone()
+            };
+
+            assert!(Tee::is_identity_legal(&id));
+        });
+    }
+
+    #[test]
+    fn test_for_verify_sig_failed() {
+        new_test_ext().execute_with(|| {
+            // Alice is validator in genesis block
+            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+            let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
+
+            let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
+            let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54c").expect("Invalid hex");
+
+            let id = Identity {
+                pub_key: pk.clone(),
+                account_id: applier.clone(),
+                validator_pub_key: pk.clone(),
+                validator_account_id: validator.clone(),
+                sig: sig.clone()
+            };
+
+            assert!(!Tee::is_identity_legal(&id));
+        });
+    }
+
 	#[test]
 	fn test_for_report_works_success() {
 		new_test_ext().execute_with(|| {
@@ -276,7 +327,6 @@ mod tests {
 
             let works = WorkReport {
                 pub_key: "pub_key_bob".as_bytes().to_vec(),
-
                 block_height: 50,
                 block_hash: "block_hash".as_bytes().to_vec(),
                 empty_root: "merkle_root_bob".as_bytes().to_vec(),

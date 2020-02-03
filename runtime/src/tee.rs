@@ -275,7 +275,7 @@ mod tests {
                 sig: sig.clone()
             };
 
-            assert!(!Tee::is_identity_legal(&id));
+            assert!(Tee::is_identity_legal(&id));
         });
     }
 

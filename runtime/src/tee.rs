@@ -1,8 +1,9 @@
-use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::{DispatchResult, DispatchError} };
+use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult };
 use system::ensure_signed;
 use sp_std::vec::Vec;
 use sp_std::str;
 use codec::{Encode, Decode};
+use crate::tee_api;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -74,13 +75,10 @@ decl_module! {
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
-            // 4. Judge identity sig is legal
-            let is_identity_legal = Self::is_identity_legal(&identity)?;
+            // 4. Verify sig
+            ensure!(Self::is_identity_legal(&identity), "Tee report signature is illegal");
 
-            // 5. Ensure sig_hash == report_hash
-            ensure!(is_identity_legal, "Tee report signature is illegal");
-
-            // 6. applier is new add or needs to be updated
+            // 5. applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
@@ -114,30 +112,8 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    pub fn is_identity_legal(id: &Identity<T::AccountId>) -> Result<bool, DispatchError> {
-        // 1. Transfer 128 {pub_key, sig} bytes into 64 bytes
-        let applier_pk = &id.pub_key;
-        let validator_pk = &id.validator_pub_key;
-        let id_sig = &id.sig;
-
-        // 2. Change account_id into byte array
-        let applier_id = &id.account_id.encode();
-        let validator_id = &id.validator_account_id.encode();
-
-        // 3. Concat identity byte arrays by defined sequence
-        // {
-        //    pub_key: PubKey,
-        //    account_id: T,
-        //    validator_pub_key: PubKey,
-        //    validator_account_id: T
-        // }
-        let data = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
-
-        // 4. Construct ecdsa Signature
-        //let ecdsa_sig = EcdsaSig::from_der(id_sig).unwrap();
-        //let ecdsa_pk =
-
-        Ok(true)
+    pub fn is_identity_legal(id: &Identity<T::AccountId>) -> bool {
+        tee_api::crypto::verify_identity(&id.pub_key, &id.validator_pub_key, &id.sig)
     }
 }
 
@@ -161,15 +137,6 @@ mod tests {
     use sp_core::crypto::{AccountId32, Ss58Codec};
     use keyring::Sr25519Keyring;
     use hex;
-    use std::vec::Vec;
-    use signatory_ring::ecdsa::p256::{PublicKey, Verifier, Signer};
-    use signatory::{
-        ecdsa::curve::nistp256::{FixedSignature, Asn1Signature},
-        ecdsa::generic_array::GenericArray,
-        signature::{Signature as _, Signer as _, Verifier as _},
-        public_key::PublicKeyed,
-        encoding::FromPkcs8,
-    };
 
     type AccountId = AccountId32;
 
@@ -297,15 +264,8 @@ mod tests {
             let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
             let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
 
-            let mut pk = hex::decode("cca98ffd68a64b2453749d23e57fee0a4ff843e2525377a5b6d18012885a2be09343a006d85151f519ff56aaacb73d27e01b73938bf408935c1ab45207657dcf").expect("Invalid hex");
-            // from/to little/big endian
-
-           /* let mut ppk = hex::decode("118ced2248d5a29743fc0725dc5f0f493a47486e9a660958d4db71d0e4de0bd5").expect("invalid hex string");
-            ppk.reverse();*/
-
-            let mut sig= hex::decode("0c4ed44eb7664137247e8e51a928802bbb9fcf26cb150b342e07ffc20efe679d1ac5c8e940df6640515c596b4e7195a5b5c90c9aeba34ea472002f02a69f7a49").expect("Invalid hex");
-            sig[0..32].reverse();
-            sig[32..].reverse();
+            let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
+            let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54b").expect("Invalid hex");
 
             let id = Identity {
                 pub_key: pk.clone(),
@@ -315,64 +275,29 @@ mod tests {
                 sig: sig.clone()
             };
 
-            // For test
-            // 1.
-            let applier_pk = hex::encode(&id.pub_key);
-            let validator_pk = hex::encode(&id.validator_pub_key);
-            let sig_id= &id.sig;
+            assert!(!Tee::is_identity_legal(&id));
+        });
+    }
 
-            // 2. Change account_id into byte array
-            let applier_id = &id.account_id.to_ss58check();
-            let validator_id = &id.validator_account_id.to_ss58check();
+    #[test]
+    fn test_for_verify_sig_failed() {
+        new_test_ext().execute_with(|| {
+            // Alice is validator in genesis block
+            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+            let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
 
-            // 3. Concat identity byte arrays by defined sequence
-            // {
-            //    pub_key: PubKey,
-            //    account_id: T,
-            //    validator_pub_key: PubKey,
-            //    validator_account_id: T
-            // }
-            //let data: Vec<u8> = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
-            let data_raw = format!("{}{}{}{}", applier_pk, applier_id, validator_pk, validator_id);
-            let data = data_raw.as_bytes().to_vec();
+            let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
+            let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54c").expect("Invalid hex");
 
-            // 4. Construct sig and pub_key
+            let id = Identity {
+                pub_key: pk.clone(),
+                account_id: applier.clone(),
+                validator_pub_key: pk.clone(),
+                validator_account_id: validator.clone(),
+                sig: sig.clone()
+            };
 
-            /// PKCS#8 header for a NIST P-256 private key
-            /*const P256_PKCS8_HEADER: &[u8] = b"\x30\x81\x87\x02\x01\x00\x30\x13\x06\x07\x2a\x86\x48\xce\x3d\x02\x01\x06\
-            \x08\x2a\x86\x48\xce\x3d\x03\x01\x07\x04\x6d\x30\x6b\x02\x01\x01\x04\x20";
-
-            /// PKCS#8 interstitial part for a NIST P-256 private key
-            const P256_PKCS8_PUBKEY_PREFIX: &[u8] = b"\xa1\x44\x03\x42\x00\x04";
-
-            let to_pkcs8 = |s: &Vec<u8>, p: &Vec<u8>| -> Vec<u8> {
-                // TODO: better serializer than giant hardcoded bytestring literals, like a PKCS#8 library,
-                // or at least a less bogus internal PKCS#8 implementation
-                let mut pkcs8_document = P256_PKCS8_HEADER.to_vec();
-
-                pkcs8_document.extend_from_slice(s);
-                pkcs8_document.extend_from_slice(P256_PKCS8_PUBKEY_PREFIX);
-                pkcs8_document.extend_from_slice(p);
-
-                pkcs8_document
-            };*/
-
-            pk[0..32].reverse();
-            pk[32..].reverse();
-
-            let p256_pk = PublicKey::from_untagged_point(&GenericArray::from_slice(&pk));
-            /*let signer: Signer<FixedSignature> = Signer::from_pkcs8(to_pkcs8(&ppk, &pk)).expect("invalid pk");
-
-            assert_eq!(signer.public_key().unwrap(), p256_pk);*/
-
-            let p256_sig = FixedSignature::from_bytes(sig_id.as_slice()).expect("sig illegal");
-            let p256_v = Verifier::from(&p256_pk);
-
-            let rst = p256_v.verify(data.as_slice(), &p256_sig);
-
-            assert!(rst.is_ok());
-
-            assert!(Tee::is_identity_legal(&id).unwrap());
+            assert!(!Tee::is_identity_legal(&id));
         });
     }
 

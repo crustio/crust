@@ -304,8 +304,8 @@ mod tests {
             ppk.reverse();*/
 
             let mut sig= hex::decode("0c4ed44eb7664137247e8e51a928802bbb9fcf26cb150b342e07ffc20efe679d1ac5c8e940df6640515c596b4e7195a5b5c90c9aeba34ea472002f02a69f7a49").expect("Invalid hex");
-            /*sig[0..32].reverse();
-            sig[32..].reverse();*/
+            sig[0..32].reverse();
+            sig[32..].reverse();
 
             let id = Identity {
                 pub_key: pk.clone(),

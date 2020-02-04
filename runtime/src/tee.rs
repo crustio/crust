@@ -63,14 +63,15 @@ decl_module! {
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
             let applier_pk = &identity.pub_key;
-            let validator_pr = &identity.validator_pub_key;
+            let validator_pk = &identity.validator_pub_key;
 
             // 1. Ensure who is applier
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
             // 2. applier cannot be validator
             ensure!(&applier != &validator, "You cannot verify yourself");
-            ensure!(&applier_pk != &validator_pr, "You cannot verify yourself");
+            // TODO: Add pub key verify
+//            ensure!(&applier_pk != &validator_pk, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");

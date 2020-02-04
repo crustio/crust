@@ -205,15 +205,18 @@ mod tests {
     fn test_for_register_identity_success() {
         new_test_ext().execute_with(|| {
             // Alice is validator in genesis block
-            let applier: AccountId32 = Sr25519Keyring::Bob.to_account_id();
-            let validator: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+            let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
+
+            let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").expect("Invalid hex");
+            let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
 
             let id = Identity {
-                pub_key: "pub_key_bob".as_bytes().to_vec(),
+                pub_key: pk.clone(),
                 account_id: applier.clone(),
-                validator_pub_key: "pub_key_alice".as_bytes().to_vec(),
+                validator_pub_key: pk.clone(),
                 validator_account_id: validator.clone(),
-                sig: "sig_alice".as_bytes().to_vec()
+                sig: sig.clone()
             };
 
             assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
@@ -245,7 +248,6 @@ mod tests {
     #[test]
     fn test_for_register_identity_for_self() {
         new_test_ext().execute_with(|| {
-            // Bob is not validator before
             let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
 
             let id = Identity {

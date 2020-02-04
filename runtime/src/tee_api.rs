@@ -29,7 +29,6 @@ pub trait Crypto {
         //    validator_account_id: T
         // }
         let data: Vec<u8> = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
-        println!("{:?}", &data);
 
         // 3. le/be convert
         pk[0..32].reverse();

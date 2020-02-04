@@ -31,7 +31,7 @@ pub struct WorkReport{
     pub_key: PubKey,
     block_number: u64,
     block_hash: Vec<u8>,
-	empty_root: MerkleRoot,
+    empty_root: MerkleRoot,
     empty_workload: u64,
     meaningful_workload: u64,
 	sig: Signature,

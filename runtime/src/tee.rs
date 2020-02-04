@@ -113,7 +113,9 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     pub fn is_identity_legal(id: &Identity<T::AccountId>) -> bool {
-        tee_api::crypto::verify_identity(&id.pub_key, &id.validator_pub_key, &id.sig)
+        let applier_id = id.account_id.encode();
+        let validator_id = id.validator_account_id.encode();
+        tee_api::crypto::verify_identity(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
     }
 }
 
@@ -264,8 +266,8 @@ mod tests {
             let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
             let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
 
-            let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
-            let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54b").expect("Invalid hex");
+            let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").expect("Invalid hex");
+            let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
 
             let id = Identity {
                 pub_key: pk.clone(),

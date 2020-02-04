@@ -63,14 +63,15 @@ decl_module! {
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
             let applier_pk = &identity.pub_key;
-            let validator_pr = &identity.validator_pub_key;
+            let validator_pk = &identity.validator_pub_key;
 
             // 1. Ensure who is applier
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
             // 2. applier cannot be validator
             ensure!(&applier != &validator, "You cannot verify yourself");
-            ensure!(&applier_pk != &validator_pr, "You cannot verify yourself");
+            // TODO: Add pub key verify
+//            ensure!(&applier_pk != &validator_pk, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
@@ -113,7 +114,9 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     pub fn is_identity_legal(id: &Identity<T::AccountId>) -> bool {
-        tee_api::crypto::verify_identity(&id.pub_key, &id.validator_pub_key, &id.sig)
+        let applier_id = id.account_id.encode();
+        let validator_id = id.validator_account_id.encode();
+        tee_api::crypto::verify_identity(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
     }
 }
 
@@ -202,15 +205,18 @@ mod tests {
     fn test_for_register_identity_success() {
         new_test_ext().execute_with(|| {
             // Alice is validator in genesis block
-            let applier: AccountId32 = Sr25519Keyring::Bob.to_account_id();
-            let validator: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+            let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
+
+            let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").expect("Invalid hex");
+            let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
 
             let id = Identity {
-                pub_key: "pub_key_bob".as_bytes().to_vec(),
+                pub_key: pk.clone(),
                 account_id: applier.clone(),
-                validator_pub_key: "pub_key_alice".as_bytes().to_vec(),
+                validator_pub_key: pk.clone(),
                 validator_account_id: validator.clone(),
-                sig: "sig_alice".as_bytes().to_vec()
+                sig: sig.clone()
             };
 
             assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
@@ -242,7 +248,6 @@ mod tests {
     #[test]
     fn test_for_register_identity_for_self() {
         new_test_ext().execute_with(|| {
-            // Bob is not validator before
             let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
 
             let id = Identity {
@@ -264,8 +269,8 @@ mod tests {
             let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
             let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
 
-            let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
-            let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54b").expect("Invalid hex");
+            let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").expect("Invalid hex");
+            let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
 
             let id = Identity {
                 pub_key: pk.clone(),

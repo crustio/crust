@@ -10,6 +10,11 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+#[cfg(test)]
+mod mock;
+#[cfg(test)]
+mod tests;
+
 use sp_std::prelude::*;
 use sp_core::OpaqueMetadata;
 use sp_runtime::{

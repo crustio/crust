@@ -1,7 +1,6 @@
 use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
 use system::ensure_signed;
-use sp_std::vec::Vec;
-use sp_std::str;
+use sp_std::{vec::Vec, str};
 use sp_std::convert::TryInto;
 use codec::{Encode, Decode};
 use crate::tee_api;
@@ -17,24 +16,24 @@ type MerkleRoot = Vec<u8>;
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Identity<T> {
-    pub_key: PubKey,
-    account_id: T,
-    validator_pub_key: PubKey,
-    validator_account_id: T,
-    sig: Signature,
+    pub pub_key: PubKey,
+    pub account_id: T,
+    pub validator_pub_key: PubKey,
+    pub validator_account_id: T,
+    pub sig: Signature,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 // TODO: change block_number & block_hash to standard data type
 pub struct WorkReport{
-    pub_key: PubKey,
-    block_number: u64,
-    block_hash: Vec<u8>,
-    empty_root: MerkleRoot,
-    empty_workload: u64,
-    meaningful_workload: u64,
-	sig: Signature,
+    pub pub_key: PubKey,
+    pub block_number: u64,
+    pub block_hash: Vec<u8>,
+    pub empty_root: MerkleRoot,
+    pub empty_workload: u64,
+    pub meaningful_workload: u64,
+    pub sig: Signature,
 }
 
 /// The module's configuration trait.
@@ -46,8 +45,8 @@ pub trait Trait: system::Trait {
 // This module's storage items.
 decl_storage! {
 	trait Store for Module<T: Trait> as Tee {
-		TeeIdentities get(tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
-		WorkReports get(work_reports): map T::AccountId => Option<WorkReport>;
+		pub TeeIdentities get(tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
+		pub WorkReports get(work_reports): map T::AccountId => Option<WorkReport>;
 	}
 }
 
@@ -59,7 +58,7 @@ decl_module! {
 		// this is needed only if you are using events in your module
 		fn deposit_event() = default;
 
-		fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
+		pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
 		    // TODO: add account_id <-> tee_pub_key validation
 		    let who = ensure_signed(origin)?;
 
@@ -80,7 +79,7 @@ decl_module! {
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
             // 4. Verify sig
-            ensure!(Self::is_identity_legal(&identity), "Tee report signature is illegal");
+            ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
 
             // 5. applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
@@ -94,7 +93,7 @@ decl_module! {
             Ok(())
 		}
 
-		fn report_works(origin, work_report: WorkReport) -> DispatchResult {
+		pub fn report_works(origin, work_report: WorkReport) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
@@ -103,12 +102,13 @@ decl_module! {
             // 2. Do timing check
             ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
-            // TODO: 3. Do sig check
+            // 3. Do sig check
+            ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
-            // 3. Upsert works
+            // 4. Upsert works
             <WorkReports<T>>::insert(&who, &work_report);
 
-            // 4. Emit event
+            // 5. Emit event
             Self::deposit_event(RawEvent::ReportWorks(who, work_report));
 
             Ok(())
@@ -117,10 +117,11 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    pub fn is_identity_legal(id: &Identity<T::AccountId>) -> bool {
+    pub fn identity_sig_check(id: &Identity<T::AccountId>) -> bool {
         let applier_id = id.account_id.encode();
         let validator_id = id.validator_account_id.encode();
-        tee_api::crypto::verify_identity(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
+        // TODO: concat data inside runtime for saving PassBy params number
+        tee_api::crypto::verify_identity_sig(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
     }
 
     pub fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {
@@ -140,6 +141,12 @@ impl<T: Trait> Module<T> {
 
         Ok(())
     }
+
+    pub fn work_report_sig_check(wr: &WorkReport) -> bool {
+        // TODO: concat data inside runtime for saving PassBy params number
+        tee_api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
+                                                wr.empty_workload, wr.meaningful_workload, &wr.sig)
+    }
 }
 
 decl_event!(
@@ -148,304 +155,3 @@ decl_event!(
 		ReportWorks(AccountId, WorkReport),
 	}
 );
-
-// TODO: move test into tests file
-/// tests for this module
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use sp_core::H256;
-    use frame_support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight};
-    use sp_runtime::{
-        traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize}, testing::Header, Perbill
-    };
-    use sp_core::crypto::{AccountId32, Ss58Codec};
-    use keyring::Sr25519Keyring;
-    use hex;
-
-    type AccountId = AccountId32;
-
-    impl_outer_origin! {
-		pub enum Origin for Test {}
-	}
-
-    // For testing the module, we construct most of a mock runtime. This means
-    // first constructing a configuration type (`Test`) which `impl`s each of the
-    // configuration traits of modules we want to use.
-    #[derive(Clone, Eq, PartialEq)]
-    pub struct Test;
-    parameter_types! {
-		pub const BlockHashCount: u64 = 250;
-		pub const MaximumBlockWeight: Weight = 1024;
-		pub const MaximumBlockLength: u32 = 2 * 1024;
-		pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
-	}
-    impl system::Trait for Test {
-        type Origin = Origin;
-        type Call = ();
-        type Index = u64;
-        type BlockNumber = u64;
-        type Hash = H256;
-        type Hashing = BlakeTwo256;
-        type AccountId = AccountId;
-        type Lookup = IdentityLookup<Self::AccountId>;
-        type Header = Header;
-        type Event = ();
-        type BlockHashCount = BlockHashCount;
-        type MaximumBlockWeight = MaximumBlockWeight;
-        type MaximumBlockLength = MaximumBlockLength;
-        type AvailableBlockRatio = AvailableBlockRatio;
-        type Version = ();
-        type ModuleToIndex = ();
-    }
-
-    impl Trait for Test {
-        type Event = ();
-    }
-
-    type Tee = Module<Test>;
-    type System = system::Module<Test>;
-
-    /// Run until a particular block.
-    pub fn run_to_block(n: u64) {
-        while System::block_number() < n {
-            if System::block_number() > 1 {
-                System::on_finalize(System::block_number());
-            }
-            System::set_block_number(System::block_number() + 1);
-            System::on_initialize(System::block_number());
-        }
-    }
-
-    // This function basically just builds a genesis storage key/value store according to
-    // our desired mockup.
-    fn new_test_ext() -> sp_io::TestExternalities {
-        let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
-        let tee_ids = [
-            Sr25519Keyring::Alice.to_account_id()
-        ];
-
-        GenesisConfig::<Test> {
-            tee_identities: tee_ids
-                .iter()
-                .map(|x| (x.clone(), Default::default()))
-                .collect()
-        }.assimilate_storage(&mut t).unwrap();
-
-        t.into()
-    }
-
-    #[test]
-    fn test_for_register_identity_success() {
-        new_test_ext().execute_with(|| {
-            // Alice is validator in genesis block
-            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
-            let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
-
-            let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").expect("Invalid hex");
-            let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
-
-            let id = Identity {
-                pub_key: pk.clone(),
-                account_id: applier.clone(),
-                validator_pub_key: pk.clone(),
-                validator_account_id: validator.clone(),
-                sig: sig.clone()
-            };
-
-            assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
-
-            let id_registered = Tee::tee_identities(applier.clone()).unwrap();
-
-			assert_eq!(id.clone(), id_registered);
-        });
-    }
-
-    #[test]
-    fn test_for_register_identity_failed() {
-        new_test_ext().execute_with(|| {
-            // Bob is not validator before
-            let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
-
-            let id = Identity {
-                pub_key: "pub_key_bob".as_bytes().to_vec(),
-                account_id: account.clone(),
-                validator_pub_key: "pub_key_bob".as_bytes().to_vec(),
-                validator_account_id: account.clone(),
-                sig: "sig_bob".as_bytes().to_vec()
-            };
-
-            assert!(Tee::register_identity(Origin::signed(account.clone()), id.clone()).is_err());
-        });
-    }
-
-    #[test]
-    fn test_for_register_identity_for_self() {
-        new_test_ext().execute_with(|| {
-            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-
-            let id = Identity {
-                pub_key: "pub_key_self".as_bytes().to_vec(),
-                account_id: account.clone(),
-                validator_pub_key: "pub_key_self".as_bytes().to_vec(),
-                validator_account_id: account.clone(),
-                sig: "sig_self".as_bytes().to_vec()
-            };
-
-            assert!(Tee::register_identity(Origin::signed(account.clone()), id.clone()).is_err());
-        });
-    }
-
-    #[test]
-    fn test_for_verify_sig_success() {
-        new_test_ext().execute_with(|| {
-            // Alice is validator in genesis block
-            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
-            let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
-
-            let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").expect("Invalid hex");
-            let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
-
-            let id = Identity {
-                pub_key: pk.clone(),
-                account_id: applier.clone(),
-                validator_pub_key: pk.clone(),
-                validator_account_id: validator.clone(),
-                sig: sig.clone()
-            };
-
-            assert!(Tee::is_identity_legal(&id));
-        });
-    }
-
-    #[test]
-    fn test_for_verify_sig_failed() {
-        new_test_ext().execute_with(|| {
-            // Alice is validator in genesis block
-            let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
-            let validator: AccountId = AccountId::from_ss58check("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").expect("valid ss58 address");
-
-            let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
-            let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54c").expect("Invalid hex");
-
-            let id = Identity {
-                pub_key: pk.clone(),
-                account_id: applier.clone(),
-                validator_pub_key: pk.clone(),
-                validator_account_id: validator.clone(),
-                sig: sig.clone()
-            };
-
-            assert!(!Tee::is_identity_legal(&id));
-        });
-    }
-
-	#[test]
-	fn test_for_report_works_genesis_success() {
-		new_test_ext().execute_with(|| {
-            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-            let block_hash= [0; 32].to_vec();
-
-            let works = WorkReport {
-                pub_key: "pub_key_alice".as_bytes().to_vec(),
-                block_number: 1,
-                block_hash,
-                empty_root: "merkle_root_alice".as_bytes().to_vec(),
-                empty_workload: 1000,
-                meaningful_workload: 1000,
-                sig: "sig_key_alice".as_bytes().to_vec()
-            };
-
-			assert_ok!(Tee::report_works(Origin::signed(account), works));
-		});
-	}
-
-    #[test]
-    fn test_for_report_works_success() {
-        new_test_ext().execute_with(|| {
-            // generate 53 blocks first
-            run_to_block(53);
-
-            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-            let block_hash= [0; 32].to_vec();
-
-            let works = WorkReport {
-                pub_key: "pub_key_alice".as_bytes().to_vec(),
-                block_number: 50,
-                block_hash,
-                empty_root: "merkle_root_alice".as_bytes().to_vec(),
-                empty_workload: 1000,
-                meaningful_workload: 1000,
-                sig: "sig_key_alice".as_bytes().to_vec()
-            };
-
-            assert_ok!(Tee::report_works(Origin::signed(account), works));
-        });
-    }
-
-    #[test]
-    fn test_for_report_works_hash_is_wrong_failed() {
-        new_test_ext().execute_with(|| {
-            // generate 50 blocks first
-            run_to_block(50);
-
-            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-            let block_hash= [1; 32].to_vec();
-
-            let works = WorkReport {
-                pub_key: "pub_key_alice".as_bytes().to_vec(),
-                block_number: 50,
-                block_hash,
-                empty_root: "merkle_root_alice".as_bytes().to_vec(),
-                empty_workload: 0,
-                meaningful_workload: 1000,
-                sig: "sig_key_alice".as_bytes().to_vec()
-            };
-
-            assert!(Tee::report_works(Origin::signed(account), works).is_err());
-        });
-    }
-
-    #[test]
-    fn test_for_report_works_slot_outdated_failed() {
-        new_test_ext().execute_with(|| {
-            // generate 50 blocks first
-            run_to_block(103);
-
-            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-            let block_hash= [0; 32].to_vec();
-
-            let works = WorkReport {
-                pub_key: "pub_key_alice".as_bytes().to_vec(),
-                block_number: 50,
-                block_hash,
-                empty_root: "merkle_root_alice".as_bytes().to_vec(),
-                empty_workload: 5000,
-                meaningful_workload: 1000,
-                sig: "sig_key_alice".as_bytes().to_vec()
-            };
-
-            assert!(Tee::report_works(Origin::signed(account), works).is_err());
-        });
-    }
-
-    #[test]
-    fn test_for_report_works_failed() {
-        new_test_ext().execute_with(|| {
-            let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
-
-            let works = WorkReport {
-                pub_key: "pub_key_bob".as_bytes().to_vec(),
-                block_number: 50,
-                block_hash: "block_hash".as_bytes().to_vec(),
-                empty_root: "merkle_root_bob".as_bytes().to_vec(),
-                empty_workload: 2000,
-                meaningful_workload: 2000,
-                sig: "sig_key_bob".as_bytes().to_vec()
-            };
-
-            assert!(Tee::report_works(Origin::signed(account), works).is_err());
-        });
-    }
-}

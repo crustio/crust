@@ -80,7 +80,7 @@ decl_module! {
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
 
             // 4. Verify sig
-            ensure!(Self::is_identity_legal(&identity), "Tee report signature is illegal");
+            ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
 
             // 5. applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
@@ -117,7 +117,7 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    pub fn is_identity_legal(id: &Identity<T::AccountId>) -> bool {
+    pub fn identity_sig_check(id: &Identity<T::AccountId>) -> bool {
         let applier_id = id.account_id.encode();
         let validator_id = id.validator_account_id.encode();
         tee_api::crypto::verify_identity(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
@@ -315,7 +315,7 @@ mod tests {
                 sig: sig.clone()
             };
 
-            assert!(Tee::is_identity_legal(&id));
+            assert!(Tee::identity_sig_check(&id));
         });
     }
 
@@ -337,7 +337,7 @@ mod tests {
                 sig: sig.clone()
             };
 
-            assert!(!Tee::is_identity_legal(&id));
+            assert!(!Tee::identity_sig_check(&id));
         });
     }
 

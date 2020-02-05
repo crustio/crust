@@ -485,6 +485,7 @@ construct_runtime!(
 		Indices: indices,
 		Balances: balances,
 		TransactionPayment: transaction_payment::{Module, Storage},
+		// TODO: [Remove] disable sudo rights
 		Sudo: sudo,
 
 		// Consensus support
@@ -496,7 +497,7 @@ construct_runtime!(
 		ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
 		AuthorityDiscovery: authority_discovery::{Module, Call, Config},
 
-		// TODO: Governance stuff; uncallable initially.
+		// TODO: [Remove] Governance stuff; uncallable initially.
 		// Do not need right now, will add in the future
 		/*Democracy: democracy::{Module, Call, Storage, Config, Event<T>},
 		Council: collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},

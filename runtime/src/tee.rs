@@ -1,7 +1,8 @@
-use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult };
+use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
 use system::ensure_signed;
 use sp_std::vec::Vec;
 use sp_std::str;
+use sp_std::convert::TryInto;
 use codec::{Encode, Decode};
 use crate::tee_api;
 
@@ -25,11 +26,12 @@ pub struct Identity<T> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+// TODO: change block_number & block_hash to standard data type
 pub struct WorkReport{
     pub_key: PubKey,
-    block_height: u64,
+    block_number: u64,
     block_hash: Vec<u8>,
-	empty_root: MerkleRoot,
+    empty_root: MerkleRoot,
     empty_workload: u64,
     meaningful_workload: u64,
 	sig: Signature,
@@ -58,6 +60,7 @@ decl_module! {
 		fn deposit_event() = default;
 
 		fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
+		    // TODO: add account_id <-> tee_pub_key validation
 		    let who = ensure_signed(origin)?;
 
             let applier = &identity.account_id;
@@ -92,19 +95,20 @@ decl_module! {
 		}
 
 		fn report_works(origin, work_report: WorkReport) -> DispatchResult {
-		    // TODO: 1. validate block information to determine real-time report
-		    // TODO: 2. Tee applier must be the extrinsic sender (can find public key, which is used in 3)
-		    // TODO: 3. validate public key to determine identity Information
-		    // TODO: 4. validate signature
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
             ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
-            // 2. Upsert works
+            // 2. Do timing check
+            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+
+            // TODO: 3. Do sig check
+
+            // 3. Upsert works
             <WorkReports<T>>::insert(&who, &work_report);
 
-            // 3. Emit event
+            // 4. Emit event
             Self::deposit_event(RawEvent::ReportWorks(who, work_report));
 
             Ok(())
@@ -118,6 +122,24 @@ impl<T: Trait> Module<T> {
         let validator_id = id.validator_account_id.encode();
         tee_api::crypto::verify_identity(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
     }
+
+    pub fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {
+        // 1. Check block hash
+        // TODO: move to constants
+        const REPORT_SLOT: u64 = 50;
+        let wr_block_number: T::BlockNumber = wr.block_number.try_into().ok().unwrap();
+        let wr_block_hash = <system::Module<T>>::block_hash(wr_block_number).as_ref().to_vec();
+        ensure!(&wr_block_hash == &wr.block_hash, "work report hash is illegal");
+
+        // 2. Check work report timing
+        let current_block_number = <system::Module<T>>::block_number();
+        let current_block_number_numeric: u64 = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
+        let current_report_slot = current_block_number_numeric / REPORT_SLOT;
+        // genesis block or must be 50-times number
+        ensure!(wr.block_number == 1 || wr.block_number == current_report_slot * REPORT_SLOT, "work report is outdated or beforehand");
+
+        Ok(())
+    }
 }
 
 decl_event!(
@@ -127,6 +149,7 @@ decl_event!(
 	}
 );
 
+// TODO: move test into tests file
 /// tests for this module
 #[cfg(test)]
 mod tests {
@@ -135,7 +158,7 @@ mod tests {
     use sp_core::H256;
     use frame_support::{impl_outer_origin, assert_ok, parameter_types, weights::Weight};
     use sp_runtime::{
-        traits::{BlakeTwo256, IdentityLookup}, testing::Header, Perbill
+        traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize}, testing::Header, Perbill
     };
     use sp_core::crypto::{AccountId32, Ss58Codec};
     use keyring::Sr25519Keyring;
@@ -182,6 +205,18 @@ mod tests {
     }
 
     type Tee = Module<Test>;
+    type System = system::Module<Test>;
+
+    /// Run until a particular block.
+    pub fn run_to_block(n: u64) {
+        while System::block_number() < n {
+            if System::block_number() > 1 {
+                System::on_finalize(System::block_number());
+            }
+            System::set_block_number(System::block_number() + 1);
+            System::on_initialize(System::block_number());
+        }
+    }
 
     // This function basically just builds a genesis storage key/value store according to
     // our desired mockup.
@@ -307,14 +342,15 @@ mod tests {
     }
 
 	#[test]
-	fn test_for_report_works_success() {
+	fn test_for_report_works_genesis_success() {
 		new_test_ext().execute_with(|| {
             let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+            let block_hash= [0; 32].to_vec();
 
             let works = WorkReport {
                 pub_key: "pub_key_alice".as_bytes().to_vec(),
-                block_height: 50,
-                block_hash: "block_hash".as_bytes().to_vec(),
+                block_number: 1,
+                block_hash,
                 empty_root: "merkle_root_alice".as_bytes().to_vec(),
                 empty_workload: 1000,
                 meaningful_workload: 1000,
@@ -326,13 +362,82 @@ mod tests {
 	}
 
     #[test]
+    fn test_for_report_works_success() {
+        new_test_ext().execute_with(|| {
+            // generate 53 blocks first
+            run_to_block(53);
+
+            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+            let block_hash= [0; 32].to_vec();
+
+            let works = WorkReport {
+                pub_key: "pub_key_alice".as_bytes().to_vec(),
+                block_number: 50,
+                block_hash,
+                empty_root: "merkle_root_alice".as_bytes().to_vec(),
+                empty_workload: 1000,
+                meaningful_workload: 1000,
+                sig: "sig_key_alice".as_bytes().to_vec()
+            };
+
+            assert_ok!(Tee::report_works(Origin::signed(account), works));
+        });
+    }
+
+    #[test]
+    fn test_for_report_works_hash_is_wrong_failed() {
+        new_test_ext().execute_with(|| {
+            // generate 50 blocks first
+            run_to_block(50);
+
+            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+            let block_hash= [1; 32].to_vec();
+
+            let works = WorkReport {
+                pub_key: "pub_key_alice".as_bytes().to_vec(),
+                block_number: 50,
+                block_hash,
+                empty_root: "merkle_root_alice".as_bytes().to_vec(),
+                empty_workload: 0,
+                meaningful_workload: 1000,
+                sig: "sig_key_alice".as_bytes().to_vec()
+            };
+
+            assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        });
+    }
+
+    #[test]
+    fn test_for_report_works_slot_outdated_failed() {
+        new_test_ext().execute_with(|| {
+            // generate 50 blocks first
+            run_to_block(103);
+
+            let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+            let block_hash= [0; 32].to_vec();
+
+            let works = WorkReport {
+                pub_key: "pub_key_alice".as_bytes().to_vec(),
+                block_number: 50,
+                block_hash,
+                empty_root: "merkle_root_alice".as_bytes().to_vec(),
+                empty_workload: 5000,
+                meaningful_workload: 1000,
+                sig: "sig_key_alice".as_bytes().to_vec()
+            };
+
+            assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        });
+    }
+
+    #[test]
     fn test_for_report_works_failed() {
         new_test_ext().execute_with(|| {
             let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
 
             let works = WorkReport {
                 pub_key: "pub_key_bob".as_bytes().to_vec(),
-                block_height: 50,
+                block_number: 50,
                 block_hash: "block_hash".as_bytes().to_vec(),
                 empty_root: "merkle_root_bob".as_bytes().to_vec(),
                 empty_workload: 2000,

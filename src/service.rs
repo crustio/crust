@@ -17,6 +17,7 @@ native_executor_instance!(
 	pub Executor,
 	crust_runtime::api::dispatch,
 	crust_runtime::native_version,
+	crust_runtime::tee_api::crypto::HostFunctions
 );
 
 construct_simple_protocol! {

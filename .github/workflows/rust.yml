@@ -5,15 +5,34 @@ on:
     branches: 
       - master
       - feature/*
-
+  pull_request:
+    branches:
+      - master
+      - feature/*
 jobs:
   build:
     name: Build Crust
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@master
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.toml') }}
+      - name: Cache target directory
+        id: cache-target
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target2-${{ hashFiles('**/Cargo.toml') }}
       - run: sudo apt-get remove -y clang-6.0 libclang-common-6.0-dev libclang1-6.0 libllvm6.0
       - run: sudo apt update && sudo apt install -y cmake pkg-config libssl-dev git gcc build-essential clang libclang-dev
-      - uses: actions/checkout@master
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2019-12-20-x86_64-unknown-linux-gnu

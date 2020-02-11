@@ -1,3 +1,13 @@
+[package]
+authors = ['crustio']
+edition = '2018'
+name = 'crust-runtime'
+version = '0.1.0'
+build = 'build.rs'
+
+[dependencies]
+cstrml-tee = { path = '../cstrml/tee', default_features = false }
+
 [dependencies.authorship]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -297,31 +307,16 @@ std = [
     'sudo/std',
     'staking/std',
     'session/std',
-    'staking/std',
     'system/std',
     'timestamp/std',
     'treasury/std',
     'transaction-payment/std',
     'sp-runtime-interface/std',
+    'cstrml-tee/std'
 ]
-
-[package]
-authors = ['crustio']
-edition = '2018'
-name = 'crust-runtime'
-version = '0.0.1'
 
 [build-dependencies.wasm-builder-runner]
 git = 'https://github.com/paritytech/substrate.git'
 package = 'substrate-wasm-builder-runner'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '1.0.4'
-
-[dependencies]
-serde_json = "1.0.44"
-signatory = "0.18.0"
-signatory-ring = "0.18.0"
-
-[dev-dependencies]
-keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-hex = '0.4.0'

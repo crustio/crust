@@ -6,7 +6,7 @@ authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
 name = 'crust'
-version = '0.0.1'
+version = '0.1.0'
 
 [build-dependencies]
 vergen = '3.0.4'
@@ -23,10 +23,6 @@ log = '0.4.8'
 parking_lot = '0.9.0'
 tokio = '0.1.22'
 trie-root = '0.15.2'
-
-[dependencies.codec]
-package = 'parity-scale-codec'
-version = '1.0.0'
 
 [dependencies.ctrlc]
 features = ['termination']
@@ -50,7 +46,11 @@ version = '2.0.0'
 
 [dependencies.crust-runtime]
 path = 'runtime'
-version = '0.0.1'
+version = '0.1.0'
+
+[dependencies.cstrml-tee]
+path = 'cstrml/tee'
+version = '0.1.0'
 
 [dependencies.sc-basic-authority]
 git = 'https://github.com/paritytech/substrate.git'

@@ -1,7 +1,6 @@
 use super::*;
-use crate::tee;
 
-use sp_core::H256;
+use sp_core::{H256, crypto::AccountId32};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize}, testing::Header, Perbill
@@ -32,7 +31,7 @@ impl system::Trait for Test {
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = AccountId;
+    type AccountId = AccountId32;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
     type Event = ();
@@ -44,11 +43,11 @@ impl system::Trait for Test {
     type ModuleToIndex = ();
 }
 
-impl tee::Trait for Test {
+impl Trait for Test {
     type Event = ();
 }
 
-pub type Tee = tee::Module<Test>;
+pub type Tee = Module<Test>;
 type System = system::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
@@ -59,7 +58,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         Sr25519Keyring::Alice.to_account_id()
     ];
 
-    tee::GenesisConfig::<Test> {
+    GenesisConfig::<Test> {
         tee_identities: tee_ids
             .iter()
             .map(|x| (x.clone(), Default::default()))

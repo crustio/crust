@@ -500,7 +500,7 @@ construct_runtime!(
 		TechnicalMembership: membership::<Instance1>::{Module, Call, Storage, Event<T>, Config<T>},
 		Treasury: treasury::{Module, Call, Storage, Event<T>},*/
 
-		/// Crust runtime modules
+		// Crust modules
 		Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );

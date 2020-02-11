@@ -1,7 +1,14 @@
+#[cfg(test)]
+
 use super::*;
+
+#[allow(unused_imports)]
 use crate::mock::{Tee, Origin, new_test_ext, run_to_block};
 
+#[allow(unused_imports)]
 use frame_support::assert_ok;
+
+#[allow(unused_imports)]
 use sp_core::crypto::{AccountId32, Ss58Codec};
 use keyring::Sr25519Keyring;
 use hex;
@@ -18,7 +25,7 @@ fn test_for_register_identity_success() {
         let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
         let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
 
-        let id = tee::Identity {
+        let id = Identity {
             pub_key: pk.clone(),
             account_id: applier.clone(),
             validator_pub_key: pk.clone(),
@@ -40,7 +47,7 @@ fn test_for_register_identity_failed_by_validator_illegal() {
         // Bob is not validator before
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
 
-        let id = tee::Identity {
+        let id = Identity {
             pub_key: "pub_key_bob".as_bytes().to_vec(),
             account_id: account.clone(),
             validator_pub_key: "pub_key_bob".as_bytes().to_vec(),
@@ -57,7 +64,7 @@ fn test_for_register_identity_failed_by_validate_for_self() {
     new_test_ext().execute_with(|| {
         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
 
-        let id = tee::Identity {
+        let id = Identity {
             pub_key: "pub_key_self".as_bytes().to_vec(),
             account_id: account.clone(),
             validator_pub_key: "pub_key_self".as_bytes().to_vec(),
@@ -79,7 +86,7 @@ fn test_for_identity_sig_check_failed() {
         let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");
         let sig= hex::decode("9b252b7112c6d38215726a5fbeaa53172e1a343ce96f8aa7441561f4947b08248ffdc568aee62d07c7651c0b881bcaa437e0b9e1fb6ffc807d3cd8287fedc54c").expect("Invalid hex");
 
-        let id = tee::Identity {
+        let id = Identity {
             pub_key: pk.clone(),
             account_id: applier.clone(),
             validator_pub_key: pk.clone(),
@@ -103,7 +110,7 @@ fn test_for_report_works_success() {
         let empty_root = hex::decode("ae56f97320fbebbd1dd44d573486261709f5497d9d8391b2b2b6c23287927f5d").unwrap();
         let sig = hex::decode("4b23f3a95015387c735100dae6fdcb78445a2db50d08e19713bff900b69bc8c0719bf62750b30b92d082adfe8e0fa705a6cbe909c09961b4d0cc5f22d5c91581").unwrap();
 
-        let works = tee::WorkReport {
+        let works = WorkReport {
             pub_key,
             block_number: 50,
             block_hash,
@@ -123,7 +130,7 @@ fn test_for_report_works_failed_by_reporter_is_not_registered() {
     new_test_ext().execute_with(|| {
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
 
-        let works = tee::WorkReport {
+        let works = WorkReport {
             pub_key: "pub_key_bob".as_bytes().to_vec(),
             block_number: 50,
             block_hash: "block_hash".as_bytes().to_vec(),
@@ -146,7 +153,7 @@ fn test_for_work_report_timing_check_failed_by_wrong_hash() {
         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
         let block_hash= [1; 32].to_vec();
 
-        let works = tee::WorkReport {
+        let works = WorkReport {
             pub_key: "pub_key_alice".as_bytes().to_vec(),
             block_number: 50,
             block_hash,
@@ -169,7 +176,7 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
         let block_hash= [0; 32].to_vec();
 
-        let works = tee::WorkReport {
+        let works = WorkReport {
             pub_key: "pub_key_alice".as_bytes().to_vec(),
             block_number: 50,
             block_hash,
@@ -195,7 +202,7 @@ fn test_for_work_report_sig_check_failed() {
         let empty_root = hex::decode("ae56f97320fbebbd1dd44d573486261709f5497d9d8391b2b2b6c23287927f5d").unwrap();
         let sig = hex::decode("4b23f3a95015387c735100dae6fdcb78445a2db50d08e19713bff900b69bc8c0719bf62750b30b92d082adfe8e0fa705a6cbe909c09961b4d0cc5f22d5c91599").unwrap();
 
-        let works = tee::WorkReport {
+        let works = WorkReport {
             pub_key,
             block_number: 50,
             block_hash,

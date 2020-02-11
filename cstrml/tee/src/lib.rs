@@ -1,12 +1,22 @@
+//! The Substrate Node runtime. This can be compiled with `#[no_std]`, ready for Wasm.
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#![feature(option_result_contains)]
+
 use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
 use system::ensure_signed;
 use sp_std::{vec::Vec, str};
 use sp_std::convert::TryInto;
 use codec::{Encode, Decode};
-use crate::tee_api;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
+
+/// Provides crypto and other std functions by implementing `runtime_interface`
+mod api;
+
+mod mock;
+mod tests;
 
 /// Define TEE basic elements
 type PubKey = Vec<u8>;
@@ -121,7 +131,7 @@ impl<T: Trait> Module<T> {
         let applier_id = id.account_id.encode();
         let validator_id = id.validator_account_id.encode();
         // TODO: concat data inside runtime for saving PassBy params number
-        tee_api::crypto::verify_identity_sig(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
+        api::crypto::verify_identity_sig(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
     }
 
     pub fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {
@@ -144,7 +154,7 @@ impl<T: Trait> Module<T> {
 
     pub fn work_report_sig_check(wr: &WorkReport) -> bool {
         // TODO: concat data inside runtime for saving PassBy params number
-        tee_api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
+        api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
                                                 wr.empty_workload, wr.meaningful_workload, &wr.sig)
     }
 }

@@ -4,16 +4,9 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit="256"]
 
-#![feature(option_result_contains)]
-
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-
-#[cfg(test)]
-mod mock;
-#[cfg(test)]
-mod tests;
 
 use sp_std::prelude::*;
 use sp_core::OpaqueMetadata;
@@ -55,11 +48,8 @@ use system::offchain::TransactionSubmitter;
 pub mod constants;
 use constants::{*, time::*};
 
-/// Used for the module tee in `./tee.rs`
-mod tee;
-
-/// Used for tee api
-pub mod tee_api;
+/// Crust runtime modules
+use cstrml_tee as tee;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -115,12 +105,10 @@ parameter_types! {
 }
 
 impl system::Trait for Runtime {
-	/// The identifier used to distinguish between accounts.
-	type AccountId = AccountId;
+	/// The ubiquitous origin type.
+	type Origin = Origin;
 	/// The aggregated dispatch type that is available for extrinsics.
 	type Call = Call;
-	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
-	type Lookup = Indices;
 	/// The index type for storing how many extrinsics an account has signed.
 	type Index = Index;
 	/// The index type for blocks.
@@ -129,12 +117,14 @@ impl system::Trait for Runtime {
 	type Hash = Hash;
 	/// The hashing algorithm used.
 	type Hashing = BlakeTwo256;
+	/// The identifier used to distinguish between accounts.
+	type AccountId = AccountId;
+	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
+	type Lookup = Indices;
 	/// The header type.
 	type Header = generic::Header<BlockNumber, BlakeTwo256>;
 	/// The ubiquitous event type.
 	type Event = Event;
-	/// The ubiquitous origin type.
-	type Origin = Origin;
 	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
 	type BlockHashCount = BlockHashCount;
 	/// Maximum weight of each block.
@@ -468,7 +458,6 @@ impl sudo::Trait for Runtime {
 	type Proposal = Call;
 }
 
-/// Used for the module tee in `./tee.rs`
 impl tee::Trait for Runtime {
 	type Event = Event;
 }
@@ -511,7 +500,7 @@ construct_runtime!(
 		TechnicalMembership: membership::<Instance1>::{Module, Call, Storage, Event<T>, Config<T>},
 		Treasury: treasury::{Module, Call, Storage, Event<T>},*/
 
-		// Used for the module tee in `./tee.rs`
+		/// Crust runtime modules
 		Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );

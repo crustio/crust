@@ -6,7 +6,7 @@ authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
 name = 'crust'
-version = '0.0.1'
+version = '0.1.0'
 
 [build-dependencies]
 vergen = '3.0.4'
@@ -50,7 +50,7 @@ version = '2.0.0'
 
 [dependencies.crust-runtime]
 path = 'runtime'
-version = '0.0.1'
+version = '0.1.0'
 
 [dependencies.sc-basic-authority]
 git = 'https://github.com/paritytech/substrate.git'
@@ -132,7 +132,10 @@ rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
 [workspace]
-members = ['runtime']
+members = [
+    'cstrml/tee',
+    'runtime'
+]
 
 [[bin]]
 name = 'crust'

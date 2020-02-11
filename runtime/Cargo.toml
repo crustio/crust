@@ -1,8 +1,12 @@
 [package]
-name = 'crust-runtime'
 authors = ['crustio']
 edition = '2018'
+name = 'crust-runtime'
 version = '0.1.0'
+build = 'build.rs'
+
+[dependencies]
+cstrml-tee = { path = '../cstrml/tee', default_features = false }
 
 [dependencies.authorship]
 default-features = false
@@ -136,6 +140,11 @@ version = '2.0.0'
 [dependencies.safe-mix]
 default-features = false
 version = '1.0.0'
+
+[dependencies.serde]
+features = ['derive']
+optional = true
+version = '1.0.101'
 
 [dependencies.sp-api]
 default-features = false
@@ -282,6 +291,7 @@ std = [
     'indices/std',
     'randomness-collective-flip/std',
     'safe-mix/std',
+    'serde',
     'sp-api/std',
     'sp-block-builder/std',
     'sp-core/std',
@@ -302,11 +312,8 @@ std = [
     'treasury/std',
     'transaction-payment/std',
     'sp-runtime-interface/std',
+    'cstrml-tee/std'
 ]
-
-# crust runtime modules
-[dependencies]
-cstrml-tee = { path = '../cstrml/tee' }
 
 [build-dependencies.wasm-builder-runner]
 git = 'https://github.com/paritytech/substrate.git'

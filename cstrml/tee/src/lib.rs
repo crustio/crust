@@ -1,4 +1,5 @@
 //! The Substrate Node runtime. This can be compiled with `#[no_std]`, ready for Wasm.
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #![feature(option_result_contains)]
@@ -13,9 +14,12 @@ use codec::{Encode, Decode};
 use serde::{Deserialize, Serialize};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
-mod api;
+pub mod api;
 
+#[cfg(test)]
 mod mock;
+
+#[cfg(test)]
 mod tests;
 
 /// Define TEE basic elements

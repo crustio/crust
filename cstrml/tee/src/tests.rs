@@ -1,14 +1,7 @@
-#[cfg(test)]
-
 use super::*;
 
-#[allow(unused_imports)]
 use crate::mock::{Tee, Origin, new_test_ext, run_to_block};
-
-#[allow(unused_imports)]
 use frame_support::assert_ok;
-
-#[allow(unused_imports)]
 use sp_core::crypto::{AccountId32, Ss58Codec};
 use keyring::Sr25519Keyring;
 use hex;

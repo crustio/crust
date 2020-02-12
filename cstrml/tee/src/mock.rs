@@ -3,9 +3,21 @@ use super::*;
 use sp_core::{H256, crypto::AccountId32};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize}, testing::Header, Perbill
+    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
+    testing::{Header, UintAuthorityId},
+    Perbill,
+    curve::PiecewiseLinear
 };
 use keyring::Sr25519Keyring;
+
+// TODO: Copy from constants, abstract into `primitives`
+/// Balance of an account.
+pub type Balance = u128;
+
+/// An index to a block.
+pub type BlockNumber = u32;
+
+type AccountId = AccountId32;
 
 impl_outer_origin! {
     pub enum Origin for Test {}
@@ -31,7 +43,7 @@ impl system::Trait for Test {
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = AccountId32;
+    type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
     type Event = ();
@@ -42,6 +54,93 @@ impl system::Trait for Test {
     type Version = ();
     type ModuleToIndex = ();
 }
+
+parameter_types! {
+    pub const MinimumPeriod: u64 = 3;
+}
+
+impl timestamp::Trait for Test {
+    type Moment = u64;
+    type OnTimestampSet = ();
+    type MinimumPeriod = MinimumPeriod;
+}
+
+parameter_types! {
+    pub const ExistentialDeposit: Balance = 0;
+    pub const TransferFee: Balance = 0;
+    pub const CreationFee: Balance = 0;
+}
+
+impl balances::Trait for Test {
+    type Balance = Balance;
+    type OnFreeBalanceZero = ();
+    type OnNewAccount = ();
+    type TransferPayment = ();
+    type DustRemoval = ();
+    type Event = ();
+    type ExistentialDeposit = ExistentialDeposit;
+    type TransferFee = TransferFee;
+    type CreationFee = CreationFee;
+}
+
+parameter_types! {
+	pub const Period: BlockNumber = 1;
+	pub const Offset: BlockNumber = 0;
+	pub const UncleGenerations: u64 = 0;
+	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(25);
+}
+impl session::Trait for Test {
+    type Event = ();
+    type ValidatorId = AccountId;
+    type ValidatorIdOf = staking::StashOf<Test>;
+    type ShouldEndSession = session::PeriodicSessions<Period, Offset>;
+    type OnSessionEnding = ();
+    type SessionHandler = session::TestSessionHandler;
+    type Keys = UintAuthorityId;
+    type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+    type SelectInitialValidators = ();
+}
+
+impl session::historical::Trait for Test {
+    type FullIdentification = staking::Exposure<AccountId, Balance>;
+    type FullIdentificationOf = staking::ExposureOf<Test>;
+}
+
+pallet_staking_reward_curve::build! {
+    const REWARD_CURVE: PiecewiseLinear<'static> = curve!(
+        min_inflation: 0_025_000,
+        max_inflation: 0_100_000,
+        ideal_stake: 0_500_000,
+        falloff: 0_050_000,
+        max_piece_count: 40,
+        test_precision: 0_005_000,
+    );
+}
+
+parameter_types! {
+    pub const SessionsPerEra: sp_staking::SessionIndex = 6;
+    pub const BondingDuration: staking::EraIndex = 28;
+    pub const SlashDeferDuration: staking::EraIndex = 7;
+    pub const AttestationPeriod: BlockNumber = 100;
+    pub const RewardCurve: &'static PiecewiseLinear<'static> = &REWARD_CURVE;
+}
+
+impl cstrml_staking::Trait for Test {
+    type Currency = balances::Module<Test>;
+    type Time = timestamp::Module<Test>;
+    type CurrencyToVote = ();
+    type RewardRemainder = ();
+    type Event = ();
+    type Slash = ();
+    type Reward = ();
+    type SessionsPerEra = SessionsPerEra;
+    type BondingDuration = BondingDuration;
+    type SlashDeferDuration = SlashDeferDuration;
+    type SlashCancelOrigin = system::EnsureRoot<Self::AccountId>;
+    type SessionInterface = Self;
+    type RewardCurve = RewardCurve;
+}
+
 
 impl Trait for Test {
     type Event = ();

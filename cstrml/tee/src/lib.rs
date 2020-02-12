@@ -13,6 +13,9 @@ use codec::{Encode, Decode};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
+// Crust runtime modules
+use cstrml_staking as staking;
+
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
 
@@ -51,7 +54,7 @@ pub struct WorkReport{
 }
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait {
+pub trait Trait: system::Trait + staking::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
@@ -122,7 +125,11 @@ decl_module! {
             // 4. Upsert works
             <WorkReports<T>>::insert(&who, &work_report);
 
-            // 5. Emit event
+            // 5. Check staking
+            let limitation = work_report.empty_workload + work_report.meaningful_workload;
+            Self::check_and_set_stake_limitation(&who, limitation);
+
+            // 6. Emit event
             Self::deposit_event(RawEvent::ReportWorks(who, work_report));
 
             Ok(())
@@ -160,6 +167,23 @@ impl<T: Trait> Module<T> {
         // TODO: concat data inside runtime for saving PassBy params number
         api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
                                                 wr.empty_workload, wr.meaningful_workload, &wr.sig)
+    }
+
+    // TODO: change into own staking module
+    pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u64) {
+        /*// 1. Get lockable balances and stash account
+        let mut ledger = <staking::Module<T>>::ledger(&who).unwrap();
+        let active_lockable_result = ledger.active;
+        let stash_account = ledger.stash;
+
+        // 2. Judge limitation
+        if active_lockable_result <= limitation { return }
+        ledger.active = limitation;
+        ledger.total = limitation;
+
+        // 3. [DANGER] If exceed limitation set new
+        // TODO: Try another safe way to set stake limit
+        <staking::Module<T>>::update_ledger(&stash_account, &ledger);*/
     }
 }
 

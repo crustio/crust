@@ -7,6 +7,8 @@ build = 'build.rs'
 
 [dependencies]
 cstrml-tee = { path = '../cstrml/tee', default_features = false }
+cstrml-staking = { path = '../cstrml/staking', default_features = false }
+
 
 [dependencies.authorship]
 default-features = false
@@ -216,13 +218,6 @@ git = 'https://github.com/paritytech/substrate.git'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
-[dependencies.sudo]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-package = 'pallet-sudo'
-rev = '3e651110aa06aa835790df63410a29676243fc54'
-version = '2.0.0'
-
 [dependencies.system]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -234,13 +229,6 @@ version = '2.0.0'
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'pallet-session'
-rev = '3e651110aa06aa835790df63410a29676243fc54'
-version = '2.0.0'
-
-[dependencies.staking]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-package = 'pallet-staking'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 
@@ -304,15 +292,14 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
-    'sudo/std',
-    'staking/std',
     'session/std',
     'system/std',
     'timestamp/std',
     'treasury/std',
     'transaction-payment/std',
     'sp-runtime-interface/std',
-    'cstrml-tee/std'
+    'cstrml-tee/std',
+    'cstrml-staking/std'
 ]
 
 [build-dependencies.wasm-builder-runner]

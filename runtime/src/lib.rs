@@ -28,8 +28,6 @@ use sp_version::RuntimeVersion;
 use sp_version::NativeVersion;
 use sp_staking::SessionIndex;
 
-#[cfg(feature = "std")]
-pub use staking::StakerStatus;
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
@@ -50,6 +48,10 @@ use constants::{*, time::*};
 
 /// Crust runtime modules
 use cstrml_tee as tee;
+use cstrml_staking as staking;
+
+#[cfg(feature = "std")]
+pub use staking::StakerStatus;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -190,10 +192,10 @@ impl indices::Trait for Runtime {
 	/// The type for recording indexing into the account enumeration. If this ever overflows, there
 	/// will be problems!
 	type AccountIndex = AccountIndex;
-	/// Use the standard means of resolving an index hint from an id.
-	type ResolveHint = indices::SimpleResolveHint<Self::AccountId, Self::AccountIndex>;
 	/// Determine whether an account is dead.
 	type IsDeadAccount = Balances;
+	/// Use the standard means of resolving an index hint from an id.
+	type ResolveHint = indices::SimpleResolveHint<Self::AccountId, Self::AccountIndex>;
 	/// The ubiquitous event type.
 	type Event = Event;
 }
@@ -453,11 +455,6 @@ impl transaction_payment::Trait for Runtime {
 	type FeeMultiplierUpdate = ();
 }
 
-impl sudo::Trait for Runtime {
-	type Event = Event;
-	type Proposal = Call;
-}
-
 impl tee::Trait for Runtime {
 	type Event = Event;
 }
@@ -479,8 +476,6 @@ construct_runtime!(
 		Indices: indices,
 		Balances: balances,
 		TransactionPayment: transaction_payment::{Module, Storage},
-		// TODO: [Remove] disable sudo rights
-		Sudo: sudo,
 
 		// Consensus support
 		Authorship: authorship::{Module, Call, Storage},

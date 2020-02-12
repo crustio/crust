@@ -9,6 +9,7 @@ build = 'build.rs'
 cstrml-tee = { path = '../cstrml/tee', default_features = false }
 cstrml-staking = { path = '../cstrml/staking', default_features = false }
 
+
 [dependencies.authorship]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'

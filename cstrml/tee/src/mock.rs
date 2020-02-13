@@ -1,6 +1,6 @@
 use super::*;
 
-use sp_core::{H256, crypto::AccountId32};
+use sp_core::{H256, crypto::AccountId32, sr25519};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
@@ -9,13 +9,8 @@ use sp_runtime::{
     curve::PiecewiseLinear
 };
 use keyring::Sr25519Keyring;
-
-// TODO: Copy from constants, abstract into `primitives`
-/// Balance of an account.
-pub type Balance = u128;
-
-/// An index to a block.
-pub type BlockNumber = u32;
+use cstrml_staking::StakerStatus;
+use cst_primitives::{Balance, BlockNumber};
 
 type AccountId = AccountId32;
 
@@ -147,21 +142,47 @@ impl Trait for Test {
 }
 
 pub type Tee = Module<Test>;
-type System = system::Module<Test>;
+pub type System = system::Module<Test>;
+pub type Staking = cstrml_staking::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
-    let tee_ids = [
-        Sr25519Keyring::Alice.to_account_id()
+
+    // stash-controller accounts
+    let accounts = [
+        (Sr25519Keyring::One.to_account_id(), Sr25519Keyring::Alice.to_account_id())
     ];
 
+    let tee_identities = accounts.iter().map(|x| (x.1.clone(), Default::default())).collect();
+
+    // controllers are the index + 1000
+    let stakers = accounts.iter().map(|i| (
+        i.0.clone(),
+        i.1.clone(),
+        10_000,
+        StakerStatus::Validator,
+    )).collect();
+
+    let balances = accounts.iter().map(|id|(id.0.clone(), 100000)).collect();
+
     GenesisConfig::<Test> {
-        tee_identities: tee_ids
-            .iter()
-            .map(|x| (x.clone(), Default::default()))
-            .collect()
+        tee_identities
+    }.assimilate_storage(&mut t).unwrap();
+
+    balances::GenesisConfig::<Test> {
+        balances,
+        vesting: vec![],
+    }.assimilate_storage(&mut t).unwrap();
+
+    staking::GenesisConfig::<Test> {
+        current_era: 0,
+        stakers,
+        validator_count: 4,
+        minimum_validator_count: 1,
+        invulnerables: vec![],
+        .. Default::default()
     }.assimilate_storage(&mut t).unwrap();
 
     t.into()

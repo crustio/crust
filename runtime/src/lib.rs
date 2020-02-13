@@ -44,7 +44,9 @@ use system::offchain::TransactionSubmitter;
 
 /// Constant values used within the runtime.
 pub mod constants;
-use constants::{*, time::*};
+
+use constants::time::*;
+use primitives::*;
 
 /// Crust runtime modules
 use cstrml_tee as tee;

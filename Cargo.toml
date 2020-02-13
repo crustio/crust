@@ -26,6 +26,7 @@ trie-root = '0.15.2'
 
 # Crust runtime modules
 cstrml-staking = { path = 'cstrml/staking' }
+primitives = { package = 'cst-primitives', path = 'primitives'}
 
 [dependencies.ctrlc]
 features = ['termination']

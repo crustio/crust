@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use cstrml_staking as staking;
+use cstrml_staking::BalanceOf;
+use cst_primitives::{ PubKey, TeeSignature, MerkleRoot};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -25,11 +27,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-/// Define TEE basic elements
-type PubKey = Vec<u8>;
-type Signature = Vec<u8>;
-type MerkleRoot = Vec<u8>;
-
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Identity<T> {
@@ -37,7 +34,7 @@ pub struct Identity<T> {
     pub account_id: T,
     pub validator_pub_key: PubKey,
     pub validator_account_id: T,
-    pub sig: Signature,
+    pub sig: TeeSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -50,7 +47,7 @@ pub struct WorkReport{
     pub empty_root: MerkleRoot,
     pub empty_workload: u64,
     pub meaningful_workload: u64,
-    pub sig: Signature,
+    pub sig: TeeSignature,
 }
 
 /// The module's configuration trait.
@@ -117,7 +114,7 @@ decl_module! {
             ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
             // 2. Do timing check
-            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            //ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
             // 3. Do sig check
             ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
@@ -171,19 +168,23 @@ impl<T: Trait> Module<T> {
 
     // TODO: change into own staking module
     pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u64) {
-        /*// 1. Get lockable balances and stash account
+        // 1. Get lockable balances and stash account
         let mut ledger = <staking::Module<T>>::ledger(&who).unwrap();
-        let active_lockable_result = ledger.active;
-        let stash_account = ledger.stash;
+        let active_lockable_balances = &ledger.active;
+
+        // 2. Convert storage into limited balances
+        // TODO: Calculate with accurate gigabytes converter and exchange rate
+        let storage_balances = limitation / 1_000_000;
+        let limited_balances: BalanceOf<T> = storage_balances.try_into().ok().unwrap();
 
         // 2. Judge limitation
-        if active_lockable_result <= limitation { return }
-        ledger.active = limitation;
-        ledger.total = limitation;
+        if active_lockable_balances <= &limited_balances { return; }
+        ledger.active = limited_balances;
+        ledger.total = limited_balances;
 
         // 3. [DANGER] If exceed limitation set new
         // TODO: Try another safe way to set stake limit
-        <staking::Module<T>>::update_ledger(&stash_account, &ledger);*/
+        <staking::Module<T>>::update_ledger(&who, &ledger);
     }
 }
 

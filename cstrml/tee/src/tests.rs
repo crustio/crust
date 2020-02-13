@@ -1,12 +1,32 @@
 use super::*;
 
-use crate::mock::{Tee, Origin, new_test_ext, run_to_block};
+use crate::mock::{Tee, Staking, Origin, new_test_ext, run_to_block};
 use frame_support::assert_ok;
 use sp_core::crypto::{AccountId32, Ss58Codec};
 use keyring::Sr25519Keyring;
 use hex;
 
+use cstrml_staking as staking;
+use staking::StakingLedger;
+
 type AccountId = AccountId32;
+
+fn get_valid_work_report() -> WorkReport {
+    let pub_key = hex::decode("19817c0e3be0793b9c27b6064aeac6a82df3335a2ccdac7ea3d4c56e96a315a1e4dfe23491330c1ba11347ca4d6474151636ec15a7fc45d219d034eb9a33bb75").unwrap();
+    let block_hash= [0; 32].to_vec();
+    let empty_root = hex::decode("ae56f97320fbebbd1dd44d573486261709f5497d9d8391b2b2b6c23287927f5d").unwrap();
+    let sig = hex::decode("4b23f3a95015387c735100dae6fdcb78445a2db50d08e19713bff900b69bc8c0719bf62750b30b92d082adfe8e0fa705a6cbe909c09961b4d0cc5f22d5c91581").unwrap();
+
+    WorkReport {
+        pub_key,
+        block_number: 50,
+        block_hash,
+        empty_root,
+        empty_workload: 4294967296,
+        meaningful_workload: 1676266280,
+        sig
+    }
+}
 
 #[test]
 fn test_for_register_identity_success() {
@@ -98,20 +118,7 @@ fn test_for_report_works_success() {
         run_to_block(53);
 
         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-        let pub_key = hex::decode("19817c0e3be0793b9c27b6064aeac6a82df3335a2ccdac7ea3d4c56e96a315a1e4dfe23491330c1ba11347ca4d6474151636ec15a7fc45d219d034eb9a33bb75").unwrap();
-        let block_hash= [0; 32].to_vec();
-        let empty_root = hex::decode("ae56f97320fbebbd1dd44d573486261709f5497d9d8391b2b2b6c23287927f5d").unwrap();
-        let sig = hex::decode("4b23f3a95015387c735100dae6fdcb78445a2db50d08e19713bff900b69bc8c0719bf62750b30b92d082adfe8e0fa705a6cbe909c09961b4d0cc5f22d5c91581").unwrap();
-
-        let works = WorkReport {
-            pub_key,
-            block_number: 50,
-            block_hash,
-            empty_root,
-            empty_workload: 4294967296,
-            meaningful_workload: 1676266280,
-            sig
-        };
+        let works = get_valid_work_report();
 
         assert_ok!(Tee::report_works(Origin::signed(account), works));
     });
@@ -206,6 +213,25 @@ fn test_for_work_report_sig_check_failed() {
         };
 
         assert!(Tee::report_works(Origin::signed(account), works).is_err());
+    });
+}
+
+#[test]
+fn test_for_check_and_set_stake_limitation_success() {
+    new_test_ext().execute_with(|| {
+        let account: AccountId = Sr25519Keyring::Alice.to_account_id();
+        let stash_account: AccountId = Sr25519Keyring::One.to_account_id();
+
+        // Alice is validator and staked 1,000 CRUs
+        Tee::check_and_set_stake_limitation(&account, 5000_000_000);
+
+        // Check how much is at stake
+        assert_eq!(Staking::ledger(&account), Some(StakingLedger {
+            stash: stash_account,
+            total: 5000,
+            active: 5000,
+            unlocking: vec![],
+        }));
     });
 }
 

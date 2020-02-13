@@ -3,14 +3,16 @@ use crust_runtime::{
 	BalancesConfig, GenesisConfig, IndicesConfig,
 	SystemConfig, WASM_BINARY, SessionConfig, StakingConfig,
 	AuthorityDiscoveryConfig, SessionKeys, ImOnlineId,
-	AuthorityDiscoveryId, TeeConfig, StakerStatus
+	AuthorityDiscoveryId, TeeConfig, StakerStatus,
+	constants::currency::CRUS
 };
-use crust_runtime::constants::{*, currency::CRUS};
+use primitives::*;
 use sp_consensus_babe::{AuthorityId as BabeId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
 use sc_service;
 use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
 use cstrml_staking::Forcing;
+use cstrml_tee::WorkReport;
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server
@@ -141,6 +143,16 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 	const ENDOWMENT: u128 = 1_000_000 * CRUS;
 	const STASH: u128 = 20_000 * CRUS;
 
+	/*let initial_work_report = WorkReport {
+		pub_key: "pub_key".as_bytes().to_vec(),
+		block_number: 0,
+		block_hash: [0; 32].to_vec(),
+		empty_root: "merkle_root".as_bytes().to_vec(),
+		empty_workload: 10_000,
+		meaningful_workload: 20_000,
+		sig: "sig_keys".as_bytes().to_vec()
+	};*/
+
 	GenesisConfig {
 		system: Some(SystemConfig {
 			code: WASM_BINARY.to_vec(),
@@ -161,8 +173,8 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 		}),
 		staking: Some(StakingConfig {
 			current_era: 0,
-			validator_count: 4,
-			minimum_validator_count: 2,
+			validator_count: 2,
+			minimum_validator_count: 1,
 			stakers: initial_authorities
 				.iter()
 				.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
@@ -182,7 +194,11 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 			tee_identities: endowed_accounts
 				.iter()
 				.map(|x| (x.clone(), Default::default()))
-				.collect()
+				.collect(),
+			/*work_reports: endowed_accounts
+				.iter()
+				.map(|x| (x.clone(), initial_work_report.clone()))
+				.collect(),*/
 		})
 	}
 }

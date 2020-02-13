@@ -980,7 +980,8 @@ impl<T: Trait> Module<T> {
 
     /// Update the ledger for a controller. This will also update the stash lock. The lock will
     /// will lock the entire funds except paying for further transactions.
-    fn update_ledger(
+    /// TODO: Stop let dangerous be pub
+    pub fn update_ledger(
         controller: &T::AccountId,
         ledger: &StakingLedger<T::AccountId, BalanceOf<T>>
     ) {

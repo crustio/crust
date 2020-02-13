@@ -117,10 +117,19 @@ fn test_for_report_works_success() {
         // generate 53 blocks first
         run_to_block(53);
 
-        let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+        let account: AccountId = Sr25519Keyring::Alice.to_account_id();
+        let stash_account: AccountId = Sr25519Keyring::One.to_account_id();
         let works = get_valid_work_report();
 
-        assert_ok!(Tee::report_works(Origin::signed(account), works));
+        assert_ok!(Tee::report_works(Origin::signed(account.clone()), works));
+
+        // Check how much is at stake
+        assert_eq!(Staking::ledger(&account), Some(StakingLedger {
+            stash: stash_account,
+            total: 5971,
+            active: 5971,
+            unlocking: vec![],
+        }));
     });
 }
 

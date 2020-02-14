@@ -8,6 +8,7 @@ use hex;
 
 use cstrml_staking as staking;
 use staking::StakingLedger;
+use primitives::constants::currency::CRUS;
 
 type AccountId = AccountId32;
 
@@ -123,11 +124,12 @@ fn test_for_report_works_success() {
 
         assert_ok!(Tee::report_works(Origin::signed(account.clone()), works));
 
+        let limited_stakes = 5971233576 * (CRUS / 1_000_000);
         // Check how much is at stake
         assert_eq!(Staking::ledger(&account), Some(StakingLedger {
             stash: stash_account,
-            total: 5971,
-            active: 5971,
+            total: limited_stakes,
+            active: limited_stakes,
             unlocking: vec![],
         }));
     });
@@ -234,11 +236,12 @@ fn test_for_check_and_set_stake_limitation_success() {
         // Alice is validator and staked 1,000 CRUs
         Tee::check_and_set_stake_limitation(&account, 5000_000_000);
 
+        let limited_stakes = 5000_000_000 * (CRUS / 1_000_000);
         // Check how much is at stake
         assert_eq!(Staking::ledger(&account), Some(StakingLedger {
             stash: stash_account,
-            total: 5000,
-            active: 5000,
+            total: limited_stakes,
+            active: limited_stakes,
             unlocking: vec![],
         }));
     });

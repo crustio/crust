@@ -3,16 +3,14 @@ use crust_runtime::{
 	BalancesConfig, GenesisConfig, IndicesConfig,
 	SystemConfig, WASM_BINARY, SessionConfig, StakingConfig,
 	AuthorityDiscoveryConfig, SessionKeys, ImOnlineId,
-	AuthorityDiscoveryId, TeeConfig, StakerStatus,
-	constants::currency::CRUS
+	AuthorityDiscoveryId, TeeConfig, StakerStatus
 };
-use primitives::*;
+use primitives::{*, constants::currency::CRUS};
 use sp_consensus_babe::{AuthorityId as BabeId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
 use sc_service;
 use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
 use cstrml_staking::Forcing;
-use cstrml_tee::WorkReport;
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server

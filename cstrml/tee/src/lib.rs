@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 // Crust runtime modules
 use cstrml_staking as staking;
 use cstrml_staking::BalanceOf;
-use cst_primitives::{ PubKey, TeeSignature, MerkleRoot};
+use primitives::{PubKey, TeeSignature, MerkleRoot, constants::currency::*};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -114,7 +114,7 @@ decl_module! {
             ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
             // 2. Do timing check
-            //ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
             // 3. Do sig check
             ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
@@ -170,11 +170,11 @@ impl<T: Trait> Module<T> {
     pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u64) {
         // 1. Get lockable balances and stash account
         let mut ledger = <staking::Module<T>>::ledger(&who).unwrap();
-        let active_lockable_balances = &ledger.active;
+        let active_lockable_balances: &BalanceOf<T> = &ledger.active;
 
         // 2. Convert storage into limited balances
         // TODO: Calculate with accurate gigabytes converter and exchange rate
-        let storage_balances = limitation / 1_000_000;
+        let storage_balances = limitation as u128 * (CRUS / 1_000_000);
         let limited_balances: BalanceOf<T> = storage_balances.try_into().ok().unwrap();
 
         // 2. Judge limitation

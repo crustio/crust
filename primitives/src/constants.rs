@@ -1,6 +1,6 @@
 /// Money matters.
 pub mod currency {
-    use primitives::Balance;
+    use crate::Balance;
 
     pub const CRUS: Balance = 1_000_000_000_000;
     pub const DOLLARS: Balance = CRUS;
@@ -10,7 +10,7 @@ pub mod currency {
 
 /// Time and blocks.
 pub mod time {
-    use primitives::{Moment, BlockNumber};
+    use crate::{Moment, BlockNumber};
 
     // Alpha & mainnet
     pub const MILLISECS_PER_BLOCK: Moment = 6000;

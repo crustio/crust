@@ -10,7 +10,7 @@ use sp_runtime::{
 };
 use keyring::Sr25519Keyring;
 use cstrml_staking::StakerStatus;
-use cst_primitives::{Balance, BlockNumber};
+use primitives::{Balance, BlockNumber, constants::currency::CRUS};
 
 type AccountId = AccountId32;
 
@@ -157,15 +157,14 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     let tee_identities = accounts.iter().map(|x| (x.1.clone(), Default::default())).collect();
 
-    // controllers are the index + 1000
     let stakers = accounts.iter().map(|i| (
         i.0.clone(),
         i.1.clone(),
-        10_000,
+        10_000 * CRUS,
         StakerStatus::Validator,
     )).collect();
 
-    let balances = accounts.iter().map(|id|(id.0.clone(), 100000)).collect();
+    let balances = accounts.iter().map(|id|(id.0.clone(), 100000 * CRUS)).collect();
 
     GenesisConfig::<Test> {
         tee_identities

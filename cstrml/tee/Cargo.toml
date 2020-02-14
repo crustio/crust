@@ -20,7 +20,7 @@ system = { package = 'frame-system', default-features = false, git = 'https://gi
 
 # Crust runtime modules
 cstrml-staking = { path = '../staking', default-features = false }
-cst-primitives = { path = '../../primitives', default-features = false }
+primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [features]
 default = ['std']
@@ -35,7 +35,7 @@ std = [
     'system/std',
     'sp-runtime-interface/std',
     'cstrml-staking/std',
-    'cst-primitives/std'
+    'primitives/std'
 ]
 
 [dev-dependencies]

@@ -8,6 +8,7 @@ build = 'build.rs'
 [dependencies]
 cstrml-tee = { path = '../cstrml/tee', default_features = false }
 cstrml-staking = { path = '../cstrml/staking', default_features = false }
+primitives = { package = 'cst-primitives', path = '../primitives', default_features = false }
 
 
 [dependencies.authorship]
@@ -299,7 +300,8 @@ std = [
     'transaction-payment/std',
     'sp-runtime-interface/std',
     'cstrml-tee/std',
-    'cstrml-staking/std'
+    'cstrml-staking/std',
+    'primitives/std'
 ]
 
 [build-dependencies.wasm-builder-runner]

@@ -42,9 +42,8 @@ pub use im_online::sr25519::AuthorityId as ImOnlineId;
 pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 use system::offchain::TransactionSubmitter;
 
-/// Constant values used within the runtime.
-pub mod constants;
-use constants::{*, time::*};
+/// Crust primitives
+use primitives::{*, constants::time::*};
 
 /// Crust runtime modules
 use cstrml_tee as tee;

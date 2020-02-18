@@ -75,8 +75,16 @@ decl_module! {
 		fn deposit_event() = default;
 
 		pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
-		    // TODO: add account_id <-> tee_pub_key validation
 		    let who = ensure_signed(origin)?;
+
+            // 0. Genesis validators have rights to register themselves
+            if let Some(maybe_genesis_validator) = <TeeIdentities<T>>::get(&who) {
+                if &maybe_genesis_validator.account_id == &maybe_genesis_validator.validator_account_id {
+                    // Store the tee identity
+                    <TeeIdentities<T>>::insert(&who, &identity);
+                    return Ok(());
+                }
+            }
 
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
@@ -87,12 +95,13 @@ decl_module! {
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
             // 2. applier cannot be validator
-            ensure!(&applier != &validator, "You cannot verify yourself");
+            ensure!(applier != validator, "You cannot verify yourself");
             // TODO: Add pub key verify
-//            ensure!(&applier_pk != &validator_pk, "You cannot verify yourself");
+//            ensure!(applier_pk != validator_pk, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
+            ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key do not exist");
 
             // 4. Verify sig
             ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");

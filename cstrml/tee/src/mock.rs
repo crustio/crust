@@ -1,6 +1,6 @@
 use super::*;
 
-use sp_core::{H256, crypto::AccountId32, sr25519};
+use sp_core::{H256, crypto::AccountId32};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
@@ -155,7 +155,16 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         (Sr25519Keyring::One.to_account_id(), Sr25519Keyring::Alice.to_account_id())
     ];
 
-    let tee_identities = accounts.iter().map(|x| (x.1.clone(), Default::default())).collect();
+    let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
+    let tee_identities = accounts.iter().map(|x|
+        (x.1.clone(), Identity {
+            pub_key: pk.clone(),
+            account_id: x.1.clone(),
+            validator_pub_key: pk.clone(),
+            validator_account_id: x.1.clone(),
+            sig: [0;32].to_vec()
+        }))
+        .collect();
 
     let stakers = accounts.iter().map(|i| (
         i.0.clone(),

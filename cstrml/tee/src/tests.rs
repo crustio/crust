@@ -122,6 +122,9 @@ fn test_for_report_works_success() {
         let stash_account: AccountId = Sr25519Keyring::One.to_account_id();
         let works = get_valid_work_report();
 
+        // Check workloads
+        assert_eq!(Tee::workloads(), None);
+
         assert_ok!(Tee::report_works(Origin::signed(account.clone()), works));
 
         let limited_stakes = 5971233576 * (CRUS / 1_000_000);
@@ -132,6 +135,9 @@ fn test_for_report_works_success() {
             active: limited_stakes,
             unlocking: vec![],
         }));
+
+        // Check workloads after work report
+        assert_eq!(Tee::workloads(), Some(5971233576));
     });
 }
 

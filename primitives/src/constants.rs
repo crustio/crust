@@ -40,3 +40,7 @@ pub mod fee {
     /// The block saturation level. Fees will be updates based on this value.
     pub const TARGET_BLOCK_FULLNESS: Perbill = Perbill::from_percent(25);
 }
+
+pub mod tee {
+    pub const REPORT_SLOT: u64 = 50;
+}

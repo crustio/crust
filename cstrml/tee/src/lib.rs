@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 // Crust runtime modules
 use cstrml_staking as staking;
 use cstrml_staking::BalanceOf;
-use primitives::{PubKey, TeeSignature, MerkleRoot, constants::currency::*};
+use primitives::{PubKey, TeeSignature, MerkleRoot, constants::currency::*, constants::tee::*};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -56,11 +56,13 @@ pub trait Trait: system::Trait + staking::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
+// TODO: add add_extra_genesis to unify chain_spec
 // This module's storage items.
 decl_storage! {
 	trait Store for Module<T: Trait> as Tee {
-		pub TeeIdentities get(tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
-		pub WorkReports get(work_reports): map T::AccountId => Option<WorkReport>;
+		pub TeeIdentities get(fn tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
+		pub WorkReports get(fn work_reports): map T::AccountId => Option<WorkReport>;
+		pub Workloads get(fn workloads): Option<u128>;
 	}
 }
 
@@ -119,15 +121,25 @@ decl_module! {
             // 3. Do sig check
             ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
-            // 4. Upsert works
-            <WorkReports<T>>::insert(&who, &work_report);
+            // 4. Judge new and old workload
+            let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();
+            let new_workload = (work_report.empty_workload + work_report.meaningful_workload) as u128;
+            let old_workload = (old_work_report.empty_workload + old_work_report.meaningful_workload) as u128;
 
-            // 5. Check staking
-            let limitation = work_report.empty_workload + work_report.meaningful_workload;
-            Self::check_and_set_stake_limitation(&who, limitation);
+            if new_workload != old_workload {
+                // 4.1 Get workloads
+                let workloads = Workloads::get().unwrap_or_default();
 
-            // 6. Emit event
-            Self::deposit_event(RawEvent::ReportWorks(who, work_report));
+                // 4.2 Upsert works and workloads
+                <WorkReports<T>>::insert(&who, &work_report);
+                Workloads::put(workloads + new_workload - old_workload);
+
+                // 4.3 Check staking
+                Self::check_and_set_stake_limitation(&who, new_workload);
+
+                // 4.4 Emit event
+                Self::deposit_event(RawEvent::ReportWorks(who, work_report));
+            }
 
             Ok(())
         }
@@ -144,8 +156,6 @@ impl<T: Trait> Module<T> {
 
     pub fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {
         // 1. Check block hash
-        // TODO: move to constants
-        const REPORT_SLOT: u64 = 50;
         let wr_block_number: T::BlockNumber = wr.block_number.try_into().ok().unwrap();
         let wr_block_hash = <system::Module<T>>::block_hash(wr_block_number).as_ref().to_vec();
         ensure!(&wr_block_hash == &wr.block_hash, "work report hash is illegal");
@@ -167,14 +177,14 @@ impl<T: Trait> Module<T> {
     }
 
     // TODO: change into own staking module
-    pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u64) {
+    pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u128) {
         // 1. Get lockable balances and stash account
         let mut ledger = <staking::Module<T>>::ledger(&who).unwrap();
         let active_lockable_balances: &BalanceOf<T> = &ledger.active;
 
         // 2. Convert storage into limited balances
         // TODO: Calculate with accurate gigabytes converter and exchange rate
-        let storage_balances = limitation as u128 * (CRUS / 1_000_000);
+        let storage_balances = limitation * (CRUS / 1_000_000);
         let limited_balances: BalanceOf<T> = storage_balances.try_into().ok().unwrap();
 
         // 2. Judge limitation

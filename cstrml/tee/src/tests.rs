@@ -12,6 +12,23 @@ use primitives::constants::currency::CRUS;
 
 type AccountId = AccountId32;
 
+fn get_valid_identity() -> Identity<AccountId> {
+    // Alice is validator in genesis block
+    let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+    let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
+
+    let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
+    let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
+
+    Identity {
+        pub_key: pk.clone(),
+        account_id: applier.clone(),
+        validator_pub_key: pk.clone(),
+        validator_account_id: validator.clone(),
+        sig: sig.clone()
+    }
+}
+
 fn get_valid_work_report() -> WorkReport {
     let pub_key = hex::decode("19817c0e3be0793b9c27b6064aeac6a82df3335a2ccdac7ea3d4c56e96a315a1e4dfe23491330c1ba11347ca4d6474151636ec15a7fc45d219d034eb9a33bb75").unwrap();
     let block_hash= [0; 32].to_vec();
@@ -34,18 +51,7 @@ fn test_for_register_identity_success() {
     new_test_ext().execute_with(|| {
         // Alice is validator in genesis block
         let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
-        let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
-
-        let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
-        let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
-
-        let id = Identity {
-            pub_key: pk.clone(),
-            account_id: applier.clone(),
-            validator_pub_key: pk.clone(),
-            validator_account_id: validator.clone(),
-            sig: sig.clone()
-        };
+        let id = get_valid_identity();
 
         assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
 
@@ -54,6 +60,25 @@ fn test_for_register_identity_success() {
         assert_eq!(id.clone(), id_registered);
     });
 }
+
+#[test]
+fn test_for_register_identity_success_with_genesis_validator() {
+    new_test_ext().execute_with(|| {
+        // Alice can report anything she wants cause she is genesis validators
+        let alice: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+
+        let id = Identity {
+            pub_key: "pub_key".as_bytes().to_vec(),
+            account_id: alice.clone(),
+            validator_pub_key: "pub_key".as_bytes().to_vec(),
+            validator_account_id: alice.clone(),
+            sig: "sig".as_bytes().to_vec()
+        };
+
+        assert_ok!(Tee::register_identity(Origin::signed(alice.clone()), id.clone()));
+    });
+}
+
 
 #[test]
 fn test_for_register_identity_failed_by_validator_illegal() {
@@ -76,17 +101,17 @@ fn test_for_register_identity_failed_by_validator_illegal() {
 #[test]
 fn test_for_register_identity_failed_by_validate_for_self() {
     new_test_ext().execute_with(|| {
-        let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+        let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
 
-        let id = Identity {
-            pub_key: "pub_key_self".as_bytes().to_vec(),
-            account_id: account.clone(),
-            validator_pub_key: "pub_key_self".as_bytes().to_vec(),
-            validator_account_id: account.clone(),
-            sig: "sig_self".as_bytes().to_vec()
-        };
+        // 1. register bob by alice
+        let mut id = get_valid_identity();
 
-        assert!(Tee::register_identity(Origin::signed(account.clone()), id.clone()).is_err());
+        assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
+
+        // 2. register bob by bob
+        id.validator_account_id = applier.clone();
+
+        assert!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()).is_err());
     });
 }
 

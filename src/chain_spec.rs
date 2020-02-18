@@ -192,11 +192,7 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 			tee_identities: endowed_accounts
 				.iter()
 				.map(|x| (x.clone(), Default::default()))
-				.collect(),
-			/*work_reports: endowed_accounts
-				.iter()
-				.map(|x| (x.clone(), initial_work_report.clone()))
-				.collect(),*/
+				.collect()
 		})
 	}
 }

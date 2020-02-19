@@ -7,7 +7,7 @@ use keyring::Sr25519Keyring;
 use hex;
 
 use cstrml_staking as staking;
-use staking::StakingLedger;
+use staking::{StakingLedger, Exposure, IndividualExposure};
 use primitives::constants::currency::CRUS;
 
 type AccountId = AccountId32;
@@ -146,6 +146,16 @@ fn test_for_report_works_success() {
         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
         let stash_account: AccountId = Sr25519Keyring::One.to_account_id();
         let works = get_valid_work_report();
+
+        let ledger = Staking::ledger(&account).unwrap();
+        let stakers = Staking::stakers(&stash_account);
+        let stakes = Staking::slot_stake();
+
+        assert_eq!(&ledger.stash, &stash_account);
+        assert_eq!(
+            Staking::stakers(&stash_account),
+            Exposure { total: 15_000 * CRUS, own: 10_000 * CRUS, others: vec![IndividualExposure { who: Sr25519Keyring::Two.to_account_id(), value: 5000 * CRUS }] }
+        );
 
         // Check workloads
         assert_eq!(Tee::workloads(), None);

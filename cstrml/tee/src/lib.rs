@@ -187,21 +187,30 @@ impl<T: Trait> Module<T> {
 
     // TODO: change into own staking module
     pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u128) {
-        // 1. Get lockable balances and stash account
+        // 1. If who's ledger is exist
+        if <staking::Module<T>>::ledger(&who).is_none() {
+            return
+        }
+
+        // 2. Get lockable balances and stash account
         let mut ledger = <staking::Module<T>>::ledger(&who).unwrap();
+        let stash_account = &ledger.stash;
+        let stakers = <staking::Module<T>>::stakers(stash_account);
         let active_lockable_balances: &BalanceOf<T> = &ledger.active;
 
-        // 2. Convert storage into limited balances
+        // 3. Convert storage into limited balances
         // TODO: Calculate with accurate gigabytes converter and exchange rate
         let storage_balances = limitation * (CRUS / 1_000_000);
         let limited_balances: BalanceOf<T> = storage_balances.try_into().ok().unwrap();
 
-        // 2. Judge limitation
-        if active_lockable_balances <= &limited_balances { return; }
+        // 4. Judge limitation
+        if active_lockable_balances <= &limited_balances {
+            return
+        }
         ledger.active = limited_balances;
         ledger.total = limited_balances;
 
-        // 3. [DANGER] If exceed limitation set new
+        // 5. [DANGER] If exceed limitation set new
         // TODO: Try another safe way to set stake limit
         <staking::Module<T>>::update_ledger(&who, &ledger);
     }

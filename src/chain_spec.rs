@@ -141,16 +141,6 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 	const ENDOWMENT: u128 = 1_000_000 * CRUS;
 	const STASH: u128 = 20_000 * CRUS;
 
-	/*let initial_work_report = WorkReport {
-		pub_key: "pub_key".as_bytes().to_vec(),
-		block_number: 0,
-		block_hash: [0; 32].to_vec(),
-		empty_root: "merkle_root".as_bytes().to_vec(),
-		empty_workload: 10_000,
-		meaningful_workload: 20_000,
-		sig: "sig_keys".as_bytes().to_vec()
-	};*/
-
 	GenesisConfig {
 		system: Some(SystemConfig {
 			code: WASM_BINARY.to_vec(),

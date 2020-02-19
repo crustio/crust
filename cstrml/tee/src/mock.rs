@@ -152,7 +152,9 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     // stash-controller accounts
     let accounts = [
-        (Sr25519Keyring::One.to_account_id(), Sr25519Keyring::Alice.to_account_id())
+        (Sr25519Keyring::One.to_account_id(), Sr25519Keyring::Alice.to_account_id()),
+        (Sr25519Keyring::Two.to_account_id(), Sr25519Keyring::Bob.to_account_id()),
+        (Sr25519Keyring::Charlie.to_account_id(), Sr25519Keyring::Dave.to_account_id()),
     ];
 
     let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
@@ -166,14 +168,18 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         }))
         .collect();
 
-    let stakers = accounts.iter().map(|i| (
-        i.0.clone(),
-        i.1.clone(),
-        10_000 * CRUS,
-        StakerStatus::Validator,
-    )).collect();
+    let validator = &accounts[0];
+    let nominator1 = &accounts[1];
+    let nominator2 = &accounts[2];
+    let stakers = vec![
+        // (stash, controller, stakes, status)
+        (validator.0.clone(), validator.1.clone(), 10_000 * CRUS, StakerStatus::Validator),
+        // nominator
+        (nominator1.0.clone(), nominator1.1.clone(), 8000 * CRUS, StakerStatus::Nominator(vec![validator.0.clone(), validator.1.clone()])),
+        (nominator2.0.clone(), nominator2.1.clone(), 7000 * CRUS, StakerStatus::Nominator(vec![validator.0.clone(), validator.1.clone()]))
+    ];
 
-    let balances = accounts.iter().map(|id|(id.0.clone(), 100000 * CRUS)).collect();
+    let balances = accounts.iter().map(|id|(id.0.clone(), 100_000 * CRUS)).collect();
 
     GenesisConfig::<Test> {
         tee_identities
@@ -187,9 +193,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     staking::GenesisConfig::<Test> {
         current_era: 0,
         stakers,
-        validator_count: 4,
+        validator_count: 2,
         minimum_validator_count: 1,
-        invulnerables: vec![],
+        invulnerables: vec![validator.0.clone()],
+        slash_reward_fraction: Perbill::from_percent(10),
         .. Default::default()
     }.assimilate_storage(&mut t).unwrap();
 

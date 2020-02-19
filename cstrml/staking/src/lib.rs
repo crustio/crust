@@ -240,10 +240,10 @@ pub struct Nominations<AccountId> {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, Decode, RuntimeDebug)]
 pub struct IndividualExposure<AccountId, Balance: HasCompact> {
     /// The stash account of the nominator in question.
-    who: AccountId,
+    pub who: AccountId,
     /// Amount of funds exposed.
     #[codec(compact)]
-    value: Balance,
+    pub value: Balance,
 }
 
 /// A snapshot of the stake backing a single validator in the system.

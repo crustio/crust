@@ -157,6 +157,7 @@ impl Trait for Test {
 pub type Tee = Module<Test>;
 pub type System = system::Module<Test>;
 pub type Staking = cstrml_staking::Module<Test>;
+pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
@@ -169,6 +170,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         Sr25519Keyring::Bob.to_account_id(),
         Sr25519Keyring::One.to_account_id(),
         Sr25519Keyring::Two.to_account_id(),
+        Sr25519Keyring::Dave.to_account_id(),
+        Sr25519Keyring::Ferdie.to_account_id(),
     ];
 
     let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
@@ -183,12 +186,14 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .collect();
 
     let validator = (Sr25519Keyring::One.to_account_id(), Sr25519Keyring::Alice.to_account_id());
-    let nominator = (Sr25519Keyring::Two.to_account_id(), Sr25519Keyring::Bob.to_account_id());
+    let nominator1 = (Sr25519Keyring::Two.to_account_id(), Sr25519Keyring::Bob.to_account_id());
+    let nominator2 = (Sr25519Keyring::Dave.to_account_id(), Sr25519Keyring::Ferdie.to_account_id());
     let stakers = vec![
         // (stash, controller, stakes, status)
-        (validator.0.clone(), validator.1.clone(), 10_000 * CRUS, StakerStatus::Validator),
+        (validator.0.clone(), validator.1.clone(), 4000 * CRUS, StakerStatus::Validator),
         // nominator
-        (nominator.0.clone(), nominator.1.clone(), 8000 * CRUS, StakerStatus::Nominator(vec![validator.0.clone()])),
+        (nominator1.0.clone(), nominator1.1.clone(), 3000 * CRUS, StakerStatus::Nominator(vec![validator.0.clone()])),
+        (nominator2.0.clone(), nominator2.1.clone(), 4000 * CRUS, StakerStatus::Nominator(vec![validator.0.clone()])),
     ];
 
     let balances = accounts.iter().map(|id|(id.clone(), 100_000 * CRUS)).collect();

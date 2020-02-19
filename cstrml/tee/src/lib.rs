@@ -15,8 +15,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use cstrml_staking as staking;
-use cstrml_staking::BalanceOf;
-use primitives::{PubKey, TeeSignature, MerkleRoot, constants::currency::*, constants::tee::*};
+use primitives::{PubKey, TeeSignature, MerkleRoot, constants::tee::*};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -122,13 +121,13 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
+            // ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
             // 2. Do timing check
-            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            // ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
             // 3. Do sig check
-            ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
+            // ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
             // 4. Judge new and old workload
             let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();
@@ -144,7 +143,7 @@ decl_module! {
                 Workloads::put(workloads + new_workload - old_workload);
 
                 // 4.3 Check staking
-                Self::check_and_set_stake_limitation(&who, new_workload);
+                Self::check_stake_limitation(&who, new_workload);
 
                 // 4.4 Emit event
                 Self::deposit_event(RawEvent::ReportWorks(who, work_report));
@@ -186,33 +185,13 @@ impl<T: Trait> Module<T> {
     }
 
     // TODO: change into own staking module
-    pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u128) {
-        // 1. If who's ledger is exist
-        if <staking::Module<T>>::ledger(&who).is_none() {
+    pub fn check_stake_limitation(who: &T::AccountId, limitation: u128) {
+        // 1. If who's not staked
+        if <staking::Module<T>>::ledger(who).is_none() {
             return
         }
 
-        // 2. Get lockable balances and stash account
-        let mut ledger = <staking::Module<T>>::ledger(&who).unwrap();
-        let stash_account = &ledger.stash;
-        let stakers = <staking::Module<T>>::stakers(stash_account);
-        let active_lockable_balances: &BalanceOf<T> = &ledger.active;
-
-        // 3. Convert storage into limited balances
-        // TODO: Calculate with accurate gigabytes converter and exchange rate
-        let storage_balances = limitation * (CRUS / 1_000_000);
-        let limited_balances: BalanceOf<T> = storage_balances.try_into().ok().unwrap();
-
-        // 4. Judge limitation
-        if active_lockable_balances <= &limited_balances {
-            return
-        }
-        ledger.active = limited_balances;
-        ledger.total = limited_balances;
-
-        // 5. [DANGER] If exceed limitation set new
-        // TODO: Try another safe way to set stake limit
-        <staking::Module<T>>::update_ledger(&who, &ledger);
+        <staking::Module<T>>::check_stake_limitation(who, limitation);
     }
 }
 

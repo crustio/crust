@@ -14,7 +14,6 @@ use codec::{Encode, Decode};
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use cstrml_staking as staking;
 use primitives::{PubKey, TeeSignature, MerkleRoot, constants::tee::*};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
@@ -50,7 +49,7 @@ pub struct WorkReport{
 }
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait + staking::Trait {
+pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
@@ -60,7 +59,7 @@ pub trait Trait: system::Trait + staking::Trait {
 decl_storage! {
 	trait Store for Module<T: Trait> as Tee {
 		pub TeeIdentities get(fn tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
-		pub WorkReports get(fn work_reports): map T::AccountId => Option<WorkReport>;
+		pub WorkReports get(fn work_reports) config(): map T::AccountId => Option<WorkReport>;
 		pub Workloads get(fn workloads): Option<u128>;
 	}
 }
@@ -121,13 +120,13 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
+            // ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
             // 2. Do timing check
-            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            // ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
             // 3. Do sig check
-            ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
+            // ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
             // 4. Judge new and old workload
             let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();
@@ -142,10 +141,7 @@ decl_module! {
                 <WorkReports<T>>::insert(&who, &work_report);
                 Workloads::put(workloads + new_workload - old_workload);
 
-                // 4.3 Check staking
-                Self::check_stake_limitation(&who, new_workload);
-
-                // 4.4 Emit event
+                // 4.3 Emit event
                 Self::deposit_event(RawEvent::ReportWorks(who, work_report));
             }
 
@@ -182,16 +178,6 @@ impl<T: Trait> Module<T> {
         // TODO: concat data inside runtime for saving PassBy params number
         api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
                                                 wr.empty_workload, wr.meaningful_workload, &wr.sig)
-    }
-
-    // TODO: change into own staking module
-    pub fn check_stake_limitation(who: &T::AccountId, limitation: u128) {
-        // 1. If who's not staked
-        if <staking::Module<T>>::ledger(who).is_none() {
-            return
-        }
-
-        <staking::Module<T>>::check_stake_limitation(who, limitation);
     }
 }
 

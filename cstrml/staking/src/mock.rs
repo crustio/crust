@@ -174,6 +174,9 @@ impl pallet_timestamp::Trait for Test {
 	type OnTimestampSet = ();
 	type MinimumPeriod = MinimumPeriod;
 }
+impl tee::Trait for Test {
+	type Event = ();
+}
 pallet_staking_reward_curve::build! {
 	const I_NPOS: PiecewiseLinear<'static> = curve!(
 		min_inflation: 0_025_000,
@@ -198,9 +201,9 @@ impl Trait for Test {
 	type Slash = ();
 	type Reward = ();
 	type SessionsPerEra = SessionsPerEra;
+	type BondingDuration = BondingDuration;
 	type SlashDeferDuration = SlashDeferDuration;
 	type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
-	type BondingDuration = BondingDuration;
 	type SessionInterface = Self;
 	type RewardCurve = RewardCurve;
 }
@@ -318,6 +321,10 @@ impl ExtBuilder {
 			StakerStatus::<AccountId>::Idle
 		};
 		let nominated = if self.nominate { vec![11, 21] } else { vec![] };
+
+		// tee genesis
+		let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6];
+
 		let _ = GenesisConfig::<Test>{
 			current_era: 0,
 			stakers: vec![
@@ -338,6 +345,19 @@ impl ExtBuilder {
 
 		let _ = pallet_session::GenesisConfig::<Test> {
 			keys: validators.iter().map(|x| (*x, UintAuthorityId(*x))).collect(),
+		}.assimilate_storage(&mut storage);
+
+		let _ = tee::GenesisConfig::<Test> {
+			tee_identities: identities.iter().map(|id| (*id, Default::default())).collect(),
+			work_reports: identities.iter().map(|id| (*id, tee::WorkReport{
+				pub_key: vec![],
+				block_number: 0,
+				block_hash: vec![],
+				empty_root: vec![],
+				empty_workload: 20000000000000,
+				meaningful_workload: 0,
+				sig: vec![]
+			})).collect()
 		}.assimilate_storage(&mut storage);
 
 		let mut ext = sp_io::TestExternalities::from(storage);

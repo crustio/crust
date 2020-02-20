@@ -11,6 +11,7 @@ use grandpa_primitives::{AuthorityId as GrandpaId};
 use sc_service;
 use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
 use cstrml_staking::Forcing;
+use cstrml_tee::WorkReport;
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server
@@ -140,6 +141,7 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 
 	const ENDOWMENT: u128 = 1_000_000 * CRUS;
 	const STASH: u128 = 20_000 * CRUS;
+	const WORKLOAD: u64 = 20_000 * 1000_000;
 
 	GenesisConfig {
 		system: Some(SystemConfig {
@@ -182,7 +184,19 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 			tee_identities: endowed_accounts
 				.iter()
 				.map(|x| (x.clone(), Default::default()))
-				.collect()
+				.collect(),
+			work_reports: endowed_accounts
+				.iter()
+				.map(|x| (x.clone(), WorkReport {
+					pub_key: vec![],
+					block_number: 0,
+					block_hash: vec![],
+					empty_root: vec![],
+					empty_workload: WORKLOAD,
+					meaningful_workload: 0,
+					sig: vec![]
+				}))
+				.collect(),
 		})
 	}
 }

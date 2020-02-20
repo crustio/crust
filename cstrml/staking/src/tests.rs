@@ -2541,3 +2541,47 @@ fn version_initialized() {
 		assert_eq!(<Staking as Store>::StorageVersion::get(), crate::migration::CURRENT_VERSION);
 	});
 }
+
+#[test]
+fn limit_should_work() {
+	ExtBuilder::default().build().execute_with(|| {
+		Staking::set_limit(&10, 1100);
+
+		// Check validator
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000, active: 1000, unlocking: vec![] }));
+		assert_eq!(Staking::stakers(11).total, 1100);
+
+		// Check nominator
+		if cfg!(feature = "equalize") {
+			assert_eq!(Staking::ledger(&100), Some(StakingLedger { stash: 101, total: 350, active: 350, unlocking: vec![]}));
+		} else {
+			assert_eq!(Staking::ledger(&100), Some(StakingLedger { stash: 101, total: 475, active: 475, unlocking: vec![]}));
+		}
+
+		assert_eq!(Staking::nominators(&101), Some(Nominations { targets: vec![11, 21], submitted_in: 0, suppressed: false }));
+	});
+}
+
+/*#[test]
+fn limit_should_work_new_era() {
+	ExtBuilder::default().build().execute_with(|| {
+		start_session(0);
+		start_session(1);
+		start_session(2);
+
+		// new_era
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 0, active: 0, unlocking: vec![] }));
+		assert_eq!(Staking::stakers(11).total, 0);
+
+		// Check nominator
+		if cfg!(feature = "equalize") {
+			assert_eq!(Staking::ledger(&100), Some(StakingLedger { stash: 101, total: 0, active: 0, unlocking: vec![]}));
+		} else {
+			assert_eq!(Staking::ledger(&100), Some(StakingLedger { stash: 101, total: 0, active: 0, unlocking: vec![]}));
+		}
+
+		assert_eq!(Staking::nominators(&101), None);
+	});
+}*/
+
+

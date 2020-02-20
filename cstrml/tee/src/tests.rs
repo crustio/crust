@@ -88,7 +88,7 @@ fn test_for_register_identity_success_with_genesis_validator() {
 fn test_for_register_identity_failed_by_validator_illegal() {
     new_test_ext().execute_with(|| {
         // Bob is not validator before
-        let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
+        let account: AccountId32 = Sr25519Keyring::Charlie.to_account_id();
 
         let id = Identity {
             pub_key: "pub_key_bob".as_bytes().to_vec(),
@@ -159,8 +159,8 @@ fn test_for_report_works_success() {
         // Check how much is at stake
         assert_eq!(Staking::ledger(&account), Some(StakingLedger {
             stash: stash_account,
-            total: limited_stakes,
-            active: limited_stakes,
+            total: 4000 * CRUS,
+            active: 4000 * CRUS,
             unlocking: vec![],
         }));
 

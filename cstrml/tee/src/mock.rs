@@ -3,7 +3,7 @@ use super::*;
 use sp_core::{H256, crypto::AccountId32};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
+    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize, Convert, SaturatedConversion},
     testing::{Header, UintAuthorityId},
     Perbill,
     curve::PiecewiseLinear
@@ -29,6 +29,18 @@ parameter_types! {
     pub const MaximumBlockWeight: Weight = 1024;
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
+}
+
+/// Simple structure that exposes how u64 currency can be represented as... u64.
+pub struct CurrencyToVoteHandler;
+impl Convert<u64, u64> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u64 { x }
+}
+impl Convert<u128, u64> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u64 { x.saturated_into() }
+}
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 { x.saturated_into() }
 }
 
 impl system::Trait for Test {
@@ -84,16 +96,17 @@ parameter_types! {
 	pub const UncleGenerations: u64 = 0;
 	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(25);
 }
+
 impl session::Trait for Test {
     type Event = ();
     type ValidatorId = AccountId;
     type ValidatorIdOf = staking::StashOf<Test>;
     type ShouldEndSession = session::PeriodicSessions<Period, Offset>;
-    type OnSessionEnding = ();
+    type OnSessionEnding = session::historical::NoteHistoricalRoot<Test, Staking>;
     type SessionHandler = session::TestSessionHandler;
     type Keys = UintAuthorityId;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
-    type SelectInitialValidators = ();
+    type SelectInitialValidators = Staking;
 }
 
 impl session::historical::Trait for Test {
@@ -123,7 +136,7 @@ parameter_types! {
 impl cstrml_staking::Trait for Test {
     type Currency = balances::Module<Test>;
     type Time = timestamp::Module<Test>;
-    type CurrencyToVote = ();
+    type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
     type Event = ();
     type Slash = ();
@@ -144,6 +157,7 @@ impl Trait for Test {
 pub type Tee = Module<Test>;
 pub type System = system::Module<Test>;
 pub type Staking = cstrml_staking::Module<Test>;
+pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
@@ -152,28 +166,40 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     // stash-controller accounts
     let accounts = [
-        (Sr25519Keyring::One.to_account_id(), Sr25519Keyring::Alice.to_account_id())
+        Sr25519Keyring::Alice.to_account_id(),
+        Sr25519Keyring::Bob.to_account_id(),
+        Sr25519Keyring::One.to_account_id(),
+        Sr25519Keyring::Two.to_account_id(),
+        Sr25519Keyring::Dave.to_account_id(),
+        Sr25519Keyring::Ferdie.to_account_id(),
     ];
 
     let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
     let tee_identities = accounts.iter().map(|x|
-        (x.1.clone(), Identity {
+        (x.clone(), Identity {
             pub_key: pk.clone(),
-            account_id: x.1.clone(),
+            account_id: x.clone(),
             validator_pub_key: pk.clone(),
-            validator_account_id: x.1.clone(),
+            validator_account_id: x.clone(),
             sig: [0;32].to_vec()
         }))
         .collect();
 
-    let stakers = accounts.iter().map(|i| (
-        i.0.clone(),
-        i.1.clone(),
-        10_000 * CRUS,
-        StakerStatus::Validator,
-    )).collect();
+    let validator = (Sr25519Keyring::One.to_account_id(), Sr25519Keyring::Alice.to_account_id());
+    let nominator1 = (Sr25519Keyring::Two.to_account_id(), Sr25519Keyring::Bob.to_account_id());
+    let nominator2 = (Sr25519Keyring::Dave.to_account_id(), Sr25519Keyring::Ferdie.to_account_id());
+    let stakers = vec![
+        // (stash, controller, stakes, status)
+        (validator.0.clone(), validator.1.clone(), 4000 * CRUS, StakerStatus::Validator),
+        // nominator
+        (nominator1.0.clone(), nominator1.1.clone(), 3000 * CRUS, StakerStatus::Nominator(vec![validator.0.clone()])),
+        (nominator2.0.clone(), nominator2.1.clone(), 4000 * CRUS, StakerStatus::Nominator(vec![validator.0.clone()])),
+    ];
 
-    let balances = accounts.iter().map(|id|(id.0.clone(), 100000 * CRUS)).collect();
+    let balances = accounts.iter().map(|id|(id.clone(), 100_000 * CRUS)).collect();
+
+    // Fake keys for test
+    let session_keys = vec![(validator.0, UintAuthorityId(10))];
 
     GenesisConfig::<Test> {
         tee_identities
@@ -187,10 +213,15 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     staking::GenesisConfig::<Test> {
         current_era: 0,
         stakers,
-        validator_count: 4,
+        validator_count: 2,
         minimum_validator_count: 1,
         invulnerables: vec![],
+        slash_reward_fraction: Perbill::from_percent(10),
         .. Default::default()
+    }.assimilate_storage(&mut t).unwrap();
+
+    session::GenesisConfig::<Test> {
+        keys: session_keys
     }.assimilate_storage(&mut t).unwrap();
 
     t.into()

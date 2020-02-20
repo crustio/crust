@@ -18,6 +18,7 @@ frame-support = { version = "2.0.0", default-features = false, git = 'https://gi
 frame-system = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 pallet-session = { version = "2.0.0", features = ["historical"], git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', default-features = false }
 pallet-authorship = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+primitives = { package="cst-primitives", path="../../primitives", default-features = false }
 
 [dev-dependencies]
 sp-core = { version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
@@ -44,5 +45,6 @@ std = [
 	"pallet-session/std",
 	"frame-system/std",
 	"pallet-authorship/std",
+	"primitives/std"
 ]
 

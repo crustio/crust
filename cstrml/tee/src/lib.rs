@@ -15,8 +15,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use cstrml_staking as staking;
-use cstrml_staking::BalanceOf;
-use primitives::{PubKey, TeeSignature, MerkleRoot, constants::currency::*, constants::tee::*};
+use primitives::{PubKey, TeeSignature, MerkleRoot, constants::tee::*};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -144,7 +143,7 @@ decl_module! {
                 Workloads::put(workloads + new_workload - old_workload);
 
                 // 4.3 Check staking
-                Self::check_and_set_stake_limitation(&who, new_workload);
+                Self::check_stake_limitation(&who, new_workload);
 
                 // 4.4 Emit event
                 Self::deposit_event(RawEvent::ReportWorks(who, work_report));
@@ -186,24 +185,13 @@ impl<T: Trait> Module<T> {
     }
 
     // TODO: change into own staking module
-    pub fn check_and_set_stake_limitation(who: &T::AccountId, limitation: u128) {
-        // 1. Get lockable balances and stash account
-        let mut ledger = <staking::Module<T>>::ledger(&who).unwrap();
-        let active_lockable_balances: &BalanceOf<T> = &ledger.active;
+    pub fn check_stake_limitation(who: &T::AccountId, limitation: u128) {
+        // 1. If who's not staked
+        if <staking::Module<T>>::ledger(who).is_none() {
+            return
+        }
 
-        // 2. Convert storage into limited balances
-        // TODO: Calculate with accurate gigabytes converter and exchange rate
-        let storage_balances = limitation * (CRUS / 1_000_000);
-        let limited_balances: BalanceOf<T> = storage_balances.try_into().ok().unwrap();
-
-        // 2. Judge limitation
-        if active_lockable_balances <= &limited_balances { return; }
-        ledger.active = limited_balances;
-        ledger.total = limited_balances;
-
-        // 3. [DANGER] If exceed limitation set new
-        // TODO: Try another safe way to set stake limit
-        <staking::Module<T>>::update_ledger(&who, &ledger);
+        <staking::Module<T>>::check_stake_limitation(who, limitation);
     }
 }
 

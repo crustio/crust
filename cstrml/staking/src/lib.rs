@@ -432,6 +432,10 @@ decl_storage! {
 		/// This is keyed by the stash account.
 		pub Stakers get(fn stakers): map T::AccountId => Exposure<T::AccountId, BalanceOf<T>>;
 
+		/// The stake limit
+		/// This is keyed by the stash account.
+		pub StakeLimit get(fn stake_limit): map T::AccountId => Option<BalanceOf<T>>;
+
 		/// The currently elected validator set keyed by stash account ID.
 		pub CurrentElected get(fn current_elected): Vec<T::AccountId>;
 
@@ -524,6 +528,7 @@ decl_storage! {
 						)
 					}, _ => Ok(())
 				};
+				<StakeLimit<T>>::insert(stash, balance);
 			}
 
 			StorageVersion::put(migration::CURRENT_VERSION);
@@ -1178,7 +1183,7 @@ impl<T: Trait> Module<T> {
                 // 2. Get work report
                 let mut workloads = 0;
                 if let Some(work_report) = <tee::Module<T>>::work_reports(&v_controller) {
-                    workloads = work_report.empty_workload as u128 + work_report.meaningful_workload as u128;
+                    workloads = (work_report.empty_workload + work_report.meaningful_workload) as u128;
                 }
                 Self::set_limit(&v_controller, Self::get_stake_limit(workloads));
 

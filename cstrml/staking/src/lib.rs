@@ -1185,12 +1185,16 @@ impl<T: Trait> Module<T> {
                 if let Some(work_report) = <tee::Module<T>>::work_reports(&v_controller) {
                     workloads = (work_report.empty_workload + work_report.meaningful_workload) as u128;
                 }
-                Self::maybe_set_limit(&v_controller, Self::get_stake_limit(workloads));
+                let workloads_stake = Self::get_stake_limit(workloads);
+                Self::maybe_set_limit(&v_controller, workloads_stake.clone());
 
                 // 3. Remove empty workloads validator
                 if workloads == 0 {
                     <Validators<T>>::remove(&v);
+                    <StakeLimit<T>>::remove(&v);
                     new_validators.remove_item(&v);
+                } else {
+                    <StakeLimit<T>>::insert(&v, workloads_stake);
                 }
             }
             Some(new_validators)
@@ -1460,7 +1464,7 @@ impl<T: Trait> Module<T> {
             Self::update_ledger(&n_controller, &n_ledger);
         }
 
-        // 3. Update stakers, slot_stake and stake_limit
+        // 3. Update stakers and slot_stake
         let new_slot_stake = Self::slot_stake().min(limited_stakes);
         let new_exposure = Exposure {
             own: stakers.own,
@@ -1468,10 +1472,8 @@ impl<T: Trait> Module<T> {
             others: new_nominators
         };
 
-        // 4. Update storage
         <Stakers<T>>::insert(&stash, new_exposure);
         <SlotStake<T>>::put(new_slot_stake);
-        <StakeLimit<T>>::insert(&stash, limited_stakes);
     }
 
     /// Add reward points to validators using their stash account ID.

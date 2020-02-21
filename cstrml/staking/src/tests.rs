@@ -2568,14 +2568,16 @@ fn limit_should_work() {
 	});
 }
 
-/*#[test]
+#[test]
 fn limit_should_work_new_era() {
 	ExtBuilder::default().build().execute_with(|| {
 		start_session(0);
 		start_session(1);
 		start_session(2);
 
-		// new_era
+		assert_eq!(Staking::stake_limit(&11), Some(u64::max_value()));
+
+		/*// new_era
 		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 0, active: 0, unlocking: vec![] }));
 		assert_eq!(Staking::stakers(11).total, 0);
 
@@ -2586,8 +2588,8 @@ fn limit_should_work_new_era() {
 			assert_eq!(Staking::ledger(&100), Some(StakingLedger { stash: 101, total: 0, active: 0, unlocking: vec![]}));
 		}
 
-		assert_eq!(Staking::nominators(&101), None);
+		assert_eq!(Staking::nominators(&101), None);*/
 	});
-}*/
+}
 
 

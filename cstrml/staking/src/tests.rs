@@ -2545,7 +2545,10 @@ fn version_initialized() {
 #[test]
 fn limit_should_work() {
 	ExtBuilder::default().build().execute_with(|| {
-		Staking::set_limit(&10, 1100);
+		// Check stake_limit
+		assert_eq!(Staking::stake_limit(&11), Some(1000));
+
+		Staking::maybe_set_limit(&10, 1100);
 
 		// Check validator
 		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000, active: 1000, unlocking: vec![] }));
@@ -2559,6 +2562,9 @@ fn limit_should_work() {
 		}
 
 		assert_eq!(Staking::nominators(&101), Some(Nominations { targets: vec![11, 21], submitted_in: 0, suppressed: false }));
+
+		// Check stash_limit
+		assert_eq!(Staking::stake_limit(&11), Some(1100));
 	});
 }
 

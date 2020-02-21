@@ -1185,7 +1185,7 @@ impl<T: Trait> Module<T> {
                 if let Some(work_report) = <tee::Module<T>>::work_reports(&v_controller) {
                     workloads = (work_report.empty_workload + work_report.meaningful_workload) as u128;
                 }
-                Self::set_limit(&v_controller, Self::get_stake_limit(workloads));
+                Self::maybe_set_limit(&v_controller, Self::get_stake_limit(workloads));
 
                 // 3. Remove empty workloads validator
                 if workloads == 0 {
@@ -1374,7 +1374,7 @@ impl<T: Trait> Module<T> {
 
     // PUBLIC MUTABLES
 
-    /// Set stake limitation
+    /// Set stake limitation: v_stash + v_nominators_stash > limited_stakes
     /// v_stash >= limited_stakes -> remove all nominators and reduce v_stash;
     /// v_stash < limited_stakes -> reduce nominators' stash until limitation_remains run out;
     ///
@@ -1384,7 +1384,7 @@ impl<T: Trait> Module<T> {
     /// If the stash is: v_stash = 4000 + nominators = {(n_stash1 = 1500), (n_stash2 = 1000)},
     /// it will become into v_stash = 4000 + nominators = {(n_stash1 = 1000)},
     /// at the same time, n_stash1.locks.amount -= 500.
-    pub fn set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
+    pub fn maybe_set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
         // 1. Get lockable balances
         // total = own + nominators
         let mut ledger: StakingLedger<T::AccountId, BalanceOf<T>> = Self::ledger(controller).unwrap();
@@ -1460,9 +1460,7 @@ impl<T: Trait> Module<T> {
             Self::update_ledger(&n_controller, &n_ledger);
         }
 
-        // 3. Update stakers and slot_stake
-        <Stakers<T>>::remove(&stash);
-
+        // 3. Update stakers, slot_stake and stake_limit
         let new_slot_stake = Self::slot_stake().min(limited_stakes);
         let new_exposure = Exposure {
             own: stakers.own,
@@ -1470,8 +1468,10 @@ impl<T: Trait> Module<T> {
             others: new_nominators
         };
 
+        // 4. Update storage
         <Stakers<T>>::insert(&stash, new_exposure);
         <SlotStake<T>>::put(new_slot_stake);
+        <StakeLimit<T>>::insert(&stash, limited_stakes);
     }
 
     /// Add reward points to validators using their stash account ID.

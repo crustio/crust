@@ -432,6 +432,10 @@ decl_storage! {
 		/// This is keyed by the stash account.
 		pub Stakers get(fn stakers): map T::AccountId => Exposure<T::AccountId, BalanceOf<T>>;
 
+		/// The stake limit
+		/// This is keyed by the stash account.
+		pub StakeLimit get(fn stake_limit): map T::AccountId => Option<BalanceOf<T>>;
+
 		/// The currently elected validator set keyed by stash account ID.
 		pub CurrentElected get(fn current_elected): Vec<T::AccountId>;
 
@@ -524,6 +528,7 @@ decl_storage! {
 						)
 					}, _ => Ok(())
 				};
+				<StakeLimit<T>>::insert(stash, balance);
 			}
 
 			StorageVersion::put(migration::CURRENT_VERSION);
@@ -1178,14 +1183,18 @@ impl<T: Trait> Module<T> {
                 // 2. Get work report
                 let mut workloads = 0;
                 if let Some(work_report) = <tee::Module<T>>::work_reports(&v_controller) {
-                    workloads = work_report.empty_workload as u128 + work_report.meaningful_workload as u128;
+                    workloads = (work_report.empty_workload + work_report.meaningful_workload) as u128;
                 }
-                Self::set_limit(&v_controller, Self::get_stake_limit(workloads));
+                let workloads_stake = Self::get_stake_limit(workloads);
+                Self::maybe_set_limit(&v_controller, workloads_stake.clone());
 
                 // 3. Remove empty workloads validator
                 if workloads == 0 {
                     <Validators<T>>::remove(&v);
+                    <StakeLimit<T>>::remove(&v);
                     new_validators.remove_item(&v);
+                } else {
+                    <StakeLimit<T>>::insert(&v, workloads_stake);
                 }
             }
             Some(new_validators)
@@ -1369,7 +1378,7 @@ impl<T: Trait> Module<T> {
 
     // PUBLIC MUTABLES
 
-    /// Set stake limitation
+    /// Set stake limitation: v_stash + v_nominators_stash > limited_stakes
     /// v_stash >= limited_stakes -> remove all nominators and reduce v_stash;
     /// v_stash < limited_stakes -> reduce nominators' stash until limitation_remains run out;
     ///
@@ -1379,7 +1388,7 @@ impl<T: Trait> Module<T> {
     /// If the stash is: v_stash = 4000 + nominators = {(n_stash1 = 1500), (n_stash2 = 1000)},
     /// it will become into v_stash = 4000 + nominators = {(n_stash1 = 1000)},
     /// at the same time, n_stash1.locks.amount -= 500.
-    pub fn set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
+    pub fn maybe_set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
         // 1. Get lockable balances
         // total = own + nominators
         let mut ledger: StakingLedger<T::AccountId, BalanceOf<T>> = Self::ledger(controller).unwrap();
@@ -1456,8 +1465,6 @@ impl<T: Trait> Module<T> {
         }
 
         // 3. Update stakers and slot_stake
-        <Stakers<T>>::remove(&stash);
-
         let new_slot_stake = Self::slot_stake().min(limited_stakes);
         let new_exposure = Exposure {
             own: stakers.own,

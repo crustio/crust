@@ -65,18 +65,24 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ];
 
     let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
-    let tee_identities = accounts.iter().map(|x|
-        (x.clone(), Identity {
+    let tee_identities = accounts
+        .iter()
+        .map(|x| (x.clone(), Identity {
             pub_key: pk.clone(),
             account_id: x.clone(),
             validator_pub_key: pk.clone(),
             validator_account_id: x.clone(),
-            sig: [0;32].to_vec()
+            sig: vec![]
         }))
+        .collect();
+    let work_reports = accounts
+        .iter()
+        .map(|x| (x.clone(), Default::default()))
         .collect();
 
     GenesisConfig::<Test> {
-        tee_identities
+        tee_identities,
+        work_reports
     }.assimilate_storage(&mut t).unwrap();
 
     t.into()

@@ -41,6 +41,9 @@ use sp_runtime::{Serialize, Deserialize};
 use frame_system::{self as system, ensure_signed, ensure_root};
 
 use sp_phragmen::{ExtendedBalance, PhragmenStakedAssignment};
+
+// Crust runtime modules
+use tee;
 use primitives::constants::currency::CRUS;
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -326,7 +329,7 @@ impl<T: Trait> SessionInterface<<T as frame_system::Trait>::AccountId> for T whe
     }
 }
 
-pub trait Trait: frame_system::Trait {
+pub trait Trait: frame_system::Trait + tee::Trait {
     /// The staking balance.
     type Currency: LockableCurrency<Self::AccountId, Moment=Self::BlockNumber>;
 
@@ -981,6 +984,12 @@ impl<T: Trait> Module<T> {
         Self::bonded(stash).and_then(Self::ledger).map(|l| l.active).unwrap_or_default()
     }
 
+    pub fn get_stake_limit(workloads: u128) -> BalanceOf<T> {
+        // TODO: Calculate with accurate gigabytes converter and exchange rate
+        let workloads_to_stakes = (workloads * (CRUS / 1000_000)).min(u64::max_value() as u128);
+        workloads_to_stakes.try_into().ok().unwrap()
+    }
+
     // MUTABLES (DANGEROUS)
 
     /// Update the ledger for a controller. This will also update the stash lock. The lock will
@@ -1084,6 +1093,7 @@ impl<T: Trait> Module<T> {
     ///
     /// NOTE: This always happens immediately before a session change to ensure that new validators
     /// get a chance to set their session keys.
+    /// This also checks stake limitation based on work reports
     fn new_era(start_session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
         // Payout
         let points = CurrentEraPointsEarned::take();
@@ -1159,7 +1169,30 @@ impl<T: Trait> Module<T> {
         let (_slot_stake, maybe_new_validators) = Self::select_validators();
         Self::apply_unapplied_slashes(current_era);
 
-        maybe_new_validators
+        // Set stake limit for all validators.
+        if let Some(mut new_validators) = maybe_new_validators {
+            for v in new_validators.clone() {
+                // 1. Get controller
+                let v_controller = Self::bonded(&v).unwrap();
+
+                // 2. Get work report
+                let mut workloads = 0;
+                if let Some(work_report) = <tee::Module<T>>::work_reports(&v_controller) {
+                    workloads = work_report.empty_workload as u128 + work_report.meaningful_workload as u128;
+                }
+                Self::set_limit(&v_controller, Self::get_stake_limit(workloads));
+
+                // 3. Remove empty workloads validator
+                if workloads == 0 {
+                    <Validators<T>>::remove(&v);
+                    new_validators.remove_item(&v);
+                }
+            }
+            Some(new_validators)
+        } else {
+            None
+        }
+
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
@@ -1334,123 +1367,101 @@ impl<T: Trait> Module<T> {
         slashing::clear_stash_metadata::<T>(stash);
     }
 
-    /// Get all locks of nominators
-    /// This function's tc = O(n*m) in math
-    /// while n is validators number and m is nominators in each validator.
-    /// But the real situation is quite simple, due to n's value max to 16,
-    /// and m has no limit, So the actual tc = O(m)
-    fn get_nominator_locks(n_stash: &T::AccountId) -> BalanceOf<T> {
-        // get all validators n chose
-        let nominations: Nominations<T::AccountId> = Self::nominators(n_stash).unwrap();
-        let mut locked_balance: BalanceOf<T> = Zero::zero();
-
-        for v in nominations.targets {
-            let v_stakers: Exposure<T::AccountId, BalanceOf<T>> = Self::stakers(&v);
-            v_stakers.others.iter().for_each(|n| {
-                if &n.who == n_stash {
-                    locked_balance += n.value;
-                }
-            })
-        }
-
-        locked_balance
-    }
-
     // PUBLIC MUTABLES
 
-    /// Set stake limitation by workloads
-    pub fn check_stake_limitation(controller: &T::AccountId, stake_limit: u128) {
+    /// Set stake limitation
+    /// v_stash >= limited_stakes -> remove all nominators and reduce v_stash;
+    /// v_stash < limited_stakes -> reduce nominators' stash until limitation_remains run out;
+    ///
+    /// For example, limited_stakes = 5000 CRUs
+    /// if the stash is: v_stash = 6000 + nominators = {(n_stash1 = 2000), (n_stash2 = 3000)},
+    /// it will become into v_stash = 5000.
+    /// If the stash is: v_stash = 4000 + nominators = {(n_stash1 = 1500), (n_stash2 = 1000)},
+    /// it will become into v_stash = 4000 + nominators = {(n_stash1 = 1000)},
+    /// at the same time, n_stash1.locks.amount -= 500.
+    pub fn set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
         // 1. Get lockable balances
         // total = own + nominators
         let mut ledger: StakingLedger<T::AccountId, BalanceOf<T>> = Self::ledger(controller).unwrap();
         let stash = &ledger.stash;
 
         let mut stakers: Exposure<T::AccountId, BalanceOf<T>> = Self::stakers(&stash);
-        let total_locked_balances = &stakers.total;
-        let owned_locked_balances = &stakers.own;
+        let total_locked_stakes = &stakers.total;
+        let owned_locked_stakes = &stakers.own;
 
-        // 3. Convert storage into limited balances
-        // TODO: Calculate with accurate gigabytes converter and exchange rate
-        let storage_balances = stake_limit * (CRUS / 1_000_000);
-        let limited_balances: BalanceOf<T> = storage_balances.try_into().ok().unwrap();
-
-        // 4. Judge limitation and return exceeded back
+        // 2. Judge limitation and return exceeded back
         // a. own + nominators <= limitation
-        if total_locked_balances <= &limited_balances {
+        if total_locked_stakes <= &limited_stakes {
             return
         }
 
         // b. own >= limitation, update ledger and stakers
-        if owned_locked_balances >= &limited_balances {
-            ledger.active = ledger.active.min(limited_balances);
-            ledger.total = limited_balances;
-            stakers.own = limited_balances;
+        if owned_locked_stakes >= &limited_stakes {
+            ledger.active = ledger.active.min(limited_stakes);
+            ledger.total = limited_stakes;
+            stakers.own = limited_stakes;
 
             Self::update_ledger(controller, &ledger);
         }
 
         // c. own < limitation, set new nominators
         let mut new_nominators: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
-        let mut remains = limited_balances - stakers.own;
+        let mut remains = limited_stakes - stakers.own;
 
         for n in stakers.others {
+            // old_n_value is for update remains
+            let old_n_value = n.value;
+            // new_n_value is for new stakers' nominators
+            let new_n_value: BalanceOf<T>;
+
             if remains != Zero::zero() {
-                // old_n_value is for update remains
-                let old_n_value = n.value;
-                // n_value is for new stakers' nominators
-                let mut n_value = n.value;
+                // i. update new_n_value
+                new_n_value = n.value.min(remains);
 
-                // i. change nominator's balances
-                if remains < n.value {
-                    n_value = remains;
-                    // locks: Vec<BalanceLock<T::Balance, T::BlockNumber>>
-                    // total_locked_stakes - reduced_stakes
-                    let mut new_lock_stakes = Self::get_nominator_locks(&n.who);
-                    new_lock_stakes -= old_n_value - remains;
-
-                    T::Currency::set_lock(
-                        STAKING_ID,
-                        &n.who,
-                        new_lock_stakes,
-                        T::BlockNumber::max_value(),
-                        WithdrawReasons::all(),
-                    );
-                }
-
-                // ii. add updated nominators
+                // ii. update stakers - nominators
                 new_nominators.push(IndividualExposure {
                     who: n.who.clone(),
-                    value: n_value
+                    value: new_n_value
                 });
 
-                // iii. update remains
+                // iii. update remains, remains cannot be negative
                 if remains > old_n_value {
                     remains -= old_n_value;
                 } else {
                     remains = Zero::zero();
                 }
-
-                continue
             } else {
-                // get all validators n chose
+                // i. set value = 0
+                new_n_value = Zero::zero();
+
+                // ii. remove this v_stash
                 let mut nominations: Nominations<T::AccountId> = Self::nominators(&n.who).unwrap();
                 nominations.targets.remove_item(&stash);
 
-                // Update nominators
+                // iii. update nominators
                 <Nominators<T>>::remove(&n.who);
                 if !nominations.targets.is_empty() {
                     <Nominators<T>>::insert(&n.who, nominations);
                 }
             }
+
+            // d. update nominator's ledger
+            let n_controller = Self::bonded(&n.who).unwrap();
+            let mut n_ledger: StakingLedger<T::AccountId, BalanceOf<T>> = Self::ledger(&n_controller).unwrap();
+
+            // total_locked_stakes - reduced_stakes
+            n_ledger.active -= old_n_value - new_n_value;
+            n_ledger.total -= old_n_value - new_n_value;
+            Self::update_ledger(&n_controller, &n_ledger);
         }
 
-        // 5. Update stakers and SlotStake
+        // 3. Update stakers and slot_stake
         <Stakers<T>>::remove(&stash);
 
-        let new_slot_stake = Self::slot_stake().min(limited_balances);
+        let new_slot_stake = Self::slot_stake().min(limited_stakes);
         let new_exposure = Exposure {
             own: stakers.own,
-            total: limited_balances,
+            total: limited_stakes,
             others: new_nominators
         };
 

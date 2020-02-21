@@ -1,18 +1,10 @@
 use super::*;
 
-use crate::mock::{Tee, Staking, Balances, Origin, new_test_ext, run_to_block};
-use frame_support::{
-    assert_ok,
-    traits::Currency,
-};
+use crate::mock::{Tee, Origin, new_test_ext, run_to_block};
+use frame_support::assert_ok;
 use sp_core::crypto::{AccountId32, Ss58Codec};
 use keyring::Sr25519Keyring;
 use hex;
-
-use cstrml_staking as staking;
-use staking::{StakingLedger, Exposure, IndividualExposure};
-use primitives::constants::currency::CRUS;
-use cstrml_staking::Nominations;
 
 type AccountId = AccountId32;
 
@@ -155,15 +147,6 @@ fn test_for_report_works_success() {
 
         assert_ok!(Tee::report_works(Origin::signed(account.clone()), get_valid_work_report()));
 
-        let limited_stakes = 5971233576 * (CRUS / 1_000_000);
-        // Check how much is at stake
-        assert_eq!(Staking::ledger(&account), Some(StakingLedger {
-            stash: stash_account,
-            total: 4000 * CRUS,
-            active: 4000 * CRUS,
-            unlocking: vec![],
-        }));
-
         // Check workloads after work report
         assert_eq!(Tee::workloads(), Some(5971233576));
     });
@@ -260,51 +243,3 @@ fn test_for_work_report_sig_check_failed() {
         assert!(Tee::report_works(Origin::signed(account), works).is_err());
     });
 }
-
-#[test]
-fn test_for_check_and_set_stake_limitation_success() {
-    new_test_ext().execute_with(|| {
-        let account: AccountId = Sr25519Keyring::Alice.to_account_id();
-        let stash_account: AccountId = Sr25519Keyring::One.to_account_id();
-
-        let nominator1_stash: AccountId = Sr25519Keyring::Two.to_account_id();
-        let nominator2_stash: AccountId = Sr25519Keyring::Dave.to_account_id();
-
-        // Alice is validator and staked 1,000 CRUs
-        Tee::check_stake_limitation(&account, 5000_000_000);
-
-        let limited_stakes = 5000 * CRUS;
-
-        // Check how much is at stake
-        assert_eq!(Staking::ledger(&account), Some(StakingLedger {
-            stash: stash_account.clone(),
-            total: 4000 * CRUS,
-            active: 4000 * CRUS,
-            unlocking: vec![],
-        }));
-
-        // Check how much is at stakers
-        assert_eq!(Staking::stakers(&stash_account), Exposure {
-            total: limited_stakes,
-            own: 4000 * CRUS,
-            others: vec![IndividualExposure {
-                who: nominator2_stash.clone(),
-                value: 1000 * CRUS
-            }]
-        });
-
-        // Check nominators works fine
-        assert_eq!(Staking::nominators(&nominator1_stash), None);
-
-        assert_eq!(Staking::nominators(&nominator2_stash), Some(Nominations {
-            targets: vec![stash_account],
-            submitted_in: 0,
-            suppressed: false
-        }));
-
-        // Check nominators' balances works fine
-        let locked_balances = Balances::locks(&nominator2_stash)[0].amount;
-        assert_eq!(locked_balances, 1000 * CRUS);
-    });
-}
-

@@ -19,7 +19,6 @@ sp-std = { default-features = false, git = 'https://github.com/paritytech/substr
 system = { package = 'frame-system', default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
 
 # Crust runtime modules
-cstrml-staking = { path = '../staking', default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [features]
@@ -34,8 +33,7 @@ std = [
     'sp-std/std',
     'system/std',
     'sp-runtime-interface/std',
-    'cstrml-staking/std',
-    'primitives/std'
+    'primitives/std',
 ]
 
 [dev-dependencies]

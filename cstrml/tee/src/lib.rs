@@ -124,13 +124,13 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            // ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
+            ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
             // 2. Do timing check
-            // ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
             // 3. Do sig check
-            // ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
+            ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
             // 4. Judge new and old workload
             let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();

@@ -514,6 +514,9 @@ decl_storage! {
 					balance,
 					RewardDestination::Staked,
 				);
+
+				// TODO: make genesis validator's limitation more reasonable
+				<StakeLimit<T>>::insert(stash, balance+balance);
 				let _ = match status {
 					StakerStatus::Validator => {
 						<Module<T>>::validate(
@@ -528,7 +531,6 @@ decl_storage! {
 						)
 					}, _ => Ok(())
 				};
-				<StakeLimit<T>>::insert(stash, balance);
 			}
 
 			StorageVersion::put(migration::CURRENT_VERSION);
@@ -572,6 +574,10 @@ decl_error! {
 		InsufficientValue,
 		/// Can not schedule more unlock chunks.
 		NoMoreChunks,
+		/// Can not bond with more than limit
+		ExceedLimit,
+		/// Can not validate without workloads
+		NoWorkloads
 	}
 }
 
@@ -659,7 +665,7 @@ decl_module! {
 		/// # <weight>
 		/// - Independent of the arguments. Insignificant complexity.
 		/// - O(1).
-		/// - One DB entry.
+		/// - Two DB entry.
 		/// # </weight>
 		#[weight = SimpleDispatchInfo::FixedNormal(500_000)]
 		fn bond_extra(origin, #[compact] max_additional: BalanceOf<T>) {
@@ -670,8 +676,12 @@ decl_module! {
 
 			let stash_balance = T::Currency::free_balance(&stash);
 
-			if let Some(extra) = stash_balance.checked_sub(&ledger.total) {
-				let extra = extra.min(max_additional);
+			if let Some(mut extra) = stash_balance.checked_sub(&ledger.total) {
+				extra = extra.min(max_additional);
+				// Check stake limit
+				if let Some(limit) = Self::stake_limit(&stash) {
+				    extra = extra.min(limit-ledger.total);
+				}
 				ledger.total += extra;
 				ledger.active += extra;
 				Self::update_ledger(&controller, &ledger);
@@ -780,8 +790,18 @@ decl_module! {
 			Self::ensure_storage_upgraded();
 
 			let controller = ensure_signed(origin)?;
-			let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-			let stash = &ledger.stash;
+			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+            let stash = &ledger.stash;
+            let limit = Self::stake_limit(&stash).ok_or(Error::<T>::NoWorkloads)?;
+
+            if limit == Zero::zero() {
+                Err(Error::<T>::ExceedLimit)?
+            }
+
+            ledger.total = ledger.total.min(limit);
+            ledger.active = ledger.active.min(limit);
+            Self::update_ledger(&controller, &ledger);
+
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
 		}
@@ -1174,7 +1194,10 @@ impl<T: Trait> Module<T> {
         let (_slot_stake, maybe_new_validators) = Self::select_validators();
         Self::apply_unapplied_slashes(current_era);
 
-        // Set stake limit for all validators.
+        // Update all work reporters
+        Self::update_stake_limit();
+
+        // Set stake limit for all selected validators.
         if let Some(mut new_validators) = maybe_new_validators {
             for v in new_validators.clone() {
                 // 1. Get controller
@@ -1193,15 +1216,12 @@ impl<T: Trait> Module<T> {
                     <Validators<T>>::remove(&v);
                     <StakeLimit<T>>::remove(&v);
                     new_validators.remove_item(&v);
-                } else {
-                    <StakeLimit<T>>::insert(&v, workloads_stake);
                 }
             }
             Some(new_validators)
         } else {
             None
         }
-
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
@@ -1376,7 +1396,28 @@ impl<T: Trait> Module<T> {
         slashing::clear_stash_metadata::<T>(stash);
     }
 
-    // PUBLIC MUTABLES
+    /// This function will update all the work reporters' stake limit
+    ///
+    /// # <weight>
+    /// - Independent of the arguments. Insignificant complexity.
+    /// - O(n).
+    /// - 2n+1 DB entry.
+    /// # </weight>
+    fn update_stake_limit() {
+        // 1. Get all work reports
+        let work_reports = <tee::WorkReports<T>>::enumerate().collect::<Vec<_>>();
+
+        for (controller, wr) in work_reports {
+            // 2. Get controller's (maybe)ledger
+            let maybe_ledger = Self::ledger(controller);
+            if let Some(ledger) = maybe_ledger {
+                let workloads = (wr.empty_workload + wr.meaningful_workload) as u128;
+
+                // 3. Update stake limit anyway
+                <StakeLimit<T>>::insert(&ledger.stash, Self::get_stake_limit(workloads));
+            }
+        }
+    }
 
     /// Set stake limitation: v_stash + v_nominators_stash > limited_stakes
     /// v_stash >= limited_stakes -> remove all nominators and reduce v_stash;
@@ -1388,7 +1429,8 @@ impl<T: Trait> Module<T> {
     /// If the stash is: v_stash = 4000 + nominators = {(n_stash1 = 1500), (n_stash2 = 1000)},
     /// it will become into v_stash = 4000 + nominators = {(n_stash1 = 1000)},
     /// at the same time, n_stash1.locks.amount -= 500.
-    pub fn maybe_set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
+    /// TODO: write down time and db complex
+    fn maybe_set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
         // 1. Get lockable balances
         // total = own + nominators
         let mut ledger: StakingLedger<T::AccountId, BalanceOf<T>> = Self::ledger(controller).unwrap();
@@ -1398,7 +1440,10 @@ impl<T: Trait> Module<T> {
         let total_locked_stakes = &stakers.total;
         let owned_locked_stakes = &stakers.own;
 
-        // 2. Judge limitation and return exceeded back
+        // 2. Update stake limit anyway
+        <StakeLimit<T>>::insert(&stash, limited_stakes.clone());
+
+        // 3. Judge limitation and return exceeded back
         // a. own + nominators <= limitation
         if total_locked_stakes <= &limited_stakes {
             return
@@ -1464,7 +1509,7 @@ impl<T: Trait> Module<T> {
             Self::update_ledger(&n_controller, &n_ledger);
         }
 
-        // 3. Update stakers and slot_stake
+        // 4. Update stakers and slot_stake
         let new_slot_stake = Self::slot_stake().min(limited_stakes);
         let new_exposure = Exposure {
             own: stakers.own,

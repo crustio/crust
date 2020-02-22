@@ -323,7 +323,7 @@ impl ExtBuilder {
 		let nominated = if self.nominate { vec![11, 21] } else { vec![] };
 
 		// tee genesis
-		let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6];
+		let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
 
 		let _ = GenesisConfig::<Test>{
 			current_era: 0,

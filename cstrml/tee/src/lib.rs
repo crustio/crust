@@ -59,7 +59,7 @@ pub trait Trait: system::Trait {
 decl_storage! {
 	trait Store for Module<T: Trait> as Tee {
 		pub TeeIdentities get(fn tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
-		pub WorkReports get(fn work_reports) config(): map T::AccountId => Option<WorkReport>;
+		pub WorkReports get(fn work_reports) config(): linked_map T::AccountId => Option<WorkReport>;
 		pub Workloads get(fn workloads) build(|config: &GenesisConfig<T>| {
 			Some(config.work_reports.iter().fold(0, |acc, (_, work_report)|
 			    acc + (&work_report.empty_workload + &work_report.meaningful_workload) as u128
@@ -124,13 +124,13 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
+            // ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
 
             // 2. Do timing check
-            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            // ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
             // 3. Do sig check
-            ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
+            // ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
             // 4. Judge new and old workload
             let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();

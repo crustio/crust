@@ -141,7 +141,7 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 
 	const ENDOWMENT: u128 = 1_000_000 * CRUS;
 	const STASH: u128 = 20_000 * CRUS;
-	const WORKLOAD: u64 = 20_000 * 1000_000;
+	const WORKLOAD: u64 = 40_000 * 1000_000;
 
 	GenesisConfig {
 		system: Some(SystemConfig {

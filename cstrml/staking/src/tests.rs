@@ -11,6 +11,8 @@ use frame_support::{
 };
 use substrate_test_utils::assert_eq_uvec;
 
+// TODO: new validate test case cannot pass because of stake limit, fix with better genesis initial
+
 #[test]
 fn force_unstake_works() {
 	// Verifies initial conditions of mock
@@ -1040,7 +1042,7 @@ fn bond_extra_works() {
 		}));
 
 		// Give account 11 some large free balance greater than total
-		let _ = Balances::make_free_balance_be(&11, 1000000);
+		let _ = Balances::make_free_balance_be(&11, 1500);
 
 		// Call the bond_extra function from controller, add only 100
 		assert_ok!(Staking::bond_extra(Origin::signed(11), 100));
@@ -1057,8 +1059,22 @@ fn bond_extra_works() {
 		// The full amount of the funds should now be in the total and active
 		assert_eq!(Staking::ledger(&10), Some(StakingLedger {
 			stash: 11,
-			total: 1000000,
-			active: 1000000,
+			total: 1500,
+			active: 1500,
+			unlocking: vec![],
+		}));
+
+		// Stake limit should work
+		// Give account 11 some large free balance greater than total
+		let _ = Balances::make_free_balance_be(&11, 1000000);
+
+		// Call the bond_extra function from controller, add only 100
+		assert_ok!(Staking::bond_extra(Origin::signed(11), u64::max_value()));
+		// There should be at most 2000 limit
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger {
+			stash: 11,
+			total: 2000,
+			active: 2000,
 			unlocking: vec![],
 		}));
 	});
@@ -2546,7 +2562,7 @@ fn version_initialized() {
 fn limit_should_work() {
 	ExtBuilder::default().build().execute_with(|| {
 		// Check stake_limit
-		assert_eq!(Staking::stake_limit(&11), Some(1000));
+		assert_eq!(Staking::stake_limit(&11), Some(2000));
 
 		Staking::maybe_set_limit(&10, 1100);
 
@@ -2576,6 +2592,7 @@ fn limit_should_work_new_era() {
 		start_session(2);
 
 		assert_eq!(Staking::stake_limit(&11), Some(u64::max_value()));
+		assert_eq!(Staking::stake_limit(&101), Some(u64::max_value()));
 
 		/*// new_era
 		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 0, active: 0, unlocking: vec![] }));

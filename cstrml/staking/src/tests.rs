@@ -2591,8 +2591,8 @@ fn limit_should_work_new_era() {
 		start_session(1);
 		start_session(2);
 
-		assert_eq!(Staking::stake_limit(&11), Some(u64::max_value()));
-		assert_eq!(Staking::stake_limit(&101), Some(u64::max_value()));
+		assert_eq!(Staking::stake_limit(&11), Some(45454545987));
+		assert_eq!(Staking::stake_limit(&101), Some(45454545987));
 
 		/*// new_era
 		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 0, active: 0, unlocking: vec![] }));

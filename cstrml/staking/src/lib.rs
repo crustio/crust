@@ -43,8 +43,8 @@ use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_phragmen::{ExtendedBalance, PhragmenStakedAssignment};
 
 // Crust runtime modules
+// TODO: using tee passing into `Trait` like Currency?
 use tee;
-use primitives::constants::currency::CRUS;
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_NOMINATIONS: usize = 16;
@@ -1010,8 +1010,12 @@ impl<T: Trait> Module<T> {
     }
 
     pub fn get_stake_limit(workloads: u128) -> BalanceOf<T> {
-        // TODO: Calculate with accurate gigabytes converter and exchange rate
-        let workloads_to_stakes = (workloads * (CRUS / 1000_000)).min(u64::max_value() as u128);
+        let total_workloads = <tee::Module<T>>::workloads().unwrap();
+        let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance()).ok().unwrap();
+
+        // total_workloads cannot be zero, or system go panic!
+        let workloads_to_stakes = ((workloads * total_issuance / total_workloads / 2) as u128).min(u64::max_value() as u128);
+
         workloads_to_stakes.try_into().ok().unwrap()
     }
 
@@ -1429,7 +1433,11 @@ impl<T: Trait> Module<T> {
     /// If the stash is: v_stash = 4000 + nominators = {(n_stash1 = 1500), (n_stash2 = 1000)},
     /// it will become into v_stash = 4000 + nominators = {(n_stash1 = 1000)},
     /// at the same time, n_stash1.locks.amount -= 500.
-    /// TODO: write down time and db complex
+    /// # <weight>
+    /// - Independent of the arguments. Insignificant complexity.
+    /// - O(n).
+    /// - 3n+5 DB entry.
+    /// # </weight>
     fn maybe_set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
         // 1. Get lockable balances
         // total = own + nominators
@@ -1462,6 +1470,8 @@ impl<T: Trait> Module<T> {
         let mut new_nominators: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
         let mut remains = limited_stakes - stakers.own;
 
+        // let n be FILO order by reversing `others` order
+        stakers.others.reverse();
         for n in stakers.others {
             // old_n_value is for update remains
             let old_n_value = n.value;

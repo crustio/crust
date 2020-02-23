@@ -1,16 +1,17 @@
 use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
-	BalancesConfig, GenesisConfig, SudoConfig, IndicesConfig,
+	BalancesConfig, GenesisConfig, IndicesConfig,
 	SystemConfig, WASM_BINARY, SessionConfig, StakingConfig,
 	AuthorityDiscoveryConfig, SessionKeys, ImOnlineId,
 	AuthorityDiscoveryId, TeeConfig, StakerStatus
 };
-use crust_runtime::constants::{*, currency::CRUS};
+use primitives::{*, constants::currency::CRUS};
 use sp_consensus_babe::{AuthorityId as BabeId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
 use sc_service;
 use sp_runtime::{Perbill, traits::{Verify, IdentifyAccount}};
-use pallet_staking::Forcing;
+use cstrml_staking::Forcing;
+use cstrml_tee::WorkReport;
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server
@@ -140,6 +141,7 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 
 	const ENDOWMENT: u128 = 1_000_000 * CRUS;
 	const STASH: u128 = 20_000 * CRUS;
+	const WORKLOAD: u64 = 40_000 * 1000_000;
 
 	GenesisConfig {
 		system: Some(SystemConfig {
@@ -153,9 +155,6 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 			balances: endowed_accounts.iter().cloned().map(|k|(k, ENDOWMENT)).collect(),
 			vesting: vec![],
 		}),
-		sudo: Some(SudoConfig {
-			key: root_key,
-		}),
 		session: Some(SessionConfig {
 			keys: initial_authorities.iter().map(|x| (
 				x.0.clone(),
@@ -164,8 +163,8 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 		}),
 		staking: Some(StakingConfig {
 			current_era: 0,
-			validator_count: 4,
-			minimum_validator_count: 2,
+			validator_count: 2,
+			minimum_validator_count: 1,
 			stakers: initial_authorities
 				.iter()
 				.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
@@ -185,7 +184,19 @@ fn testnet_genesis(initial_authorities: Vec<(AccountId, AccountId, GrandpaId, Ba
 			tee_identities: endowed_accounts
 				.iter()
 				.map(|x| (x.clone(), Default::default()))
-				.collect()
+				.collect(),
+			work_reports: endowed_accounts
+				.iter()
+				.map(|x| (x.clone(), WorkReport {
+					pub_key: vec![],
+					block_number: 0,
+					block_hash: vec![],
+					empty_root: vec![],
+					empty_workload: WORKLOAD,
+					meaningful_workload: 0,
+					sig: vec![]
+				}))
+				.collect(),
 		})
 	}
 }

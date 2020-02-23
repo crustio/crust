@@ -4,16 +4,9 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit="256"]
 
-#![feature(option_result_contains)]
-
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-
-#[cfg(test)]
-mod mock;
-#[cfg(test)]
-mod tests;
 
 use sp_std::prelude::*;
 use sp_core::OpaqueMetadata;
@@ -35,8 +28,6 @@ use sp_version::RuntimeVersion;
 use sp_version::NativeVersion;
 use sp_staking::SessionIndex;
 
-#[cfg(feature = "std")]
-pub use staking::StakerStatus;
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
@@ -51,15 +42,15 @@ pub use im_online::sr25519::AuthorityId as ImOnlineId;
 pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 use system::offchain::TransactionSubmitter;
 
-/// Constant values used within the runtime.
-pub mod constants;
-use constants::{*, time::*};
+/// Crust primitives
+use primitives::{*, constants::time::*};
 
-/// Used for the module tee in `./tee.rs`
-mod tee;
+/// Crust runtime modules
+use cstrml_tee as tee;
+use cstrml_staking as staking;
 
-/// Used for tee api
-pub mod tee_api;
+#[cfg(feature = "std")]
+pub use staking::StakerStatus;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -115,12 +106,10 @@ parameter_types! {
 }
 
 impl system::Trait for Runtime {
-	/// The identifier used to distinguish between accounts.
-	type AccountId = AccountId;
+	/// The ubiquitous origin type.
+	type Origin = Origin;
 	/// The aggregated dispatch type that is available for extrinsics.
 	type Call = Call;
-	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
-	type Lookup = Indices;
 	/// The index type for storing how many extrinsics an account has signed.
 	type Index = Index;
 	/// The index type for blocks.
@@ -129,12 +118,14 @@ impl system::Trait for Runtime {
 	type Hash = Hash;
 	/// The hashing algorithm used.
 	type Hashing = BlakeTwo256;
+	/// The identifier used to distinguish between accounts.
+	type AccountId = AccountId;
+	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
+	type Lookup = Indices;
 	/// The header type.
 	type Header = generic::Header<BlockNumber, BlakeTwo256>;
 	/// The ubiquitous event type.
 	type Event = Event;
-	/// The ubiquitous origin type.
-	type Origin = Origin;
 	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
 	type BlockHashCount = BlockHashCount;
 	/// Maximum weight of each block.
@@ -200,10 +191,10 @@ impl indices::Trait for Runtime {
 	/// The type for recording indexing into the account enumeration. If this ever overflows, there
 	/// will be problems!
 	type AccountIndex = AccountIndex;
-	/// Use the standard means of resolving an index hint from an id.
-	type ResolveHint = indices::SimpleResolveHint<Self::AccountId, Self::AccountIndex>;
 	/// Determine whether an account is dead.
 	type IsDeadAccount = Balances;
+	/// Use the standard means of resolving an index hint from an id.
+	type ResolveHint = indices::SimpleResolveHint<Self::AccountId, Self::AccountIndex>;
 	/// The ubiquitous event type.
 	type Event = Event;
 }
@@ -463,12 +454,6 @@ impl transaction_payment::Trait for Runtime {
 	type FeeMultiplierUpdate = ();
 }
 
-impl sudo::Trait for Runtime {
-	type Event = Event;
-	type Proposal = Call;
-}
-
-/// Used for the module tee in `./tee.rs`
 impl tee::Trait for Runtime {
 	type Event = Event;
 }
@@ -490,8 +475,6 @@ construct_runtime!(
 		Indices: indices,
 		Balances: balances,
 		TransactionPayment: transaction_payment::{Module, Storage},
-		// TODO: [Remove] disable sudo rights
-		Sudo: sudo,
 
 		// Consensus support
 		Authorship: authorship::{Module, Call, Storage},
@@ -511,7 +494,7 @@ construct_runtime!(
 		TechnicalMembership: membership::<Instance1>::{Module, Call, Storage, Event<T>, Config<T>},
 		Treasury: treasury::{Module, Call, Storage, Event<T>},*/
 
-		// Used for the module tee in `./tee.rs`
+		// Crust modules
 		Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );

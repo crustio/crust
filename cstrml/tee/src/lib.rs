@@ -1,17 +1,29 @@
+//! The Substrate Node runtime. This can be compiled with `#[no_std]`, ready for Wasm.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#![feature(option_result_contains)]
+
 use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
 use system::ensure_signed;
 use sp_std::{vec::Vec, str};
 use sp_std::convert::TryInto;
 use codec::{Encode, Decode};
-use crate::tee_api;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
-/// Define TEE basic elements
-type PubKey = Vec<u8>;
-type Signature = Vec<u8>;
-type MerkleRoot = Vec<u8>;
+// Crust runtime modules
+use primitives::{PubKey, TeeSignature, MerkleRoot, constants::tee::*};
+
+/// Provides crypto and other std functions by implementing `runtime_interface`
+pub mod api;
+
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -20,7 +32,7 @@ pub struct Identity<T> {
     pub account_id: T,
     pub validator_pub_key: PubKey,
     pub validator_account_id: T,
-    pub sig: Signature,
+    pub sig: TeeSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -33,7 +45,7 @@ pub struct WorkReport{
     pub empty_root: MerkleRoot,
     pub empty_workload: u64,
     pub meaningful_workload: u64,
-    pub sig: Signature,
+    pub sig: TeeSignature,
 }
 
 /// The module's configuration trait.
@@ -42,11 +54,17 @@ pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
+// TODO: add add_extra_genesis to unify chain_spec
 // This module's storage items.
 decl_storage! {
 	trait Store for Module<T: Trait> as Tee {
-		pub TeeIdentities get(tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
-		pub WorkReports get(work_reports): map T::AccountId => Option<WorkReport>;
+		pub TeeIdentities get(fn tee_identities) config(): map T::AccountId => Option<Identity<T::AccountId>>;
+		pub WorkReports get(fn work_reports) config(): linked_map T::AccountId => Option<WorkReport>;
+		pub Workloads get(fn workloads) build(|config: &GenesisConfig<T>| {
+			Some(config.work_reports.iter().fold(0, |acc, (_, work_report)|
+			    acc + (&work_report.empty_workload + &work_report.meaningful_workload) as u128
+            ))
+		}): Option<u128>;
 	}
 }
 
@@ -59,8 +77,16 @@ decl_module! {
 		fn deposit_event() = default;
 
 		pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
-		    // TODO: add account_id <-> tee_pub_key validation
 		    let who = ensure_signed(origin)?;
+
+            // 0. Genesis validators have rights to register themselves
+            if let Some(maybe_genesis_validator) = <TeeIdentities<T>>::get(&who) {
+                if &maybe_genesis_validator.account_id == &maybe_genesis_validator.validator_account_id {
+                    // Store the tee identity
+                    <TeeIdentities<T>>::insert(&who, &identity);
+                    return Ok(());
+                }
+            }
 
             let applier = &identity.account_id;
             let validator = &identity.validator_account_id;
@@ -71,12 +97,13 @@ decl_module! {
             ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
             // 2. applier cannot be validator
-            ensure!(&applier != &validator, "You cannot verify yourself");
+            ensure!(applier != validator, "You cannot verify yourself");
             // TODO: Add pub key verify
-//            ensure!(&applier_pk != &validator_pk, "You cannot verify yourself");
+//            ensure!(applier_pk != validator_pk, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
+            ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key do not exist");
 
             // 4. Verify sig
             ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
@@ -105,11 +132,22 @@ decl_module! {
             // 3. Do sig check
             ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
-            // 4. Upsert works
-            <WorkReports<T>>::insert(&who, &work_report);
+            // 4. Judge new and old workload
+            let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();
+            let new_workload = (work_report.empty_workload + work_report.meaningful_workload) as u128;
+            let old_workload = (old_work_report.empty_workload + old_work_report.meaningful_workload) as u128;
 
-            // 5. Emit event
-            Self::deposit_event(RawEvent::ReportWorks(who, work_report));
+            if new_workload != old_workload {
+                // 4.1 Get workloads
+                let workloads = Workloads::get().unwrap_or_default();
+
+                // 4.2 Upsert works and workloads
+                <WorkReports<T>>::insert(&who, &work_report);
+                Workloads::put(workloads + new_workload - old_workload);
+
+                // 4.3 Emit event when workloads changed
+                Self::deposit_event(RawEvent::ReportWorks(who, work_report));
+            }
 
             Ok(())
         }
@@ -121,13 +159,11 @@ impl<T: Trait> Module<T> {
         let applier_id = id.account_id.encode();
         let validator_id = id.validator_account_id.encode();
         // TODO: concat data inside runtime for saving PassBy params number
-        tee_api::crypto::verify_identity_sig(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
+        api::crypto::verify_identity_sig(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
     }
 
     pub fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {
         // 1. Check block hash
-        // TODO: move to constants
-        const REPORT_SLOT: u64 = 50;
         let wr_block_number: T::BlockNumber = wr.block_number.try_into().ok().unwrap();
         let wr_block_hash = <system::Module<T>>::block_hash(wr_block_number).as_ref().to_vec();
         ensure!(&wr_block_hash == &wr.block_hash, "work report hash is illegal");
@@ -144,7 +180,7 @@ impl<T: Trait> Module<T> {
 
     pub fn work_report_sig_check(wr: &WorkReport) -> bool {
         // TODO: concat data inside runtime for saving PassBy params number
-        tee_api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
+        api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
                                                 wr.empty_workload, wr.meaningful_workload, &wr.sig)
     }
 }

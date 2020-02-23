@@ -1,12 +1,15 @@
 use super::*;
-use crate::tee;
 
-use sp_core::H256;
+use sp_core::{H256, crypto::AccountId32};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize}, testing::Header, Perbill
+    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
+    testing::Header,
+    Perbill
 };
 use keyring::Sr25519Keyring;
+
+type AccountId = AccountId32;
 
 impl_outer_origin! {
     pub enum Origin for Test {}
@@ -44,26 +47,42 @@ impl system::Trait for Test {
     type ModuleToIndex = ();
 }
 
-impl tee::Trait for Test {
+impl Trait for Test {
     type Event = ();
 }
 
-pub type Tee = tee::Module<Test>;
-type System = system::Module<Test>;
+pub type Tee = Module<Test>;
+pub type System = system::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
-    let tee_ids = [
+
+    // stash-controller accounts
+    let accounts = [
         Sr25519Keyring::Alice.to_account_id()
     ];
 
-    tee::GenesisConfig::<Test> {
-        tee_identities: tee_ids
-            .iter()
-            .map(|x| (x.clone(), Default::default()))
-            .collect()
+    let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
+    let tee_identities = accounts
+        .iter()
+        .map(|x| (x.clone(), Identity {
+            pub_key: pk.clone(),
+            account_id: x.clone(),
+            validator_pub_key: pk.clone(),
+            validator_account_id: x.clone(),
+            sig: vec![]
+        }))
+        .collect();
+    let work_reports = accounts
+        .iter()
+        .map(|x| (x.clone(), Default::default()))
+        .collect();
+
+    GenesisConfig::<Test> {
+        tee_identities,
+        work_reports
     }.assimilate_storage(&mut t).unwrap();
 
     t.into()

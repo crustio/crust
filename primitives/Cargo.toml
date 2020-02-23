@@ -1,0 +1,22 @@
+[package]
+name = "cst-primitives"
+version = "0.1.0"
+authors = ["crustio"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.102", optional = true, features = ["derive"] }
+parity-scale-codec = { version = "1.1.0", default-features = false, features = ["bit-vec", "derive"] }
+sp-runtime = { git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0', default-features = false }
+sp-core = { git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0', default-features = false }
+sp-std = { git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0', default-features = false }
+
+[features]
+default = ["std"]
+std = [
+	"parity-scale-codec/std",
+	"sp-runtime/std",
+	"sp-core/std",
+	"sp-std/std",
+	"serde",
+]

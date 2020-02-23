@@ -43,8 +43,8 @@ use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_phragmen::{ExtendedBalance, PhragmenStakedAssignment};
 
 // Crust runtime modules
+// TODO: using tee passing into `Trait` like Currency?
 use tee;
-use primitives::constants::currency::CRUS;
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_NOMINATIONS: usize = 16;
@@ -1010,8 +1010,12 @@ impl<T: Trait> Module<T> {
     }
 
     pub fn get_stake_limit(workloads: u128) -> BalanceOf<T> {
-        // TODO: Calculate with accurate gigabytes converter and exchange rate
-        let workloads_to_stakes = (workloads * (CRUS / 1000_000)).min(u64::max_value() as u128);
+        let total_workloads = <tee::Module<T>>::workloads().unwrap();
+        let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance()).ok().unwrap();
+
+        // total_workloads cannot be zero, or system go panic!
+        let workloads_to_stakes = ((workloads * total_issuance / total_workloads / 2) as u128).min(u64::max_value() as u128);
+
         workloads_to_stakes.try_into().ok().unwrap()
     }
 

@@ -47,9 +47,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
-          command: test --package cstrml-staking --lib tests
+          command: test
+          args: --package cstrml-staking --lib tests
       - name: Cargo test tee
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
-          command: test --package cstrml-tee --lib tests
+          command: test
+          args: --package cstrml-tee --lib tests

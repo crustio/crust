@@ -10,13 +10,13 @@ Go to our [Crust Client](https://github.com/crustio/crust-client), follow the RE
 
 ### 1. Install Rust
 
-```bash
+```shell
 curl https://sh.rustup.rs -sSf | sh
 ```
 
 ### 2. Initialize your Wasm Build environment
 
-```bash
+```shell
 ./scripts/init.sh
 ```
 
@@ -63,7 +63,7 @@ In the second terminal, we'll start Bob's substrate node on a different TCP port
 ```bash
 ./target/release/crust \
   --base-path /tmp/bob \
-  --chain=local \
+  --chain local \
   --bob \
   --port 30334 \
   --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/QmRpheLN4JWdAnY7HGJfWFNbfkQCb6tFf4vvA6hgjMZKrR

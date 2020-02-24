@@ -282,6 +282,7 @@ fn staking_should_work() {
 			start_session(1);
 			// add a new candidate for being a validator. account 3 controlled by 4.
 			assert_ok!(Staking::bond(Origin::signed(3), 4, 1500, RewardDestination::Controller));
+			Staking::upsert_stake_limit(&3, u64::max_value());
 			assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
 
 			// No effects will be seen so far.
@@ -1372,6 +1373,7 @@ fn switching_roles() {
 
 		// add a new validator candidate
 		assert_ok!(Staking::bond(Origin::signed(5), 6, 1000, RewardDestination::Controller));
+		Staking::upsert_stake_limit(&5, u64::max_value());
 		assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
 
 		// new block
@@ -1505,6 +1507,7 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
 
 			// Stingy validator.
 			assert_ok!(Staking::bond(Origin::signed(1), 2, 1, RewardDestination::Controller));
+			Staking::upsert_stake_limit(&1, u64::max_value());
 			assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
 
 			let total_payout_0 = current_total_payout_for_duration(3000);
@@ -1618,14 +1621,15 @@ fn phragmen_should_not_overflow_validators() {
 		bond_nominator(6, u64::max_value() / 2, vec![3, 5]);
 		bond_nominator(8, u64::max_value() / 2, vec![3, 5]);
 
+		// TODO: this will broken the stake limit of mock set
 		start_era(1);
 
 		assert_eq_uvec!(validator_controllers(), vec![4, 2]);
 
 		// This test will fail this. Will saturate.
 		// check_exposure_all();
-		assert_eq!(Staking::stakers(3).total, u64::max_value());
-		assert_eq!(Staking::stakers(5).total, u64::max_value());
+		assert_eq!(Staking::stakers(3).total, Staking::stake_limit(3).unwrap());
+		assert_eq!(Staking::stakers(5).total, Staking::stake_limit(5).unwrap());
 	})
 }
 
@@ -1646,8 +1650,8 @@ fn phragmen_should_not_overflow_nominators() {
 		assert_eq_uvec!(validator_controllers(), vec![4, 2]);
 
 		// Saturate.
-		assert_eq!(Staking::stakers(3).total, u64::max_value());
-		assert_eq!(Staking::stakers(5).total, u64::max_value());
+		assert_eq!(Staking::stakers(3).total, Staking::stake_limit(3).unwrap());
+		assert_eq!(Staking::stakers(5).total, Staking::stake_limit(5).unwrap());
 	})
 }
 
@@ -1665,8 +1669,9 @@ fn phragmen_should_not_overflow_ultimate() {
 		assert_eq_uvec!(validator_controllers(), vec![4, 2]);
 
 		// Saturate.
-		assert_eq!(Staking::stakers(3).total, u64::max_value());
-		assert_eq!(Staking::stakers(5).total, u64::max_value());
+		// Nominator's stake should be cut
+		assert_eq!(Staking::stakers(3).total, Staking::stake_limit(3).unwrap());
+		assert_eq!(Staking::stakers(5).total, Staking::stake_limit(5).unwrap());
 	})
 }
 

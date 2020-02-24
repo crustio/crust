@@ -431,6 +431,7 @@ pub fn bond_validator(acc: u64, val: u64) {
 	// a + 1 = stash
 	let _ = Balances::make_free_balance_be(&(acc + 1), val);
 	assert_ok!(Staking::bond(Origin::signed(acc + 1), acc, val, RewardDestination::Controller));
+	Staking::upsert_stake_limit(&(acc + 1), u64::max_value());
 	assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
 }
 

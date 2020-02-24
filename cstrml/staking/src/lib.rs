@@ -516,7 +516,7 @@ decl_storage! {
 				);
 
 				// TODO: make genesis validator's limitation more reasonable
-				<StakeLimit<T>>::insert(stash, balance+balance);
+				<Module<T>>::upsert_stake_limit(stash, balance+balance);
 				let _ = match status {
 					StakerStatus::Validator => {
 						<Module<T>>::validate(
@@ -1009,7 +1009,7 @@ impl<T: Trait> Module<T> {
         Self::bonded(stash).and_then(Self::ledger).map(|l| l.active).unwrap_or_default()
     }
 
-    pub fn get_stake_limit(workloads: u128) -> BalanceOf<T> {
+    fn stake_limit_of(workloads: u128) -> BalanceOf<T> {
         let total_workloads = <tee::Module<T>>::workloads().unwrap();
         let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance()).ok().unwrap();
 
@@ -1020,6 +1020,11 @@ impl<T: Trait> Module<T> {
     }
 
     // MUTABLES (DANGEROUS)
+
+    /// Insert new or update old stake limit
+    fn upsert_stake_limit(account_id: &T::AccountId, limit: BalanceOf<T>) {
+        <StakeLimit<T>>::insert(account_id, limit);
+    }
 
     /// Update the ledger for a controller. This will also update the stash lock. The lock will
     /// will lock the entire funds except paying for further transactions.
@@ -1212,7 +1217,7 @@ impl<T: Trait> Module<T> {
                 if let Some(work_report) = <tee::Module<T>>::work_reports(&v_controller) {
                     workloads = (work_report.empty_workload + work_report.meaningful_workload) as u128;
                 }
-                let workloads_stake = Self::get_stake_limit(workloads);
+                let workloads_stake = Self::stake_limit_of(workloads);
                 Self::maybe_set_limit(&v_controller, workloads_stake.clone());
 
                 // 3. Remove empty workloads validator
@@ -1418,7 +1423,7 @@ impl<T: Trait> Module<T> {
                 let workloads = (wr.empty_workload + wr.meaningful_workload) as u128;
 
                 // 3. Update stake limit anyway
-                <StakeLimit<T>>::insert(&ledger.stash, Self::get_stake_limit(workloads));
+                Self::upsert_stake_limit(&ledger.stash, Self::stake_limit_of(workloads));
             }
         }
     }
@@ -1449,7 +1454,7 @@ impl<T: Trait> Module<T> {
         let owned_locked_stakes = &stakers.own;
 
         // 2. Update stake limit anyway
-        <StakeLimit<T>>::insert(&stash, limited_stakes.clone());
+        Self::upsert_stake_limit(&stash, limited_stakes.clone());
 
         // 3. Judge limitation and return exceeded back
         // a. own + nominators <= limitation

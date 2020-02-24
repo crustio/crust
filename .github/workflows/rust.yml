@@ -1,4 +1,4 @@
-name: Build Crust
+name: Crust CI
 
 on: 
   push:
@@ -11,7 +11,7 @@ on:
       - feature/*
 jobs:
   build:
-    name: Build Crust
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
@@ -43,3 +43,15 @@ jobs:
         with:
           use-cross: false
           command: build
+      - name: Cargo test staking
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: test
+          args: --package cstrml-staking --lib tests
+      - name: Cargo test tee
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: test
+          args: --package cstrml-tee --lib tests

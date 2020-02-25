@@ -64,7 +64,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         Sr25519Keyring::Alice.to_account_id()
     ];
 
-    let pk = hex::decode("58a2a072d24dd6acbe59951e3824f36594f66912b84c2da0d5b3711b99d077963b78ad3bd89114594769564cf982a58f41841b9724604c8997f24cce853fec2f").unwrap();
+    let pk = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
     let tee_identities = accounts
         .iter()
         .map(|x| (x.clone(), Identity {

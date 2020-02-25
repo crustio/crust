@@ -102,7 +102,7 @@ decl_module! {
 
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
-            ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key do not exist");
+            ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key not found");
 
             // 4. Verify sig
             ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
@@ -124,6 +124,7 @@ decl_module! {
 
             // 1. Ensure reporter is verified
             ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
+            ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, "Validator public key not found");
 
             // 2. Do timing check
             ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");

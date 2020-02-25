@@ -98,8 +98,7 @@ decl_module! {
 
             // 2. applier cannot be validator
             ensure!(applier != validator, "You cannot verify yourself");
-            // TODO: Add pub key verify
-//            ensure!(applier_pk != validator_pk, "You cannot verify yourself");
+            ensure!(applier_pk != validator_pk, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
             ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");

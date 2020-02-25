@@ -1213,14 +1213,14 @@ impl<T: Trait> Module<T> {
                 let v_controller = Self::bonded(&v).unwrap();
 
                 // 2. Get work report
-                let workload = <tee::Module<T>>::get_and_update_workload(&v_controller);
-                let workload_stake = Self::stake_limit_of(workload);
+                let workload_stake = Self::stake_limit(&v).unwrap_or(Zero::zero());
                 Self::maybe_set_limit(&v_controller, workload_stake);
 
                 // 3. Remove empty workloads validator
-                if workload == 0 {
+                if workload_stake == Zero::zero() {
                     <Validators<T>>::remove(&v);
                     <StakeLimit<T>>::remove(&v);
+
                     new_validators.remove_item(&v);
                 }
             }

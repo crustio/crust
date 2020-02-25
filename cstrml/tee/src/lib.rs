@@ -112,7 +112,7 @@ decl_module! {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
 
-                // Emit event
+                // Emit tee identity event
                 Self::deposit_event(RawEvent::RegisterIdentity(who, identity));
             }
 
@@ -137,15 +137,17 @@ decl_module! {
             let new_workload = (work_report.empty_workload + work_report.meaningful_workload) as u128;
             let old_workload = (old_work_report.empty_workload + old_work_report.meaningful_workload) as u128;
 
-            if new_workload != old_workload {
-                // 4.1 Get workloads
+            if &old_work_report != &work_report {
+                // 5. Upsert workload
+                <WorkReports<T>>::insert(&who, &work_report);
+
+                // 6. Get workloads
                 let workloads = Workloads::get().unwrap_or_default();
 
-                // 4.2 Upsert works and workloads
-                <WorkReports<T>>::insert(&who, &work_report);
+                // 7. Upsert workloads
                 Workloads::put(workloads + new_workload - old_workload);
 
-                // 4.3 Emit event when workloads changed
+                // 8. Emit workload event
                 Self::deposit_event(RawEvent::ReportWorks(who, work_report));
             }
 
@@ -157,8 +159,8 @@ decl_module! {
 impl<T: Trait> Module<T> {
     // IMMUTABLE PUBLIC
     /// Get updated workload by controller account
-    pub fn get_and_update_workload(account_id: &T::AccountId) -> u128 {
-        if let Some(wr) = <WorkReports<T>>::get(account_id) {
+    pub fn get_and_update_workload(controller: &T::AccountId) -> u128 {
+        if let Some(wr) = <WorkReports<T>>::get(controller) {
             // 1. Get current block number
             let current_block_number = <system::Module<T>>::block_number();
             let current_block_number_numeric: u64 = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
@@ -167,14 +169,14 @@ impl<T: Trait> Module<T> {
             // 2. Judge if work report is outdated
             if current_block_number_numeric - wr.block_number <= REPORT_SLOT {
                 return workload;
+            } else {
+                // 3. Remove outdated work report
+                <WorkReports<T>>::remove(controller);
+
+                // 4. Update workloads
+                let current_workloads = Workloads::get().unwrap_or_default();
+                Workloads::put((current_workloads - workload).max(0));
             }
-
-            // 3. Remove outdated work report
-            <WorkReports<T>>::remove(&account_id);
-
-            // 4. Update workloads
-            let current_workloads = Workloads::get().unwrap_or_default();
-            Workloads::put((current_workloads - workload).max(0));
         }
         0
     }

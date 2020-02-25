@@ -10,16 +10,17 @@ type AccountId = AccountId32;
 
 fn get_valid_identity() -> Identity<AccountId> {
     // Alice is validator in genesis block
-    let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+    let applier: AccountId = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX").expect("valid ss58 address");
     let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
 
-    let pk = hex::decode("5c4af2d40f305ce58aed1c6a8019a61d004781396c1feae5784a5f28cc8c40abe4229b13bc803ae9fbe93f589a60220b9b4816a5a199dfdab4a39b36c86a4c37").unwrap();
-    let sig= hex::decode("5188fad93d76346415581218082d6239ea5c0a4be251aa20d2464080d662259f791bf78dbe1bd090abb382a6d13959538371890bc2741f08090465eac91dee4a").expect("Invalid hex");
+    let a_pk = hex::decode("f572bd3a2053627441532cb20d42e1132b3c00cf0f5257e9c1e7d2bf1913f1a86bd4120569ffc8dcd110849b4093c2f3e0e78ba0c1a96ad4cdeb0f92bf8fd828").unwrap();
+    let v_pk = hex::decode("58a2a072d24dd6acbe59951e3824f36594f66912b84c2da0d5b3711b99d077963b78ad3bd89114594769564cf982a58f41841b9724604c8997f24cce853fec2f").unwrap();
+    let sig= hex::decode("f1095c95b7888675847506bc87b1aeb87e1ffda82c15e15e25a57732308b8e055c2d734644426cd5acdc5fb0533795b91c5cb98a66865620f6552eb434ccd015").expect("Invalid hex");
 
     Identity {
-        pub_key: pk.clone(),
+        pub_key: a_pk.clone(),
         account_id: applier.clone(),
-        validator_pub_key: pk.clone(),
+        validator_pub_key: v_pk.clone(),
         validator_account_id: validator.clone(),
         sig: sig.clone()
     }
@@ -46,7 +47,7 @@ fn get_valid_work_report() -> WorkReport {
 fn test_for_register_identity_success() {
     new_test_ext().execute_with(|| {
         // Alice is validator in genesis block
-        let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+        let applier: AccountId = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX").expect("valid ss58 address");
         let id = get_valid_identity();
 
         assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
@@ -97,7 +98,7 @@ fn test_for_register_identity_failed_by_validator_illegal() {
 #[test]
 fn test_for_register_identity_failed_by_validate_for_self() {
     new_test_ext().execute_with(|| {
-        let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+        let applier: AccountId = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX").expect("valid ss58 address");
 
         // 1. register bob by alice
         let mut id = get_valid_identity();
@@ -115,7 +116,7 @@ fn test_for_register_identity_failed_by_validate_for_self() {
 fn test_for_identity_sig_check_failed() {
     new_test_ext().execute_with(|| {
         // Alice is validator in genesis block
-        let applier: AccountId = AccountId::from_ss58check("5Cowt7B9CbBa3CffyusJTCuhT33WcwpqRoULdSQwwmKHNRW2").expect("valid ss58 address");
+        let applier: AccountId = AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA").expect("valid ss58 address");
         let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
 
         let pk = hex::decode("1228875e855ad2af220194090e3de95e497a3f257665a005bdb9c65d012ac98b2ca6ca77740bb47ba300033b29873db46a869755e82570d8bc8f426bb153eff6").expect("Invalid hex");

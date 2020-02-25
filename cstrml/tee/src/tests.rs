@@ -254,3 +254,23 @@ fn test_for_work_report_sig_check_failed() {
         assert!(Tee::report_works(Origin::signed(account), works).is_err());
     });
 }
+
+#[test]
+fn test_for_oudated_work_reports() {
+    new_test_ext().execute_with(|| {
+        let account: AccountId = Sr25519Keyring::Alice.to_account_id();
+        // generate 103 blocks first
+        run_to_block(103);
+
+        assert_ok!(Tee::report_works(Origin::signed(account.clone()), get_valid_work_report()));
+        // generate 203 blocks then
+        run_to_block(203);
+
+        assert_eq!(Tee::get_and_update_workload(&account), 0);
+
+        // Check workloads
+        assert_eq!(Tee::workloads(), Some(0));
+
+        assert_eq!(Tee::work_reports(&account), None);
+    });
+}

@@ -52,7 +52,7 @@ pub trait Crypto {
         let data: Vec<u8> = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
 
         // 2. do p256 sig check
-        Self::verify_p256_sig(applier_pk, &data, sig)
+        Self::verify_p256_sig(validator_pk, &data, sig)
     }
 
     fn verify_work_report_sig(pk: &Vec<u8>, bn: u64,

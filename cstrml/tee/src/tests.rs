@@ -10,12 +10,12 @@ type AccountId = AccountId32;
 
 fn get_valid_identity() -> Identity<AccountId> {
     // Alice is validator in genesis block
-    let applier: AccountId = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX").expect("valid ss58 address");
+    let applier: AccountId = AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA").expect("valid ss58 address");
     let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
 
-    let a_pk = hex::decode("f572bd3a2053627441532cb20d42e1132b3c00cf0f5257e9c1e7d2bf1913f1a86bd4120569ffc8dcd110849b4093c2f3e0e78ba0c1a96ad4cdeb0f92bf8fd828").unwrap();
-    let v_pk = hex::decode("58a2a072d24dd6acbe59951e3824f36594f66912b84c2da0d5b3711b99d077963b78ad3bd89114594769564cf982a58f41841b9724604c8997f24cce853fec2f").unwrap();
-    let sig= hex::decode("f1095c95b7888675847506bc87b1aeb87e1ffda82c15e15e25a57732308b8e055c2d734644426cd5acdc5fb0533795b91c5cb98a66865620f6552eb434ccd015").expect("Invalid hex");
+    let a_pk = hex::decode("921d7f8dd38cb2ad1e6ea10c489bd7e04b5cd6c1684267a96fbfcceddf46beafe50792e7dde0f17376902213dff06b913c675181df9d9863ab88ea289619d2a3").unwrap();
+    let v_pk = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
+    let sig= hex::decode("cfb8bc08cdcc8b1b03ccb7a4af94783a693de038a93c249124964b89d83f57827b36807382f9c402791ff4984cf601e7e908fa67c46eb403f071cf3a13769c81").expect("Invalid hex");
 
     Identity {
         pub_key: a_pk.clone(),
@@ -27,14 +27,14 @@ fn get_valid_identity() -> Identity<AccountId> {
 }
 
 fn get_valid_work_report() -> WorkReport {
-    let pub_key = hex::decode("19817c0e3be0793b9c27b6064aeac6a82df3335a2ccdac7ea3d4c56e96a315a1e4dfe23491330c1ba11347ca4d6474151636ec15a7fc45d219d034eb9a33bb75").unwrap();
+    let pub_key = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
     let block_hash= [0; 32].to_vec();
-    let empty_root = hex::decode("ae56f97320fbebbd1dd44d573486261709f5497d9d8391b2b2b6c23287927f5d").unwrap();
-    let sig = hex::decode("4b23f3a95015387c735100dae6fdcb78445a2db50d08e19713bff900b69bc8c0719bf62750b30b92d082adfe8e0fa705a6cbe909c09961b4d0cc5f22d5c91581").unwrap();
+    let empty_root = hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+    let sig = hex::decode("f6c64850383176a0c195bff219f44ad2e38259161eb8525298503ba6ac859cee6ea1944928ba37cf9d1e0203726bce1de34aa299475a9b778b0f201cc8824bce").unwrap();
 
     WorkReport {
         pub_key,
-        block_number: 50,
+        block_number: 100,
         block_hash,
         empty_root,
         empty_workload: 4294967296,
@@ -47,7 +47,7 @@ fn get_valid_work_report() -> WorkReport {
 fn test_for_register_identity_success() {
     new_test_ext().execute_with(|| {
         // Alice is validator in genesis block
-        let applier: AccountId = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX").expect("valid ss58 address");
+        let applier: AccountId = AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA").expect("valid ss58 address");
         let id = get_valid_identity();
 
         assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
@@ -98,7 +98,7 @@ fn test_for_register_identity_failed_by_validator_illegal() {
 #[test]
 fn test_for_register_identity_failed_by_validate_for_self() {
     new_test_ext().execute_with(|| {
-        let applier: AccountId = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX").expect("valid ss58 address");
+        let applier: AccountId = AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA").expect("valid ss58 address");
 
         // 1. register bob by alice
         let mut id = get_valid_identity();
@@ -138,7 +138,7 @@ fn test_for_identity_sig_check_failed() {
 fn test_for_report_works_success() {
     new_test_ext().execute_with(|| {
         // generate 53 blocks first
-        run_to_block(53);
+        run_to_block(103);
 
         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
 
@@ -152,6 +152,17 @@ fn test_for_report_works_success() {
     });
 }
 
+#[test]
+fn test_for_report_works_failed_by_pub_key_is_not_found() {
+    new_test_ext().execute_with(|| {
+        let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
+
+        let mut works = get_valid_work_report();
+        works.pub_key = "another_pub_key".as_bytes().to_vec();
+
+        assert!(Tee::report_works(Origin::signed(account), works).is_err());
+    });
+}
 
 #[test]
 fn test_for_report_works_failed_by_reporter_is_not_registered() {

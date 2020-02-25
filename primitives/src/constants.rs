@@ -18,7 +18,7 @@ pub mod time {
 //	pub const MILLISECS_PER_BLOCK: Moment = 1000;
     pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
     // Alpha
-    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 2 * MINUTES;
+    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 10 * MINUTES;
     // Mainnet
 //	pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 4 * HOURS;
     // Testnet
@@ -42,5 +42,5 @@ pub mod fee {
 }
 
 pub mod tee {
-    pub const REPORT_SLOT: u64 = 50;
+    pub const REPORT_SLOT: u64 = 100;
 }

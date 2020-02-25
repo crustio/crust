@@ -1213,17 +1213,14 @@ impl<T: Trait> Module<T> {
                 let v_controller = Self::bonded(&v).unwrap();
 
                 // 2. Get work report
-                let mut workloads = 0;
-                if let Some(work_report) = <tee::Module<T>>::work_reports(&v_controller) {
-                    workloads = (work_report.empty_workload + work_report.meaningful_workload) as u128;
-                }
-                let workloads_stake = Self::stake_limit_of(workloads);
-                Self::maybe_set_limit(&v_controller, workloads_stake.clone());
+                let workload_stake = Self::stake_limit(&v).unwrap_or(Zero::zero());
+                Self::maybe_set_limit(&v_controller, workload_stake);
 
                 // 3. Remove empty workloads validator
-                if workloads == 0 {
+                if workload_stake == Zero::zero() {
                     <Validators<T>>::remove(&v);
                     <StakeLimit<T>>::remove(&v);
+
                     new_validators.remove_item(&v);
                 }
             }
@@ -1414,16 +1411,16 @@ impl<T: Trait> Module<T> {
     /// # </weight>
     fn update_stake_limit() {
         // 1. Get all work reports
-        let work_reports = <tee::WorkReports<T>>::enumerate().collect::<Vec<_>>();
+        let ids = <tee::TeeIdentities<T>>::enumerate().collect::<Vec<_>>();
 
-        for (controller, wr) in work_reports {
+        for (controller, _) in ids {
             // 2. Get controller's (maybe)ledger
-            let maybe_ledger = Self::ledger(controller);
+            let maybe_ledger = Self::ledger(&controller);
             if let Some(ledger) = maybe_ledger {
-                let workloads = (wr.empty_workload + wr.meaningful_workload) as u128;
+                let workload = <tee::Module<T>>::get_and_update_workload(&controller);
 
                 // 3. Update stake limit anyway
-                Self::upsert_stake_limit(&ledger.stash, Self::stake_limit_of(workloads));
+                Self::upsert_stake_limit(&ledger.stash, Self::stake_limit_of(workload));
             }
         }
     }

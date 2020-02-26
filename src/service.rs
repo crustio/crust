@@ -88,10 +88,14 @@ macro_rules! new_full_start {
 pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisConfig>)
 	-> Result<impl AbstractService, ServiceError>
 {
+	use sc_network::Event;
+	use futures::stream::StreamExt;
+
 	let is_authority = config.roles.is_authority();
 	let force_authoring = config.force_authoring;
 	let name = config.name.clone();
 	let disable_grandpa = config.disable_grandpa;
+	let sentry_nodes = config.network.sentry_nodes.clone();
 
 	// sentry nodes announce themselves as authorities to the network
 	// and should run the same protocols authorities do, but it should
@@ -141,6 +145,22 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 		// the BABE authoring task is considered essential, i.e. if it
 		// fails we take down the service with it.
 		service.spawn_essential_task(babe);
+
+		// Start authority discovery anyway to make sure authority nodes can always connected each other
+		// TODO: solve #49
+		let network = service.network();
+		let dht_event_stream = network.event_stream().filter_map(|e| async move { match e {
+			Event::Dht(e) => Some(e),
+			_ => None,
+		}}).boxed();
+		let audi = authority_discovery::AuthorityDiscovery::new(
+			service.client(),
+			network,
+			sentry_nodes,
+			service.keystore(),
+			dht_event_stream,
+		);
+		service.spawn_task(audi);
 	}
 
 	// if the node isn't actively participating in consensus then it doesn't

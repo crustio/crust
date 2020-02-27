@@ -89,7 +89,12 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 	-> Result<impl AbstractService, ServiceError>
 {
 	use sc_network::Event;
-	use futures01::prelude::*;
+	use futures01::Stream;
+	use futures::{
+		compat::Stream01CompatExt,
+		stream::StreamExt,
+		future::{FutureExt, TryFutureExt},
+	};
 
 	let is_authority = config.roles.is_authority();
 	let force_authoring = config.force_authoring;
@@ -150,19 +155,23 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 		// Start authority discovery anyway to make sure authority nodes can always connected each other
 		// TODO: solve #49
 		let network = service.network();
-		let dht_event_stream = network.event_stream().filter_map(|e| async move { match e {
+		let dht_event_stream = network.event_stream().filter_map(|e| match e {
 			Event::Dht(e) => Some(e),
 			_ => None,
-		}}).boxed();
-
-		let audi = authority_discovery::AuthorityDiscovery::new(
+		});
+		let future01_dht_event_stream = dht_event_stream.compat()
+			.map(|x| x.expect("<mpsc::channel::Receiver as Stream> never returns an error; qed"))
+			.boxed();
+		let authority_discovery = authority_discovery::AuthorityDiscovery::new(
 			service.client(),
 			network,
 			sentry_nodes,
 			service.keystore(),
-			Box::pin(dht_event_stream),
+			future01_dht_event_stream,
 		);
-		service.spawn_task(audi);
+		let future01_authority_discovery = authority_discovery.map(|x| Ok(x)).compat();
+
+		service.spawn_task(future01_authority_discovery);
 	}
 
 	// if the node isn't actively participating in consensus then it doesn't

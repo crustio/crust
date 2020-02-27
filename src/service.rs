@@ -89,7 +89,7 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 	-> Result<impl AbstractService, ServiceError>
 {
 	use sc_network::Event;
-	use futures::stream::StreamExt;
+	use futures01::prelude::*;
 
 	let is_authority = config.roles.is_authority();
 	let force_authoring = config.force_authoring;
@@ -108,7 +108,8 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 		import_setup.take()
 			.expect("Link Half and Block Import are present for Full Services or setup failed before. qed");
 
-	let service = builder.with_network_protocol(|_| Ok(NodeProtocol::new()))?
+	let service = builder
+		.with_network_protocol(|_| Ok(NodeProtocol::new()))?
 		.with_finality_proof_provider(|client, backend|
 			Ok(Arc::new(GrandpaFinalityProofProvider::new(backend, client)) as _)
 		)?
@@ -153,12 +154,13 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 			Event::Dht(e) => Some(e),
 			_ => None,
 		}}).boxed();
+
 		let audi = authority_discovery::AuthorityDiscovery::new(
 			service.client(),
 			network,
 			sentry_nodes,
 			service.keystore(),
-			dht_event_stream,
+			Box::pin(dht_event_stream),
 		);
 		service.spawn_task(audi);
 	}

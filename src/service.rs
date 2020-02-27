@@ -88,10 +88,19 @@ macro_rules! new_full_start {
 pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisConfig>)
 	-> Result<impl AbstractService, ServiceError>
 {
+	use sc_network::Event;
+	use futures01::Stream;
+	use futures::{
+		compat::Stream01CompatExt,
+		stream::StreamExt,
+		future::{FutureExt, TryFutureExt},
+	};
+
 	let is_authority = config.roles.is_authority();
 	let force_authoring = config.force_authoring;
 	let name = config.name.clone();
 	let disable_grandpa = config.disable_grandpa;
+	let sentry_nodes = config.network.sentry_nodes.clone();
 
 	// sentry nodes announce themselves as authorities to the network
 	// and should run the same protocols authorities do, but it should
@@ -104,7 +113,8 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 		import_setup.take()
 			.expect("Link Half and Block Import are present for Full Services or setup failed before. qed");
 
-	let service = builder.with_network_protocol(|_| Ok(NodeProtocol::new()))?
+	let service = builder
+		.with_network_protocol(|_| Ok(NodeProtocol::new()))?
 		.with_finality_proof_provider(|client, backend|
 			Ok(Arc::new(GrandpaFinalityProofProvider::new(backend, client)) as _)
 		)?
@@ -141,6 +151,27 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 		// the BABE authoring task is considered essential, i.e. if it
 		// fails we take down the service with it.
 		service.spawn_essential_task(babe);
+
+		// Start authority discovery anyway to make sure authority nodes can always connected each other
+		// TODO: solve #49
+		let network = service.network();
+		let dht_event_stream = network.event_stream().filter_map(|e| match e {
+			Event::Dht(e) => Some(e),
+			_ => None,
+		});
+		let future01_dht_event_stream = dht_event_stream.compat()
+			.map(|x| x.expect("<mpsc::channel::Receiver as Stream> never returns an error; qed"))
+			.boxed();
+		let authority_discovery = authority_discovery::AuthorityDiscovery::new(
+			service.client(),
+			network,
+			sentry_nodes,
+			service.keystore(),
+			future01_dht_event_stream,
+		);
+		let future01_authority_discovery = authority_discovery.map(|x| Ok(x)).compat();
+
+		service.spawn_task(future01_authority_discovery);
 	}
 
 	// if the node isn't actively participating in consensus then it doesn't

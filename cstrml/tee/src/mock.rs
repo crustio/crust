@@ -1,13 +1,13 @@
 use super::*;
 
-use sp_core::{H256, crypto::AccountId32};
 use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
-use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
-    testing::Header,
-    Perbill
-};
 use keyring::Sr25519Keyring;
+use sp_core::{crypto::AccountId32, H256};
+use sp_runtime::{
+    testing::Header,
+    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
+    Perbill,
+};
 
 type AccountId = AccountId32;
 
@@ -57,23 +57,28 @@ pub type System = system::Module<Test>;
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+    let mut t = system::GenesisConfig::default()
+        .build_storage::<Test>()
+        .unwrap();
 
     // stash-controller accounts
-    let accounts = [
-        Sr25519Keyring::Alice.to_account_id()
-    ];
+    let accounts = [Sr25519Keyring::Alice.to_account_id()];
 
     let pk = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
     let tee_identities = accounts
         .iter()
-        .map(|x| (x.clone(), Identity {
-            pub_key: pk.clone(),
-            account_id: x.clone(),
-            validator_pub_key: pk.clone(),
-            validator_account_id: x.clone(),
-            sig: vec![]
-        }))
+        .map(|x| {
+            (
+                x.clone(),
+                Identity {
+                    pub_key: pk.clone(),
+                    account_id: x.clone(),
+                    validator_pub_key: pk.clone(),
+                    validator_account_id: x.clone(),
+                    sig: vec![],
+                },
+            )
+        })
         .collect();
     let work_reports = accounts
         .iter()
@@ -82,8 +87,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     GenesisConfig::<Test> {
         tee_identities,
-        work_reports
-    }.assimilate_storage(&mut t).unwrap();
+        work_reports,
+    }
+    .assimilate_storage(&mut t)
+    .unwrap();
 
     t.into()
 }

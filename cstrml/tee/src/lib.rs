@@ -1,20 +1,19 @@
 //! The Substrate Node runtime. This can be compiled with `#[no_std]`, ready for Wasm.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-
 #![feature(option_result_contains)]
 
-use frame_support::{decl_module, decl_storage, decl_event, ensure, dispatch::DispatchResult};
-use system::ensure_signed;
-use sp_std::{vec::Vec, str};
+use codec::{Decode, Encode};
+use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure};
 use sp_std::convert::TryInto;
-use codec::{Encode, Decode};
+use sp_std::{str, vec::Vec};
+use system::ensure_signed;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{PubKey, TeeSignature, MerkleRoot, constants::tee::*};
+use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -38,7 +37,7 @@ pub struct Identity<T> {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 // TODO: change block_number & block_hash to standard data type
-pub struct WorkReport{
+pub struct WorkReport {
     pub pub_key: PubKey,
     pub block_number: u64,
     pub block_hash: Vec<u8>,
@@ -57,27 +56,27 @@ pub trait Trait: system::Trait {
 // TODO: add add_extra_genesis to unify chain_spec
 // This module's storage items.
 decl_storage! {
-	trait Store for Module<T: Trait> as Tee {
-		pub TeeIdentities get(fn tee_identities) config(): linked_map T::AccountId => Option<Identity<T::AccountId>>;
-		pub WorkReports get(fn work_reports) config(): map T::AccountId => Option<WorkReport>;
-		pub Workloads get(fn workloads) build(|config: &GenesisConfig<T>| {
-			Some(config.work_reports.iter().fold(0, |acc, (_, work_report)|
-			    acc + (&work_report.empty_workload + &work_report.meaningful_workload) as u128
+    trait Store for Module<T: Trait> as Tee {
+        pub TeeIdentities get(fn tee_identities) config(): linked_map T::AccountId => Option<Identity<T::AccountId>>;
+        pub WorkReports get(fn work_reports) config(): map T::AccountId => Option<WorkReport>;
+        pub Workloads get(fn workloads) build(|config: &GenesisConfig<T>| {
+            Some(config.work_reports.iter().fold(0, |acc, (_, work_report)|
+                acc + (&work_report.empty_workload + &work_report.meaningful_workload) as u128
             ))
-		}): Option<u128>;
-	}
+        }): Option<u128>;
+    }
 }
 
 // The module's dispatchable functions.
 decl_module! {
-	/// The module declaration.
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		// Initializing events
-		// this is needed only if you are using events in your module
-		fn deposit_event() = default;
+    /// The module declaration.
+    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        // Initializing events
+        // this is needed only if you are using events in your module
+        fn deposit_event() = default;
 
-		fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
-		    let who = ensure_signed(origin)?;
+        fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
+            let who = ensure_signed(origin)?;
 
             // 0. Genesis validators have rights to register themselves
             if let Some(maybe_genesis_validator) = <TeeIdentities<T>>::get(&who) {
@@ -117,9 +116,9 @@ decl_module! {
             }
 
             Ok(())
-		}
+        }
 
-		fn report_works(origin, work_report: WorkReport) -> DispatchResult {
+        fn report_works(origin, work_report: WorkReport) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
@@ -153,7 +152,7 @@ decl_module! {
 
             Ok(())
         }
-	}
+    }
 }
 
 impl<T: Trait> Module<T> {
@@ -163,7 +162,8 @@ impl<T: Trait> Module<T> {
         if let Some(wr) = <WorkReports<T>>::get(controller) {
             // 1. Get current block number
             let current_block_number = <system::Module<T>>::block_number();
-            let current_block_number_numeric: u64 = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
+            let current_block_number_numeric: u64 =
+                TryInto::<u64>::try_into(current_block_number).ok().unwrap();
             let workload = (wr.empty_workload + wr.meaningful_workload) as u128;
 
             // 2. Judge if work report is outdated
@@ -186,35 +186,60 @@ impl<T: Trait> Module<T> {
         let applier_id = id.account_id.encode();
         let validator_id = id.validator_account_id.encode();
         // TODO: concat data inside runtime for saving PassBy params number
-        api::crypto::verify_identity_sig(&id.pub_key, &applier_id, &id.validator_pub_key, &validator_id, &id.sig)
+        api::crypto::verify_identity_sig(
+            &id.pub_key,
+            &applier_id,
+            &id.validator_pub_key,
+            &validator_id,
+            &id.sig,
+        )
     }
 
     fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {
         // 1. Check block hash
         let wr_block_number: T::BlockNumber = wr.block_number.try_into().ok().unwrap();
-        let wr_block_hash = <system::Module<T>>::block_hash(wr_block_number).as_ref().to_vec();
-        ensure!(&wr_block_hash == &wr.block_hash, "work report hash is illegal");
+        let wr_block_hash = <system::Module<T>>::block_hash(wr_block_number)
+            .as_ref()
+            .to_vec();
+        ensure!(
+            &wr_block_hash == &wr.block_hash,
+            "work report hash is illegal"
+        );
 
         // 2. Check work report timing
         let current_block_number = <system::Module<T>>::block_number();
-        let current_block_number_numeric: u64 = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
+        let current_block_number_numeric: u64 =
+            TryInto::<u64>::try_into(current_block_number).ok().unwrap();
         let current_report_slot = current_block_number_numeric / REPORT_SLOT;
         // genesis block or must be 50-times number
-        ensure!(wr.block_number == 1 || wr.block_number == current_report_slot * REPORT_SLOT, "work report is outdated or beforehand");
+        ensure!(
+            wr.block_number == 1 || wr.block_number == current_report_slot * REPORT_SLOT,
+            "work report is outdated or beforehand"
+        );
 
         Ok(())
     }
 
     fn work_report_sig_check(wr: &WorkReport) -> bool {
         // TODO: concat data inside runtime for saving PassBy params number
-        api::crypto::verify_work_report_sig(&wr.pub_key, wr.block_number, &wr.block_hash, &wr.empty_root,
-                                                wr.empty_workload, wr.meaningful_workload, &wr.sig)
+        api::crypto::verify_work_report_sig(
+            &wr.pub_key,
+            wr.block_number,
+            &wr.block_hash,
+            &wr.empty_root,
+            wr.empty_workload,
+            wr.meaningful_workload,
+            &wr.sig,
+        )
     }
 }
 
 decl_event!(
-	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
-		RegisterIdentity(AccountId, Identity<AccountId>),
-		ReportWorks(AccountId, WorkReport),
-	}
+    pub enum Event<T>
+    where
+        AccountId = <T as system::Trait>::AccountId,
+    {
+        RegisterIdentity(AccountId, Identity<AccountId>),
+        ReportWorks(AccountId, WorkReport),
+    }
 );

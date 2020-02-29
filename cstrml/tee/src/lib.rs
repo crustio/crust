@@ -167,7 +167,7 @@ impl<T: Trait> Module<T> {
             let workload = (wr.empty_workload + wr.meaningful_workload) as u128;
 
             // 2. Judge if work report is outdated
-            if current_block_number_numeric - wr.block_number <= REPORT_SLOT {
+            if current_block_number_numeric - wr.block_number <= REPORT_SLOT*3 + 1 {
                 return workload;
             } else {
                 // 3. Remove outdated work report

@@ -284,8 +284,14 @@ fn test_for_oudated_work_reports() {
             Origin::signed(account.clone()),
             get_valid_work_report()
         ));
-        // generate 203 blocks then
-        run_to_block(203);
+
+        // generate 401 blocks, wr still valid
+        run_to_block(401);
+        // Check workloads
+        assert_eq!(Tee::workloads(), Some(5971233576));
+
+        // generate 402 blocks then wr outdated
+        run_to_block(402);
 
         assert_eq!(Tee::get_and_update_workload(&account), 0);
 

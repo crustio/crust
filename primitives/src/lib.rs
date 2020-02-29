@@ -1,6 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_runtime::{ MultiSignature, traits::{ Verify, IdentifyAccount}, generic };
+use sp_runtime::{
+    generic,
+    traits::{IdentifyAccount, Verify},
+    MultiSignature,
+};
 use sp_std::vec::Vec;
 
 pub mod constants;

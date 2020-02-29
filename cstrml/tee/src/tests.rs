@@ -1,16 +1,18 @@
 use super::*;
 
-use crate::mock::{Tee, Origin, new_test_ext, run_to_block};
+use crate::mock::{new_test_ext, run_to_block, Origin, Tee};
 use frame_support::assert_ok;
-use sp_core::crypto::{AccountId32, Ss58Codec};
-use keyring::Sr25519Keyring;
 use hex;
+use keyring::Sr25519Keyring;
+use sp_core::crypto::{AccountId32, Ss58Codec};
 
 type AccountId = AccountId32;
 
 fn get_valid_identity() -> Identity<AccountId> {
     // Alice is validator in genesis block
-    let applier: AccountId = AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA").expect("valid ss58 address");
+    let applier: AccountId =
+        AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA")
+            .expect("valid ss58 address");
     let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
 
     let a_pk = hex::decode("921d7f8dd38cb2ad1e6ea10c489bd7e04b5cd6c1684267a96fbfcceddf46beafe50792e7dde0f17376902213dff06b913c675181df9d9863ab88ea289619d2a3").unwrap();
@@ -22,14 +24,15 @@ fn get_valid_identity() -> Identity<AccountId> {
         account_id: applier.clone(),
         validator_pub_key: v_pk.clone(),
         validator_account_id: validator.clone(),
-        sig: sig.clone()
+        sig: sig.clone(),
     }
 }
 
 fn get_valid_work_report() -> WorkReport {
     let pub_key = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
-    let block_hash= [0; 32].to_vec();
-    let empty_root = hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+    let block_hash = [0; 32].to_vec();
+    let empty_root =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
     let sig = hex::decode("f6c64850383176a0c195bff219f44ad2e38259161eb8525298503ba6ac859cee6ea1944928ba37cf9d1e0203726bce1de34aa299475a9b778b0f201cc8824bce").unwrap();
 
     WorkReport {
@@ -39,7 +42,7 @@ fn get_valid_work_report() -> WorkReport {
         empty_root,
         empty_workload: 4294967296,
         meaningful_workload: 1676266280,
-        sig
+        sig,
     }
 }
 
@@ -47,10 +50,15 @@ fn get_valid_work_report() -> WorkReport {
 fn test_for_register_identity_success() {
     new_test_ext().execute_with(|| {
         // Alice is validator in genesis block
-        let applier: AccountId = AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA").expect("valid ss58 address");
+        let applier: AccountId =
+            AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA")
+                .expect("valid ss58 address");
         let id = get_valid_identity();
 
-        assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
+        assert_ok!(Tee::register_identity(
+            Origin::signed(applier.clone()),
+            id.clone()
+        ));
 
         let id_registered = Tee::tee_identities(applier.clone()).unwrap();
 
@@ -69,13 +77,15 @@ fn test_for_register_identity_success_with_genesis_validator() {
             account_id: alice.clone(),
             validator_pub_key: "pub_key".as_bytes().to_vec(),
             validator_account_id: alice.clone(),
-            sig: "sig".as_bytes().to_vec()
+            sig: "sig".as_bytes().to_vec(),
         };
 
-        assert_ok!(Tee::register_identity(Origin::signed(alice.clone()), id.clone()));
+        assert_ok!(Tee::register_identity(
+            Origin::signed(alice.clone()),
+            id.clone()
+        ));
     });
 }
-
 
 #[test]
 fn test_for_register_identity_failed_by_validator_illegal() {
@@ -88,7 +98,7 @@ fn test_for_register_identity_failed_by_validator_illegal() {
             account_id: account.clone(),
             validator_pub_key: "pub_key_bob".as_bytes().to_vec(),
             validator_account_id: account.clone(),
-            sig: "sig_bob".as_bytes().to_vec()
+            sig: "sig_bob".as_bytes().to_vec(),
         };
 
         assert!(Tee::register_identity(Origin::signed(account.clone()), id.clone()).is_err());
@@ -98,12 +108,17 @@ fn test_for_register_identity_failed_by_validator_illegal() {
 #[test]
 fn test_for_register_identity_failed_by_validate_for_self() {
     new_test_ext().execute_with(|| {
-        let applier: AccountId = AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA").expect("valid ss58 address");
+        let applier: AccountId =
+            AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA")
+                .expect("valid ss58 address");
 
         // 1. register bob by alice
         let mut id = get_valid_identity();
 
-        assert_ok!(Tee::register_identity(Origin::signed(applier.clone()), id.clone()));
+        assert_ok!(Tee::register_identity(
+            Origin::signed(applier.clone()),
+            id.clone()
+        ));
 
         // 2. register bob by bob
         id.validator_account_id = applier.clone();
@@ -145,7 +160,10 @@ fn test_for_report_works_success() {
         // Check workloads
         assert_eq!(Tee::workloads(), Some(0));
 
-        assert_ok!(Tee::report_works(Origin::signed(account.clone()), get_valid_work_report()));
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            get_valid_work_report()
+        ));
 
         // Check workloads after work report
         assert_eq!(Tee::workloads(), Some(5971233576));
@@ -176,7 +194,7 @@ fn test_for_report_works_failed_by_reporter_is_not_registered() {
             empty_root: "merkle_root_bob".as_bytes().to_vec(),
             empty_workload: 2000,
             meaningful_workload: 2000,
-            sig: "sig_key_bob".as_bytes().to_vec()
+            sig: "sig_key_bob".as_bytes().to_vec(),
         };
 
         assert!(Tee::report_works(Origin::signed(account), works).is_err());
@@ -190,7 +208,7 @@ fn test_for_work_report_timing_check_failed_by_wrong_hash() {
         run_to_block(50);
 
         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-        let block_hash= [1; 32].to_vec();
+        let block_hash = [1; 32].to_vec();
 
         let works = WorkReport {
             pub_key: "pub_key_alice".as_bytes().to_vec(),
@@ -199,7 +217,7 @@ fn test_for_work_report_timing_check_failed_by_wrong_hash() {
             empty_root: "merkle_root_alice".as_bytes().to_vec(),
             empty_workload: 0,
             meaningful_workload: 1000,
-            sig: "sig_key_alice".as_bytes().to_vec()
+            sig: "sig_key_alice".as_bytes().to_vec(),
         };
 
         assert!(Tee::report_works(Origin::signed(account), works).is_err());
@@ -213,7 +231,7 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
         run_to_block(103);
 
         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-        let block_hash= [0; 32].to_vec();
+        let block_hash = [0; 32].to_vec();
 
         let works = WorkReport {
             pub_key: "pub_key_alice".as_bytes().to_vec(),
@@ -222,7 +240,7 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
             empty_root: "merkle_root_alice".as_bytes().to_vec(),
             empty_workload: 5000,
             meaningful_workload: 1000,
-            sig: "sig_key_alice".as_bytes().to_vec()
+            sig: "sig_key_alice".as_bytes().to_vec(),
         };
 
         assert!(Tee::report_works(Origin::signed(account), works).is_err());
@@ -262,7 +280,10 @@ fn test_for_oudated_work_reports() {
         // generate 103 blocks first
         run_to_block(103);
 
-        assert_ok!(Tee::report_works(Origin::signed(account.clone()), get_valid_work_report()));
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            get_valid_work_report()
+        ));
         // generate 203 blocks then
         run_to_block(203);
 

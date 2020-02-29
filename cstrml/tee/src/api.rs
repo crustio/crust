@@ -4,13 +4,13 @@ use sp_runtime_interface::runtime_interface;
 use sp_std::vec::Vec;
 
 #[cfg(feature = "std")]
-use signatory_ring::ecdsa::p256::{PublicKey, Verifier};
-#[cfg(feature = "std")]
 use signatory::{
     ecdsa::curve::nistp256::FixedSignature,
     ecdsa::generic_array::GenericArray,
-    signature::{Signature as _, Verifier as _}
+    signature::{Signature as _, Verifier as _},
 };
+#[cfg(feature = "std")]
+use signatory_ring::ecdsa::p256::{PublicKey, Verifier};
 
 #[runtime_interface]
 pub trait Crypto {
@@ -39,9 +39,13 @@ pub trait Crypto {
         }
     }
 
-    fn verify_identity_sig(applier_pk: &Vec<u8>, applier_id: &Vec<u8>,
-                       validator_pk: &Vec<u8>, validator_id: &Vec<u8>,
-                       sig: &Vec<u8>) -> bool {
+    fn verify_identity_sig(
+        applier_pk: &Vec<u8>,
+        applier_id: &Vec<u8>,
+        validator_pk: &Vec<u8>,
+        validator_id: &Vec<u8>,
+        sig: &Vec<u8>,
+    ) -> bool {
         // 1. Construct identity data
         // {
         //    pub_key: PubKey,
@@ -49,16 +53,27 @@ pub trait Crypto {
         //    validator_pub_key: PubKey,
         //    validator_account_id: T
         // }
-        let data: Vec<u8> = [&applier_pk[..], &applier_id[..], &validator_pk[..], &validator_id[..]].concat();
+        let data: Vec<u8> = [
+            &applier_pk[..],
+            &applier_id[..],
+            &validator_pk[..],
+            &validator_id[..],
+        ]
+        .concat();
 
         // 2. do p256 sig check
         Self::verify_p256_sig(validator_pk, &data, sig)
     }
 
-    fn verify_work_report_sig(pk: &Vec<u8>, bn: u64,
-                              block_hash: &Vec<u8>, empty_root: &Vec<u8>,
-                              ew: u64, mw: u64,
-                              sig: &Vec<u8>) -> bool {
+    fn verify_work_report_sig(
+        pk: &Vec<u8>,
+        bn: u64,
+        block_hash: &Vec<u8>,
+        empty_root: &Vec<u8>,
+        ew: u64,
+        mw: u64,
+        sig: &Vec<u8>,
+    ) -> bool {
         // 1. Encode u64
         let block_number = bn.to_string().as_bytes().to_vec();
         let empty_workload = ew.to_string().as_bytes().to_vec();
@@ -73,8 +88,15 @@ pub trait Crypto {
         //    empty_workload: u64,
         //    meaningful_workload: u64
         //}
-        let data: Vec<u8> = [&pk[..], &block_number[..], &block_hash[..],
-            &empty_root[..], &empty_workload[..], &meaningful_workload[..]].concat();
+        let data: Vec<u8> = [
+            &pk[..],
+            &block_number[..],
+            &block_hash[..],
+            &empty_root[..],
+            &empty_workload[..],
+            &meaningful_workload[..],
+        ]
+        .concat();
 
         // 3. do p256 sig check
         Self::verify_p256_sig(pk, &data, sig)

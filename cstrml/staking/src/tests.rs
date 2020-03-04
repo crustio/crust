@@ -2036,8 +2036,8 @@ fn phragmen_should_not_overflow_validators() {
 
             // This test will fail this. Will saturate.
             // check_exposure_all();
-            assert_eq!(Staking::stakers(3).total, Staking::stake_limit(3).unwrap());
-            assert_eq!(Staking::stakers(5).total, Staking::stake_limit(5).unwrap());
+            assert_eq!(Staking::stakers(3).total, 18446744073709551615);
+            assert_eq!(Staking::stakers(5).total, 18446744073709551615);
         })
 }
 
@@ -2061,8 +2061,8 @@ fn phragmen_should_not_overflow_nominators() {
             assert_eq_uvec!(validator_controllers(), vec![4, 2]);
 
             // Saturate.
-            assert_eq!(Staking::stakers(3).total, Staking::stake_limit(3).unwrap());
-            assert_eq!(Staking::stakers(5).total, Staking::stake_limit(5).unwrap());
+            assert_eq!(Staking::stakers(3).total, 18446744073709551615);
+            assert_eq!(Staking::stakers(5).total, 18446744073709551615);
         })
 }
 
@@ -2084,8 +2084,8 @@ fn phragmen_should_not_overflow_ultimate() {
 
             // Saturate.
             // Nominator's stake should be cut
-            assert_eq!(Staking::stakers(3).total, Staking::stake_limit(3).unwrap());
-            assert_eq!(Staking::stakers(5).total, Staking::stake_limit(5).unwrap());
+            assert_eq!(Staking::stakers(3).total, 18446744073709551615);
+            assert_eq!(Staking::stakers(5).total, 18446744073709551615);
         })
 }
 

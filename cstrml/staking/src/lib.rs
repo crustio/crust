@@ -1223,35 +1223,14 @@ impl<T: Trait> Module<T> {
             }
         });
 
+        // Judge and update all validator's staking
+        Self::update_validator_stake_limit();
+
         // Reassign all Stakers.
         let (_slot_stake, maybe_new_validators) = Self::select_validators();
         Self::apply_unapplied_slashes(current_era);
 
-        // Update all work reporters
-        Self::update_stake_limit();
-
-        // Set stake limit for all selected validators.
-        if let Some(mut new_validators) = maybe_new_validators {
-            for v in new_validators.clone() {
-                // 1. Get controller
-                let v_controller = Self::bonded(&v).unwrap();
-
-                // 2. Get work report
-                let workload_stake = Self::stake_limit(&v).unwrap_or(Zero::zero());
-                Self::maybe_set_limit(&v_controller, workload_stake);
-
-                // 3. Remove empty workloads validator
-                if workload_stake == Zero::zero() {
-                    <Validators<T>>::remove(&v);
-                    <StakeLimit<T>>::remove(&v);
-
-                    new_validators.remove_item(&v);
-                }
-            }
-            Some(new_validators)
-        } else {
-            None
-        }
+        maybe_new_validators
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
@@ -1436,6 +1415,7 @@ impl<T: Trait> Module<T> {
         <Payee<T>>::remove(stash);
         <Validators<T>>::remove(stash);
         <Nominators<T>>::remove(stash);
+        <StakeLimit<T>>::remove(stash);
 
         slashing::clear_stash_metadata::<T>(stash);
     }
@@ -1447,18 +1427,28 @@ impl<T: Trait> Module<T> {
     /// - O(n).
     /// - 2n+1 DB entry.
     /// # </weight>
-    fn update_stake_limit() {
+    fn update_validator_stake_limit() {
         // 1. Get all work reports
         let ids = <tee::TeeIdentities<T>>::enumerate().collect::<Vec<_>>();
 
         for (controller, _) in ids {
             // 2. Get controller's (maybe)ledger
             let maybe_ledger = Self::ledger(&controller);
+
+            // 3. If controller has bonded stash
             if let Some(ledger) = maybe_ledger {
                 let workload = <tee::Module<T>>::get_and_update_workload(&controller);
 
-                // 3. Update stake limit anyway
-                Self::upsert_stake_limit(&ledger.stash, Self::stake_limit_of(workload));
+                // a. Update stake limit
+                let workload_stake = Self::stake_limit_of(workload);
+
+                // b. Update stake_limit, stakers, ledger and slot_stake
+                Self::maybe_set_limit(&controller, workload_stake);
+
+                // c. free all balances and remove all staking storage immediately
+                if workload == 0 {
+                    Self::on_free_balance_zero(&ledger.stash);
+                }
             }
         }
     }

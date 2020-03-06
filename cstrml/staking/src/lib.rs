@@ -1224,13 +1224,27 @@ impl<T: Trait> Module<T> {
         });
 
         // Judge and update all validator's staking
-        Self::update_validator_stake_limit();
+        Self::set_candidates_stake_limit();
 
         // Reassign all Stakers.
         let (_slot_stake, maybe_new_validators) = Self::select_validators();
         Self::apply_unapplied_slashes(current_era);
 
-        maybe_new_validators
+        // Remove all zero-stash stakers
+        if let Some(mut new_validators) = maybe_new_validators {
+            for new_validator in new_validators.clone() {
+                let stake_limit = <StakeLimit<T>>::get(&new_validator).unwrap_or(Zero::zero());
+
+                // Free zero-stash validator
+                if stake_limit == Zero::zero() {
+                    new_validators.remove_item(&new_validator);
+                    Self::on_free_balance_zero(&new_validator);
+                }
+            }
+            Some(new_validators)
+        } else {
+            None
+        }
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
@@ -1427,7 +1441,7 @@ impl<T: Trait> Module<T> {
     /// - O(n).
     /// - 2n+1 DB entry.
     /// # </weight>
-    fn update_validator_stake_limit() {
+    fn set_candidates_stake_limit() {
         // 1. Get all work reports
         let ids = <tee::TeeIdentities<T>>::enumerate().collect::<Vec<_>>();
 
@@ -1444,11 +1458,6 @@ impl<T: Trait> Module<T> {
 
                 // b. Update stake_limit, stakers, ledger and slot_stake
                 Self::maybe_set_limit(&controller, workload_stake);
-
-                // c. free all balances and remove all staking storage immediately
-                if workload == 0 {
-                    Self::on_free_balance_zero(&ledger.stash);
-                }
             }
         }
     }

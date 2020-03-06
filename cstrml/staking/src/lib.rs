@@ -1450,7 +1450,7 @@ impl<T: Trait> Module<T> {
             let maybe_ledger = Self::ledger(&controller);
 
             // 3. If controller has bonded stash
-            if let Some(ledger) = maybe_ledger {
+            if let Some(_) = maybe_ledger {
                 let workload = <tee::Module<T>>::get_and_update_workload(&controller);
 
                 // a. Update stake limit

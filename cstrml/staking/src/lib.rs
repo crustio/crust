@@ -39,8 +39,6 @@ use frame_system::{self as system, ensure_root, ensure_signed};
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
 
-use sp_phragmen::{ExtendedBalance, PhragmenStakedAssignment};
-
 // Crust runtime modules
 // TODO: using tee passing into `Trait` like Currency?
 use tee;
@@ -1223,28 +1221,11 @@ impl<T: Trait> Module<T> {
             }
         });
 
-        // Judge and update all validator's staking
-        Self::set_candidates_stake_limit();
-
         // Reassign all Stakers.
         let (_slot_stake, maybe_new_validators) = Self::select_validators();
         Self::apply_unapplied_slashes(current_era);
 
-        // Remove all zero-stash stakers
-        if let Some(mut new_validators) = maybe_new_validators {
-            for new_validator in new_validators.clone() {
-                let stake_limit = <StakeLimit<T>>::get(&new_validator).unwrap_or(Zero::zero());
-
-                // Free zero-stash validator
-                if stake_limit == Zero::zero() {
-                    new_validators.remove_item(&new_validator);
-                    Self::on_free_balance_zero(&new_validator);
-                }
-            }
-            Some(new_validators)
-        } else {
-            None
-        }
+        maybe_new_validators
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
@@ -1271,131 +1252,111 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> (BalanceOf<T>, Option<Vec<T::AccountId>>) {
-        let mut all_nominators: Vec<(T::AccountId, Vec<T::AccountId>)> = Vec::new();
-        let all_validator_candidates_iter = <Validators<T>>::enumerate();
-        let all_validators = all_validator_candidates_iter
-            .map(|(who, _pref)| {
-                let self_vote = (who.clone(), vec![who.clone()]);
-                all_nominators.push(self_vote);
-                who
-            })
+        let to_votes = |b: BalanceOf<T>| {
+            <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128
+        };
+        let to_balance = |e: u128| {
+            <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e)
+        };
+
+        let candidates: Vec<T::AccountId> = <Validators<T>>::enumerate()
+            .map(|(who, _pref)| who)
             .collect::<Vec<T::AccountId>>();
 
-        let nominator_votes = <Nominators<T>>::enumerate().map(|(nominator, nominations)| {
-            let Nominations {
-                submitted_in,
-                mut targets,
-                suppressed: _,
-            } = nominations;
+        let nominators = <Nominators<T>>::enumerate()
+            .map(|(nominator, nominations)| {
+                let Nominations {
+                    submitted_in,
+                    mut targets,
+                    suppressed: _,
+                } = nominations;
 
-            // Filter out nomination targets which were nominated before the most recent
-            // slashing span.
-            targets.retain(|stash| {
-                <Self as Store>::SlashingSpans::get(&stash)
-                    .map_or(true, |spans| submitted_in >= spans.last_start())
-            });
+                // Filter out nomination targets which were nominated before the most recent
+                // slashing span.
+                targets.retain(|stash| {
+                    <Self as Store>::SlashingSpans::get(&stash)
+                        .map_or(true, |spans| submitted_in >= spans.last_start())
+                });
 
-            (nominator, targets)
-        });
-        all_nominators.extend(nominator_votes);
+                (nominator, targets)
+            })
+            .collect::<Vec<(T::AccountId, Vec<T::AccountId>)>>();
 
-        let maybe_phragmen_result = sp_phragmen::elect::<_, _, _, T::CurrencyToVote>(
-            Self::validator_count() as usize,
-            Self::minimum_validator_count().max(1) as usize,
-            all_validators,
-            all_nominators,
-            Self::slashable_balance_of,
-        );
+        let candidate_count = candidates.len();
+        let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
-        if let Some(phragmen_result) = maybe_phragmen_result {
-            let elected_stashes = phragmen_result
-                .winners
-                .iter()
-                .map(|(s, _)| s.clone())
-                .collect::<Vec<T::AccountId>>();
-            let assignments = phragmen_result.assignments;
+        if candidate_count >= minimum_validator_count {
+            // 1. Update stake limit
+            Self::update_stake_limit();
 
-            let to_votes = |b: BalanceOf<T>| {
-                <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as ExtendedBalance
-            };
-            let to_balance = |e: ExtendedBalance| {
-                <T::CurrencyToVote as Convert<ExtendedBalance, BalanceOf<T>>>::convert(e)
-            };
+            // 2. Allocate candidates' stakers, and set each candidate's nominators
+            // outer loop for candidates
+            // - time complex is O(n*(inner_look + maybe_set_limit))
+            // - DB try is 3n + inner_loop + maybe_set_limit
+            for c_stash in &candidates {
+                let c_controller = Self::bonded(c_stash).unwrap();
+                let c_own_stakes = Self::slashable_balance_of(c_stash);
+                let mut c_total_votes = to_votes(c_own_stakes.clone());
+                let c_stake_limit = Self::stake_limit(c_stash).unwrap_or(Zero::zero());
+                let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
 
-            let mut supports = sp_phragmen::build_support_map::<_, _, _, T::CurrencyToVote>(
-                &elected_stashes,
-                &assignments,
-                Self::slashable_balance_of,
-            );
-
-            if cfg!(feature = "equalize") {
-                let mut staked_assignments: Vec<(
-                    T::AccountId,
-                    Vec<PhragmenStakedAssignment<T::AccountId>>,
-                )> = Vec::with_capacity(assignments.len());
-                for (n, assignment) in assignments.iter() {
-                    let mut staked_assignment: Vec<PhragmenStakedAssignment<T::AccountId>> =
-                        Vec::with_capacity(assignment.len());
-
-                    // If this is a self vote, then we don't need to equalise it at all. While the
-                    // staking system does not allow nomination and validation at the same time,
-                    // this must always be 100% support.
-                    if assignment.len() == 1 && assignment[0].0 == *n {
-                        continue;
+                // a. get new others
+                // inner loop for nominators
+                // - time complex is O(m)
+                // - DB try is 2m
+                // TODO: remove this when nominator can select stakes for each candidate
+                for (n_stash, targets) in &nominators {
+                    if !targets.contains(c_stash) {
+                        continue
                     }
-                    for (c, per_thing) in assignment.iter() {
-                        let nominator_stake = to_votes(Self::slashable_balance_of(n));
-                        let other_stake = *per_thing * nominator_stake;
-                        staked_assignment.push((c.clone(), other_stake));
-                    }
-                    staked_assignments.push((n.clone(), staked_assignment));
+
+                    // calculate nominator's support by using equalized strategy
+                    // TODO: #63
+                    let each_votes = to_votes(Self::slashable_balance_of(n_stash)) / (targets.len() as u128);
+                    c_total_votes += each_votes;
+                    others.push(IndividualExposure { who: n_stash.clone(), value: to_balance(each_votes) });
                 }
 
-                let tolerance = 0_u128;
-                let iterations = 2_usize;
-                sp_phragmen::equalize::<_, _, T::CurrencyToVote, _>(
-                    staked_assignments,
-                    &mut supports,
-                    tolerance,
-                    iterations,
-                    Self::slashable_balance_of,
-                );
-            }
-
-            // Clear Stakers.
-            for v in Self::current_elected().iter() {
-                <Stakers<T>>::remove(v);
-            }
-
-            // Populate Stakers and figure out the minimum stake behind a slot.
-            let mut slot_stake = BalanceOf::<T>::max_value();
-            for (c, s) in supports.into_iter() {
+                // b. build stakers
                 // build `struct exposure` from `support`
                 let exposure = Exposure {
-                    own: to_balance(s.own),
+                    own: c_own_stakes,
                     // This might reasonably saturate and we cannot do much about it. The sum of
                     // someone's stake might exceed the balance type if they have the maximum amount
                     // of balance and receive some support. This is super unlikely to happen, yet
                     // we simulate it in some tests.
-                    total: to_balance(s.total),
-                    others: s
-                        .others
-                        .into_iter()
-                        .map(|(who, value)| IndividualExposure {
-                            who,
-                            value: to_balance(value),
-                        })
-                        .collect::<Vec<IndividualExposure<_, _>>>(),
+                    total: to_balance(c_total_votes),
+                    others,
                 };
-                if exposure.total < slot_stake {
-                    slot_stake = exposure.total;
+                <Stakers<T>>::insert(c_stash, exposure);
+
+                // c. update candidates' stake limit
+                Self::maybe_set_limit(&c_controller, c_stake_limit.clone());
+
+                // d. Remove zero-stake validator
+                if c_stake_limit == Zero::zero() {
+                    Self::on_free_balance_zero(&c_stash);
                 }
-                <Stakers<T>>::insert(&c, exposure.clone());
             }
 
-            // Update slot stake.
-            <SlotStake<T>>::put(&slot_stake);
+            // 3. Select new validators by top-down their stakes
+            // - time complex is O(2n)
+            // - DB try is n
+            let mut candidates_stakes = <Validators<T>>::enumerate()
+                .map(|(stash, _pref)| {
+                    let stakers = Self::stakers(&stash);
+                    (stash, to_votes(stakers.total))
+                })
+                .collect::<Vec<(T::AccountId, u128)>>();
 
+            candidates_stakes.sort_by(|a, b| b.1.cmp(&a.1));
+
+            let to_elect = (Self::validator_count() as usize).min(candidates.len());
+            let elected_stashes = candidates_stakes[0..to_elect].iter()
+                .map(|(who, _stakes)| who.clone())
+                .collect::<Vec<T::AccountId>>();
+
+            // 4. Update runtime storage
             // Set the new validator set in sessions.
             <CurrentElected<T>>::put(&elected_stashes);
 
@@ -1403,14 +1364,14 @@ impl<T: Trait> Module<T> {
             // that we must return the new validator set even if it's the same as the old,
             // as long as any underlying economic conditions have changed, we don't attempt
             // to do any optimization where we compare against the prior set.
-            (slot_stake, Some(elected_stashes))
+            (Self::slot_stake(), Some(elected_stashes))
         } else {
             // There were not enough candidates for even our minimal level of functionality.
             // This is bad.
             // We should probably disable all functionality except for block production
             // and let the chain keep producing blocks until we can decide on a sufficiently
             // substantial set.
-            // TODO: #2494
+            // TODO: #2494(paritytech/substrate)
             (Self::slot_stake(), None)
         }
     }
@@ -1429,7 +1390,6 @@ impl<T: Trait> Module<T> {
         <Payee<T>>::remove(stash);
         <Validators<T>>::remove(stash);
         <Nominators<T>>::remove(stash);
-        <StakeLimit<T>>::remove(stash);
 
         slashing::clear_stash_metadata::<T>(stash);
     }
@@ -1441,23 +1401,18 @@ impl<T: Trait> Module<T> {
     /// - O(n).
     /// - 2n+1 DB entry.
     /// # </weight>
-    fn set_candidates_stake_limit() {
+    fn update_stake_limit() {
         // 1. Get all work reports
         let ids = <tee::TeeIdentities<T>>::enumerate().collect::<Vec<_>>();
 
         for (controller, _) in ids {
             // 2. Get controller's (maybe)ledger
             let maybe_ledger = Self::ledger(&controller);
-
-            // 3. If controller has bonded stash
-            if let Some(_) = maybe_ledger {
+            if let Some(ledger) = maybe_ledger {
                 let workload = <tee::Module<T>>::get_and_update_workload(&controller);
 
-                // a. Update stake limit
-                let workload_stake = Self::stake_limit_of(workload);
-
-                // b. Update stake_limit, stakers, ledger and slot_stake
-                Self::maybe_set_limit(&controller, workload_stake);
+                // 3. Update stake limit anyway
+                Self::upsert_stake_limit(&ledger.stash, Self::stake_limit_of(workload));
             }
         }
     }

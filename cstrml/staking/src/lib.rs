@@ -1265,7 +1265,7 @@ impl<T: Trait> Module<T> {
         let candidate_count = candidates.len();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
-        if candidate_count >= minimum_validator_count {
+        if candidate_count > minimum_validator_count {
             // 1. Update stake limit
             Self::update_stake_limit();
 
@@ -1351,7 +1351,7 @@ impl<T: Trait> Module<T> {
 
             candidates_stakes.sort_by(|a, b| b.1.cmp(&a.1));
 
-            let to_elect = (Self::validator_count() as usize).min(candidates.len());
+            let to_elect = (Self::validator_count() as usize).min(candidates_stakes.len());
 
             // `to_elect` must greater than 1, or `panic` is accepted
             let slot_stake = to_balance(candidates_stakes[to_elect-1].1);

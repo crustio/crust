@@ -1262,26 +1262,6 @@ impl<T: Trait> Module<T> {
         let candidates: Vec<T::AccountId> = <Validators<T>>::enumerate()
             .map(|(who, _pref)| who)
             .collect::<Vec<T::AccountId>>();
-
-        let nominators = <Nominators<T>>::enumerate()
-            .map(|(nominator, nominations)| {
-                let Nominations {
-                    submitted_in,
-                    mut targets,
-                    suppressed: _,
-                } = nominations;
-
-                // Filter out nomination targets which were nominated before the most recent
-                // slashing span.
-                targets.retain(|stash| {
-                    <Self as Store>::SlashingSpans::get(&stash)
-                        .map_or(true, |spans| submitted_in >= spans.last_start())
-                });
-
-                (nominator, targets)
-            })
-            .collect::<Vec<(T::AccountId, Vec<T::AccountId>)>>();
-
         let candidate_count = candidates.len();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
@@ -1293,6 +1273,25 @@ impl<T: Trait> Module<T> {
             // outer loop for candidates
             // - time complex is O(n*(inner_look + maybe_set_limit))
             // - DB try is 3n + inner_loop + maybe_set_limit
+            let nominators = <Nominators<T>>::enumerate()
+                .map(|(nominator, nominations)| {
+                    let Nominations {
+                        submitted_in,
+                        mut targets,
+                        suppressed: _,
+                    } = nominations;
+
+                    // Filter out nomination targets which were nominated before the most recent
+                    // slashing span.
+                    targets.retain(|stash| {
+                        <Self as Store>::SlashingSpans::get(&stash)
+                            .map_or(true, |spans| submitted_in >= spans.last_start())
+                    });
+
+                    (nominator, targets)
+                })
+                .collect::<Vec<(T::AccountId, Vec<T::AccountId>)>>();
+
             for c_stash in &candidates {
                 let c_controller = Self::bonded(c_stash).unwrap();
                 let c_own_stakes = Self::slashable_balance_of(c_stash);
@@ -1318,7 +1317,7 @@ impl<T: Trait> Module<T> {
                 }
 
                 // b. build stakers
-                // build `struct exposure` from `support`
+                // build `struct exposure`
                 let exposure = Exposure {
                     own: c_own_stakes,
                     // This might reasonably saturate and we cannot do much about it. The sum of
@@ -1331,7 +1330,7 @@ impl<T: Trait> Module<T> {
                 <Stakers<T>>::insert(c_stash, exposure);
 
                 // c. update candidates' stake limit
-                Self::maybe_set_limit(&c_controller, c_stake_limit.clone());
+                Self::maybe_update_stakers(&c_controller, c_stake_limit.clone());
 
                 // d. Remove zero-stake validator
                 if c_stake_limit == Zero::zero() {
@@ -1342,6 +1341,7 @@ impl<T: Trait> Module<T> {
             // 3. Select new validators by top-down their stakes
             // - time complex is O(2n)
             // - DB try is n
+            // Populate elections and figure out the minimum stake behind a slot.
             let mut candidates_stakes = <Validators<T>>::enumerate()
                 .map(|(stash, _pref)| {
                     let stakers = Self::stakers(&stash);
@@ -1352,19 +1352,25 @@ impl<T: Trait> Module<T> {
             candidates_stakes.sort_by(|a, b| b.1.cmp(&a.1));
 
             let to_elect = (Self::validator_count() as usize).min(candidates.len());
+
+            // `to_elect` must greater than 1, or `panic` is accepted
+            let slot_stake = to_balance(candidates_stakes[to_elect-1].1);
             let elected_stashes = candidates_stakes[0..to_elect].iter()
-                .map(|(who, _stakes)| who.clone())
+                .map(|(who, stakes)| who.clone())
                 .collect::<Vec<T::AccountId>>();
 
             // 4. Update runtime storage
             // Set the new validator set in sessions.
             <CurrentElected<T>>::put(&elected_stashes);
 
+            // Update slot stake.
+            <SlotStake<T>>::put(&slot_stake);
+
             // In order to keep the property required by `n_session_ending`
             // that we must return the new validator set even if it's the same as the old,
             // as long as any underlying economic conditions have changed, we don't attempt
             // to do any optimization where we compare against the prior set.
-            (Self::slot_stake(), Some(elected_stashes))
+            (slot_stake, Some(elected_stashes))
         } else {
             // There were not enough candidates for even our minimal level of functionality.
             // This is bad.
@@ -1417,7 +1423,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// Set stake limitation: v_stash + v_nominators_stash > limited_stakes
+    /// Update ledgers by stake limit, comparing with {v_stash + v_nominators_stash, limited_stakes}
     /// v_stash >= limited_stakes -> remove all nominators and reduce v_stash;
     /// v_stash < limited_stakes -> reduce nominators' stash until limitation_remains run out;
     ///
@@ -1432,7 +1438,7 @@ impl<T: Trait> Module<T> {
     /// - O(n).
     /// - 3n+5 DB entry.
     /// # </weight>
-    fn maybe_set_limit(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
+    fn maybe_update_stakers(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
         // 1. Get lockable balances
         // total = own + nominators
         let mut ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
@@ -1443,10 +1449,7 @@ impl<T: Trait> Module<T> {
         let total_locked_stakes = &stakers.total;
         let owned_locked_stakes = &stakers.own;
 
-        // 2. Update stake limit anyway
-        Self::upsert_stake_limit(&stash, limited_stakes.clone());
-
-        // 3. Judge limitation and return exceeded back
+        // 2. Judge limitation and return exceeded back
         // a. own + nominators <= limitation
         if total_locked_stakes <= &limited_stakes {
             return;
@@ -1515,8 +1518,7 @@ impl<T: Trait> Module<T> {
             Self::update_ledger(&n_controller, &n_ledger);
         }
 
-        // 4. Update stakers and slot_stake
-        let new_slot_stake = Self::slot_stake().min(limited_stakes);
+        // 3. Update stakers
         let new_exposure = Exposure {
             own: stakers.own,
             total: limited_stakes,
@@ -1524,7 +1526,6 @@ impl<T: Trait> Module<T> {
         };
 
         <Stakers<T>>::insert(&stash, new_exposure);
-        <SlotStake<T>>::put(new_slot_stake);
     }
 
     /// Add reward points to validators using their stash account ID.

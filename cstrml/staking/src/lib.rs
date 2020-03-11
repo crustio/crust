@@ -1361,7 +1361,7 @@ impl<T: Trait> Module<T> {
             // `to_elect` must greater than 1, or `panic` is accepted
             let slot_stake = to_balance(candidates_stakes[to_elect-1].1);
             let elected_stashes = candidates_stakes[0..to_elect].iter()
-                .map(|(who, stakes)| who.clone())
+                .map(|(who, _stakes)| who.clone())
                 .collect::<Vec<T::AccountId>>();
 
             // 3. Update runtime storage

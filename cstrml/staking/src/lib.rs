@@ -1252,6 +1252,9 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> (BalanceOf<T>, Option<Vec<T::AccountId>>) {
+        // Update stake limit anyway
+        Self::update_stake_limit();
+
         let to_votes = |b: BalanceOf<T>| {
             <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128
         };
@@ -1265,11 +1268,8 @@ impl<T: Trait> Module<T> {
         let candidate_count = candidates.len();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
-        if candidate_count > minimum_validator_count {
-            // 1. Update stake limit
-            Self::update_stake_limit();
-
-            // 2. Allocate candidates' stakers, and set each candidate's nominators
+        if candidate_count >= minimum_validator_count {
+            // 1. Allocate candidates' stakers, and set each candidate's nominators
             // outer loop for candidates
             // - time complex is O(n*(inner_look + maybe_set_limit))
             // - DB try is 3n + inner_loop + maybe_set_limit
@@ -1338,7 +1338,7 @@ impl<T: Trait> Module<T> {
                 }
             }
 
-            // 3. Select new validators by top-down their stakes
+            // 2. Select new validators by top-down their stakes
             // - time complex is O(2n)
             // - DB try is n
             // Populate elections and figure out the minimum stake behind a slot.
@@ -1353,13 +1353,18 @@ impl<T: Trait> Module<T> {
 
             let to_elect = (Self::validator_count() as usize).min(candidates_stakes.len());
 
+            // If there's no validators, be as same as little candidates
+            if to_elect < 1 {
+                return (Self::slot_stake(), None)
+            }
+
             // `to_elect` must greater than 1, or `panic` is accepted
             let slot_stake = to_balance(candidates_stakes[to_elect-1].1);
             let elected_stashes = candidates_stakes[0..to_elect].iter()
                 .map(|(who, stakes)| who.clone())
                 .collect::<Vec<T::AccountId>>();
 
-            // 4. Update runtime storage
+            // 3. Update runtime storage
             // Set the new validator set in sessions.
             <CurrentElected<T>>::put(&elected_stashes);
 

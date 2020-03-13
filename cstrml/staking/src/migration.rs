@@ -9,9 +9,10 @@ pub const CURRENT_VERSION: VersionNumber = 1;
 #[cfg(any(test, feature = "migrate"))]
 mod inner {
     use super::{VersionNumber, CURRENT_VERSION};
-    use crate::{Module, Store, Trait};
+    use crate::{Module, Store, Trait, IndividualExposure, BalanceOf};
     use frame_support::{StorageLinkedMap, StorageValue};
     use sp_std::vec::Vec;
+    use sp_runtime::traits::Zero;
 
     // the minimum supported version of the migration logic.
     const MIN_SUPPORTED_VERSION: VersionNumber = 0;
@@ -19,7 +20,7 @@ mod inner {
     // migrate storage from v0 to v1.
     //
     // this upgrades the `Nominators` linked_map value type from `Vec<T::AccountId>` to
-    // `Option<Nominations<T::AccountId>>`
+    // `Option<Nominations<T::AccountId, BalanceOf<T>>`
     pub fn to_v1<T: Trait>(version: &mut VersionNumber) {
         if *version != 0 {
             return;
@@ -31,7 +32,13 @@ mod inner {
             <Module<T> as Store>::Nominators::translate::<T::AccountId, Vec<T::AccountId>, _, _>(
                 |key| key,
                 |targets| crate::Nominations {
-                    targets,
+                    targets: targets.iter().map(|t| {
+                        crate::IndividualExposure {
+                            who: t.clone(),
+                            // TODO: This is wrong, but we don't have migration, so we don't care 😈
+                            value: Zero::zero()
+                        }
+                    }).collect::<Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>>(),
                     submitted_in: now,
                     suppressed: false,
                 },

@@ -33,7 +33,7 @@ use sp_staking::{
     offence::{Offence, OffenceDetails, OnOffenceHandler, ReportOffence},
     SessionIndex,
 };
-use sp_std::{convert::TryInto, prelude::*, result};
+use sp_std::{convert::TryInto, prelude::*};
 
 use frame_system::{self as system, ensure_root, ensure_signed};
 #[cfg(feature = "std")]
@@ -80,13 +80,13 @@ impl EraPoints {
 /// Indicates the initial status of the staker.
 #[derive(RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub enum StakerStatus<AccountId> {
+pub enum StakerStatus<AccountId, Balance: HasCompact> {
     /// Chilling.
     Idle,
     /// Declared desire in validating or already participating in it.
     Validator,
     /// Nominating for a group of other stakers.
-    Nominator(Vec<AccountId>),
+    Nominator(Vec<(AccountId, Balance)>),
 }
 
 /// A destination account for payment.
@@ -232,9 +232,9 @@ where
 
 /// A record of the nominations made by a specific account.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
-pub struct Nominations<AccountId> {
+pub struct Nominations<AccountId, Balance: HasCompact> {
     /// The targets of nomination.
-    pub targets: Vec<AccountId>,
+    pub targets: Vec<IndividualExposure<AccountId, Balance>>,
     /// The era the nominations were submitted.
     pub submitted_in: EraIndex,
     /// Whether the nominations have been suppressed.
@@ -430,10 +430,10 @@ decl_storage! {
         ///
         /// NOTE: is private so that we can ensure upgraded before all typical accesses.
         /// Direct storage APIs can still bypass this protection.
-        Nominators get(fn nominators): linked_map T::AccountId => Option<Nominations<T::AccountId>>;
+        Nominators get(fn nominators): linked_map T::AccountId => Option<Nominations<T::AccountId, BalanceOf<T>>>;
 
         /// Nominators for a particular account that is in action right now. You can't iterate
-        /// through validators here, but you can find them in the Session module.
+        /// through candidates here, but you can find them using Validators.
         ///
         /// This is keyed by the stash account.
         pub Stakers get(fn stakers): map T::AccountId => Exposure<T::AccountId, BalanceOf<T>>;
@@ -507,7 +507,7 @@ decl_storage! {
     }
     add_extra_genesis {
         config(stakers):
-            Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
+            Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId, BalanceOf<T>>)>;
         build(|config: &GenesisConfig<T>| {
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
@@ -533,7 +533,7 @@ decl_storage! {
                     StakerStatus::Nominator(votes) => {
                         <Module<T>>::nominate(
                             T::Origin::from(Some(controller.clone()).into()),
-                            votes.iter().map(|l| T::Lookup::unlookup(l.clone())).collect(),
+                            votes.iter().map(|(l, v)| (T::Lookup::unlookup(l.clone()), v.clone())).collect(),
                         )
                     }, _ => Ok(())
                 };
@@ -823,18 +823,35 @@ decl_module! {
         /// which is capped at `MAX_NOMINATIONS`.
         /// - Both the reads and writes follow a similar pattern.
         /// # </weight>
+        // TODO: Change batch op(targetS) to single op(target)
         #[weight = SimpleDispatchInfo::FixedNormal(750_000)]
-        fn nominate(origin, targets: Vec<<T::Lookup as StaticLookup>::Source>) {
+        fn nominate(origin, targets: Vec<(<T::Lookup as StaticLookup>::Source, BalanceOf<T>)>) {
             Self::ensure_storage_upgraded();
 
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let stash = &ledger.stash;
+            let mut total_stake = ledger.total;
             ensure!(!targets.is_empty(), Error::<T>::EmptyTargets);
             let targets = targets.into_iter()
                 .take(MAX_NOMINATIONS)
-                .map(|t| T::Lookup::lookup(t))
-                .collect::<result::Result<Vec<T::AccountId>, _>>()?;
+                .filter_map(|(t, s)|
+                    // TODO: judge target's stake limit
+                    if total_stake < s {
+                        None
+                    } else {
+                        total_stake -= s;
+                        if let Ok(c_stash) = T::Lookup::lookup(t) {
+                            Some(IndividualExposure {
+                                who: c_stash,
+                                value: s
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                )
+                .collect::<Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>>();
 
             let nominations = Nominations {
                 targets,
@@ -1283,38 +1300,43 @@ impl<T: Trait> Module<T> {
 
                     // Filter out nomination targets which were nominated before the most recent
                     // slashing span.
-                    targets.retain(|stash| {
-                        <Self as Store>::SlashingSpans::get(&stash)
+                    targets.retain(|target| {
+                        <Self as Store>::SlashingSpans::get(&target.who)
                             .map_or(true, |spans| submitted_in >= spans.last_start())
                     });
 
                     (nominator, targets)
                 })
-                .collect::<Vec<(T::AccountId, Vec<T::AccountId>)>>();
+                .collect::<Vec<(T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>)>>();
 
             for c_stash in &candidates {
                 let c_controller = Self::bonded(c_stash).unwrap();
                 let c_own_stakes = Self::slashable_balance_of(c_stash);
-                let mut c_total_votes = to_votes(c_own_stakes.clone());
+                let mut c_total_votes = to_votes(c_own_stakes.clone()) as u128;
                 let c_stake_limit = Self::stake_limit(c_stash).unwrap_or(Zero::zero());
                 let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
 
                 // a. get new others
-                // inner loop for nominators
-                // - time complex is O(m)
+                // inner loop A for nominators
+                // - time complex is O(m*l), which m is nominator number
+                // and l is target number, l <= 16
                 // - DB try is 2m
-                // TODO: remove this when nominator can select stakes for each candidate
                 for (n_stash, targets) in &nominators {
-                    if !targets.contains(c_stash) {
-                        continue
-                    }
+                    for target in targets {
+                        if &target.who != c_stash {
+                            continue;
+                        }
 
-                    // calculate nominator's support by using equalized strategy
-                    // TODO: #63
-                    let each_votes = to_votes(Self::slashable_balance_of(n_stash)) / (targets.len() as u128);
-                    c_total_votes += each_votes;
-                    others.push(IndividualExposure { who: n_stash.clone(), value: to_balance(each_votes) });
+                        c_total_votes += to_votes(target.value);
+                        others.push(IndividualExposure {
+                            who: n_stash.clone(),
+                            value: target.value
+                        });
+                    }
                 }
+
+                // c. judge `c_total_votes` beyond MAX votes
+                c_total_votes = c_total_votes.min(u64::max_value() as u128);
 
                 // b. build stakers
                 // build `struct exposure`
@@ -1502,8 +1524,10 @@ impl<T: Trait> Module<T> {
                 new_n_value = Zero::zero();
 
                 // ii. remove this v_stash
-                let mut nominations: Nominations<T::AccountId> = Self::nominators(&n.who).unwrap();
-                nominations.targets.remove_item(&stash);
+                // TODO: high time complex -> optimize this part
+                let mut nominations: Nominations<T::AccountId, BalanceOf<T>> =
+                    Self::nominators(&n.who).unwrap();
+                nominations.targets.retain(|t| &t.who != stash);
 
                 // iii. update nominators
                 <Nominators<T>>::remove(&n.who);

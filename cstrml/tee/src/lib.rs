@@ -93,18 +93,18 @@ decl_module! {
             let validator_pk = &identity.validator_pub_key;
 
             // 1. Ensure who is applier
-            // ensure!(&who == applier, "Tee applier must be the extrinsic sender");
+            ensure!(&who == applier, "Tee applier must be the extrinsic sender");
 
             // 2. applier cannot be validator
-            // ensure!(applier != validator, "You cannot verify yourself");
-            // ensure!(applier_pk != validator_pk, "You cannot verify yourself");
+            ensure!(applier != validator, "You cannot verify yourself");
+            ensure!(applier_pk != validator_pk, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
-            // ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
-            // ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key not found");
+            ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
+            ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key not found");
 
             // 4. Verify sig
-            // ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
+            ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
 
             // 5. applier is new add or needs to be updated
             if !<TeeIdentities<T>>::get(applier).contains(&identity) {
@@ -122,14 +122,14 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            // ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
-            // ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, "Validator public key not found");
+            ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
+            ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, "Validator public key not found");
 
             // 2. Do timing check
-            // ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
 
             // 3. Do sig check
-            // ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
+            ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
             // 4. Judge new and old workload
             let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();

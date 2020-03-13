@@ -1,9 +1,6 @@
 //! Test utilities
 
-use crate::{
-    inflation, EraIndex, GenesisConfig, Module, Nominators, RewardDestination, StakerStatus, Trait,
-    ValidatorPrefs,
-};
+use crate::{inflation, EraIndex, GenesisConfig, Module, Nominators, RewardDestination, StakerStatus, Trait, ValidatorPrefs};
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     traits::{Currency, FindAuthor, Get},
@@ -331,11 +328,11 @@ impl ExtBuilder {
             1
         };
         let status_41 = if self.validator_pool {
-            StakerStatus::<AccountId>::Validator
+            StakerStatus::<AccountId, Balance>::Validator
         } else {
-            StakerStatus::<AccountId>::Idle
+            StakerStatus::<AccountId, Balance>::Idle
         };
-        let nominated = if self.nominate { vec![11, 21] } else { vec![] };
+        let nominated = if self.nominate { vec![(11, 250), (21, 250)] } else { vec![] };
 
         // tee genesis
         let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
@@ -348,17 +345,17 @@ impl ExtBuilder {
                     11,
                     10,
                     balance_factor * 1000,
-                    StakerStatus::<AccountId>::Validator,
+                    StakerStatus::<AccountId, Balance>::Validator,
                 ),
-                (21, 20, stake_21, StakerStatus::<AccountId>::Validator),
-                (31, 30, stake_31, StakerStatus::<AccountId>::Validator),
+                (21, 20, stake_21, StakerStatus::<AccountId, Balance>::Validator),
+                (31, 30, stake_31, StakerStatus::<AccountId, Balance>::Validator),
                 (41, 40, balance_factor * 1000, status_41),
                 // nominator
                 (
                     101,
                     100,
                     balance_factor * 500,
-                    StakerStatus::<AccountId>::Nominator(nominated),
+                    StakerStatus::<AccountId, Balance>::Nominator(nominated),
                 ),
             ],
             validator_count: self.validator_count,
@@ -497,7 +494,7 @@ pub fn bond_validator(acc: u64, val: u64) {
     ));
 }
 
-pub fn bond_nominator(acc: u64, val: u64, target: Vec<u64>) {
+pub fn bond_nominator(acc: u64, val: u64, target: Vec<(u64, u64)>) {
     // a = controller
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);

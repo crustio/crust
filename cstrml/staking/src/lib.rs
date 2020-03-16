@@ -833,25 +833,40 @@ decl_module! {
             let stash = &ledger.stash;
             let mut total_stake = ledger.total;
             ensure!(!targets.is_empty(), Error::<T>::EmptyTargets);
+
+            // Time complex is O(t_num), t <= 16
+            // DB try is O(4*t_num)
             let targets = targets.into_iter()
                 .take(MAX_NOMINATIONS)
                 .filter_map(|(t, s)|
-                    // TODO: judge target's stake limit
                     if total_stake < s {
                         None
                     } else {
                         total_stake -= s;
                         if let Ok(c_stash) = T::Lookup::lookup(t) {
-                            Some(IndividualExposure {
-                                who: c_stash,
-                                value: s
-                            })
-                        } else {
-                            None
+                            if let Some(mut c_limit) = Self::stake_limit(&c_stash) {
+                                // This maybe a temp set, cause it allow no-bonding vote mechanism
+                                // TODO: only allow vote to validators/candidates?
+                                let c_stake = Self::stakers(&c_stash).total.max(Self::slashable_balance_of(&c_stash));
+                                // `c_limit` should be greater than `c_stake`
+                                // and `s` should be less than `c_limit`
+                                c_limit -= c_stake;
+                                if c_limit != Zero::zero() {
+                                    return Some(IndividualExposure {
+                                        who: c_stash,
+                                        value: s.min(c_limit)
+                                    })
+                                } else {
+                                    return None
+                                }
+                            }
                         }
+                        None
                     }
                 )
                 .collect::<Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>>();
+
+            ensure!(!targets.is_empty(), Error::<T>::ExceedLimit);
 
             let nominations = Nominations {
                 targets,

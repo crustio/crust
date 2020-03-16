@@ -1718,6 +1718,7 @@ fn switching_roles() {
         .build()
         .execute_with(|| {
             Timestamp::set_timestamp(1); // Initialize time.
+            Staking::upsert_stake_limit(&5, u64::max_value());
 
             // Reset reward destination
             for i in &[10, 20] {
@@ -1764,7 +1765,6 @@ fn switching_roles() {
                 1000,
                 RewardDestination::Controller
             ));
-            Staking::upsert_stake_limit(&5, u64::max_value());
             assert_ok!(Staking::validate(
                 Origin::signed(6),
                 ValidatorPrefs::default()
@@ -3111,5 +3111,58 @@ fn update_stakers_should_work_new_era() {
         }
 
         assert_eq!(Staking::nominators(&101), None);*/
+    });
+}
+
+#[test]
+fn nominate_limit_should_work() {
+    ExtBuilder::default()
+        .nominate(false)
+        .build()
+        .execute_with(|| {
+            Timestamp::set_timestamp(1); // Initialize time.
+
+            // put some money in account that we'll use.
+            for i in 1..7 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            Staking::upsert_stake_limit(&5, 1500);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 1500);
+
+            // add a new validator candidate
+            assert_ok!(Staking::bond(
+                Origin::signed(5),
+                6,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(
+                Origin::signed(6),
+                ValidatorPrefs::default()
+            ));
+
+            // add nominator
+            assert_ok!(Staking::bond(
+                Origin::signed(1),
+                2,
+                2000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::nominate(Origin::signed(2), vec![
+                (5, 1000)
+            ]));
+
+            // nominator's info should ✅
+            assert_eq!(
+                Staking::nominators(&1),
+                Some(Nominations {
+                    targets: vec![
+                        IndividualExposure{ who: 5, value: 500 },
+                    ],
+                    submitted_in: 0,
+                    suppressed: false
+                })
+            );
     });
 }

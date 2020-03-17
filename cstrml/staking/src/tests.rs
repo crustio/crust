@@ -786,6 +786,9 @@ fn nominators_also_get_slashed() {
         .nominate(false)
         .build()
         .execute_with(|| {
+            Staking::upsert_stake_limit(&20, 2000);
+            Staking::upsert_stake_limit(&10, 2000);
+
             assert_eq!(Staking::validator_count(), 2);
 
             // Set payee to controller
@@ -861,6 +864,8 @@ fn double_staking_should_fail() {
     // * an account already bonded as controller can nominate.
     ExtBuilder::default().build().execute_with(|| {
         let arbitrary_value = 5;
+        Staking::upsert_stake_limit(&1, 1000);
+
         // 2 = controller, 1 stashed => ok
         assert_ok!(Staking::bond(
             Origin::signed(1),
@@ -1657,6 +1662,8 @@ fn on_free_balance_zero_stash_removes_nominator() {
         .existential_deposit(10)
         .build()
         .execute_with(|| {
+            Staking::upsert_stake_limit(&20, 2000);
+
             // Make 10 a nominator
             assert_ok!(Staking::nominate(Origin::signed(10), vec![
                 (20, 100),
@@ -1718,6 +1725,7 @@ fn switching_roles() {
         .build()
         .execute_with(|| {
             Timestamp::set_timestamp(1); // Initialize time.
+            Staking::upsert_stake_limit(&5, u64::max_value());
 
             // Reset reward destination
             for i in &[10, 20] {
@@ -1764,7 +1772,6 @@ fn switching_roles() {
                 1000,
                 RewardDestination::Controller
             ));
-            Staking::upsert_stake_limit(&5, u64::max_value());
             assert_ok!(Staking::validate(
                 Origin::signed(6),
                 ValidatorPrefs::default()
@@ -2058,10 +2065,10 @@ fn topdown_should_not_overflow_validators() {
             bond_validator(2, u64::max_value());
             bond_validator(4, u64::max_value());
 
-            bond_nominator(6, u64::max_value() / 2,
+            /*bond_nominator(6, u64::max_value() / 2,
                            vec![(3, u64::max_value() / 4), (5, u64::max_value() / 4)]);
             bond_nominator(8, u64::max_value() / 2,
-                           vec![(3, u64::max_value() / 4), (5, u64::max_value() / 4)]);
+                           vec![(3, u64::max_value() / 4), (5, u64::max_value() / 4)]);*/
 
             // TODO: this will broken the stake limit of mock set
             start_era(1);
@@ -2087,10 +2094,10 @@ fn topdown_should_not_overflow_nominators() {
             bond_validator(2, u64::max_value() / 2);
             bond_validator(4, u64::max_value() / 2);
 
-            bond_nominator(6, u64::max_value(),
+            /*bond_nominator(6, u64::max_value(),
                            vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
             bond_nominator(8, u64::max_value(),
-                           vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
+                           vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);*/
 
             start_era(1);
 
@@ -2112,10 +2119,10 @@ fn topdown_should_not_overflow_ultimate() {
             bond_validator(2, u64::max_value());
             bond_validator(4, u64::max_value());
 
-            bond_nominator(6, u64::max_value(),
+            /*bond_nominator(6, u64::max_value(),
                            vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
             bond_nominator(8, u64::max_value(),
-                           vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
+                           vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);*/
 
             start_era(1);
 
@@ -3111,5 +3118,58 @@ fn update_stakers_should_work_new_era() {
         }
 
         assert_eq!(Staking::nominators(&101), None);*/
+    });
+}
+
+#[test]
+fn nominate_limit_should_work() {
+    ExtBuilder::default()
+        .nominate(false)
+        .build()
+        .execute_with(|| {
+            Timestamp::set_timestamp(1); // Initialize time.
+
+            // put some money in account that we'll use.
+            for i in 1..7 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            Staking::upsert_stake_limit(&5, 1500);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 1500);
+
+            // add a new validator candidate
+            assert_ok!(Staking::bond(
+                Origin::signed(5),
+                6,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(
+                Origin::signed(6),
+                ValidatorPrefs::default()
+            ));
+
+            // add nominator
+            assert_ok!(Staking::bond(
+                Origin::signed(1),
+                2,
+                2000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::nominate(Origin::signed(2), vec![
+                (5, 1000)
+            ]));
+
+            // nominator's info should ✅
+            assert_eq!(
+                Staking::nominators(&1),
+                Some(Nominations {
+                    targets: vec![
+                        IndividualExposure{ who: 5, value: 500 },
+                    ],
+                    submitted_in: 0,
+                    suppressed: false
+                })
+            );
     });
 }

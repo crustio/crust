@@ -95,10 +95,19 @@ fn basic_setup_works() {
                 unlocking: vec![]
             })
         );
-        assert_eq!(Staking::nominators(101).unwrap().targets, vec![
-            IndividualExposure{ who: 11, value: 250 },
-            IndividualExposure{ who: 21, value: 250 }
-        ]);
+        assert_eq!(
+            Staking::nominators(101).unwrap().targets,
+            vec![
+                IndividualExposure {
+                    who: 11,
+                    value: 250
+                },
+                IndividualExposure {
+                    who: 21,
+                    value: 250
+                }
+            ]
+        );
 
         if cfg!(feature = "equalize") {
             assert_eq!(
@@ -571,11 +580,10 @@ fn nominating_and_rewards_should_work() {
                 1000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (11, 333),
-                (21, 333),
-                (31, 333)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(2),
+                vec![(11, 333), (21, 333), (31, 333)]
+            ));
             // 4 will nominate for 10, 20, 40
             assert_ok!(Staking::bond(
                 Origin::signed(3),
@@ -583,11 +591,10 @@ fn nominating_and_rewards_should_work() {
                 1000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(4), vec![
-                (11, 333),
-                (21, 333),
-                (41, 333)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(4),
+                vec![(11, 333), (21, 333), (41, 333)]
+            ));
 
             // the total reward for era 0
             let total_payout_0 = current_total_payout_for_duration(3000);
@@ -811,10 +818,10 @@ fn nominators_also_get_slashed() {
                 nominator_stake,
                 RewardDestination::default()
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (20, 250),
-                (10, 250)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(2),
+                vec![(20, 250), (10, 250)]
+            ));
 
             let total_payout = current_total_payout_for_duration(3000);
             assert!(total_payout > 100); // Test is meaningfull if reward something
@@ -885,15 +892,14 @@ fn double_staking_should_fail() {
         );
         // 1 = stashed => attempting to nominate should fail.
         assert_noop!(
-            Staking::nominate(Origin::signed(1), vec![
-                (1, arbitrary_value),
-            ]),
+            Staking::nominate(Origin::signed(1), vec![(1, arbitrary_value),]),
             Error::<Test>::NotController
         );
         // 2 = controller  => nominating should work.
-        assert_ok!(Staking::nominate(Origin::signed(2), vec![
-            (1, arbitrary_value),
-        ]));
+        assert_ok!(Staking::nominate(
+            Origin::signed(2),
+            vec![(1, arbitrary_value),]
+        ));
     });
 }
 
@@ -1665,9 +1671,7 @@ fn on_free_balance_zero_stash_removes_nominator() {
             Staking::upsert_stake_limit(&20, 2000);
 
             // Make 10 a nominator
-            assert_ok!(Staking::nominate(Origin::signed(10), vec![
-                (20, 100),
-            ]));
+            assert_ok!(Staking::nominate(Origin::signed(10), vec![(20, 100),]));
             // Check that account 10 is a nominator
             assert!(<Nominators<Test>>::exists(11));
             // Check the balance of the nominator account
@@ -1749,10 +1753,10 @@ fn switching_roles() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (11, 1000),
-                (5, 1000)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(2),
+                vec![(11, 1000), (5, 1000)]
+            ));
 
             assert_ok!(Staking::bond(
                 Origin::signed(3),
@@ -1760,10 +1764,10 @@ fn switching_roles() {
                 500,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(4), vec![
-                (21, 250),
-                (1, 250),
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(4),
+                vec![(21, 250), (1, 250),]
+            ));
 
             // add a new validator candidate
             assert_ok!(Staking::bond(
@@ -1846,8 +1850,13 @@ fn wrong_vote_is_null() {
             assert_ok!(Staking::nominate(
                 Origin::signed(2),
                 vec![
-                    (11, 500), (21, 500), // good votes
-                    (1, 50), (2, 50), (15, 30), (1000, 500), (25, 100) // crap votes. No effect.
+                    (11, 500),
+                    (21, 500), // good votes
+                    (1, 50),
+                    (2, 50),
+                    (15, 30),
+                    (1000, 500),
+                    (25, 100) // crap votes. No effect.
                 ]
             ));
 
@@ -2031,7 +2040,6 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
             check_nominator_all();
         })
 }*/
-
 #[test]
 fn new_era_elects_correct_number_of_validators() {
     ExtBuilder::default()
@@ -3086,8 +3094,14 @@ fn update_stakers_should_work() {
             Staking::nominators(&101),
             Some(Nominations {
                 targets: vec![
-                    IndividualExposure{ who: 11, value: 250 },
-                    IndividualExposure{ who: 21, value: 250 },
+                    IndividualExposure {
+                        who: 11,
+                        value: 250
+                    },
+                    IndividualExposure {
+                        who: 21,
+                        value: 250
+                    },
                 ],
                 submitted_in: 0,
                 suppressed: false
@@ -3156,20 +3170,16 @@ fn nominate_limit_should_work() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (5, 1000)
-            ]));
+            assert_ok!(Staking::nominate(Origin::signed(2), vec![(5, 1000)]));
 
             // nominator's info should ✅
             assert_eq!(
                 Staking::nominators(&1),
                 Some(Nominations {
-                    targets: vec![
-                        IndividualExposure{ who: 5, value: 500 },
-                    ],
+                    targets: vec![IndividualExposure { who: 5, value: 500 },],
                     submitted_in: 0,
                     suppressed: false
                 })
             );
-    });
+        });
 }

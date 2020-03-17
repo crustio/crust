@@ -9,10 +9,10 @@ pub const CURRENT_VERSION: VersionNumber = 1;
 #[cfg(any(test, feature = "migrate"))]
 mod inner {
     use super::{VersionNumber, CURRENT_VERSION};
-    use crate::{Module, Store, Trait, IndividualExposure, BalanceOf};
+    use crate::{BalanceOf, IndividualExposure, Module, Store, Trait};
     use frame_support::{StorageLinkedMap, StorageValue};
-    use sp_std::vec::Vec;
     use sp_runtime::traits::Zero;
+    use sp_std::vec::Vec;
 
     // the minimum supported version of the migration logic.
     const MIN_SUPPORTED_VERSION: VersionNumber = 0;
@@ -32,13 +32,16 @@ mod inner {
             <Module<T> as Store>::Nominators::translate::<T::AccountId, Vec<T::AccountId>, _, _>(
                 |key| key,
                 |targets| crate::Nominations {
-                    targets: targets.iter().map(|t| {
-                        crate::IndividualExposure {
-                            who: t.clone(),
-                            // TODO: This is wrong, but we don't have migration, so we don't care 😈
-                            value: Zero::zero()
-                        }
-                    }).collect::<Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>>(),
+                    targets: targets
+                        .iter()
+                        .map(|t| {
+                            crate::IndividualExposure {
+                                who: t.clone(),
+                                // TODO: This is wrong, but we don't have migration, so we don't care 😈
+                                value: Zero::zero(),
+                            }
+                        })
+                        .collect::<Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>>(),
                     submitted_in: now,
                     suppressed: false,
                 },

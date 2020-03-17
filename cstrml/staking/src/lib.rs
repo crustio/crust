@@ -1284,12 +1284,9 @@ impl<T: Trait> Module<T> {
         // Update stake limit anyway
         Self::update_all_stake_limit();
 
-        let to_votes = |b: BalanceOf<T>| {
-            <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128
-        };
-        let to_balance = |e: u128| {
-            <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e)
-        };
+        let to_votes =
+            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
+        let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
         let candidates: Vec<T::AccountId> = <Validators<T>>::enumerate()
             .map(|(who, _pref)| who)
@@ -1319,7 +1316,10 @@ impl<T: Trait> Module<T> {
 
                     (nominator, targets)
                 })
-                .collect::<Vec<(T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>)>>();
+                .collect::<Vec<(
+                    T::AccountId,
+                    Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>,
+                )>>();
 
             for c_stash in &candidates {
                 let c_controller = Self::bonded(c_stash).unwrap();
@@ -1342,7 +1342,7 @@ impl<T: Trait> Module<T> {
                         c_total_votes += to_votes(target.value);
                         others.push(IndividualExposure {
                             who: n_stash.clone(),
-                            value: target.value
+                            value: target.value,
                         });
                     }
                 }
@@ -1389,12 +1389,13 @@ impl<T: Trait> Module<T> {
 
             // If there's no validators, be as same as little candidates
             if to_elect < 1 {
-                return (Self::slot_stake(), None)
+                return (Self::slot_stake(), None);
             }
 
             // `to_elect` must greater than 1, or `panic` is accepted
-            let slot_stake = to_balance(candidates_stakes[to_elect-1].1);
-            let elected_stashes = candidates_stakes[0..to_elect].iter()
+            let slot_stake = to_balance(candidates_stakes[to_elect - 1].1);
+            let elected_stashes = candidates_stakes[0..to_elect]
+                .iter()
                 .map(|(who, _stakes)| who.clone())
                 .collect::<Vec<T::AccountId>>();
 

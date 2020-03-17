@@ -1,6 +1,9 @@
 //! Test utilities
 
-use crate::{inflation, EraIndex, GenesisConfig, Module, Nominators, RewardDestination, StakerStatus, Trait, ValidatorPrefs};
+use crate::{
+    inflation, EraIndex, GenesisConfig, Module, Nominators, RewardDestination, StakerStatus, Trait,
+    ValidatorPrefs,
+};
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     traits::{Currency, FindAuthor, Get},
@@ -332,7 +335,11 @@ impl ExtBuilder {
         } else {
             StakerStatus::<AccountId, Balance>::Idle
         };
-        let nominated = if self.nominate { vec![(11, 250), (21, 250)] } else { vec![] };
+        let nominated = if self.nominate {
+            vec![(11, 250), (21, 250)]
+        } else {
+            vec![]
+        };
 
         // tee genesis
         let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
@@ -347,8 +354,18 @@ impl ExtBuilder {
                     balance_factor * 1000,
                     StakerStatus::<AccountId, Balance>::Validator,
                 ),
-                (21, 20, stake_21, StakerStatus::<AccountId, Balance>::Validator),
-                (31, 30, stake_31, StakerStatus::<AccountId, Balance>::Validator),
+                (
+                    21,
+                    20,
+                    stake_21,
+                    StakerStatus::<AccountId, Balance>::Validator,
+                ),
+                (
+                    31,
+                    30,
+                    stake_31,
+                    StakerStatus::<AccountId, Balance>::Validator,
+                ),
                 (41, 40, balance_factor * 1000, status_41),
                 // nominator
                 (

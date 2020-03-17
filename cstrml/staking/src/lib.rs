@@ -684,10 +684,16 @@ decl_module! {
 
             if let Some(mut extra) = stash_balance.checked_sub(&ledger.total) {
                 extra = extra.min(max_additional);
-                // Check stake limit
-                if let Some(limit) = Self::stake_limit(&stash) {
-                    extra = extra.min(limit-ledger.total);
+                // if it is candidate
+                if <Validators<T>>::exists(&stash) {
+                    let limit = Self::stake_limit(&stash).unwrap_or_default();
+                    if ledger.active >= limit {
+                        Err(Error::<T>::NoWorkloads)?
+                    } else {
+                        extra = extra.min(limit - ledger.active);
+                    }
                 }
+
                 ledger.total += extra;
                 ledger.active += extra;
                 Self::update_ledger(&controller, &ledger);
@@ -796,17 +802,13 @@ decl_module! {
             Self::ensure_storage_upgraded();
 
             let controller = ensure_signed(origin)?;
-            let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+            let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let stash = &ledger.stash;
-            let limit = Self::stake_limit(&stash).ok_or(Error::<T>::NoWorkloads)?;
+            let limit = Self::stake_limit(&stash).unwrap_or_default();
 
             if limit == Zero::zero() {
-                Err(Error::<T>::ExceedLimit)?
+                Err(Error::<T>::NoWorkloads)?
             }
-
-            ledger.total = ledger.total.min(limit);
-            ledger.active = ledger.active.min(limit);
-            Self::update_ledger(&controller, &ledger);
 
             <Nominators<T>>::remove(stash);
             <Validators<T>>::insert(stash, prefs);
@@ -844,21 +846,16 @@ decl_module! {
                     } else {
                         total_stake -= s;
                         if let Ok(c_stash) = T::Lookup::lookup(t) {
-                            if let Some(mut c_limit) = Self::stake_limit(&c_stash) {
-                                // This maybe a temp set, cause it allow no-bonding vote mechanism
-                                // TODO: only allow vote to validators/candidates?
-                                let c_stake = Self::stakers(&c_stash).total.max(Self::slashable_balance_of(&c_stash));
-                                // `c_limit` should be greater than `c_stake`
-                                // and `s` should be less than `c_limit`
-                                c_limit -= c_stake;
-                                if c_limit != Zero::zero() {
-                                    return Some(IndividualExposure {
-                                        who: c_stash,
-                                        value: s.min(c_limit)
-                                    })
-                                } else {
-                                    return None
-                                }
+                            let c_limit = Self::stake_limit(&c_stash).unwrap_or_default();
+                            let c_stake = Self::stakers(&c_stash).total.max(Self::slashable_balance_of(&c_stash));
+
+                            if c_limit == Zero::zero() || c_stake >= c_limit {
+                                return None
+                            } else {
+                                return Some(IndividualExposure {
+                                    who: c_stash,
+                                    value: s.min(c_limit-c_stake)
+                                })
                             }
                         }
                         None
@@ -1285,7 +1282,7 @@ impl<T: Trait> Module<T> {
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> (BalanceOf<T>, Option<Vec<T::AccountId>>) {
         // Update stake limit anyway
-        Self::update_stake_limit();
+        Self::update_all_stake_limit();
 
         let to_votes = |b: BalanceOf<T>| {
             <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128
@@ -1449,7 +1446,7 @@ impl<T: Trait> Module<T> {
     /// - O(n).
     /// - 2n+1 DB entry.
     /// # </weight>
-    fn update_stake_limit() {
+    fn update_all_stake_limit() {
         // 1. Get all work reports
         let ids = <tee::TeeIdentities<T>>::enumerate().collect::<Vec<_>>();
 

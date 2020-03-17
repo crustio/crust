@@ -94,13 +94,17 @@ impl Alternative {
                 "dev",
                 || {
                     testnet_genesis(
-                        vec![get_authority_keys_from_seed("Alice")],
+                        vec![
+                            get_authority_keys_from_seed("Alice")
+                        ],
                         get_account_id_from_seed::<sr25519::Public>("Alice"),
                         vec![
                             get_account_id_from_seed::<sr25519::Public>("Alice"),
                             get_account_id_from_seed::<sr25519::Public>("Bob"),
+                            get_account_id_from_seed::<sr25519::Public>("Charlie"),
                             get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
                             get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+                            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
                         ],
                         true,
                     )
@@ -203,7 +207,7 @@ fn testnet_genesis(
         staking: Some(StakingConfig {
             current_era: 0,
             validator_count: 4,
-            minimum_validator_count: 2,
+            minimum_validator_count: 1,
             stakers: initial_authorities
                 .iter()
                 .map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))

@@ -94,7 +94,9 @@ impl Alternative {
                 "dev",
                 || {
                     testnet_genesis(
-                        vec![get_authority_keys_from_seed("Alice")],
+                        vec![
+                            get_authority_keys_from_seed("Alice")
+                        ],
                         get_account_id_from_seed::<sr25519::Public>("Alice"),
                         vec![
                             get_account_id_from_seed::<sr25519::Public>("Alice"),

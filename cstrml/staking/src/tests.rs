@@ -60,6 +60,7 @@ fn basic_setup_works() {
                 stash: 11,
                 total: 1000,
                 active: 1000,
+                valid: 1000,
                 unlocking: vec![]
             })
         );
@@ -70,6 +71,7 @@ fn basic_setup_works() {
                 stash: 21,
                 total: 1000,
                 active: 1000,
+                valid: 1000,
                 unlocking: vec![]
             })
         );
@@ -92,13 +94,23 @@ fn basic_setup_works() {
                 stash: 101,
                 total: 500,
                 active: 500,
+                valid: 500,
                 unlocking: vec![]
             })
         );
-        assert_eq!(Staking::nominators(101).unwrap().targets, vec![
-            IndividualExposure{ who: 11, value: 250 },
-            IndividualExposure{ who: 21, value: 250 }
-        ]);
+        assert_eq!(
+            Staking::nominators(101).unwrap().targets,
+            vec![
+                IndividualExposure {
+                    who: 11,
+                    value: 250
+                },
+                IndividualExposure {
+                    who: 21,
+                    value: 250
+                }
+            ]
+        );
 
         if cfg!(feature = "equalize") {
             assert_eq!(
@@ -420,6 +432,7 @@ fn staking_should_work() {
                     stash: 3,
                     total: 1500,
                     active: 1500,
+                    valid: 1500,
                     unlocking: vec![]
                 })
             );
@@ -571,11 +584,10 @@ fn nominating_and_rewards_should_work() {
                 1000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (11, 333),
-                (21, 333),
-                (31, 333)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(2),
+                vec![(11, 333), (21, 333), (31, 333)]
+            ));
             // 4 will nominate for 10, 20, 40
             assert_ok!(Staking::bond(
                 Origin::signed(3),
@@ -583,11 +595,10 @@ fn nominating_and_rewards_should_work() {
                 1000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(4), vec![
-                (11, 333),
-                (21, 333),
-                (41, 333)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(4),
+                vec![(11, 333), (21, 333), (41, 333)]
+            ));
 
             // the total reward for era 0
             let total_payout_0 = current_total_payout_for_duration(3000);
@@ -811,10 +822,10 @@ fn nominators_also_get_slashed() {
                 nominator_stake,
                 RewardDestination::default()
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (20, 250),
-                (10, 250)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(2),
+                vec![(20, 250), (10, 250)]
+            ));
 
             let total_payout = current_total_payout_for_duration(3000);
             assert!(total_payout > 100); // Test is meaningfull if reward something
@@ -885,15 +896,14 @@ fn double_staking_should_fail() {
         );
         // 1 = stashed => attempting to nominate should fail.
         assert_noop!(
-            Staking::nominate(Origin::signed(1), vec![
-                (1, arbitrary_value),
-            ]),
+            Staking::nominate(Origin::signed(1), vec![(1, arbitrary_value),]),
             Error::<Test>::NotController
         );
         // 2 = controller  => nominating should work.
-        assert_ok!(Staking::nominate(Origin::signed(2), vec![
-            (1, arbitrary_value),
-        ]));
+        assert_ok!(Staking::nominate(
+            Origin::signed(2),
+            vec![(1, arbitrary_value),]
+        ));
     });
 }
 
@@ -1122,6 +1132,7 @@ fn reward_destination_works() {
                     stash: 11,
                     total: 1000,
                     active: 1000,
+                    valid: 1000,
                     unlocking: vec![],
                 })
             );
@@ -1144,6 +1155,7 @@ fn reward_destination_works() {
                     stash: 11,
                     total: 1000 + total_payout_0,
                     active: 1000 + total_payout_0,
+                    valid: 1000 + total_payout_0,
                     unlocking: vec![],
                 })
             );
@@ -1174,6 +1186,7 @@ fn reward_destination_works() {
                     stash: 11,
                     total: 1000 + total_payout_0,
                     active: 1000 + total_payout_0,
+                    valid: 1000 + total_payout_0,
                     unlocking: vec![],
                 })
             );
@@ -1202,6 +1215,7 @@ fn reward_destination_works() {
                     stash: 11,
                     total: 1000 + total_payout_0,
                     active: 1000 + total_payout_0,
+                    valid: 1000 + total_payout_0,
                     unlocking: vec![],
                 })
             );
@@ -1284,6 +1298,7 @@ fn bond_extra_works() {
                 stash: 11,
                 total: 1000,
                 active: 1000,
+                valid: 1000,
                 unlocking: vec![],
             })
         );
@@ -1300,6 +1315,7 @@ fn bond_extra_works() {
                 stash: 11,
                 total: 1000 + 100,
                 active: 1000 + 100,
+                valid: 1000,
                 unlocking: vec![],
             })
         );
@@ -1313,6 +1329,7 @@ fn bond_extra_works() {
                 stash: 11,
                 total: 1500,
                 active: 1500,
+                valid: 1000,
                 unlocking: vec![],
             })
         );
@@ -1330,6 +1347,7 @@ fn bond_extra_works() {
                 stash: 11,
                 total: 2000,
                 active: 2000,
+                valid: 1000,
                 unlocking: vec![],
             })
         );
@@ -1373,6 +1391,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     stash: 11,
                     total: 1000,
                     active: 1000,
+                    valid: 1000,
                     unlocking: vec![],
                 })
             );
@@ -1394,6 +1413,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     stash: 11,
                     total: 1000 + 100,
                     active: 1000 + 100,
+                    valid: 1000,
                     unlocking: vec![],
                 })
             );
@@ -1419,6 +1439,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     stash: 11,
                     total: 1000 + 100,
                     active: 1000 + 100,
+                    valid: 1000 + 100,
                     unlocking: vec![],
                 })
             );
@@ -1440,6 +1461,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     stash: 11,
                     total: 1000 + 100,
                     active: 100,
+                    valid: 100,
                     unlocking: vec![UnlockChunk {
                         value: 1000,
                         era: 2 + 3
@@ -1455,6 +1477,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     stash: 11,
                     total: 1000 + 100,
                     active: 100,
+                    valid: 100,
                     unlocking: vec![UnlockChunk {
                         value: 1000,
                         era: 2 + 3
@@ -1473,6 +1496,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     stash: 11,
                     total: 1000 + 100,
                     active: 100,
+                    valid: 100,
                     unlocking: vec![UnlockChunk {
                         value: 1000,
                         era: 2 + 3
@@ -1491,6 +1515,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     stash: 11,
                     total: 100,
                     active: 100,
+                    valid: 100,
                     unlocking: vec![]
                 })
             );
@@ -1570,6 +1595,7 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
                     stash: 22,
                     total: 69,
                     active: 69,
+                    valid: 69,
                     unlocking: vec![],
                 },
             );
@@ -1665,9 +1691,7 @@ fn on_free_balance_zero_stash_removes_nominator() {
             Staking::upsert_stake_limit(&20, 2000);
 
             // Make 10 a nominator
-            assert_ok!(Staking::nominate(Origin::signed(10), vec![
-                (20, 100),
-            ]));
+            assert_ok!(Staking::nominate(Origin::signed(10), vec![(20, 100),]));
             // Check that account 10 is a nominator
             assert!(<Nominators<Test>>::exists(11));
             // Check the balance of the nominator account
@@ -1749,10 +1773,10 @@ fn switching_roles() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (11, 1000),
-                (5, 1000)
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(2),
+                vec![(11, 1000), (5, 1000)]
+            ));
 
             assert_ok!(Staking::bond(
                 Origin::signed(3),
@@ -1760,10 +1784,10 @@ fn switching_roles() {
                 500,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(4), vec![
-                (21, 250),
-                (1, 250),
-            ]));
+            assert_ok!(Staking::nominate(
+                Origin::signed(4),
+                vec![(21, 250), (1, 250),]
+            ));
 
             // add a new validator candidate
             assert_ok!(Staking::bond(
@@ -1846,8 +1870,13 @@ fn wrong_vote_is_null() {
             assert_ok!(Staking::nominate(
                 Origin::signed(2),
                 vec![
-                    (11, 500), (21, 500), // good votes
-                    (1, 50), (2, 50), (15, 30), (1000, 500), (25, 100) // crap votes. No effect.
+                    (11, 500),
+                    (21, 500), // good votes
+                    (1, 50),
+                    (2, 50),
+                    (15, 30),
+                    (1000, 500),
+                    (25, 100) // crap votes. No effect.
                 ]
             ));
 
@@ -1891,6 +1920,7 @@ fn bond_with_no_staked_value() {
                     stash: 1,
                     active: 0,
                     total: 5,
+                    valid: 0,
                     unlocking: vec![UnlockChunk { value: 5, era: 3 }]
                 })
             );
@@ -2031,7 +2061,6 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
             check_nominator_all();
         })
 }*/
-
 #[test]
 fn new_era_elects_correct_number_of_validators() {
     ExtBuilder::default()
@@ -3040,63 +3069,6 @@ fn version_initialized() {
 }
 
 #[test]
-fn update_stakers_should_work() {
-    ExtBuilder::default().build().execute_with(|| {
-        // Check stake_limit
-        assert_eq!(Staking::stake_limit(&11), Some(2000));
-
-        Staking::maybe_update_stakers(&10, 1100);
-
-        // Check validator
-        assert_eq!(
-            Staking::ledger(&10),
-            Some(StakingLedger {
-                stash: 11,
-                total: 1000,
-                active: 1000,
-                unlocking: vec![]
-            })
-        );
-        assert_eq!(Staking::stakers(11).total, 1100);
-
-        // Check nominator
-        if cfg!(feature = "equalize") {
-            assert_eq!(
-                Staking::ledger(&100),
-                Some(StakingLedger {
-                    stash: 101,
-                    total: 350,
-                    active: 350,
-                    unlocking: vec![]
-                })
-            );
-        } else {
-            assert_eq!(
-                Staking::ledger(&100),
-                Some(StakingLedger {
-                    stash: 101,
-                    total: 475,
-                    active: 475,
-                    unlocking: vec![]
-                })
-            );
-        }
-
-        assert_eq!(
-            Staking::nominators(&101),
-            Some(Nominations {
-                targets: vec![
-                    IndividualExposure{ who: 11, value: 250 },
-                    IndividualExposure{ who: 21, value: 250 },
-                ],
-                submitted_in: 0,
-                suppressed: false
-            })
-        );
-    });
-}
-
-#[test]
 fn update_stakers_should_work_new_era() {
     ExtBuilder::default().build().execute_with(|| {
         start_session(0);
@@ -3156,20 +3128,16 @@ fn nominate_limit_should_work() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![
-                (5, 1000)
-            ]));
+            assert_ok!(Staking::nominate(Origin::signed(2), vec![(5, 1000)]));
 
             // nominator's info should ✅
             assert_eq!(
                 Staking::nominators(&1),
                 Some(Nominations {
-                    targets: vec![
-                        IndividualExposure{ who: 5, value: 500 },
-                    ],
+                    targets: vec![IndividualExposure { who: 5, value: 500 },],
                     submitted_in: 0,
                     suppressed: false
                 })
             );
-    });
+        });
 }

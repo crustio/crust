@@ -147,6 +147,10 @@ pub struct StakingLedger<AccountId, Balance: HasCompact> {
     /// rounds.
     #[codec(compact)]
     pub active: Balance,
+    /// The valid amount of the stash's balance that will be used for calculate rewards
+    /// by limitation
+    #[codec(compact)]
+    pub valid: Balance,
     /// Any balance that is becoming free, which may eventually be transferred out
     /// of the stash (assuming it doesn't get slashed first).
     pub unlocking: Vec<UnlockChunk<Balance>>,
@@ -173,6 +177,7 @@ impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId
             total,
             active: self.active,
             stash: self.stash,
+            valid: self.valid,
             unlocking,
         }
     }
@@ -655,7 +660,13 @@ decl_module! {
 
             let stash_balance = T::Currency::free_balance(&stash);
             let value = value.min(stash_balance);
-            let item = StakingLedger { stash, total: value, active: value, unlocking: vec![] };
+            let item = StakingLedger {
+                stash,
+                total: value,
+                active: value,
+                valid: Zero::zero(),
+                unlocking: vec![]
+            };
             Self::update_ledger(&controller, &item);
         }
 
@@ -745,6 +756,8 @@ decl_module! {
 
                 let era = Self::current_era() + T::BondingDuration::get();
                 ledger.unlocking.push(UnlockChunk { value, era });
+                ledger.valid = ledger.active;
+
                 Self::update_ledger(&controller, &ledger);
             }
         }
@@ -1281,15 +1294,8 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> (BalanceOf<T>, Option<Vec<T::AccountId>>) {
-        // Update stake limit anyway
+        // Update all stake limit anyway
         Self::update_all_stake_limit();
-
-        let to_votes = |b: BalanceOf<T>| {
-            <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128
-        };
-        let to_balance = |e: u128| {
-            <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e)
-        };
 
         let candidates: Vec<T::AccountId> = <Validators<T>>::enumerate()
             .map(|(who, _pref)| who)
@@ -1297,61 +1303,122 @@ impl<T: Trait> Module<T> {
         let candidate_count = candidates.len();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
-        if candidate_count >= minimum_validator_count {
-            // 1. Allocate candidates' stakers, and set each candidate's nominators
-            // outer loop for candidates
-            // - time complex is O(n*(inner_look + maybe_set_limit))
-            // - DB try is 3n + inner_loop + maybe_set_limit
-            let nominators = <Nominators<T>>::enumerate()
-                .map(|(nominator, nominations)| {
-                    let Nominations {
-                        submitted_in,
-                        mut targets,
-                        suppressed: _,
-                    } = nominations;
+        if candidate_count < minimum_validator_count {
+            // There were not enough candidates for even our minimal level of functionality.
+            // This is bad.
+            // We should probably disable all functionality except for block production
+            // and let the chain keep producing blocks until we can decide on a sufficiently
+            // substantial set.
+            // TODO: #2494(paritytech/substrate)
+            return (Self::slot_stake(), None)
+        }
 
-                    // Filter out nomination targets which were nominated before the most recent
-                    // slashing span.
-                    targets.retain(|target| {
-                        <Self as Store>::SlashingSpans::get(&target.who)
-                            .map_or(true, |spans| submitted_in >= spans.last_start())
-                    });
+        let to_votes =
+            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
+        let to_balance =
+            |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
-                    (nominator, targets)
-                })
-                .collect::<Vec<(T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>)>>();
+        let nominators: Vec<T::AccountId> = <Nominators<T>>::enumerate()
+            .map(|(nominator, _)| {
+                /*let Nominations {
+                    submitted_in: _,
+                    mut targets,
+                    suppressed: _,
+                } = nominations;
 
-            for c_stash in &candidates {
-                let c_controller = Self::bonded(c_stash).unwrap();
-                let c_own_stakes = Self::slashable_balance_of(c_stash);
-                let mut c_total_votes = to_votes(c_own_stakes.clone()) as u128;
-                let c_stake_limit = Self::stake_limit(c_stash).unwrap_or(Zero::zero());
-                let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
+                // Filter out nomination targets which were nominated before the most recent
+                // slashing span.
+                // TODO: uncomment it when figured out the slash strategy
+                targets.retain(|target| {
+                    <Self as Store>::SlashingSpans::get(&target.who)
+                        .map_or(true, |spans| submitted_in >= spans.last_start())
+                });*/
+                nominator
+            })
+            .collect();
 
-                // a. get new others
-                // inner loop A for nominators
-                // - time complex is O(m*l), which m is nominator number
-                // and l is target number, l <= 16
-                // - DB try is 2m
-                for (n_stash, targets) in &nominators {
-                    for target in targets {
+        // I. Allocate candidates' stakers, and set each candidate's nominators, and update ledger
+        // outer loop for candidates
+        // - time complex is O(n*inner_look)
+        // - DB try is 3n + inner_loop
+        for c_stash in &candidates {
+            let c_controller = Self::bonded(c_stash).unwrap();
+
+            let mut c_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
+                Self::ledger(&c_controller).unwrap();
+            let c_limit_stakes = Self::stake_limit(c_stash).unwrap_or(Zero::zero());
+            let c_limit_votes = to_votes(c_limit_stakes);
+            let c_own_stakes = c_ledger.active.min(c_limit_stakes);
+            let mut c_total_votes = to_votes(c_own_stakes.clone());
+
+            let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
+
+            // 1. get new others and update Nominators
+            // inner loop A for nominators
+            // - time complex is O(m*l*l), which m is nominator number
+            // and l is target number, l <= 16
+            // - DB try is 6m
+            // TODO: optimize the nominator update algorithm
+            for n_stash in &nominators {
+                // c. update nominator's ledger
+                let n_controller = Self::bonded(n_stash).unwrap();
+                let mut n_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
+                    Self::ledger(&n_controller).unwrap();
+                let mut n_valid_votes = to_votes(n_ledger.valid);
+
+                // nominator maybe removed due to empty targets
+                if let Some(nominations) = Self::nominators(n_stash) {
+                    let mut new_targets = nominations.targets.clone();
+
+                    for target in nominations.targets {
                         if &target.who != c_stash {
                             continue;
                         }
 
-                        c_total_votes += to_votes(target.value);
-                        others.push(IndividualExposure {
-                            who: n_stash.clone(),
-                            value: target.value
+                        // a. update nominator's (stakers' `others`), (`valid_stakes`)
+                        // and (candidate's `total_stakes`)
+                        let n_votes = to_votes(target.value);
+                        if c_total_votes + n_votes > c_limit_votes {
+                            // already exceeded, remove nominator's target
+                            new_targets.remove_item(&target);
+                        } else {
+                            c_total_votes += n_votes;
+                            n_valid_votes += n_votes;
+                            others.push(IndividualExposure {
+                                who: n_stash.clone(),
+                                value: target.value,
+                            });
+                        }
+                    }
+
+                    // b. update `Nominators`
+                    <Nominators<T>>::remove(&n_stash);
+                    if !new_targets.is_empty() {
+                        <Nominators<T>>::insert(&n_stash, Nominations {
+                            targets: new_targets,
+                            submitted_in: nominations.submitted_in,
+                            suppressed: nominations.suppressed,
                         });
                     }
-                }
 
-                // c. judge `c_total_votes` beyond MAX votes
+                    // c. judge `n_valid_votes` beyond MAX votes
+                    n_valid_votes = n_valid_votes.min(u64::max_value() as u128);
+                    n_ledger.valid = to_balance(n_valid_votes);
+
+                    Self::update_ledger(&n_controller, &n_ledger);
+                }
+            }
+
+            // 2. update candidate's stakers and ledger
+            if c_limit_votes == 0 {
+                // Remove zero-stake validator
+                <Validators<T>>::remove(c_stash);
+                c_ledger.valid = Zero::zero();
+            } else {
+                // judge `c_total_votes` beyond MAX votes
                 c_total_votes = c_total_votes.min(u64::max_value() as u128);
 
-                // b. build stakers
-                // build `struct exposure`
+                // build struct `Exposure`
                 let exposure = Exposure {
                     own: c_own_stakes,
                     // This might reasonably saturate and we cannot do much about it. The sum of
@@ -1362,63 +1429,51 @@ impl<T: Trait> Module<T> {
                     others,
                 };
                 <Stakers<T>>::insert(c_stash, exposure);
-
-                // c. update candidates' stake limit
-                Self::maybe_update_stakers(&c_controller, c_stake_limit.clone());
-
-                // d. Remove zero-stake validator
-                if c_stake_limit == Zero::zero() {
-                    Self::on_free_balance_zero(&c_stash);
-                }
+                c_ledger.valid = c_own_stakes;
             }
 
-            // 2. Select new validators by top-down their stakes
-            // - time complex is O(2n)
-            // - DB try is n
-            // Populate elections and figure out the minimum stake behind a slot.
-            let mut candidates_stakes = <Validators<T>>::enumerate()
-                .map(|(stash, _pref)| {
-                    let stakers = Self::stakers(&stash);
-                    (stash, to_votes(stakers.total))
-                })
-                .collect::<Vec<(T::AccountId, u128)>>();
-
-            candidates_stakes.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let to_elect = (Self::validator_count() as usize).min(candidates_stakes.len());
-
-            // If there's no validators, be as same as little candidates
-            if to_elect < 1 {
-                return (Self::slot_stake(), None)
-            }
-
-            // `to_elect` must greater than 1, or `panic` is accepted
-            let slot_stake = to_balance(candidates_stakes[to_elect-1].1);
-            let elected_stashes = candidates_stakes[0..to_elect].iter()
-                .map(|(who, _stakes)| who.clone())
-                .collect::<Vec<T::AccountId>>();
-
-            // 3. Update runtime storage
-            // Set the new validator set in sessions.
-            <CurrentElected<T>>::put(&elected_stashes);
-
-            // Update slot stake.
-            <SlotStake<T>>::put(&slot_stake);
-
-            // In order to keep the property required by `n_session_ending`
-            // that we must return the new validator set even if it's the same as the old,
-            // as long as any underlying economic conditions have changed, we don't attempt
-            // to do any optimization where we compare against the prior set.
-            (slot_stake, Some(elected_stashes))
-        } else {
-            // There were not enough candidates for even our minimal level of functionality.
-            // This is bad.
-            // We should probably disable all functionality except for block production
-            // and let the chain keep producing blocks until we can decide on a sufficiently
-            // substantial set.
-            // TODO: #2494(paritytech/substrate)
-            (Self::slot_stake(), None)
+            // 3. update ledger
+            Self::update_ledger(&c_controller, &c_ledger);
         }
+
+        // II. Select new validators by top-down their `valid` stakes
+        // - time complex is O(2n)
+        // - DB try is n
+        // 1. Populate elections and figure out the minimum stake behind a slot.
+        let mut candidates_stakes = <Validators<T>>::enumerate()
+            .map(|(stash, _pref)| {
+                let stakers = Self::stakers(&stash);
+                (stash, to_votes(stakers.total))
+            })
+            .collect::<Vec<(T::AccountId, u128)>>();
+
+        candidates_stakes.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let to_elect = (Self::validator_count() as usize).min(candidates_stakes.len());
+
+        // 2. If there's no validators, be as same as little candidates
+        if to_elect < 1 {
+            return (Self::slot_stake(), None);
+        }
+
+        let slot_stake = to_balance(candidates_stakes[to_elect - 1].1);
+        let elected_stashes = candidates_stakes[0..to_elect]
+            .iter()
+            .map(|(who, _stakes)| who.clone())
+            .collect::<Vec<T::AccountId>>();
+
+        // III. Update general staking storage
+        // Set the new validator set in sessions.
+        <CurrentElected<T>>::put(&elected_stashes);
+
+        // Update slot stake.
+        <SlotStake<T>>::put(&slot_stake);
+
+        // In order to keep the property required by `n_session_ending`
+        // that we must return the new validator set even if it's the same as the old,
+        // as long as any underlying economic conditions have changed, we don't attempt
+        // to do any optimization where we compare against the prior set.
+        (slot_stake, Some(elected_stashes))
     }
 
     /// Remove all associated data of a stash account from the staking system.
@@ -1460,113 +1515,6 @@ impl<T: Trait> Module<T> {
                 Self::upsert_stake_limit(&ledger.stash, Self::stake_limit_of(workload));
             }
         }
-    }
-
-    /// Update ledgers by stake limit, comparing with {v_stash + v_nominators_stash, limited_stakes}
-    /// v_stash >= limited_stakes -> remove all nominators and reduce v_stash;
-    /// v_stash < limited_stakes -> reduce nominators' stash until limitation_remains run out;
-    ///
-    /// For example, limited_stakes = 5000 CRUs
-    /// if the stash is: v_stash = 6000 + nominators = {(n_stash1 = 2000), (n_stash2 = 3000)},
-    /// it will become into v_stash = 5000.
-    /// If the stash is: v_stash = 4000 + nominators = {(n_stash1 = 1500), (n_stash2 = 1000)},
-    /// it will become into v_stash = 4000 + nominators = {(n_stash1 = 1000)},
-    /// at the same time, n_stash1.locks.amount -= 500.
-    /// # <weight>
-    /// - Independent of the arguments. Insignificant complexity.
-    /// - O(n).
-    /// - 3n+5 DB entry.
-    /// # </weight>
-    fn maybe_update_stakers(controller: &T::AccountId, limited_stakes: BalanceOf<T>) {
-        // 1. Get lockable balances
-        // total = own + nominators
-        let mut ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
-            Self::ledger(controller).unwrap();
-        let stash = &ledger.stash;
-
-        let mut stakers: Exposure<T::AccountId, BalanceOf<T>> = Self::stakers(&stash);
-        let total_locked_stakes = &stakers.total;
-        let owned_locked_stakes = &stakers.own;
-
-        // 2. Judge limitation and return exceeded back
-        // a. own + nominators <= limitation
-        if total_locked_stakes <= &limited_stakes {
-            return;
-        }
-
-        // b. own >= limitation, update ledger and stakers
-        if owned_locked_stakes >= &limited_stakes {
-            ledger.active = ledger.active.min(limited_stakes);
-            ledger.total = limited_stakes;
-            stakers.own = limited_stakes;
-
-            Self::update_ledger(controller, &ledger);
-        }
-
-        // c. own < limitation, set new nominators
-        let mut new_nominators: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
-        let mut remains = limited_stakes - stakers.own;
-
-        // let n be FILO order by reversing `others` order
-        stakers.others.reverse();
-        for n in stakers.others {
-            // old_n_value is for update remains
-            let old_n_value = n.value;
-            // new_n_value is for new stakers' nominators
-            let new_n_value: BalanceOf<T>;
-
-            if remains != Zero::zero() {
-                // i. update new_n_value
-                new_n_value = n.value.min(remains);
-
-                // ii. update stakers - nominators
-                new_nominators.push(IndividualExposure {
-                    who: n.who.clone(),
-                    value: new_n_value,
-                });
-
-                // iii. update remains, remains cannot be negative
-                if remains > old_n_value {
-                    remains -= old_n_value;
-                } else {
-                    remains = Zero::zero();
-                }
-            } else {
-                // i. set value = 0
-                new_n_value = Zero::zero();
-
-                // ii. remove this v_stash
-                // TODO: high time complex -> optimize this part
-                let mut nominations: Nominations<T::AccountId, BalanceOf<T>> =
-                    Self::nominators(&n.who).unwrap();
-                nominations.targets.retain(|t| &t.who != stash);
-
-                // iii. update nominators
-                <Nominators<T>>::remove(&n.who);
-                if !nominations.targets.is_empty() {
-                    <Nominators<T>>::insert(&n.who, nominations);
-                }
-            }
-
-            // d. update nominator's ledger
-            let n_controller = Self::bonded(&n.who).unwrap();
-            let mut n_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
-                Self::ledger(&n_controller).unwrap();
-
-            // total_locked_stakes - reduced_stakes
-            n_ledger.active -= old_n_value - new_n_value;
-            n_ledger.total -= old_n_value - new_n_value;
-            Self::update_ledger(&n_controller, &n_ledger);
-        }
-
-        // 3. Update stakers
-        let new_exposure = Exposure {
-            own: stakers.own,
-            total: limited_stakes,
-            others: new_nominators,
-        };
-
-        <Stakers<T>>::insert(&stash, new_exposure);
     }
 
     /// Add reward points to validators using their stash account ID.

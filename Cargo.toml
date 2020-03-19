@@ -6,7 +6,7 @@ authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
 name = 'crust'
-version = '0.1.1'
+version = '0.2.0'
 
 [build-dependencies]
 vergen = '3.0.4'
@@ -25,13 +25,13 @@ tokio = '0.1.22'
 trie-root = '0.15.2'
 
 # Crust runtime modules
-cstrml-staking = { path = 'cstrml/staking', version = '0.1.1' }
-cstrml-tee = { path = 'cstrml/tee', version = '0.1.1' }
-primitives = { package = 'cst-primitives', path = 'primitives', version = '0.1.1' }
+cstrml-staking = { path = 'cstrml/staking', version = '0.2.0' }
+cstrml-tee = { path = 'cstrml/tee', version = '0.2.0' }
+primitives = { package = 'cst-primitives', path = 'primitives', version = '0.2.0' }
 
 [dependencies.crust-runtime]
 path = 'runtime'
-version = '0.1.1'
+version = '0.2.0'
 
 [dependencies.ctrlc]
 features = ['termination']

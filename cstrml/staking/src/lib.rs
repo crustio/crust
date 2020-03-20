@@ -1391,15 +1391,16 @@ impl<T: Trait> Module<T> {
                         // a. update nominator's (stakers' `others`), (`valid_stakes`)
                         // and (candidate's `total_stakes`)
                         let n_votes = to_votes(target.value);
-                        if c_total_votes + n_votes > c_limit_votes {
+                        if c_total_votes >= c_limit_votes {
                             // already exceeded, remove nominator's target
                             new_targets.remove_item(&target);
                         } else {
-                            c_total_votes += n_votes;
-                            n_valid_votes += n_votes;
+                            let n_real_votes = n_votes.min(c_limit_votes - c_total_votes);
+                            c_total_votes += n_real_votes;
+                            n_valid_votes += n_real_votes;
                             others.push(IndividualExposure {
                                 who: n_stash.clone(),
-                                value: target.value,
+                                value: to_balance(n_real_votes),
                             });
                         }
                     }

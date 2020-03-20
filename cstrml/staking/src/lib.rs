@@ -1318,8 +1318,11 @@ impl<T: Trait> Module<T> {
         let to_balance =
             |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
+        // get and init all nominator's ledger
+        // time complex: O(n_num)
+        // DB try is O(4*n_num)
         let nominators: Vec<T::AccountId> = <Nominators<T>>::enumerate()
-            .map(|(nominator, _)| {
+            .map(|(n_stash, _)| {
                 /*let Nominations {
                     submitted_in: _,
                     mut targets,
@@ -1333,11 +1336,21 @@ impl<T: Trait> Module<T> {
                     <Self as Store>::SlashingSpans::get(&target.who)
                         .map_or(true, |spans| submitted_in >= spans.last_start())
                 });*/
-                nominator
+
+                // init all nominator's valid stakes, set to zero
+                let n_controller = Self::bonded(&n_stash).unwrap();
+                let mut n_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
+                    Self::ledger(&n_controller).unwrap();
+                n_ledger.valid = Zero::zero();
+                Self::update_ledger(&n_controller, &n_ledger);
+
+                // return nominator's stash account
+                n_stash
             })
             .collect();
 
-        // I. Allocate candidates' stakers, and set each candidate's nominators, and update ledger
+        // I. UPDATE DAG
+        // Allocate candidates' stakers, and set each candidate's nominators, and update ledger
         // outer loop for candidates
         // - time complex is O(n*inner_look)
         // - DB try is 3n + inner_loop
@@ -1391,7 +1404,7 @@ impl<T: Trait> Module<T> {
                         }
                     }
 
-                    // b. update `Nominators`
+                    // b. UPDATE EDGE: `Nominator` -> `Candidate`
                     <Nominators<T>>::remove(&n_stash);
                     if !new_targets.is_empty() {
                         <Nominators<T>>::insert(&n_stash, Nominations {
@@ -1405,20 +1418,21 @@ impl<T: Trait> Module<T> {
                     n_valid_votes = n_valid_votes.min(u64::max_value() as u128);
                     n_ledger.valid = to_balance(n_valid_votes);
 
+                    // d. UPDATE NODE: `Nominator`
                     Self::update_ledger(&n_controller, &n_ledger);
                 }
             }
 
             // 2. update candidate's stakers and ledger
             if c_limit_votes == 0 {
-                // Remove zero-stake validator
+                // a. Remove zero-stake validator
                 <Validators<T>>::remove(c_stash);
                 c_ledger.valid = Zero::zero();
             } else {
-                // judge `c_total_votes` beyond MAX votes
+                // b. judge `c_total_votes` beyond MAX votes
                 c_total_votes = c_total_votes.min(u64::max_value() as u128);
 
-                // build struct `Exposure`
+                // c. build struct `Exposure`
                 let exposure = Exposure {
                     own: c_own_stakes,
                     // This might reasonably saturate and we cannot do much about it. The sum of
@@ -1428,11 +1442,13 @@ impl<T: Trait> Module<T> {
                     total: to_balance(c_total_votes),
                     others,
                 };
+
+                // d. UPDATE EDGE: `Candidate` -> `Nominator`
                 <Stakers<T>>::insert(c_stash, exposure);
                 c_ledger.valid = c_own_stakes;
             }
 
-            // 3. update ledger
+            // 3. UPDATE NODE: `Candidate`
             Self::update_ledger(&c_controller, &c_ledger);
         }
 

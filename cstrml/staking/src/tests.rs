@@ -3130,13 +3130,61 @@ fn nominate_limit_should_work() {
             ));
             assert_ok!(Staking::nominate(Origin::signed(2), vec![(5, 1000)]));
 
-            // nominator's info should ✅
+            // nominator's info nominators should ✅
             assert_eq!(
                 Staking::nominators(&1),
                 Some(Nominations {
                     targets: vec![IndividualExposure { who: 5, value: 500 },],
                     submitted_in: 0,
                     suppressed: false
+                })
+            );
+
+            // After a era, valid stake should updated.
+            start_era(1);
+
+            assert_eq!(
+                Staking::nominators(&1),
+                Some(Nominations {
+                    targets: vec![IndividualExposure { who: 5, value: 500 }],
+                    submitted_in: 0,
+                    suppressed: false
+                })
+            );
+
+            assert_eq!(
+                Staking::ledger(&2),
+                Some(StakingLedger {
+                    stash: 1,
+                    total: 2000,
+                    active: 2000,
+                    valid: 500,
+                    unlocking: vec![]
+                })
+            );
+
+            assert_ok!(Staking::nominate(Origin::signed(2), vec![(5, 2000)]));
+
+            // Next era, valid and nominators should be ✅
+            start_era(2);
+
+            assert_eq!(
+                Staking::nominators(&1),
+                Some(Nominations {
+                    targets: vec![IndividualExposure { who: 5, value: 2000 }],
+                    submitted_in: 1,
+                    suppressed: false
+                })
+            );
+
+            assert_eq!(
+                Staking::ledger(&2),
+                Some(StakingLedger {
+                    stash: 1,
+                    total: 2000,
+                    active: 2000,
+                    valid: 2000,
+                    unlocking: vec![]
                 })
             );
         });

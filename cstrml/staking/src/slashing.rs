@@ -1,13 +1,13 @@
 //! A slashing implementation for NPoS systems.
 //!
 //! For the purposes of the economic model, it is easiest to think of each validator
-//! of a nominator which nominates only its own identity.
+//! of a guarantor which guarantees only its own identity.
 //!
 //! The act of nomination signals intent to unify economic identity with the validator - to take part in the
 //! rewards of a job well done, and to take part in the punishment of a job done badly.
 //!
 //! There are 3 main difficulties to account for with slashing in NPoS:
-//!   - A nominator can nominate multiple validators and be slashed via any of them.
+//!   - A guarantor can guarantee multiple validators and be slashed via any of them.
 //!   - Until slashed, stake is reused from era to era. Nominating with N coins for E eras in a row
 //!     does not mean you have N*E coins to be slashed - you've only ever had N.
 //!   - Slashable offences can be found after the fact and out of order.
@@ -20,7 +20,7 @@
 //! Second, we do not want the time period (or "span") that the maximum is computed
 //! over to last indefinitely. That would allow participants to begin acting with
 //! impunity after some point, fearing no further repercussions. For that reason, we
-//! automatically "chill" validators and withdraw a nominator's nomination after a slashing event,
+//! automatically "chill" validators and withdraw a guarantor's nomination after a slashing event,
 //! requiring them to re-enlist voluntarily (acknowledging the slash) and begin a new
 //! slashing span.
 //!
@@ -66,10 +66,10 @@ impl SlashingSpan {
     }
 }
 
-/// An encoding of all of a nominator's slashing spans.
+/// An encoding of all of a guarantor's slashing spans.
 #[derive(Encode, Decode)]
 pub struct SlashingSpans {
-    // the index of the current slashing span of the nominator. different for
+    // the index of the current slashing span of the guarantor. different for
     // every stash, resets when the account hits free balance 0.
     span_index: SpanIndex,
     // the start era of the most recent (ongoing) slashing span.
@@ -186,7 +186,7 @@ pub(crate) struct SlashParams<'a, T: 'a + Trait> {
     pub(crate) stash: &'a T::AccountId,
     /// The proportion of the slash.
     pub(crate) slash: Perbill,
-    /// The exposure of the stash and all nominators.
+    /// The exposure of the stash and all guarantors.
     pub(crate) exposure: &'a Exposure<T::AccountId, BalanceOf<T>>,
     /// The era where the offence occurred.
     pub(crate) slash_era: EraIndex,
@@ -199,7 +199,7 @@ pub(crate) struct SlashParams<'a, T: 'a + Trait> {
     pub(crate) reward_proportion: Perbill,
 }
 
-/// Computes a slash of a validator and nominators. It returns an unapplied
+/// Computes a slash of a validator and guarantors. It returns an unapplied
 /// record to be applied at some later point. Slashing metadata is updated in storage,
 /// since unapplied records are only rarely intended to be dropped.
 ///
@@ -240,11 +240,11 @@ pub(crate) fn compute_slash<T: Trait>(
         <Module<T> as Store>::ValidatorSlashInEra::insert(&slash_era, stash, &(slash, own_slash));
     } else {
         // we slash based on the max in era - this new event is not the max,
-        // so neither the validator or any nominators will need an update.
+        // so neither the validator or any guarantors will need an update.
         //
         // this does lead to a divergence of our system from the paper, which
         // pays out some reward even if the latest report is not max-in-era.
-        // we opt to avoid the nominator lookups and edits and leave more rewards
+        // we opt to avoid the guarantor lookups and edits and leave more rewards
         // for more drastic misbehavior.
         return None;
     }
@@ -278,13 +278,13 @@ pub(crate) fn compute_slash<T: Trait>(
         }
     }
 
-    let mut nominators_slashed = Vec::new();
-    reward_payout += slash_nominators::<T>(params, prior_slash_p, &mut nominators_slashed);
+    let mut guarantors_slashed = Vec::new();
+    reward_payout += slash_guarantors::<T>(params, prior_slash_p, &mut guarantors_slashed);
 
     Some(UnappliedSlash {
         validator: stash.clone(),
         own: val_slashed,
-        others: nominators_slashed,
+        others: guarantors_slashed,
         reporters: Vec::new(),
         payout: reward_payout,
     })
@@ -316,13 +316,13 @@ fn kick_out_if_recent<T: Trait>(params: SlashParams<T>) {
     }
 }
 
-/// Slash nominators. Accepts general parameters and the prior slash percentage of the validator.
+/// Slash guarantors. Accepts general parameters and the prior slash percentage of the validator.
 ///
 /// Returns the amount of reward to pay out.
-fn slash_nominators<T: Trait>(
+fn slash_guarantors<T: Trait>(
     params: SlashParams<T>,
     prior_slash_p: Perbill,
-    nominators_slashed: &mut Vec<(T::AccountId, BalanceOf<T>)>,
+    guarantors_slashed: &mut Vec<(T::AccountId, BalanceOf<T>)>,
 ) -> BalanceOf<T> {
     let SlashParams {
         stash: _,
@@ -336,24 +336,24 @@ fn slash_nominators<T: Trait>(
 
     let mut reward_payout = Zero::zero();
 
-    nominators_slashed.reserve(exposure.others.len());
-    for nominator in &exposure.others {
-        let stash = &nominator.who;
+    guarantors_slashed.reserve(exposure.others.len());
+    for guarantor in &exposure.others {
+        let stash = &guarantor.who;
         let mut nom_slashed = Zero::zero();
 
-        // the era slash of a nominator always grows, if the validator
+        // the era slash of a guarantor always grows, if the validator
         // had a new max slash for the era.
         let era_slash = {
-            let own_slash_prior = prior_slash_p * nominator.value;
-            let own_slash_by_validator = slash * nominator.value;
+            let own_slash_prior = prior_slash_p * guarantor.value;
+            let own_slash_by_validator = slash * guarantor.value;
             let own_slash_difference = own_slash_by_validator.saturating_sub(own_slash_prior);
 
-            let mut era_slash = <Module<T> as Store>::NominatorSlashInEra::get(&slash_era, stash)
+            let mut era_slash = <Module<T> as Store>::GuarantorSlashInEra::get(&slash_era, stash)
                 .unwrap_or(Zero::zero());
 
             era_slash += own_slash_difference;
 
-            <Module<T> as Store>::NominatorSlashInEra::insert(&slash_era, stash, &era_slash);
+            <Module<T> as Store>::GuarantorSlashInEra::insert(&slash_era, stash, &era_slash);
 
             era_slash
         };
@@ -371,13 +371,13 @@ fn slash_nominators<T: Trait>(
             let target_span = spans.compare_and_update_span_slash(slash_era, era_slash);
 
             if target_span == Some(spans.span_index()) {
-                // Chill the nominator outright, ending the slashing span.
+                // Chill the guarantor outright, ending the slashing span.
                 spans.end_span(now);
                 <Module<T>>::chill_stash(stash);
             }
         }
 
-        nominators_slashed.push((stash.clone(), nom_slashed));
+        guarantors_slashed.push((stash.clone(), nom_slashed));
     }
 
     reward_payout
@@ -514,7 +514,7 @@ impl<'a, T: 'a + Trait> Drop for InspectingSpans<'a, T> {
 /// Clear slashing metadata for an obsolete era.
 pub(crate) fn clear_era_metadata<T: Trait>(obsolete_era: EraIndex) {
     <Module<T> as Store>::ValidatorSlashInEra::remove_prefix(&obsolete_era);
-    <Module<T> as Store>::NominatorSlashInEra::remove_prefix(&obsolete_era);
+    <Module<T> as Store>::GuarantorSlashInEra::remove_prefix(&obsolete_era);
 }
 
 /// Clear slashing metadata for a dead account.
@@ -583,10 +583,10 @@ pub(crate) fn apply_slash<T: Trait>(unapplied_slash: UnappliedSlash<T::AccountId
         &mut slashed_imbalance,
     );
 
-    for &(ref nominator, nominator_slash) in &unapplied_slash.others {
+    for &(ref guarantor, guarantor_slash) in &unapplied_slash.others {
         do_slash::<T>(
-            &nominator,
-            nominator_slash,
+            &guarantor,
+            guarantor_slash,
             &mut reward_payout,
             &mut slashed_imbalance,
         );

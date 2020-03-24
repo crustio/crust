@@ -1,6 +1,6 @@
 use sp_runtime::{curve::PiecewiseLinear, traits::SimpleArithmetic, Perbill};
 
-/// The total payout to all validators (and their nominators) per era.
+/// The total payout to all validators (and their guarantors) per era.
 ///
 /// Defined as such:
 /// `payout = yearly_inflation(npos_token_staked / total_tokens) * total_tokans / era_per_year`

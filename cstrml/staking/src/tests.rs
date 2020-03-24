@@ -99,7 +99,7 @@ fn basic_setup_works() {
             })
         );
         assert_eq!(
-            Staking::nominators(101).unwrap().targets,
+            Staking::guarantors(101).unwrap().targets,
             vec![
                 IndividualExposure {
                     who: 11,
@@ -179,7 +179,7 @@ fn basic_setup_works() {
 
         // All exposures must be correct.
         check_exposure_all();
-        check_nominator_all();
+        check_guarantor_all();
     });
 }
 
@@ -219,9 +219,9 @@ fn rewards_should_work() {
     // should check that:
     // * rewards get recorded per session
     // * rewards get paid per Era
-    // * Check that nominators are also rewarded
+    // * Check that guarantors are also rewarded
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             // Init some balances
@@ -242,10 +242,10 @@ fn rewards_should_work() {
             assert_eq!(Staking::current_era(), 0);
             assert_eq!(Session::current_index(), 0);
 
-            // Add a dummy nominator.
+            // Add a dummy guarantor.
             //
             // Equal division indicates that the reward will be equally divided among validator and
-            // nominator.
+            // guarantor.
             <Stakers<Test>>::insert(
                 &11,
                 Exposure {
@@ -295,7 +295,7 @@ fn rewards_should_work() {
             assert_eq!(Staking::current_era(), 1);
             assert_eq!(Session::current_index(), 3);
 
-            // 11 validator has 2/3 of the total rewards and half half for it and its nominator
+            // 11 validator has 2/3 of the total rewards and half half for it and its guarantor
             assert_eq_error_rate!(
                 Balances::total_balance(&2),
                 init_balance_2 + total_payout / 3,
@@ -316,7 +316,7 @@ fn multi_era_reward_should_work() {
     // The value of current_session_reward is set at the end of each era, based on
     // slot_stake and session_reward.
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             let init_balance_10 = Balances::total_balance(&10);
@@ -367,7 +367,7 @@ fn staking_should_work() {
     // * new ones will be chosen per era
     // * either one can unlock the stash and back-down from being a validator via `chill`ing.
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .fair(false) // to give 20 more staked value
         .build()
         .execute_with(|| {
@@ -454,7 +454,7 @@ fn less_than_needed_candidates_works() {
     ExtBuilder::default()
         .minimum_validator_count(1)
         .validator_count(4)
-        .nominate(false)
+        .guarantee(false)
         .num_validators(3)
         .build()
         .execute_with(|| {
@@ -473,7 +473,7 @@ fn less_than_needed_candidates_works() {
             assert_eq!(Staking::stakers(20).others.len(), 0);
             assert_eq!(Staking::stakers(30).others.len(), 0);
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
         });
 }
 
@@ -484,7 +484,7 @@ fn no_candidate_emergency_condition() {
         .validator_count(15)
         .num_validators(4)
         .validator_pool(true)
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             // initial validators
@@ -545,7 +545,7 @@ fn nominating_and_rewards_should_work() {
     // 4  has load  0.0005555555555555556 and supported
     // 10  with stake  600.0 20  with stake  400.0 40  with stake  0.0
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .validator_pool(true)
         .build()
         .execute_with(|| {
@@ -577,25 +577,25 @@ fn nominating_and_rewards_should_work() {
             }
 
             // bond two account pairs and state interest in nomination.
-            // 2 will nominate for 10, 20, 30
+            // 2 will guarantee for 10, 20, 30
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
                 1000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(
+            assert_ok!(Staking::guarantee(
                 Origin::signed(2),
                 vec![(11, 333), (21, 333), (31, 333)]
             ));
-            // 4 will nominate for 10, 20, 40
+            // 4 will guarantee for 10, 20, 40
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
                 1000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(
+            assert_ok!(Staking::guarantee(
                 Origin::signed(4),
                 vec![(11, 333), (21, 333), (41, 333)]
             ));
@@ -620,7 +620,7 @@ fn nominating_and_rewards_should_work() {
             // ------ check the staked value of all parties.
 
             if cfg!(feature = "equalize") {
-                // total expo of 10, with 1200 coming from nominators (externals), according to phragmen.
+                // total expo of 10, with 1200 coming from guarantors (externals), according to phragmen.
                 // TODO: tmp change for equalize strategy(with voting to candidates)
                 assert_eq!(Staking::stakers(11).own, 1000);
                 assert_eq_error_rate!(Staking::stakers(11).total, 1000 + 666, 2);
@@ -641,7 +641,7 @@ fn nominating_and_rewards_should_work() {
                         .collect::<Vec<u64>>(),
                     vec![3, 1]
                 );
-                // total expo of 20, with 500 coming from nominators (externals), according to phragmen.
+                // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
                 // TODO: tmp change for equalize strategy(with voting to candidates)
                 assert_eq!(Staking::stakers(21).own, 1000);
                 assert_eq_error_rate!(Staking::stakers(21).total, 1000 + 666, 2);
@@ -663,7 +663,7 @@ fn nominating_and_rewards_should_work() {
                     vec![3, 1]
                 );
             } else {
-                // total expo of 10, with 1200 coming from nominators (externals), according to phragmen.
+                // total expo of 10, with 1200 coming from guarantors (externals), according to phragmen.
                 assert_eq!(Staking::stakers(11).own, 1000);
                 assert_eq!(Staking::stakers(11).total, 1000 + 800);
                 // 2 and 4 supported 10, each with stake 600, according to phragmen.
@@ -683,7 +683,7 @@ fn nominating_and_rewards_should_work() {
                         .collect::<Vec<u64>>(),
                     vec![3, 1]
                 );
-                // total expo of 20, with 500 coming from nominators (externals), according to phragmen.
+                // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
                 assert_eq!(Staking::stakers(21).own, 1000);
                 assert_eq_error_rate!(Staking::stakers(21).total, 1000 + 1200, 2);
                 // 2 and 4 supported 20, each with stake 250, according to phragmen.
@@ -723,18 +723,18 @@ fn nominating_and_rewards_should_work() {
             start_era(2);
 
             // nothing else will happen, era ends and rewards are paid again,
-            // it is expected that nominators will also be paid. See below
+            // it is expected that guarantors will also be paid. See below
 
             let payout_for_10 = total_payout_1 / 3;
             let payout_for_20 = 2 * total_payout_1 / 3;
             if cfg!(feature = "equalize") {
-                // Nominator 2: has [333 / 2000 ~ 1 / 5 from 10] + [333 / 2000 ~ 3 / 10 from 20]'s reward.
+                // Guarantor 2: has [333 / 2000 ~ 1 / 5 from 10] + [333 / 2000 ~ 3 / 10 from 20]'s reward.
                 assert_eq_error_rate!(
                     Balances::total_balance(&2),
                     initial_balance + payout_for_10 / 5 + payout_for_20 * 3 / 10,
                     2,
                 );
-                // Nominator 4: has [400 / 2000 ~ 1 / 5 from 20] + [600 / 2000 ~ 3 / 10 from 10]'s reward.
+                // Guarantor 4: has [400 / 2000 ~ 1 / 5 from 20] + [600 / 2000 ~ 3 / 10 from 10]'s reward.
                 assert_eq_error_rate!(
                     Balances::total_balance(&4),
                     initial_balance + payout_for_20 / 5 + payout_for_10 * 3 / 10,
@@ -754,13 +754,13 @@ fn nominating_and_rewards_should_work() {
                     1,
                 );
             } else {
-                // Nominator 2: has [400/1800 ~ 2/9 from 10] + [600/2200 ~ 3/11 from 20]'s reward. ==> 2/9 + 3/11
+                // Guarantor 2: has [400/1800 ~ 2/9 from 10] + [600/2200 ~ 3/11 from 20]'s reward. ==> 2/9 + 3/11
                 assert_eq_error_rate!(
                     Balances::total_balance(&2),
                     initial_balance + (2 * payout_for_10 / 9 + 3 * payout_for_20 / 11),
                     1,
                 );
-                // Nominator 4: has [400/1800 ~ 2/9 from 10] + [600/2200 ~ 3/11 from 20]'s reward. ==> 2/9 + 3/11
+                // Guarantor 4: has [400/1800 ~ 2/9 from 10] + [600/2200 ~ 3/11 from 20]'s reward. ==> 2/9 + 3/11
                 assert_eq_error_rate!(
                     Balances::total_balance(&4),
                     initial_balance + (2 * payout_for_10 / 9 + 3 * payout_for_20 / 11),
@@ -782,19 +782,19 @@ fn nominating_and_rewards_should_work() {
             }*/
 
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
         });
 }
 
 #[test]
-fn nominators_also_get_slashed() {
-    // A nominator should be slashed if the validator they nominated is slashed
+fn guarantors_also_get_slashed() {
+    // A guarantor should be slashed if the validator they guaranteed is slashed
     // Here is the breakdown of roles:
     // 10 - is the controller of 11
     // 11 - is the stash.
-    // 2 - is the nominator of 20, 10
+    // 2 - is the guarantor of 20, 10
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             Staking::upsert_stake_limit(&20, 2000);
@@ -814,15 +814,15 @@ fn nominators_also_get_slashed() {
                 let _ = Balances::make_free_balance_be(i, initial_balance);
             }
 
-            // 2 will nominate for 10, 20
-            let nominator_stake = 500;
+            // 2 will guarantee for 10, 20
+            let guarantor_stake = 500;
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                nominator_stake,
+                guarantor_stake,
                 RewardDestination::default()
             ));
-            assert_ok!(Staking::nominate(
+            assert_ok!(Staking::guarantee(
                 Origin::signed(2),
                 vec![(20, 250), (10, 250)]
             ));
@@ -834,7 +834,7 @@ fn nominators_also_get_slashed() {
             // new era, pay rewards,
             start_era(1);
 
-            // Nominator stash didn't collect any.
+            // Guarantor stash didn't collect any.
             assert_eq!(Balances::total_balance(&2), initial_balance);
 
             // 10 goes offline
@@ -849,7 +849,7 @@ fn nominators_also_get_slashed() {
             let slash_value = 50;
             let total_slash = expo.total.min(slash_value);
             let validator_slash = expo.own.min(total_slash);
-            let nominator_slash = nominator_stake.min(total_slash - validator_slash);
+            let guarantor_slash = guarantor_stake.min(total_slash - validator_slash);
 
             // initial + first era reward + slash
             assert_eq!(
@@ -858,10 +858,10 @@ fn nominators_also_get_slashed() {
             );
             assert_eq!(
                 Balances::total_balance(&2),
-                initial_balance - nominator_slash
+                initial_balance - guarantor_slash
             );
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
             // Because slashing happened.
             assert!(is_disabled(10));
         });
@@ -871,8 +871,8 @@ fn nominators_also_get_slashed() {
 fn double_staking_should_fail() {
     // should test (in the same order):
     // * an account already bonded as stash cannot be be stashed again.
-    // * an account already bonded as stash cannot nominate.
-    // * an account already bonded as controller can nominate.
+    // * an account already bonded as stash cannot guarantee.
+    // * an account already bonded as controller can guarantee.
     ExtBuilder::default().build().execute_with(|| {
         let arbitrary_value = 5;
         Staking::upsert_stake_limit(&1, 1000);
@@ -894,13 +894,13 @@ fn double_staking_should_fail() {
             ),
             Error::<Test>::AlreadyBonded,
         );
-        // 1 = stashed => attempting to nominate should fail.
+        // 1 = stashed => attempting to guarantee should fail.
         assert_noop!(
-            Staking::nominate(Origin::signed(1), vec![(1, arbitrary_value),]),
+            Staking::guarantee(Origin::signed(1), vec![(1, arbitrary_value),]),
             Error::<Test>::NotController
         );
         // 2 = controller  => nominating should work.
-        assert_ok!(Staking::nominate(
+        assert_ok!(Staking::guarantee(
             Origin::signed(2),
             vec![(1, arbitrary_value),]
         ));
@@ -1030,7 +1030,7 @@ fn forcing_new_era_works() {
 fn cannot_transfer_staked_balance() {
     // Tests that a stash account cannot transfer funds
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             // Confirm account 11 is stashed
@@ -1062,7 +1062,7 @@ fn cannot_transfer_staked_balance_2() {
     // Same test as above but with 20, and more accurate.
     // 21 has 2000 free balance but 1000 at stake
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .fair(true)
         .build()
         .execute_with(|| {
@@ -1116,7 +1116,7 @@ fn cannot_reserve_staked_balance() {
 fn reward_destination_works() {
     // Rewards go to the correct destination as determined in Payee
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             // Check that account 11 is a validator
@@ -1237,14 +1237,14 @@ fn validator_payment_prefs_work() {
         assert_eq!(Balances::total_balance(&10), 1);
         // check the balance of a validator's stash accounts.
         assert_eq!(Balances::total_balance(&11), stash_initial_balance);
-        // and the nominator (to-be)
+        // and the guarantor (to-be)
         let _ = Balances::make_free_balance_be(&2, 500);
 
-        // add a dummy nominator.
+        // add a dummy guarantor.
         <Stakers<Test>>::insert(
             &11,
             Exposure {
-                own: 500, // equal division indicates that the reward will be equally divided among validator and nominator.
+                own: 500, // equal division indicates that the reward will be equally divided among validator and guarantor.
                 total: 1000,
                 others: vec![IndividualExposure { who: 2, value: 500 }],
             },
@@ -1273,11 +1273,11 @@ fn validator_payment_prefs_work() {
         );
         // Controller account will not get any reward.
         assert_eq!(Balances::total_balance(&10), 1);
-        // Rest of the reward will be shared and paid to the nominator in stake.
+        // Rest of the reward will be shared and paid to the guarantor in stake.
         assert_eq!(Balances::total_balance(&2), 500 + shared_cut / 2);
 
         check_exposure_all();
-        check_nominator_all();
+        check_guarantor_all();
     });
 }
 
@@ -1362,7 +1362,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
     // * it can unbond a portion of its funds from the stash account.
     // * Once the unbonding period is done, it can actually take the funds out of the stash.
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             // Set payee to controller. avoids confusion
@@ -1560,7 +1560,7 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
     // Test that slot_stake is determined by the least staked validator
     // Test that slot_stake is the maximum punishment that can happen to a validator
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .fair(false)
         .build()
         .execute_with(|| {
@@ -1620,7 +1620,7 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
             assert_eq!(Staking::slot_stake(), 69 + total_payout_0 / 2);
 
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
         });
 }
 
@@ -1675,14 +1675,14 @@ fn on_free_balance_zero_stash_removes_validator() {
             assert!(!<Ledger<Test>>::exists(&10));
             assert!(!<Bonded<Test>>::exists(&11));
             assert!(!<Validators<Test>>::exists(&11));
-            assert!(!<Nominators<Test>>::exists(&11));
+            assert!(!<Guarantors<Test>>::exists(&11));
             assert!(!<Payee<Test>>::exists(&11));
         });
 }
 
 #[test]
-fn on_free_balance_zero_stash_removes_nominator() {
-    // Tests that nominator storage items are cleaned up when stash is empty
+fn on_free_balance_zero_stash_removes_guarantor() {
+    // Tests that guarantor storage items are cleaned up when stash is empty
     // Tests that storage items are untouched when controller is empty
     ExtBuilder::default()
         .existential_deposit(10)
@@ -1690,11 +1690,11 @@ fn on_free_balance_zero_stash_removes_nominator() {
         .execute_with(|| {
             Staking::upsert_stake_limit(&20, 2000);
 
-            // Make 10 a nominator
-            assert_ok!(Staking::nominate(Origin::signed(10), vec![(20, 100),]));
-            // Check that account 10 is a nominator
-            assert!(<Nominators<Test>>::exists(11));
-            // Check the balance of the nominator account
+            // Make 10 a guarantor
+            assert_ok!(Staking::guarantee(Origin::signed(10), vec![(20, 100),]));
+            // Check that account 10 is a guarantor
+            assert!(<Guarantors<Test>>::exists(11));
+            // Check the balance of the guarantor account
             assert_eq!(Balances::free_balance(&10), 256);
             // Check the balance of the stash account
             assert_eq!(Balances::free_balance(&11), 256000);
@@ -1708,7 +1708,7 @@ fn on_free_balance_zero_stash_removes_nominator() {
             // Check storage items that should be cleaned up
             assert!(<Ledger<Test>>::exists(&10));
             assert!(<Bonded<Test>>::exists(&11));
-            assert!(<Nominators<Test>>::exists(&11));
+            assert!(<Guarantors<Test>>::exists(&11));
             assert!(<Payee<Test>>::exists(&11));
 
             // Reduce free_balance of controller to 0
@@ -1724,7 +1724,7 @@ fn on_free_balance_zero_stash_removes_nominator() {
             // Check storage items have not changed
             assert!(<Ledger<Test>>::exists(&10));
             assert!(<Bonded<Test>>::exists(&11));
-            assert!(<Nominators<Test>>::exists(&11));
+            assert!(<Guarantors<Test>>::exists(&11));
             assert!(<Payee<Test>>::exists(&11));
 
             // Reduce free_balance of stash to 0
@@ -1736,16 +1736,16 @@ fn on_free_balance_zero_stash_removes_nominator() {
             assert!(!<Ledger<Test>>::exists(&10));
             assert!(!<Bonded<Test>>::exists(&11));
             assert!(!<Validators<Test>>::exists(&11));
-            assert!(!<Nominators<Test>>::exists(&11));
+            assert!(!<Guarantors<Test>>::exists(&11));
             assert!(!<Payee<Test>>::exists(&11));
         });
 }
 
 #[test]
 fn switching_roles() {
-    // Test that it should be possible to switch between roles (nominator, validator, idle) with minimal overhead.
+    // Test that it should be possible to switch between roles (guarantor, validator, idle) with minimal overhead.
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             Timestamp::set_timestamp(1); // Initialize time.
@@ -1766,14 +1766,14 @@ fn switching_roles() {
                 let _ = Balances::deposit_creating(&i, 5000);
             }
 
-            // add 2 nominators
+            // add 2 guarantors
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(
+            assert_ok!(Staking::guarantee(
                 Origin::signed(2),
                 vec![(11, 1000), (5, 1000)]
             ));
@@ -1784,7 +1784,7 @@ fn switching_roles() {
                 500,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(
+            assert_ok!(Staking::guarantee(
                 Origin::signed(4),
                 vec![(21, 250), (1, 250),]
             ));
@@ -1816,7 +1816,7 @@ fn switching_roles() {
             // new block --> ne era --> new validators
             start_session(3);
 
-            // with current nominators 10 and 5 have the most stake
+            // with current guarantors 10 and 5 have the most stake
             assert_eq_uvec!(validator_controllers(), vec![6, 10]);
 
             // 2 decides to be a validator. Consequences:
@@ -1842,14 +1842,14 @@ fn switching_roles() {
             assert_eq_uvec!(validator_controllers(), vec![2, 20]);
 
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
         });
 }
 
 #[test]
 fn wrong_vote_is_null() {
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .validator_pool(true)
         .build()
         .execute_with(|| {
@@ -1860,14 +1860,14 @@ fn wrong_vote_is_null() {
                 let _ = Balances::deposit_creating(&i, 5000);
             }
 
-            // add 1 nominators
+            // add 1 guarantors
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
                 2000,
                 RewardDestination::default()
             ));
-            assert_ok!(Staking::nominate(
+            assert_ok!(Staking::guarantee(
                 Origin::signed(2),
                 vec![
                     (11, 500),
@@ -1894,7 +1894,7 @@ fn bond_with_no_staked_value() {
     ExtBuilder::default()
         .validator_count(3)
         .existential_deposit(5)
-        .nominate(false)
+        .guarantee(false)
         .minimum_validator_count(1)
         .build()
         .execute_with(|| {
@@ -1948,7 +1948,7 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
     // Particularly when she votes and the candidate is elected.
     ExtBuilder::default()
         .validator_count(3)
-        .nominate(false)
+        .guarantee(false)
         .minimum_validator_count(1)
         .build()
         .execute_with(|| {
@@ -2009,7 +2009,7 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
                 init_balance_10 + total_payout_0 / 3 + total_payout_1 / 3,
             );
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
         });
 }
 
@@ -2018,7 +2018,7 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
 // TODO: fill with our validator election algorithm
 /*fn phragmen_linear_worse_case_equalize() {
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .validator_pool(true)
         .fair(true)
         .build()
@@ -2027,13 +2027,13 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
             bond_validator(60, 1000);
             bond_validator(70, 1000);
 
-            bond_nominator(2, 2000, vec![11]);
-            bond_nominator(4, 1000, vec![11, 21]);
-            bond_nominator(6, 1000, vec![21, 31]);
-            bond_nominator(8, 1000, vec![31, 41]);
-            bond_nominator(110, 1000, vec![41, 51]);
-            bond_nominator(120, 1000, vec![51, 61]);
-            bond_nominator(130, 1000, vec![61, 71]);
+            bond_guarantor(2, 2000, vec![11]);
+            bond_guarantor(4, 1000, vec![11, 21]);
+            bond_guarantor(6, 1000, vec![21, 31]);
+            bond_guarantor(8, 1000, vec![31, 41]);
+            bond_guarantor(110, 1000, vec![41, 51]);
+            bond_guarantor(120, 1000, vec![51, 61]);
+            bond_guarantor(130, 1000, vec![61, 71]);
 
             for i in &[10, 20, 30, 40, 50, 60, 70] {
                 assert_ok!(Staking::set_payee(
@@ -2058,13 +2058,13 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
             assert_eq_error_rate!(Staking::stakers(71).total, 1800, 2);
 
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
         })
 }*/
 #[test]
 fn new_era_elects_correct_number_of_validators() {
     ExtBuilder::default()
-        .nominate(true)
+        .guarantee(true)
         .validator_pool(true)
         .fair(true)
         .validator_count(1)
@@ -2078,14 +2078,14 @@ fn new_era_elects_correct_number_of_validators() {
 
             assert_eq!(validator_controllers().len(), 1);
             check_exposure_all();
-            check_nominator_all();
+            check_guarantor_all();
         })
 }
 
 #[test]
 fn topdown_should_not_overflow_validators() {
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             let _ = Staking::chill(Origin::signed(10));
@@ -2094,9 +2094,9 @@ fn topdown_should_not_overflow_validators() {
             bond_validator(2, u64::max_value());
             bond_validator(4, u64::max_value());
 
-            /*bond_nominator(6, u64::max_value() / 2,
+            /*bond_guarantor(6, u64::max_value() / 2,
                            vec![(3, u64::max_value() / 4), (5, u64::max_value() / 4)]);
-            bond_nominator(8, u64::max_value() / 2,
+            bond_guarantor(8, u64::max_value() / 2,
                            vec![(3, u64::max_value() / 4), (5, u64::max_value() / 4)]);*/
 
             // TODO: this will broken the stake limit of mock set
@@ -2112,9 +2112,9 @@ fn topdown_should_not_overflow_validators() {
 }
 
 #[test]
-fn topdown_should_not_overflow_nominators() {
+fn topdown_should_not_overflow_guarantors() {
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             let _ = Staking::chill(Origin::signed(10));
@@ -2123,9 +2123,9 @@ fn topdown_should_not_overflow_nominators() {
             bond_validator(2, u64::max_value() / 2);
             bond_validator(4, u64::max_value() / 2);
 
-            /*bond_nominator(6, u64::max_value(),
+            /*bond_guarantor(6, u64::max_value(),
                            vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
-            bond_nominator(8, u64::max_value(),
+            bond_guarantor(8, u64::max_value(),
                            vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);*/
 
             start_era(1);
@@ -2142,15 +2142,15 @@ fn topdown_should_not_overflow_nominators() {
 #[test]
 fn topdown_should_not_overflow_ultimate() {
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             bond_validator(2, u64::max_value());
             bond_validator(4, u64::max_value());
 
-            /*bond_nominator(6, u64::max_value(),
+            /*bond_guarantor(6, u64::max_value(),
                            vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
-            bond_nominator(8, u64::max_value(),
+            bond_guarantor(8, u64::max_value(),
                            vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);*/
 
             start_era(1);
@@ -2158,7 +2158,7 @@ fn topdown_should_not_overflow_ultimate() {
             assert_eq_uvec!(validator_controllers(), vec![4, 2]);
 
             // Saturate.
-            // Nominator's stake should be cut
+            // Guarantor's stake should be cut
             assert_eq!(Staking::stakers(3).total, 838488366986797800);
             assert_eq!(Staking::stakers(5).total, 838488366986797800);
         })
@@ -2535,7 +2535,7 @@ fn invulnerables_are_not_slashed() {
             let exposure = Staking::stakers(&21);
             let initial_balance = Staking::slashable_balance_of(&21);
 
-            let nominator_balances: Vec<_> = exposure
+            let guarantor_balances: Vec<_> = exposure
                 .others
                 .iter()
                 .map(|o| Balances::free_balance(&o.who))
@@ -2563,8 +2563,8 @@ fn invulnerables_are_not_slashed() {
                 2000 - (2 * initial_balance / 10)
             );
 
-            // ensure that nominators were slashed as well.
-            for (initial_balance, other) in nominator_balances.into_iter().zip(exposure.others) {
+            // ensure that guarantors were slashed as well.
+            for (initial_balance, other) in guarantor_balances.into_iter().zip(exposure.others) {
                 assert_eq!(
                     Balances::free_balance(&other.who),
                     initial_balance - (2 * other.value / 10),
@@ -2668,7 +2668,7 @@ fn garbage_collection_after_slashing() {
                 &[Perbill::from_percent(100)],
             );
 
-            // validator and nominator slash in era are garbage-collected by era change,
+            // validator and guarantor slash in era are garbage-collected by era change,
             // so we don't test those here.
 
             assert_eq!(Balances::free_balance(&11), 0);
@@ -2689,7 +2689,7 @@ fn garbage_collection_on_window_pruning() {
 
         let exposure = Staking::stakers(&11);
         assert_eq!(Balances::free_balance(&101), 2000);
-        let nominated_value = exposure.others.iter().find(|o| o.who == 101).unwrap().value;
+        let guaranteed_value = exposure.others.iter().find(|o| o.who == 101).unwrap().value;
 
         on_offence_now(
             &[OffenceDetails {
@@ -2702,26 +2702,26 @@ fn garbage_collection_on_window_pruning() {
         let now = Staking::current_era();
 
         assert_eq!(Balances::free_balance(&11), 900);
-        assert_eq!(Balances::free_balance(&101), 2000 - (nominated_value / 10));
+        assert_eq!(Balances::free_balance(&101), 2000 - (guaranteed_value / 10));
 
         assert!(<Staking as crate::Store>::ValidatorSlashInEra::get(&now, &11).is_some());
-        assert!(<Staking as crate::Store>::NominatorSlashInEra::get(&now, &101).is_some());
+        assert!(<Staking as crate::Store>::GuarantorSlashInEra::get(&now, &101).is_some());
 
         // + 1 because we have to exit the bonding window.
         for era in (0..(BondingDuration::get() + 1)).map(|offset| offset + now + 1) {
             assert!(<Staking as crate::Store>::ValidatorSlashInEra::get(&now, &11).is_some());
-            assert!(<Staking as crate::Store>::NominatorSlashInEra::get(&now, &101).is_some());
+            assert!(<Staking as crate::Store>::GuarantorSlashInEra::get(&now, &101).is_some());
 
             start_era(era);
         }
 
         assert!(<Staking as crate::Store>::ValidatorSlashInEra::get(&now, &11).is_none());
-        assert!(<Staking as crate::Store>::NominatorSlashInEra::get(&now, &101).is_none());
+        assert!(<Staking as crate::Store>::GuarantorSlashInEra::get(&now, &101).is_none());
     })
 }
 
 #[test]
-fn slashing_nominators_by_span_max() {
+fn slashing_guarantors_by_span_max() {
     ExtBuilder::default().build().execute_with(|| {
         start_era(1);
         start_era(2);
@@ -2735,13 +2735,13 @@ fn slashing_nominators_by_span_max() {
         let exposure_11 = Staking::stakers(&11);
         let exposure_21 = Staking::stakers(&21);
         assert_eq!(Balances::free_balance(&101), 2000);
-        let nominated_value_11 = exposure_11
+        let guaranteed_value_11 = exposure_11
             .others
             .iter()
             .find(|o| o.who == 101)
             .unwrap()
             .value;
-        let nominated_value_21 = exposure_21
+        let guaranteed_value_21 = exposure_21
             .others
             .iter()
             .find(|o| o.who == 101)
@@ -2759,7 +2759,7 @@ fn slashing_nominators_by_span_max() {
 
         assert_eq!(Balances::free_balance(&11), 900);
 
-        let slash_1_amount = Perbill::from_percent(10) * nominated_value_11;
+        let slash_1_amount = Perbill::from_percent(10) * guaranteed_value_11;
         assert_eq!(Balances::free_balance(&101), 2000 - slash_1_amount);
 
         let expected_spans = vec![
@@ -2795,7 +2795,7 @@ fn slashing_nominators_by_span_max() {
         assert_eq!(Balances::free_balance(&11), 900);
         assert_eq!(Balances::free_balance(&21), 1700);
 
-        let slash_2_amount = Perbill::from_percent(30) * nominated_value_21;
+        let slash_2_amount = Perbill::from_percent(30) * guaranteed_value_21;
         assert!(slash_2_amount > slash_1_amount);
 
         // only the maximum slash in a single span is taken.
@@ -2816,7 +2816,7 @@ fn slashing_nominators_by_span_max() {
         assert_eq!(Balances::free_balance(&11), 800);
         assert_eq!(Balances::free_balance(&21), 1700);
 
-        let slash_3_amount = Perbill::from_percent(20) * nominated_value_21;
+        let slash_3_amount = Perbill::from_percent(20) * guaranteed_value_21;
         assert!(slash_3_amount < slash_2_amount);
         assert!(slash_3_amount > slash_1_amount);
 
@@ -2911,7 +2911,7 @@ fn deferred_slashes_are_deferred() {
 
             let exposure = Staking::stakers(&11);
             assert_eq!(Balances::free_balance(&101), 2000);
-            let nominated_value = exposure.others.iter().find(|o| o.who == 101).unwrap().value;
+            let guaranteed_value = exposure.others.iter().find(|o| o.who == 101).unwrap().value;
 
             on_offence_now(
                 &[OffenceDetails {
@@ -2939,7 +2939,7 @@ fn deferred_slashes_are_deferred() {
             start_era(4);
 
             assert_eq!(Balances::free_balance(&11), 900);
-            assert_eq!(Balances::free_balance(&101), 2000 - (nominated_value / 10));
+            assert_eq!(Balances::free_balance(&101), 2000 - (guaranteed_value / 10));
         })
 }
 
@@ -2955,7 +2955,7 @@ fn remove_deferred() {
 
             let exposure = Staking::stakers(&11);
             assert_eq!(Balances::free_balance(&101), 2000);
-            let nominated_value = exposure.others.iter().find(|o| o.who == 101).unwrap().value;
+            let guaranteed_value = exposure.others.iter().find(|o| o.who == 101).unwrap().value;
 
             on_offence_now(
                 &[OffenceDetails {
@@ -3001,9 +3001,9 @@ fn remove_deferred() {
 
             let slash_10 = Perbill::from_percent(10);
             let slash_15 = Perbill::from_percent(15);
-            let initial_slash = slash_10 * nominated_value;
+            let initial_slash = slash_10 * guaranteed_value;
 
-            let total_slash = slash_15 * nominated_value;
+            let total_slash = slash_15 * guaranteed_value;
             let actual_slash = total_slash - initial_slash;
 
             // 5% slash (15 - 10) processed now.
@@ -3082,21 +3082,21 @@ fn update_stakers_should_work_new_era() {
         assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 0, active: 0, unlocking: vec![] }));
         assert_eq!(Staking::stakers(11).total, 0);
 
-        // Check nominator
+        // Check guarantor
         if cfg!(feature = "equalize") {
             assert_eq!(Staking::ledger(&100), Some(StakingLedger { stash: 101, total: 0, active: 0, unlocking: vec![]}));
         } else {
             assert_eq!(Staking::ledger(&100), Some(StakingLedger { stash: 101, total: 0, active: 0, unlocking: vec![]}));
         }
 
-        assert_eq!(Staking::nominators(&101), None);*/
+        assert_eq!(Staking::guarantors(&101), None);*/
     });
 }
 
 #[test]
-fn nominate_limit_should_work() {
+fn guarantee_limit_should_work() {
     ExtBuilder::default()
-        .nominate(false)
+        .guarantee(false)
         .build()
         .execute_with(|| {
             Timestamp::set_timestamp(1); // Initialize time.
@@ -3121,18 +3121,18 @@ fn nominate_limit_should_work() {
                 ValidatorPrefs::default()
             ));
 
-            // add nominator
+            // add guarantor
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![(5, 1000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 1000)]));
 
-            // nominator's info nominators should ✅
+            // guarantor's info guarantors should ✅
             assert_eq!(
-                Staking::nominators(&1),
+                Staking::guarantors(&1),
                 Some(Nominations {
                     targets: vec![IndividualExposure { who: 5, value: 500 },],
                     submitted_in: 0,
@@ -3144,7 +3144,7 @@ fn nominate_limit_should_work() {
             start_era(1);
 
             assert_eq!(
-                Staking::nominators(&1),
+                Staking::guarantors(&1),
                 Some(Nominations {
                     targets: vec![IndividualExposure { who: 5, value: 500 }],
                     submitted_in: 0,
@@ -3163,13 +3163,13 @@ fn nominate_limit_should_work() {
                 })
             );
 
-            assert_ok!(Staking::nominate(Origin::signed(2), vec![(5, 2000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 2000)]));
 
-            // Next era, valid and nominators should be ✅
+            // Next era, valid and guarantors should be ✅
             start_era(2);
 
             assert_eq!(
-                Staking::nominators(&1),
+                Staking::guarantors(&1),
                 Some(Nominations {
                     targets: vec![IndividualExposure { who: 5, value: 2000 }],
                     submitted_in: 1,

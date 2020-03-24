@@ -19,7 +19,7 @@ mod inner {
 
     // migrate storage from v0 to v1.
     //
-    // this upgrades the `Nominators` linked_map value type from `Vec<T::AccountId>` to
+    // this upgrades the `Guarantors` linked_map value type from `Vec<T::AccountId>` to
     // `Option<Nominations<T::AccountId, BalanceOf<T>>`
     pub fn to_v1<T: Trait>(version: &mut VersionNumber) {
         if *version != 0 {
@@ -29,7 +29,7 @@ mod inner {
 
         let now = <Module<T>>::current_era();
         let res =
-            <Module<T> as Store>::Nominators::translate::<T::AccountId, Vec<T::AccountId>, _, _>(
+            <Module<T> as Store>::Guarantors::translate::<T::AccountId, Vec<T::AccountId>, _, _>(
                 |key| key,
                 |targets| crate::Nominations {
                     targets: targets
@@ -48,9 +48,9 @@ mod inner {
             );
 
         if let Err(e) = res {
-            frame_support::print("Encountered error in migration of Staking::Nominators map.");
+            frame_support::print("Encountered error in migration of Staking::Guarantors map.");
             if e.is_none() {
-                frame_support::print("Staking::Nominators map reinitialized");
+                frame_support::print("Staking::Guarantors map reinitialized");
             }
         }
 

@@ -1,7 +1,7 @@
 //! Test utilities
 
 use crate::{
-    inflation, EraIndex, GenesisConfig, Module, Nominators, RewardDestination, StakerStatus, Trait,
+    inflation, EraIndex, GenesisConfig, Module, Guarantors, RewardDestination, StakerStatus, Trait,
     ValidatorPrefs,
 };
 use frame_support::{
@@ -223,7 +223,7 @@ impl Trait for Test {
 pub struct ExtBuilder {
     existential_deposit: u64,
     validator_pool: bool,
-    nominate: bool,
+    guarantee: bool,
     validator_count: u32,
     minimum_validator_count: u32,
     slash_defer_duration: EraIndex,
@@ -237,7 +237,7 @@ impl Default for ExtBuilder {
         Self {
             existential_deposit: 0,
             validator_pool: false,
-            nominate: true,
+            guarantee: true,
             validator_count: 2,
             minimum_validator_count: 0,
             slash_defer_duration: 0,
@@ -257,8 +257,8 @@ impl ExtBuilder {
         self.validator_pool = validator_pool;
         self
     }
-    pub fn nominate(mut self, nominate: bool) -> Self {
-        self.nominate = nominate;
+    pub fn guarantee(mut self, guarantee: bool) -> Self {
+        self.guarantee = guarantee;
         self
     }
     pub fn validator_count(mut self, count: u32) -> Self {
@@ -335,7 +335,7 @@ impl ExtBuilder {
         } else {
             StakerStatus::<AccountId, Balance>::Idle
         };
-        let nominated = if self.nominate {
+        let guaranteed = if self.guarantee {
             vec![(11, 250), (21, 250)]
         } else {
             vec![]
@@ -367,12 +367,12 @@ impl ExtBuilder {
                     StakerStatus::<AccountId, Balance>::Validator,
                 ),
                 (41, 40, balance_factor * 1000, status_41),
-                // nominator
+                // guarantor
                 (
                     101,
                     100,
                     balance_factor * 500,
-                    StakerStatus::<AccountId, Balance>::Nominator(nominated),
+                    StakerStatus::<AccountId, Balance>::Guarantor(guaranteed),
                 ),
             ],
             validator_count: self.validator_count,
@@ -437,8 +437,8 @@ pub fn check_exposure_all() {
         .for_each(|acc| check_exposure(acc));
 }
 
-pub fn check_nominator_all() {
-    <Nominators<Test>>::enumerate().for_each(|(acc, _)| check_nominator_exposure(acc));
+pub fn check_guarantor_all() {
+    <Guarantors<Test>>::enumerate().for_each(|(acc, _)| check_guarantor_exposure(acc));
 }
 
 /// Check for each selected validator: expo.total = Sum(expo.other) + expo.own
@@ -454,9 +454,9 @@ pub fn check_exposure(stash: u64) {
     );
 }
 
-/// Check that for each nominator: slashable_balance > sum(used_balance)
-/// Note: we might not consume all of a nominator's balance, but we MUST NOT over spend it.
-pub fn check_nominator_exposure(stash: u64) {
+/// Check that for each guarantor: slashable_balance > sum(used_balance)
+/// Note: we might not consume all of a guarantor's balance, but we MUST NOT over spend it.
+pub fn check_guarantor_exposure(stash: u64) {
     assert_is_stash(stash);
     let mut sum = 0;
     Staking::current_elected()
@@ -468,13 +468,13 @@ pub fn check_nominator_exposure(stash: u64) {
                 .filter(|i| i.who == stash)
                 .for_each(|i| sum += i.value)
         });
-    let nominator_stake = Staking::slashable_balance_of(&stash);
-    // a nominator cannot over-spend.
+    let guarantor_stake = Staking::slashable_balance_of(&stash);
+    // a guarantor cannot over-spend.
     assert!(
-        nominator_stake >= sum,
-        "failed: Nominator({}) stake({}) >= sum divided({})",
+        guarantor_stake >= sum,
+        "failed: Guarantor({}) stake({}) >= sum divided({})",
         stash,
-        nominator_stake,
+        guarantor_stake,
         sum,
     );
 }
@@ -511,7 +511,7 @@ pub fn bond_validator(acc: u64, val: u64) {
     ));
 }
 
-pub fn bond_nominator(acc: u64, val: u64, target: Vec<(u64, u64)>) {
+pub fn bond_guarantor(acc: u64, val: u64, target: Vec<(u64, u64)>) {
     // a = controller
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
@@ -521,7 +521,7 @@ pub fn bond_nominator(acc: u64, val: u64, target: Vec<(u64, u64)>) {
         val,
         RewardDestination::Controller
     ));
-    assert_ok!(Staking::nominate(Origin::signed(acc), target));
+    assert_ok!(Staking::guarantee(Origin::signed(acc), target));
 }
 
 pub fn advance_session() {

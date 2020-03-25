@@ -37,7 +37,8 @@ mod inner {
                         .map(|t| {
                             crate::IndividualExposure {
                                 who: t.clone(),
-                                // TODO: This is wrong, but we don't have migration, so we don't care 😈
+                                // TODO: This is wrong, but we don't have migration,
+                                // so we don't care 😈
                                 value: Zero::zero(),
                             }
                         })

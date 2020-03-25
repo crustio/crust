@@ -78,13 +78,13 @@ fn basic_setup_works() {
         // Account 1 does not control any stash
         assert_eq!(Staking::ledger(&1), None);
 
-        // ValidatorPrefs are default
+        // Validations are default
         assert_eq!(
             <Validators<Test>>::enumerate().collect::<Vec<_>>(),
             vec![
-                (31, ValidatorPrefs::default()),
-                (21, ValidatorPrefs::default()),
-                (11, ValidatorPrefs::default())
+                (31, Validations::default()),
+                (21, Validations::default()),
+                (11, Validations::default())
             ]
         );
 
@@ -204,7 +204,7 @@ fn change_controller_works() {
         start_era(1);
 
         assert_noop!(
-            Staking::validate(Origin::signed(10), ValidatorPrefs::default()),
+            Staking::validate(Origin::signed(10), Validations::default()),
             Error::<Test>::NotController,
         );
         assert_ok!(Staking::validate(
@@ -1252,7 +1252,7 @@ fn validator_payment_prefs_work() {
         <Payee<Test>>::insert(&2, RewardDestination::Stash);
         <Validators<Test>>::insert(
             &11,
-            ValidatorPrefs {
+            Validations {
                 commission: Perbill::from_percent(50),
             },
         );

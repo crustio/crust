@@ -2,7 +2,7 @@
 
 use crate::{
     inflation, EraIndex, GenesisConfig, Module, Guarantors, RewardDestination, StakerStatus, Trait,
-    ValidatorPrefs,
+    Validations,
 };
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,

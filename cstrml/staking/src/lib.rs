@@ -1131,7 +1131,7 @@ impl<T: Trait> Module<T> {
     fn upsert_guarantee(v_stash: &T::AccountId,
                         g_stash: &T::AccountId,
                         g_votes: BalanceOf<T>) -> bool {
-        if !<Validators<T>>::exists(v_stash) || <Validators<T>>::exists(g_stash) {
+        if !<Validators<T>>::exists(v_stash) || g_stash == v_stash {
             // v_stash is not validator or you want to vote your self
             // you vote NOTHING 🙂
             return false;

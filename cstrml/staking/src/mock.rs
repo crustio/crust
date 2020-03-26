@@ -2,7 +2,7 @@
 
 use crate::{
     inflation, EraIndex, GenesisConfig, Module, Guarantors, RewardDestination, StakerStatus, Trait,
-    ValidatorPrefs,
+    Validations,
 };
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
@@ -507,7 +507,7 @@ pub fn bond_validator(acc: u64, val: u64) {
     Staking::upsert_stake_limit(&(acc + 1), u64::max_value());
     assert_ok!(Staking::validate(
         Origin::signed(acc),
-        ValidatorPrefs::default()
+        Perbill::default()
     ));
 }
 

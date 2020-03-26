@@ -32,16 +32,7 @@ mod inner {
             <Module<T> as Store>::Guarantors::translate::<T::AccountId, Vec<T::AccountId>, _, _>(
                 |key| key,
                 |targets| crate::Nominations {
-                    targets: targets
-                        .iter()
-                        .map(|t| {
-                            crate::IndividualExposure {
-                                who: t.clone(),
-                                // TODO: This is wrong, but we don't have migration, so we don't care 😈
-                                value: Zero::zero(),
-                            }
-                        })
-                        .collect::<Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>>(),
+                    targets,
                     submitted_in: now,
                     suppressed: false,
                 },

@@ -78,13 +78,19 @@ fn basic_setup_works() {
         // Account 1 does not control any stash
         assert_eq!(Staking::ledger(&1), None);
 
-        // ValidatorPrefs are default
+        // Validations are default
         assert_eq!(
             <Validators<Test>>::enumerate().collect::<Vec<_>>(),
             vec![
-                (31, ValidatorPrefs::default()),
-                (21, ValidatorPrefs::default()),
-                (11, ValidatorPrefs::default())
+                (31, Validations::default()),
+                (21, Validations {
+                    commission: Perbill::default(),
+                    guarantors: vec![101]
+                }),
+                (11, Validations {
+                    commission: Perbill::default(),
+                    guarantors: vec![101]
+                })
             ]
         );
 
@@ -100,16 +106,15 @@ fn basic_setup_works() {
         );
         assert_eq!(
             Staking::guarantors(101).unwrap().targets,
-            vec![
-                IndividualExposure {
-                    who: 11,
-                    value: 250
-                },
-                IndividualExposure {
-                    who: 21,
-                    value: 250
-                }
-            ]
+            vec![11, 21]
+        );
+        assert_eq!(
+            Staking::guarantee_rel(vec![(101, 11)]),
+            Some(250)
+        );
+        assert_eq!(
+            Staking::guarantee_rel(vec![(101, 21)]),
+            Some(250)
         );
 
         if cfg!(feature = "equalize") {
@@ -204,12 +209,12 @@ fn change_controller_works() {
         start_era(1);
 
         assert_noop!(
-            Staking::validate(Origin::signed(10), ValidatorPrefs::default()),
+            Staking::validate(Origin::signed(10), Perbill::default()),
             Error::<Test>::NotController,
         );
         assert_ok!(Staking::validate(
             Origin::signed(5),
-            ValidatorPrefs::default()
+            Perbill::default()
         ));
     })
 }
@@ -393,7 +398,7 @@ fn staking_should_work() {
             Staking::upsert_stake_limit(&3, u64::max_value());
             assert_ok!(Staking::validate(
                 Origin::signed(4),
-                ValidatorPrefs::default()
+                Perbill::default()
             ));
 
             // No effects will be seen so far.
@@ -639,7 +644,7 @@ fn nominating_and_rewards_should_work() {
                         .iter()
                         .map(|e| e.who)
                         .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                    vec![1, 3]
                 );
                 // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
                 // TODO: tmp change for equalize strategy(with voting to candidates)
@@ -660,7 +665,7 @@ fn nominating_and_rewards_should_work() {
                         .iter()
                         .map(|e| e.who)
                         .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                    vec![1, 3]
                 );
             } else {
                 // total expo of 10, with 1200 coming from guarantors (externals), according to phragmen.
@@ -814,7 +819,7 @@ fn guarantors_also_get_slashed() {
                 let _ = Balances::make_free_balance_be(i, initial_balance);
             }
 
-            // 2 will guarantee for 10, 20
+            // 2 want to guarantee for 10, 20
             let guarantor_stake = 500;
             assert_ok!(Staking::bond(
                 Origin::signed(1),
@@ -822,10 +827,18 @@ fn guarantors_also_get_slashed() {
                 guarantor_stake,
                 RewardDestination::default()
             ));
-            assert_ok!(Staking::guarantee(
-                Origin::signed(2),
-                vec![(20, 250), (10, 250)]
-            ));
+            // but it won't work, cause 10&20 are not validators
+            assert_noop!(
+                Staking::guarantee(
+                    Origin::signed(2),
+                    vec![(20, 250), (10, 250)]
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 4,
+                    message: Some("EmptyTargets"),
+                }
+            );
 
             let total_payout = current_total_payout_for_duration(3000);
             assert!(total_payout > 100); // Test is meaningfull if reward something
@@ -902,7 +915,7 @@ fn double_staking_should_fail() {
         // 2 = controller  => nominating should work.
         assert_ok!(Staking::guarantee(
             Origin::signed(2),
-            vec![(1, arbitrary_value),]
+            vec![(11, arbitrary_value),]
         ));
     });
 }
@@ -1252,8 +1265,9 @@ fn validator_payment_prefs_work() {
         <Payee<Test>>::insert(&2, RewardDestination::Stash);
         <Validators<Test>>::insert(
             &11,
-            ValidatorPrefs {
+            Validations {
                 commission: Perbill::from_percent(50),
+                guarantors: vec![]
             },
         );
 
@@ -1688,10 +1702,8 @@ fn on_free_balance_zero_stash_removes_guarantor() {
         .existential_deposit(10)
         .build()
         .execute_with(|| {
-            Staking::upsert_stake_limit(&20, 2000);
-
             // Make 10 a guarantor
-            assert_ok!(Staking::guarantee(Origin::signed(10), vec![(20, 100),]));
+            assert_ok!(Staking::guarantee(Origin::signed(10), vec![(21, 100)]));
             // Check that account 10 is a guarantor
             assert!(<Guarantors<Test>>::exists(11));
             // Check the balance of the guarantor account
@@ -1766,6 +1778,18 @@ fn switching_roles() {
                 let _ = Balances::deposit_creating(&i, 5000);
             }
 
+            // add a new validator candidate
+            assert_ok!(Staking::bond(
+                Origin::signed(5),
+                6,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(
+                Origin::signed(6),
+                Perbill::default()
+            ));
+
             // add 2 guarantors
             assert_ok!(Staking::bond(
                 Origin::signed(1),
@@ -1789,18 +1813,6 @@ fn switching_roles() {
                 vec![(21, 250), (1, 250),]
             ));
 
-            // add a new validator candidate
-            assert_ok!(Staking::bond(
-                Origin::signed(5),
-                6,
-                1000,
-                RewardDestination::Controller
-            ));
-            assert_ok!(Staking::validate(
-                Origin::signed(6),
-                ValidatorPrefs::default()
-            ));
-
             // new block
             start_session(1);
 
@@ -1822,7 +1834,7 @@ fn switching_roles() {
             // 2 decides to be a validator. Consequences:
             assert_ok!(Staking::validate(
                 Origin::signed(2),
-                ValidatorPrefs::default()
+                Perbill::default()
             ));
             // new stakes:
             // 10: 1000 self vote
@@ -1971,7 +1983,7 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
             Staking::upsert_stake_limit(&1, u64::max_value());
             assert_ok!(Staking::validate(
                 Origin::signed(2),
-                ValidatorPrefs::default()
+                Perbill::default()
             ));
 
             let total_payout_0 = current_total_payout_for_duration(3000);
@@ -3118,7 +3130,7 @@ fn guarantee_limit_should_work() {
             ));
             assert_ok!(Staking::validate(
                 Origin::signed(6),
-                ValidatorPrefs::default()
+                Perbill::default()
             ));
 
             // add guarantor
@@ -3134,10 +3146,14 @@ fn guarantee_limit_should_work() {
             assert_eq!(
                 Staking::guarantors(&1),
                 Some(Nominations {
-                    targets: vec![IndividualExposure { who: 5, value: 500 },],
+                    targets: vec![5],
                     submitted_in: 0,
                     suppressed: false
                 })
+            );
+            assert_eq!(
+                Staking::guarantee_rel(vec![(1, 5)]),
+                Some(500)
             );
 
             // After a era, valid stake should updated.
@@ -3146,10 +3162,14 @@ fn guarantee_limit_should_work() {
             assert_eq!(
                 Staking::guarantors(&1),
                 Some(Nominations {
-                    targets: vec![IndividualExposure { who: 5, value: 500 }],
+                    targets: vec![5],
                     submitted_in: 0,
                     suppressed: false
                 })
+            );
+            assert_eq!(
+                Staking::guarantee_rel(vec![(1, 5)]),
+                Some(500)
             );
 
             assert_eq!(
@@ -3171,10 +3191,14 @@ fn guarantee_limit_should_work() {
             assert_eq!(
                 Staking::guarantors(&1),
                 Some(Nominations {
-                    targets: vec![IndividualExposure { who: 5, value: 2000 }],
+                    targets: vec![5],
                     submitted_in: 1,
                     suppressed: false
                 })
+            );
+            assert_eq!(
+                Staking::guarantee_rel(vec![(1, 5)]),
+                Some(2000)
             );
 
             assert_eq!(

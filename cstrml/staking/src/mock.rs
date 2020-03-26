@@ -507,7 +507,7 @@ pub fn bond_validator(acc: u64, val: u64) {
     Staking::upsert_stake_limit(&(acc + 1), u64::max_value());
     assert_ok!(Staking::validate(
         Origin::signed(acc),
-        ValidatorPrefs::default()
+        Perbill::default()
     ));
 }
 

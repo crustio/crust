@@ -1466,7 +1466,7 @@ impl<T: Trait> Module<T> {
             let mut v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
             let v_limit_stakes = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
-            let mut v_own_stakes = v_ledger.active.min(v_limit_stakes);
+            let v_own_stakes = v_ledger.active.min(v_limit_stakes);
             let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             let mut v_guarantors_votes = 0;
             let mut new_guarantors: Vec<T::AccountId> = vec![];

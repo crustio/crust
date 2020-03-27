@@ -847,7 +847,7 @@ decl_module! {
                 validations.guarantors = Self::validators(&stash).guarantors;
             }
 
-            <Guarantors<T>>::remove(stash);
+            Self::chill_guarantor(stash);
             <Validators<T>>::insert(stash, validations);
         }
 
@@ -869,7 +869,7 @@ decl_module! {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let g_stash = &ledger.stash;
-            let mut total_stake = ledger.total;
+            let mut remain_stake = ledger.total;
             ensure!(!targets.is_empty(), Error::<T>::EmptyTargets);
 
             let mut old_targets: Vec<T::AccountId> = vec![];
@@ -891,13 +891,18 @@ decl_module! {
                                 break
                             }
                         }
-                        if total_stake == Zero::zero() {
+                        if remain_stake == Zero::zero() {
                             None
                         } else {
-                            let g_votes = s.min(total_stake);
-                            if total_stake <= s { total_stake = Zero::zero(); }
+                            let g_votes = s.min(remain_stake);
 
-                            if Self::upsert_guarantee(&v_stash, &g_stash, g_votes) {
+                            let (upserted, real_votes) =
+                            Self::upsert_guarantee(&v_stash, &g_stash, g_votes);
+
+                            if upserted {
+                                // Update remain_stake
+                                if remain_stake <= real_votes { remain_stake = Zero::zero(); }
+                                else { remain_stake -= real_votes; }
                                 Some(v_stash)
                             } else {
                                 None
@@ -1117,6 +1122,30 @@ impl<T: Trait> Module<T> {
 
     // MUTABLES (DANGEROUS)
 
+    /// Remove validator, should remove all edges
+    fn chill_validator(v_stash: &T::AccountId) {
+        let validations = Self::validators(v_stash);
+
+        for guarantor in validations.guarantors {
+            let edge = vec![(guarantor, v_stash.clone())];
+            <GuaranteeRel<T>>::remove(&edge);
+        }
+
+        <Validators<T>>::remove(v_stash);
+    }
+
+    /// Remove guarantor, should remove all edges
+    fn chill_guarantor(g_stash: &T::AccountId) {
+        if let Some(nominations) = Self::guarantors(g_stash) {
+            for target in nominations.targets {
+                let edge = vec![(g_stash.clone(), target)];
+                <GuaranteeRel<T>>::remove(&edge);
+            }
+
+            <Guarantors<T>>::remove(g_stash);
+        }
+    }
+
     /// Update or insert an edge from {validator <-> candidate}
     /// basically, this update the UWG(Undirected Weighted Graph) with weight-limitation per node
     ///
@@ -1130,11 +1159,11 @@ impl<T: Trait> Module<T> {
     /// # </weight>
     fn upsert_guarantee(v_stash: &T::AccountId,
                         g_stash: &T::AccountId,
-                        g_votes: BalanceOf<T>) -> bool {
+                        g_votes: BalanceOf<T>) -> (bool, BalanceOf<T>) {
         if !<Validators<T>>::exists(v_stash) || g_stash == v_stash {
             // v_stash is not validator or you want to vote your self
             // you vote NOTHING 🙂
-            return false;
+            return (false, Zero::zero());
         }
         let edge = vec![(g_stash.clone(), v_stash.clone())];
         let validations = Self::validators(v_stash);
@@ -1144,11 +1173,11 @@ impl<T: Trait> Module<T> {
             // 1. Existed edge
             if g_old_votes == g_votes {
                 // a. safe and sound, do NOTHING 🙂
-                return true
+                return (true, g_votes)
             } else if g_old_votes > g_votes {
                 // b. guarantor reduce his stake: just update edge's weight
                 <GuaranteeRel<T>>::insert(&edge, g_votes);
-                return true
+                return (true, g_votes)
             } else {
                 // c. guarantor increase his stake: remove it first
                 new_guarantors.remove_item(g_stash);
@@ -1181,11 +1210,11 @@ impl<T: Trait> Module<T> {
             // c. New edge
             let new_weight = (v_limit - v_total_stakes).min(g_votes);
             <GuaranteeRel<T>>::insert(&edge, new_weight);
-            return true
+            return (true, new_weight)
         }
 
         // Or insert failed, cause there has no credit
-        return false
+        return (false, Zero::zero())
     }
 
     /// Insert new or update old stake limit
@@ -1211,8 +1240,8 @@ impl<T: Trait> Module<T> {
 
     /// Chill a stash account.
     fn chill_stash(stash: &T::AccountId) {
-        <Validators<T>>::remove(stash);
-        <Guarantors<T>>::remove(stash);
+        Self::chill_validator(stash);
+        Self::chill_guarantor(stash);
     }
 
     /// Ensures storage is upgraded to most recent necessary state.
@@ -1437,67 +1466,58 @@ impl<T: Trait> Module<T> {
             let mut v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
             let v_limit_stakes = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
-            let mut v_own_stakes = v_ledger.active;
+            let mut v_own_stakes = v_ledger.active.min(v_limit_stakes);
             let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             let mut v_guarantors_votes = 0;
             let mut new_guarantors: Vec<T::AccountId> = vec![];
 
-            if v_own_stakes >= v_limit_stakes {
-                // 1. There has no credit for guarantors
-                v_own_stakes = v_limit_stakes;
-            } else {
-                // TODO: move a separated function
-                let mut remains = to_votes(v_limit_stakes - v_own_stakes);
-                let guarantors = &validations.guarantors;
+            // TODO: move a separated function
+            let mut remains = to_votes(v_limit_stakes - v_own_stakes);
+            let guarantors = &validations.guarantors;
 
-                for guarantor in guarantors {
-                    let edge = vec![(guarantor.clone(), v_stash.clone())];
-                    let votes = to_votes(Self::guarantee_rel(&edge).unwrap_or_default());
+            for guarantor in guarantors {
+                let edge = vec![(guarantor.clone(), v_stash.clone())];
+                let votes = to_votes(Self::guarantee_rel(&edge).unwrap_or_default());
 
-                    if remains > 0 && <Guarantors<T>>::exists(guarantor) {
-                        // 2. There still has credit for guarantors
-                        // we should using `FILO` rule to calculate others
-                        let g_vote_stakes = to_balance(remains.min(votes));
+                // 1. There still has credit for guarantors
+                // we should using `FILO` rule to calculate others
+                if remains > 0 {
+                    let g_vote_stakes = to_balance(remains.min(votes));
 
-                        // a. preparing new_guarantors for `Validators`, others for `Stakers`
-                        new_guarantors.push(guarantor.clone());
-                        others.push(IndividualExposure {
-                            who: guarantor.clone(),
-                            value: g_vote_stakes,
-                        });
-                        // b. update remains and guarantors votes
-                        remains -= votes;
-                        v_guarantors_votes += votes;
+                    // a. preparing new_guarantors for `Validators`, others for `Stakers`
+                    new_guarantors.push(guarantor.clone());
+                    others.push(IndividualExposure {
+                        who: guarantor.clone(),
+                        value: g_vote_stakes,
+                    });
+                    // b. update remains and guarantors votes
+                    remains -= votes;
+                    v_guarantors_votes += votes;
 
-                        // c. UPDATE EDGE: (maybe) update GuaranteeRel
-                        <GuaranteeRel<T>>::insert(&edge, g_vote_stakes);
-                    } else {
-                        // 3. There has no credit for later guarantors
-                        // or guarantor already chilled, update `Guarantors`
-                        // and remove `GuaranteeRel`
+                    // c. UPDATE EDGE: (maybe) update GuaranteeRel
+                    <GuaranteeRel<T>>::insert(&edge, g_vote_stakes);
 
-                        // a. UPDATE NODE: update `Guarantors`
-                        if let Some(mut nominations) = Self::guarantors(guarantor) {
-                            nominations.targets.remove_item(v_stash);
-                            <Guarantors<T>>::insert(guarantor, nominations);
-                        }
-                        // b. UPDATE EDGE: delete edge
-                        <GuaranteeRel<T>>::remove(&edge);
+                // 2. There has no credit for later guarantors
+                // or guarantor already chilled, update `Guarantors`
+                // and remove `GuaranteeRel`
+                } else {
+                    // a. UPDATE NODE: update `Guarantors`
+                    if let Some(mut nominations) = Self::guarantors(guarantor) {
+                        nominations.targets.remove_item(v_stash);
+                        <Guarantors<T>>::insert(guarantor, nominations);
                     }
+                    // b. UPDATE EDGE: delete edge
+                    <GuaranteeRel<T>>::remove(&edge);
                 }
             }
 
-            // 3. UPDATE NODE: `Validator`
-            let new_validations = Validations {
-                commission: validations.commission,
-                guarantors: new_guarantors
-            };
-            <Validators<T>>::insert(v_stash, new_validations);
-
+            // 3. Update validator's ledger
             v_ledger.valid = v_own_stakes;
             Self::update_ledger(&v_controller, &v_ledger);
 
-            // 4. Update next era's snapshot `Stakers`
+            // 4. Update next era's snapshot `Stakers` and `Validators`
+            <Stakers<T>>::remove(v_stash);
+
             if v_ledger.valid == Zero::zero() {
                 // a. remove validator if valid stake goes 0
                 <Validators<T>>::remove(v_stash);
@@ -1520,6 +1540,13 @@ impl<T: Trait> Module<T> {
 
                 // d. update snapshot
                 <Stakers<T>>::insert(v_stash, exposure);
+
+                // e. UPDATE NODE: `Validator`
+                let new_validations = Validations {
+                    commission: validations.commission,
+                    guarantors: new_guarantors
+                };
+                <Validators<T>>::insert(v_stash, new_validations);
             }
         }
 
@@ -1539,17 +1566,19 @@ impl<T: Trait> Module<T> {
                     .map_or(true, |spans| submitted_in >= spans.last_start())
             });*/
 
-            // init all guarantor's valid stakes, set to zero
+            // 1. Init all guarantor's valid stakes
             let g_controller = Self::bonded(&g_stash).unwrap();
             let mut g_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&g_controller).unwrap();
             let mut g_valid_stake_votes = Zero::zero();
 
+            // 2. Sum up all valid votes
             for v_stash in targets {
                 let edge = vec![(g_stash.clone(), v_stash)];
                 g_valid_stake_votes += Self::guarantee_rel(&edge).unwrap_or_default();
             }
 
+            // 3. Update guarantor's ledger
             g_ledger.valid = g_valid_stake_votes;
             Self::update_ledger(&g_controller, &g_ledger);
         });
@@ -1607,8 +1636,8 @@ impl<T: Trait> Module<T> {
             <Ledger<T>>::remove(&controller);
         }
         <Payee<T>>::remove(stash);
-        <Validators<T>>::remove(stash);
-        <Guarantors<T>>::remove(stash);
+        Self::chill_validator(stash);
+        Self::chill_guarantor(stash);
 
         slashing::clear_stash_metadata::<T>(stash);
     }

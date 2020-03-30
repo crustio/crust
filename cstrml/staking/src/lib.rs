@@ -1482,7 +1482,8 @@ impl<T: Trait> Module<T> {
                 // 1. There still has credit for guarantors
                 // we should using `FILO` rule to calculate others
                 if remains > 0 {
-                    let g_vote_stakes = to_balance(remains.min(votes));
+                    let g_real_votes = remains.min(votes);
+                    let g_vote_stakes = to_balance(g_real_votes);
 
                     // a. preparing new_guarantors for `Validators`, others for `Stakers`
                     new_guarantors.push(guarantor.clone());
@@ -1491,8 +1492,8 @@ impl<T: Trait> Module<T> {
                         value: g_vote_stakes,
                     });
                     // b. update remains and guarantors votes
-                    remains -= votes;
-                    v_guarantors_votes += votes;
+                    remains -= g_real_votes;
+                    v_guarantors_votes += g_real_votes;
 
                     // c. UPDATE EDGE: (maybe) update GuaranteeRel
                     <GuaranteeRel<T>>::insert(&edge, g_vote_stakes);

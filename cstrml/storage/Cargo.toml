@@ -1,0 +1,47 @@
+[package]
+name = "cstrml-storage"
+version = "0.1.0"
+authors = ["crustio"]
+edition = "2020"
+
+# Keep them same with tee in the first version
+[dependencies]
+codec = { default-features = false, package = 'parity-scale-codec', version = '1.0.0' }
+frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+serde = { optional = true, version = '1.0.101' }
+serde_json = "1.0.44"
+signatory = "0.18.0"
+signatory-ring = "0.18.0"
+sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+sp-runtime-interface = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+system = { package = 'frame-system', default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+
+# Crust runtime modules
+primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
+
+[features]
+default = ['std']
+std = [
+    'serde',
+    'codec/std',
+    'frame-support/std',
+    'sp-core/std',
+    'sp-io/std',
+    'sp-runtime/std',
+    'sp-std/std',
+    'system/std',
+    'sp-runtime-interface/std',
+    'primitives/std',
+]
+
+[dev-dependencies]
+sp-staking = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+session = { package = 'pallet-session', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+balances = { package = 'pallet-balances', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+timestamp = { package = 'pallet-timestamp', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+pallet-staking-reward-curve = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+hex = '0.4.0'

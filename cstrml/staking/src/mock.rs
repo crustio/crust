@@ -188,7 +188,7 @@ impl pallet_timestamp::Trait for Test {
 }
 impl tee::Trait for Test {
     type Event = ();
-    type OnReportWorks = ();
+    type OnReportWorks = Staking;
 }
 pallet_staking_reward_curve::build! {
     const I_NPOS: PiecewiseLinear<'static> = curve!(

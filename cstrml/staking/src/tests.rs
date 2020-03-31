@@ -1133,6 +1133,7 @@ fn reward_destination_works() {
         .build()
         .execute_with(|| {
             // Check that account 11 is a validator
+            // Account 11's limit is 2000
             assert!(Staking::current_elected().contains(&11));
             // Check the balance of the validator account
             assert_eq!(Balances::free_balance(&10), 1);
@@ -1155,6 +1156,7 @@ fn reward_destination_works() {
             assert!(total_payout_0 > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
+            // After an era, stake limit should up far more than 1000 + total_payout_0
             start_era(1);
 
             // Check that RewardDestination is Staked (default)
@@ -3183,6 +3185,7 @@ fn guarantee_limit_should_work() {
                 })
             );
 
+            Staking::upsert_stake_limit(&5, 5000);
             assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 2000)]));
 
             // Next era, valid and guarantors should be ✅

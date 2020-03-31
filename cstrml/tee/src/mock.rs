@@ -49,6 +49,7 @@ impl system::Trait for Test {
 
 impl Trait for Test {
     type Event = ();
+    type OnReportWorks = ();
 }
 
 pub type Tee = Module<Test>;

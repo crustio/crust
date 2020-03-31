@@ -342,7 +342,7 @@ where
     }
 }
 
-pub trait Trait: frame_system::Trait {
+pub trait Trait: frame_system::Trait + tee::Trait {
     /// The staking balance.
     type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
@@ -1435,6 +1435,9 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> (BalanceOf<T>, Option<Vec<T::AccountId>>) {
+        // Update all tee identities work report
+        <tee::Module<T>>::update_identities();
+
         let validators: Vec<(T::AccountId, Validations<T::AccountId>)> =
             <Validators<T>>::enumerate().collect();
         let validator_count = validators.len();

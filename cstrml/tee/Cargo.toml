@@ -20,7 +20,6 @@ system = { package = 'frame-system', default-features = false, git = 'https://gi
 
 # Crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
-cstrml-session = { package = 'cstrml-session', path = '../session', default-features = false }
 
 [features]
 default = ['std']
@@ -34,13 +33,11 @@ std = [
     'sp-std/std',
     'system/std',
     'sp-runtime-interface/std',
-    'primitives/std',
-    'cstrml-session/std'
+    'primitives/std'
 ]
 
 [dev-dependencies]
 sp-staking = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-session = { package = 'pallet-session', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 balances = { package = 'pallet-balances', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 timestamp = { package = 'pallet-timestamp', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 pallet-staking-reward-curve = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }

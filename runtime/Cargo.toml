@@ -7,9 +7,9 @@ build = 'build.rs'
 
 [dependencies]
 tee = { package = 'cstrml-tee', path = '../cstrml/tee', default_features = false }
-session = { package = 'cstrml-session', path = '../cstrml/session', default_features = false }
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default_features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default_features = false }
+
 
 [dependencies.authorship]
 default-features = false
@@ -223,6 +223,13 @@ version = '2.0.0'
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'frame-system'
+rev = '3e651110aa06aa835790df63410a29676243fc54'
+version = '2.0.0'
+
+[dependencies.session]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'pallet-session'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
 

@@ -26,7 +26,6 @@ trie-root = '0.15.2'
 
 # Crust runtime modules
 cstrml-staking = { path = 'cstrml/staking', version = '0.2.1' }
-cstrml-session = { path = 'cstrml/session', version = '0.2.1' }
 cstrml-tee = { path = 'cstrml/tee', version = '0.2.1' }
 primitives = { package = 'cst-primitives', path = 'primitives', version = '0.2.1' }
 

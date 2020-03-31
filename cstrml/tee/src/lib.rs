@@ -172,7 +172,8 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    fn update_identities() {
+    // PUBLIC MUTABLES
+    pub fn update_identities() {
         let ids: Vec<(T::AccountId, Identity<T::AccountId>)> = <TeeIdentities<T>>::enumerate().collect();
 
         for (controller, _) in ids {
@@ -257,12 +258,6 @@ impl<T: Trait> Module<T> {
             wr.meaningful_workload,
             &wr.sig,
         )
-    }
-}
-
-impl<T: Trait> cstrml_session::OnSessionChecking for Module<T> {
-    fn on_session_checking(_: u32, _: u32) {
-        Self::update_identities();
     }
 }
 

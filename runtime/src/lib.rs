@@ -226,7 +226,6 @@ impl session::Trait for Runtime {
     type ValidatorIdOf = staking::StashOf<Self>;
     type ShouldEndSession = Babe;
     type OnSessionEnding = Staking;
-    type OnSessionChecking = Tee;
     type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
@@ -432,10 +431,10 @@ impl balances::Trait for Runtime {
     type OnFreeBalanceZero = Staking;
     /// What to do if a new account is created.
     type OnNewAccount = Indices;
-    type TransferPayment = ();
-    type DustRemoval = ();
     /// The ubiquitous event type.
     type Event = Event;
+    type DustRemoval = ();
+    type TransferPayment = ();
     type ExistentialDeposit = ExistentialDeposit;
     type TransferFee = TransferFee;
     type CreationFee = CreationFee;
@@ -480,7 +479,7 @@ construct_runtime!(
 
         // Consensus support
         Authorship: authorship::{Module, Call, Storage},
-        Staking: staking::{Module, Call, Storage, Config<T>, Event<T>},
+        Staking: staking,
         Session: session::{Module, Call, Storage, Event, Config<T>},
         FinalityTracker: finality_tracker::{Module, Call, Inherent},
         Grandpa: grandpa::{Module, Call, Storage, Config, Event},

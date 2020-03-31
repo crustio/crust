@@ -43,6 +43,12 @@ pub use timestamp::Call as TimestampCall;
 /// Crust primitives
 use primitives::{constants::time::*, *};
 
+use cstrml_staking as staking;
+/// Crust runtime modules
+use cstrml_tee as tee;
+
+use cstrml_storage as storage_order;
+
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;
 
@@ -459,6 +465,11 @@ impl tee::Trait for Runtime {
     type OnReportWorks = Staking;
 }
 
+
+impl storage_order::Trait for Runtime {
+    type Event = Event;
+}
+
 construct_runtime!(
     pub enum Runtime where
         Block = Block,
@@ -497,6 +508,7 @@ construct_runtime!(
 
         // Crust modules
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
+        StorageOrder: storage_order::{Module, Call, Storage, Event<T>, Config<T>},
     }
 );
 

@@ -6,8 +6,8 @@ version = '0.2.1'
 build = 'build.rs'
 
 [dependencies]
-cstrml-tee = { path = '../cstrml/tee', default_features = false }
-cstrml-staking = { path = '../cstrml/staking', default_features = false }
+tee = { package = 'cstrml-tee', path = '../cstrml/tee', default_features = false }
+staking = { package = 'cstrml-staking', path = '../cstrml/staking', default_features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default_features = false }
 
 
@@ -299,8 +299,8 @@ std = [
     'treasury/std',
     'transaction-payment/std',
     'sp-runtime-interface/std',
-    'cstrml-tee/std',
-    'cstrml-staking/std',
+    'tee/std',
+    'staking/std',
     'primitives/std'
 ]
 

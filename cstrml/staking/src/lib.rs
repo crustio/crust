@@ -1107,14 +1107,13 @@ impl<T: Trait> Module<T> {
             .unwrap_or_default()
     }
 
-    fn stake_limit_of(workloads: u128) -> BalanceOf<T> {
-        let total_workloads = <tee::Module<T>>::workloads().unwrap();
+    fn stake_limit_of(own_workloads: u128, total_workloads: u128) -> BalanceOf<T> {
         let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
             .ok()
             .unwrap();
 
         // total_workloads cannot be zero, or system go panic!
-        let workloads_to_stakes = ((workloads * total_issuance / total_workloads / 2) as u128)
+        let workloads_to_stakes = ((own_workloads * total_issuance / total_workloads / 2) as u128)
             .min(u64::max_value() as u128);
 
         workloads_to_stakes.try_into().ok().unwrap()
@@ -1436,8 +1435,8 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> (BalanceOf<T>, Option<Vec<T::AccountId>>) {
-        // Update all stake limit anyway
-        Self::update_all_stake_limit();
+        // Update all tee identities work report
+        <tee::Module<T>>::update_identities();
 
         let validators: Vec<(T::AccountId, Validations<T::AccountId>)> =
             <Validators<T>>::enumerate().collect();
@@ -1643,26 +1642,12 @@ impl<T: Trait> Module<T> {
         slashing::clear_stash_metadata::<T>(stash);
     }
 
-    /// This function will update all the work reporters' stake limit
-    ///
-    /// # <weight>
-    /// - Independent of the arguments. Insignificant complexity.
-    /// - O(n).
-    /// - 2n+1 DB entry.
-    /// # </weight>
-    fn update_all_stake_limit() {
-        // 1. Get all work reports
-        let ids = <tee::TeeIdentities<T>>::enumerate().collect::<Vec<_>>();
-
-        for (controller, _) in ids {
-            // 2. Get controller's (maybe)ledger
-            let maybe_ledger = Self::ledger(&controller);
-            if let Some(ledger) = maybe_ledger {
-                let workload = <tee::Module<T>>::get_and_update_workload(&controller);
-
-                // 3. Update stake limit anyway
-                Self::upsert_stake_limit(&ledger.stash, Self::stake_limit_of(workload));
-            }
+    /// This function will update the controller's stake limit
+    fn update_stake_limit(controller: &T::AccountId, own_workloads: u128, total_workloads: u128) {
+        if let Some(ledger) = Self::ledger(&controller) {
+            Self::upsert_stake_limit(
+                &ledger.stash,
+                Self::stake_limit_of(own_workloads, total_workloads));
         }
     }
 
@@ -1725,6 +1710,12 @@ impl<T: Trait> pallet_session::OnSessionEnding<T::AccountId> for Module<T> {
     ) -> Option<Vec<T::AccountId>> {
         Self::ensure_storage_upgraded();
         Self::new_session(start_session - 1).map(|(new, _old)| new)
+    }
+}
+
+impl<T: Trait> tee::OnReportWorks<T::AccountId> for Module<T> {
+    fn on_report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
+        Self::update_stake_limit(controller, own_workload, total_workload);
     }
 }
 

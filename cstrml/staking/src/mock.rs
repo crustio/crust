@@ -119,9 +119,9 @@ parameter_types! {
 }
 impl frame_system::Trait for Test {
     type Origin = Origin;
+    type Call = ();
     type Index = u64;
     type BlockNumber = BlockNumber;
-    type Call = ();
     type Hash = H256;
     type Hashing = ::sp_runtime::traits::BlakeTwo256;
     type AccountId = AccountId;
@@ -130,8 +130,8 @@ impl frame_system::Trait for Test {
     type Event = ();
     type BlockHashCount = BlockHashCount;
     type MaximumBlockWeight = MaximumBlockWeight;
-    type AvailableBlockRatio = AvailableBlockRatio;
     type MaximumBlockLength = MaximumBlockLength;
+    type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
     type ModuleToIndex = ();
 }
@@ -188,6 +188,7 @@ impl pallet_timestamp::Trait for Test {
 }
 impl tee::Trait for Test {
     type Event = ();
+    type OnReportWorks = Staking;
 }
 pallet_staking_reward_curve::build! {
     const I_NPOS: PiecewiseLinear<'static> = curve!(

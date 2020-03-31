@@ -43,10 +43,6 @@ pub use timestamp::Call as TimestampCall;
 /// Crust primitives
 use primitives::{constants::time::*, *};
 
-use cstrml_staking as staking;
-/// Crust runtime modules
-use cstrml_tee as tee;
-
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;
 
@@ -460,6 +456,7 @@ impl transaction_payment::Trait for Runtime {
 
 impl tee::Trait for Runtime {
     type Event = Event;
+    type OnReportWorks = Staking;
 }
 
 construct_runtime!(

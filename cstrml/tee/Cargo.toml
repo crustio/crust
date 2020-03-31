@@ -33,12 +33,11 @@ std = [
     'sp-std/std',
     'system/std',
     'sp-runtime-interface/std',
-    'primitives/std',
+    'primitives/std'
 ]
 
 [dev-dependencies]
 sp-staking = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-session = { package = 'pallet-session', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 balances = { package = 'pallet-balances', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 timestamp = { package = 'pallet-timestamp', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 pallet-staking-reward-curve = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }

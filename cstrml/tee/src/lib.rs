@@ -47,10 +47,22 @@ pub struct WorkReport {
     pub sig: TeeSignature,
 }
 
+/// An event handler for reporting works
+pub trait OnReportWorks<AccountId> {
+    fn on_report_works(controller: &AccountId, own_workload: u128, total_workload: u128);
+}
+
+impl<AId> OnReportWorks<AId> for () {
+    fn on_report_works(_: &AId, _: u128, _: u128) { }
+}
+
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+
+    /// The handler for reporting works
+    type OnReportWorks: OnReportWorks<Self::AccountId>;
 }
 
 // TODO: add add_extra_genesis to unify chain_spec
@@ -142,9 +154,13 @@ decl_module! {
 
                 // 6. Get workloads
                 let workloads = Workloads::get().unwrap_or_default();
+                let new_workloads = workloads + new_workload - old_workload;
 
                 // 7. Upsert workloads
-                Workloads::put(workloads + new_workload - old_workload);
+                Workloads::put(new_workloads);
+
+                // 8. Call outer function
+                T::OnReportWorks::on_report_works(&who, new_workload, new_workloads);
 
                 // 8. Emit workload event
                 Self::deposit_event(RawEvent::ReportWorks(who, work_report));
@@ -156,9 +172,25 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // IMMUTABLE PUBLIC
+    // PUBLIC MUTABLES
+
+    /// This function is for updating all identities' work report, mainly aimed to check if it is outdated
+    /// TC = O(n)
+    /// DB try is 2n+1
+    pub fn update_identities() {
+        let ids: Vec<(T::AccountId, Identity<T::AccountId>)> = <TeeIdentities<T>>::enumerate().collect();
+
+        for (controller, _) in ids {
+            let workload = Self::get_and_update_workload(&controller);
+            let total_workloads = Self::workloads().unwrap_or_default();
+
+            // Update stake limit
+            T::OnReportWorks::on_report_works(&controller, workload, total_workloads);
+        }
+    }
+
     /// Get updated workload by controller account
-    pub fn get_and_update_workload(controller: &T::AccountId) -> u128 {
+    fn get_and_update_workload(controller: &T::AccountId) -> u128 {
         if let Some(wr) = <WorkReports<T>>::get(controller) {
             // 1. Get current block number
             let current_block_number = <system::Module<T>>::block_number();
@@ -174,14 +206,13 @@ impl<T: Trait> Module<T> {
                 <WorkReports<T>>::remove(controller);
 
                 // 4. Update workloads
-                let current_workloads = Workloads::get().unwrap_or_default();
+                let current_workloads = Self::workloads().unwrap_or_default();
                 Workloads::put((current_workloads - workload).max(0));
             }
         }
         0
     }
 
-    // IMMUTABLE PRIVATE
     fn identity_sig_check(id: &Identity<T::AccountId>) -> bool {
         let applier_id = id.account_id.encode();
         let validator_id = id.validator_account_id.encode();

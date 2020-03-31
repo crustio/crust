@@ -43,6 +43,12 @@ jobs:
         with:
           use-cross: false
           command: build
+      - name: Cargo test session
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: test
+          args: --package cstrml-session --lib tests
       - name: Cargo test staking
         uses: actions-rs/cargo@v1
         with:

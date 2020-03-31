@@ -13,7 +13,7 @@ use system::ensure_signed;
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature};
+use primitives::{MerkleRoot, PubKey};
 
 #[cfg(test)]
 mod mock;
@@ -40,7 +40,7 @@ pub trait Trait: system::Trait {
 // TODO: add add_extra_genesis to unify chain_spec
 // This module's storage items.
 decl_storage! {
-    trait Store for Module<T: Trait> as Tee {
+    trait Store for Module<T: Trait> as Storage {
         pub StorageOrders get(fn storage_orders) config(): map T::AccountId => Option<StorageOrder>; //这个结构要再考虑一下 List of Option?
     }
 }

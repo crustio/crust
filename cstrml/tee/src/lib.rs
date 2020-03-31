@@ -173,6 +173,10 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     // PUBLIC MUTABLES
+
+    /// This function is for updating all identities' work report, mainly aimed to check if it is outdated
+    /// TC = O(n)
+    /// DB try is 2n+1
     pub fn update_identities() {
         let ids: Vec<(T::AccountId, Identity<T::AccountId>)> = <TeeIdentities<T>>::enumerate().collect();
 

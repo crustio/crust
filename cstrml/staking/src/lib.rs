@@ -1642,16 +1642,9 @@ impl<T: Trait> Module<T> {
         slashing::clear_stash_metadata::<T>(stash);
     }
 
-    /// This function will update all the work reporters' stake limit
-    ///
-    /// # <weight>
-    /// - Independent of the arguments. Insignificant complexity.
-    /// - O(n).
-    /// - 2n+1 DB entry.
-    /// # </weight>
+    /// This function will update the controller's stake limit
     fn update_stake_limit(controller: &T::AccountId, own_workloads: u128, total_workloads: u128) {
-        let maybe_ledger = Self::ledger(&controller);
-        if let Some(ledger) = maybe_ledger {
+        if let Some(ledger) = Self::ledger(&controller) {
             Self::upsert_stake_limit(
                 &ledger.stash,
                 Self::stake_limit_of(own_workloads, total_workloads));

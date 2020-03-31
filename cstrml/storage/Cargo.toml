@@ -6,7 +6,7 @@ edition = "2018"
 
 # Keep them same with tee in the first version
 [dependencies]
-codec = { default-features = false, package = 'parity-scale-codec', version = '1.0.0' }
+codec = { default-features = false, package = 'parity-scale-codec', version = '1.0.0', features = ["derive"] }
 frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
 serde = { optional = true, version = '1.0.101' }
 serde_json = "1.0.44"

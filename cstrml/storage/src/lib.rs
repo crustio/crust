@@ -4,10 +4,20 @@
 #![feature(option_result_contains)]
 
 use codec::{Decode, Encode};
-use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure};
+use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
+    traits::{
+        ExistenceRequirement,
+	}};
 use sp_std::convert::TryInto;
 use sp_std::{str, vec::Vec};
 use system::ensure_signed;
+use sp_runtime::{
+	RuntimeDebug, DispatchError,
+	traits::{
+		Zero, StaticLookup, Member, CheckedAdd, CheckedSub,
+		MaybeSerializeDeserialize, Saturating, Bounded,
+	},
+};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -34,6 +44,7 @@ pub struct StorageOrder { // Need to confirm this name. FileOrder?
 pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    type Balance: Default;
     // To do. Support work report check
 }
 
@@ -53,20 +64,26 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        fn store_storage_order(origin, storage_order: StorageOrder) -> DispatchResult {
-            let who = ensure_signed(origin)?;
+        fn store_storage_order(
+            origin,
+            dest: <T::Lookup as StaticLookup>::Source,
+            #[compact] value: T::Balance,
+            storage_order: StorageOrder) -> DispatchResult
+            {
+                let who = ensure_signed(origin)?;
+                T::Balance::transfer(&who, &dest, &value, ExistenceRequirement::AllowDeath);
 
-            // 1. Do check and should do something
-            ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
+                // 1. Do check and should do something
+                ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
 
-            // 2. Store the storage order
-            <StorageOrders<T>>::insert(&who, &storage_order);
+                // 2. Store the storage order
+                <StorageOrders<T>>::insert(&who, &storage_order);
 
-            // 3. Emit storage order event
-            Self::deposit_event(RawEvent::StorageOrders(who, storage_order));
+                // 3. Emit storage order event
+                Self::deposit_event(RawEvent::StorageOrders(who, storage_order));
 
-            Ok(())
-        }
+                Ok(())
+            }
     }
 }
 

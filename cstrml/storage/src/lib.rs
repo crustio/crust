@@ -23,7 +23,7 @@ mod tests;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct StorageOrder<T> { // Need to confirm this name. FileOrder?
+pub struct StorageOrder { // Need to confirm this name. FileOrder?
     pub file_indetify: MerkleRoot,
     pub file_size: u64,
     pub expired_duration: u64,
@@ -34,7 +34,7 @@ pub struct StorageOrder<T> { // Need to confirm this name. FileOrder?
 pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-    /// To do. Support work report check
+    // To do. Support work report check
 }
 
 // TODO: add add_extra_genesis to unify chain_spec
@@ -60,10 +60,10 @@ decl_module! {
             ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
 
             // 2. Store the storage order
-            <StorageOrders<T>>::insert(&who, &StorageOrder);
+            <StorageOrders<T>>::insert(&who, &storage_order);
 
             // 3. Emit storage order event
-            Self::deposit_event(RawEvent::ReportWorks(who, work_report));
+            Self::deposit_event(RawEvent::StorageOrders(who, storage_order));
 
             Ok(())
         }

@@ -8,6 +8,7 @@ build = 'build.rs'
 [dependencies]
 tee = { package = 'cstrml-tee', path = '../cstrml/tee', default_features = false }
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default_features = false }
+storage = { package = 'cstrml-storage', path = '../cstrml/storage', default_features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default_features = false }
 
 
@@ -292,8 +293,14 @@ std = [
     'timestamp/std',
     'transaction-payment/std',
     'sp-runtime-interface/std',
+<<<<<<< HEAD
     'tee/std',
     'staking/std',
+=======
+    'cstrml-tee/std',
+    'cstrml-storage/std',
+    'cstrml-staking/std',
+>>>>>>> 7bb72da... add dependency
     'primitives/std'
 ]
 

@@ -468,7 +468,7 @@ impl tee::Trait for Runtime {
 
 impl storage_order::Trait for Runtime {
     type Event = Event;
-    type Balances = Balances;
+    type Currency = Balances;
 }
 
 construct_runtime!(

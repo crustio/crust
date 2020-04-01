@@ -3,10 +3,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, HasCompact};
 use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
     traits::{
-        ExistenceRequirement,
+        Currency, ExistenceRequirement, LockableCurrency,
 	}};
 use sp_std::convert::TryInto;
 use sp_std::{str, vec::Vec};
@@ -31,10 +31,13 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub type BalanceOf<T> =
+    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
+
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct StorageOrder { // Need to confirm this name. FileOrder?
-    pub file_indetify: MerkleRoot,
+    // pub file_indetify: MerkleRoot,
     pub file_size: u64,
     pub expired_duration: u64,
     pub expired_on: u64
@@ -44,7 +47,7 @@ pub struct StorageOrder { // Need to confirm this name. FileOrder?
 pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-    type Balance: Default;
+    type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
     // To do. Support work report check
 }
 
@@ -67,11 +70,12 @@ decl_module! {
         fn store_storage_order(
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
-            #[compact] value: T::Balance,
+            #[compact] value: BalanceOf<T>,
             storage_order: StorageOrder) -> DispatchResult
             {
                 let who = ensure_signed(origin)?;
-                T::Balance::transfer(&who, &dest, &value, ExistenceRequirement::AllowDeath);
+                let dest = T::Lookup::lookup(dest)?;
+                T::Currency::transfer(&who, &dest, value, ExistenceRequirement::AllowDeath);
 
                 // 1. Do check and should do something
                 ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");

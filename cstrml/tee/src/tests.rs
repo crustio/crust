@@ -158,7 +158,7 @@ fn test_for_report_works_success() {
         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
 
         // Check workloads
-        assert_eq!(Tee::workloads(), Some(0));
+        assert_eq!(Tee::empty_workload(), 0);
 
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
@@ -166,7 +166,7 @@ fn test_for_report_works_success() {
         ));
 
         // Check workloads after work report
-        assert_eq!(Tee::workloads(), Some(5971233576));
+        assert_eq!(Tee::empty_workload(), 5971233576);
     });
 }
 
@@ -287,17 +287,25 @@ fn test_for_oudated_work_reports() {
 
         // generate 401 blocks, wr still valid
         run_to_block(401);
+        assert_eq!(Tee::update_and_get_workload(&account), 5971233576);
+        assert_eq!(
+            Tee::work_reports((&account, 300)),
+            Some(get_valid_work_report())
+        );
+
         // Check workloads
-        assert_eq!(Tee::workloads(), Some(5971233576));
+        assert_eq!(Tee::empty_workload(), 4294967296);
+        assert_eq!(Tee::meaningful_workload(), 1676266280);
 
         // generate 402 blocks then wr outdated
-        run_to_block(402);
+        run_to_block(602);
 
-        assert_eq!(Tee::get_and_update_workload(&account), 0);
+        assert_eq!(Tee::update_and_get_workload(&account), 0);
 
         // Check workloads
-        assert_eq!(Tee::workloads(), Some(0));
+        assert_eq!(Tee::empty_workload(), 0);
+        assert_eq!(Tee::meaningful_workload(), 0);
 
-        assert_eq!(Tee::work_reports(&account), None);
+        assert_eq!(Tee::work_reports((&account, 600)), None);
     });
 }

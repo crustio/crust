@@ -3,27 +3,20 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 
-use codec::{Decode, Encode, HasCompact};
+use codec::{Decode, Encode};
 use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
     traits::{
         Currency, ExistenceRequirement, LockableCurrency,
 	}};
-use sp_std::convert::TryInto;
 use sp_std::{str, vec::Vec};
 use system::ensure_signed;
-use sp_runtime::{
-	RuntimeDebug, DispatchError,
-	traits::{
-		Zero, StaticLookup, Member, CheckedAdd, CheckedSub,
-		MaybeSerializeDeserialize, Saturating, Bounded,
-	},
-};
+use sp_runtime::traits::StaticLookup;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{MerkleRoot, PubKey};
+use primitives::{MerkleRoot};
 
 #[cfg(test)]
 mod mock;
@@ -71,20 +64,28 @@ decl_module! {
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
             #[compact] value: BalanceOf<T>,
-            storage_order: StorageOrder) -> DispatchResult
+            file_size: u64,
+            expired_duration: u64,
+            expired_on: u64
+        ) -> DispatchResult
             {
                 let who = ensure_signed(origin)?;
                 let dest = T::Lookup::lookup(dest)?;
                 T::Currency::transfer(&who, &dest, value, ExistenceRequirement::AllowDeath);
 
+                let storage_order = StorageOrder {
+                    file_size,
+                    expired_duration,
+                    expired_on
+                };
                 // 1. Do check and should do something
                 ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
 
                 // 2. Store the storage order
                 <StorageOrders<T>>::insert(&who, &storage_order);
 
-                // 3. Emit storage order event
-                Self::deposit_event(RawEvent::StorageOrders(who, storage_order));
+                // // 3. Emit storage order event
+                // Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
 
                 Ok(())
             }
@@ -108,6 +109,6 @@ decl_event!(
     where
         AccountId = <T as system::Trait>::AccountId,
     {
-        StorageOrders(AccountId, StorageOrder),
+        ReportStorageOrders(AccountId, StorageOrder),
     }
 );

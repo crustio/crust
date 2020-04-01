@@ -1,7 +1,7 @@
 //! Test utilities
 
 use crate::{
-    inflation, EraIndex, GenesisConfig, Module, Guarantors, RewardDestination, StakerStatus, Trait,
+    inflation, EraIndex, GenesisConfig, Guarantors, Module, RewardDestination, StakerStatus, Trait,
     Validations,
 };
 use frame_support::{
@@ -506,10 +506,7 @@ pub fn bond_validator(acc: u64, val: u64) {
         RewardDestination::Controller
     ));
     Staking::upsert_stake_limit(&(acc + 1), u64::max_value());
-    assert_ok!(Staking::validate(
-        Origin::signed(acc),
-        Perbill::default()
-    ));
+    assert_ok!(Staking::validate(Origin::signed(acc), Perbill::default()));
 }
 
 pub fn bond_guarantor(acc: u64, val: u64, target: Vec<(u64, u64)>) {

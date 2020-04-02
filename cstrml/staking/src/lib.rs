@@ -767,8 +767,10 @@ decl_module! {
                 }
 
                 let era = Self::current_era() + T::BondingDuration::get();
+                let stake_limit = Self::stake_limit(&ledger.stash).unwrap_or_default();
+
                 ledger.unlocking.push(UnlockChunk { value, era });
-                ledger.valid = ledger.active;
+                ledger.valid = ledger.active.min(stake_limit);
 
                 Self::update_ledger(&controller, &ledger);
             }
@@ -1113,10 +1115,14 @@ impl<T: Trait> Module<T> {
             .unwrap();
 
         // total_workloads cannot be zero, or system go panic!
-        let workloads_to_stakes = ((own_workloads * total_issuance / total_workloads / 2) as u128)
-            .min(u64::max_value() as u128);
+        if total_workloads == 0 {
+            Zero::zero()
+        } else {
+            let workloads_to_stakes = ((own_workloads * total_issuance / total_workloads / 2) as u128)
+                .min(u64::max_value() as u128);
 
-        workloads_to_stakes.try_into().ok().unwrap()
+            workloads_to_stakes.try_into().ok().unwrap()
+        }
     }
 
     // MUTABLES (DANGEROUS)

@@ -42,5 +42,7 @@ pub mod fee {
 }
 
 pub mod tee {
-    pub const REPORT_SLOT: u64 = 100;
+    use super::time::*;
+
+    pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64 * 3;
 }

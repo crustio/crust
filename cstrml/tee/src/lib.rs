@@ -37,6 +37,7 @@ pub struct Identity<T> {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 // TODO: change block_number & block_hash to standard data type
+// TODO: change workload to u128
 pub struct WorkReport {
     pub pub_key: PubKey,
     pub block_number: u64,
@@ -53,7 +54,7 @@ pub trait OnReportWorks<AccountId> {
 }
 
 impl<AId> OnReportWorks<AId> for () {
-    fn on_report_works(_: &AId, _: u128, _: u128) { }
+    fn on_report_works(_: &AId, _: u128, _: u128) {}
 }
 
 /// The module's configuration trait.
@@ -65,17 +66,34 @@ pub trait Trait: system::Trait {
     type OnReportWorks: OnReportWorks<Self::AccountId>;
 }
 
-// TODO: add add_extra_genesis to unify chain_spec
-// This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Tee {
-        pub TeeIdentities get(fn tee_identities) config(): linked_map T::AccountId => Option<Identity<T::AccountId>>;
-        pub WorkReports get(fn work_reports) config(): map T::AccountId => Option<WorkReport>;
-        pub Workloads get(fn workloads) build(|config: &GenesisConfig<T>| {
-            Some(config.work_reports.iter().fold(0, |acc, (_, work_report)|
-                acc + (&work_report.empty_workload + &work_report.meaningful_workload) as u128
-            ))
-        }): Option<u128>;
+        /// The TEE identities, mapping from controller to optional identity value
+        pub TeeIdentities get(fn tee_identities) config(): linked_map
+            T::AccountId => Option<Identity<T::AccountId>>;
+
+        /// Node's work report, mapping from (controller, block_number) to optional work_report
+        pub WorkReports get(fn work_reports) config(): map
+            (T::AccountId, u64)  => Option<WorkReport>;
+
+        /// The old report slot block number.
+        pub LastReportSlot get(fn last_report_slot) config(): u64;
+
+        /// The meaningful workload, used for calculating stake limit in the end of era
+        /// default is 0
+        pub MeaningfulWorkload get(fn meaningful_workload) build(|config: &GenesisConfig<T>| {
+            config.work_reports.iter().fold(0, |acc, (_, work_report)|
+                acc + work_report.meaningful_workload as u128
+            )
+        }): u128 = 0;
+
+        /// The empty workload, used for calculating stake limit in the end of era
+        /// default is 0
+        pub EmptyWorkload get(fn empty_workload) build(|config: &GenesisConfig<T>| {
+            config.work_reports.iter().fold(0, |acc, (_, work_report)|
+                acc + work_report.empty_workload as u128
+            )
+        }): u128 = 0;
     }
 }
 
@@ -119,7 +137,7 @@ decl_module! {
             ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
 
             // 5. applier is new add or needs to be updated
-            if !<TeeIdentities<T>>::get(applier).contains(&identity) {
+            if !Self::tee_identities(applier).contains(&identity) {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
 
@@ -143,29 +161,11 @@ decl_module! {
             // 3. Do sig check
             ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
 
-            // 4. Judge new and old workload
-            let old_work_report = <WorkReports<T>>::get(&who).unwrap_or_default();
-            let new_workload = (work_report.empty_workload + work_report.meaningful_workload) as u128;
-            let old_workload = (old_work_report.empty_workload + old_work_report.meaningful_workload) as u128;
-
-            if &old_work_report != &work_report {
-                // 5. Upsert workload
-                <WorkReports<T>>::insert(&who, &work_report);
-
-                // 6. Get workloads
-                let workloads = Workloads::get().unwrap_or_default();
-                let new_workloads = workloads + new_workload - old_workload;
-
-                // 7. Upsert workloads
-                Workloads::put(new_workloads);
-
-                // 8. Call outer function
-                T::OnReportWorks::on_report_works(&who, new_workload, new_workloads);
-
-                // 8. Emit workload event
+            // 4. Maybe upsert work report
+            if Self::maybe_upsert_work_report(&who, &work_report) {
+                // 5. Emit workload event
                 Self::deposit_event(RawEvent::ReportWorks(who, work_report));
             }
-
             Ok(())
         }
     }
@@ -175,42 +175,115 @@ impl<T: Trait> Module<T> {
     // PUBLIC MUTABLES
 
     /// This function is for updating all identities' work report, mainly aimed to check if it is outdated
+    /// and it should be called in the start of era.
+    ///
     /// TC = O(n)
     /// DB try is 2n+1
     pub fn update_identities() {
-        let ids: Vec<(T::AccountId, Identity<T::AccountId>)> = <TeeIdentities<T>>::enumerate().collect();
+        let current_rs = Self::current_report_slot();
+        let last_rs = Self::last_report_slot();
 
-        for (controller, _) in ids {
-            let workload = Self::get_and_update_workload(&controller);
-            let total_workloads = Self::workloads().unwrap_or_default();
+        // 1. Report slot did not change, it should not trigger updating
+        if last_rs == current_rs {
+            return;
+        }
 
-            // Update stake limit
-            T::OnReportWorks::on_report_works(&controller, workload, total_workloads);
+        // 2. Update last report slot be current
+        LastReportSlot::mutate(|rs| *rs = current_rs);
+
+        // 3. Slot changed, update all identities
+        let ids: Vec<(T::AccountId, Identity<T::AccountId>)> =
+            <TeeIdentities<T>>::enumerate().collect();
+
+        // 4. Update id's work report, get id's workload and total workload
+        let workload_map: Vec<(&T::AccountId, u128)> = ids.iter().map(|(controller, _)| {
+            (controller, Self::update_and_get_workload(&controller, current_rs))
+        }).collect();
+        let total_workload = Self::meaningful_workload() + Self::empty_workload();
+
+        // 5. Update stake limit
+        for (controller, own_workload) in workload_map {
+            T::OnReportWorks::on_report_works(controller, own_workload, total_workload);
         }
     }
 
-    /// Get updated workload by controller account
-    fn get_and_update_workload(controller: &T::AccountId) -> u128 {
-        if let Some(wr) = <WorkReports<T>>::get(controller) {
-            // 1. Get current block number
-            let current_block_number = <system::Module<T>>::block_number();
-            let current_block_number_numeric: u64 =
-                TryInto::<u64>::try_into(current_block_number).ok().unwrap();
-            let workload = (wr.empty_workload + wr.meaningful_workload) as u128;
+    // PRIVATE IMMUTABLES
+    fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport) -> bool {
+        // 1. Get current era
+        let mut old_m_workload: u128 = 0;
+        let mut old_e_workload: u128 = 0;
 
-            // 2. Judge if work report is outdated
-            if current_block_number_numeric - wr.block_number <= REPORT_SLOT*3 + 1 {
-                return workload;
+        // 2. Judge if wr existed
+        if let Some(old_wr) = Self::work_reports((who, wr.block_number)) {
+            if &old_wr == wr {
+                return false;
             } else {
-                // 3. Remove outdated work report
-                <WorkReports<T>>::remove(controller);
-
-                // 4. Update workloads
-                let current_workloads = Self::workloads().unwrap_or_default();
-                Workloads::put((current_workloads - workload).max(0));
+                old_m_workload = old_wr.meaningful_workload as u128;
+                old_e_workload = old_wr.empty_workload as u128;
             }
         }
-        0
+
+        // 3. Upsert workload
+        <WorkReports<T>>::insert((who, wr.block_number), wr);
+
+        // 4. Upsert workload
+        let m_workload = wr.meaningful_workload as u128;
+        let e_workload = wr.empty_workload as u128;
+        let m_total_workload = Self::meaningful_workload() - old_m_workload + m_workload;
+        let e_total_workload = Self::empty_workload() - old_e_workload + e_workload;
+
+        MeaningfulWorkload::put(m_total_workload);
+        EmptyWorkload::put(e_total_workload);
+
+        // 5. Call `on_report_works` handler
+        T::OnReportWorks::on_report_works(
+            &who,
+            m_workload + e_workload,
+            m_total_workload + e_total_workload,
+        );
+        true
+    }
+
+    /// Get updated workload by controller account,
+    /// this function should only be called in the new era
+    /// otherwise, it will be an void in this recursive loop
+    fn update_and_get_workload(controller: &T::AccountId, current_rs: u64) -> u128 {
+        // 1. Get current era
+        let last_rs = current_rs - REPORT_SLOT;
+
+        // 2. Judge if this controller reported works in the former era
+        if let Some(wr) = Self::work_reports((controller, last_rs)) {
+            // a. Remove former era's work report
+            <WorkReports<T>>::remove((controller, last_rs));
+
+            // b. Did report works in the last era
+            // ...
+            // 889(600): (123,300){wr300} ✅ | (123, 300){wr0} ❌
+            // 889(600): (123, 300){wr300} -> (123, 600){wr300}
+            // 1080(900): (123, 600){wr600} ✅ | (123, 600){wr300} ❌
+            // 1080(900): (123, 600){wr600} -> (123, 900){wr600}
+            // ...
+            // old(old_old) <- new
+            // new(old) <- new_new
+            // TODO: between the extended current_rs wr and the real current_rs wr contains a void,
+            // it may mislead storage order
+            if wr.block_number == last_rs {
+                // Extend the last work report(if not exist) into this new report slot
+                if !<WorkReports<T>>::exists((controller, current_rs)) {
+                    // This should already be true
+                    <WorkReports<T>>::insert((controller, current_rs), &wr);
+                }
+                (wr.empty_workload + wr.meaningful_workload) as u128
+            // c. Did not report anything in the last era
+            } else {
+                // Cut workload
+                MeaningfulWorkload::mutate(|mw| *mw -= wr.meaningful_workload as u128);
+                EmptyWorkload::mutate(|ew| *ew -= wr.empty_workload as u128);
+                0
+            }
+        } else {
+            0
+        }
     }
 
     fn identity_sig_check(id: &Identity<T::AccountId>) -> bool {
@@ -238,13 +311,8 @@ impl<T: Trait> Module<T> {
         );
 
         // 2. Check work report timing
-        let current_block_number = <system::Module<T>>::block_number();
-        let current_block_number_numeric: u64 =
-            TryInto::<u64>::try_into(current_block_number).ok().unwrap();
-        let current_report_slot = current_block_number_numeric / REPORT_SLOT;
-        // genesis block or must be 50-times number
         ensure!(
-            wr.block_number == 1 || wr.block_number == current_report_slot * REPORT_SLOT,
+            wr.block_number == 1 || wr.block_number == Self::current_report_slot(),
             "work report is outdated or beforehand"
         );
 
@@ -262,6 +330,13 @@ impl<T: Trait> Module<T> {
             wr.meaningful_workload,
             &wr.sig,
         )
+    }
+
+    fn current_report_slot() -> u64 {
+        let current_block_number = <system::Module<T>>::block_number();
+        let current_block_numeric = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
+        let current_report_index = current_block_numeric / REPORT_SLOT;
+        current_report_index * REPORT_SLOT
     }
 }
 

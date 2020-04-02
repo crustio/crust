@@ -65,7 +65,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     // stash-controller accounts
     let accounts = [Sr25519Keyring::Alice.to_account_id()];
 
-    let pk = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
+    let pk = hex::decode("0fb42b36f26b69b7bbd3f60b2e377e66a4dacf0284877731bb59ca2cc9ce2759390dfb4b7023986e238d74df027f0f7f34b51f4b0dbf60e5f0ac90812d977499").unwrap();
     let tee_identities = accounts
         .iter()
         .map(|x| {
@@ -83,10 +83,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .collect();
     let work_reports = accounts
         .iter()
-        .map(|x| (x.clone(), Default::default()))
+        .map(|x| ((x.clone(), 0), Default::default()))
         .collect();
 
     GenesisConfig::<Test> {
+        last_report_slot: 0,
         tee_identities,
         work_reports,
     }

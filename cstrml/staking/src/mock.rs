@@ -1,7 +1,7 @@
 //! Test utilities
 
 use crate::{
-    inflation, EraIndex, GenesisConfig, Module, Guarantors, RewardDestination, StakerStatus, Trait,
+    inflation, EraIndex, GenesisConfig, Guarantors, Module, RewardDestination, StakerStatus, Trait,
     Validations,
 };
 use frame_support::{
@@ -344,7 +344,6 @@ impl ExtBuilder {
 
         // tee genesis
         let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
-
         let _ = GenesisConfig::<Test> {
             current_era: 0,
             stakers: vec![
@@ -392,28 +391,31 @@ impl ExtBuilder {
         }
         .assimilate_storage(&mut storage);
 
+        let mut work_reports: Vec<((u64, u64), tee::WorkReport)> = identities
+            .iter()
+            .map(|id| {
+                (
+                    (*id, 0),
+                    tee::WorkReport {
+                        pub_key: vec![],
+                        block_number: 0,
+                        block_hash: vec![],
+                        empty_root: vec![],
+                        empty_workload: 20000000000000,
+                        meaningful_workload: 0,
+                        sig: vec![],
+                    },
+                )
+            })
+            .collect();
+
         let _ = tee::GenesisConfig::<Test> {
+            last_report_slot: 0,
             tee_identities: identities
                 .iter()
                 .map(|id| (*id, Default::default()))
                 .collect(),
-            work_reports: identities
-                .iter()
-                .map(|id| {
-                    (
-                        *id,
-                        tee::WorkReport {
-                            pub_key: vec![],
-                            block_number: 0,
-                            block_hash: vec![],
-                            empty_root: vec![],
-                            empty_workload: 20000000000000,
-                            meaningful_workload: 0,
-                            sig: vec![],
-                        },
-                    )
-                })
-                .collect(),
+            work_reports
         }
         .assimilate_storage(&mut storage);
 
@@ -506,10 +508,7 @@ pub fn bond_validator(acc: u64, val: u64) {
         RewardDestination::Controller
     ));
     Staking::upsert_stake_limit(&(acc + 1), u64::max_value());
-    assert_ok!(Staking::validate(
-        Origin::signed(acc),
-        Perbill::default()
-    ));
+    assert_ok!(Staking::validate(Origin::signed(acc), Perbill::default()));
 }
 
 pub fn bond_guarantor(acc: u64, val: u64, target: Vec<(u64, u64)>) {
@@ -534,7 +533,7 @@ pub fn start_session(session_index: SessionIndex) {
     // Compensate for session delay
     let session_index = session_index + 1;
     for i in Session::current_index()..session_index {
-        System::set_block_number((i + 1).into());
+        System::set_block_number(((i+1)*100).into());
         Timestamp::set_timestamp(System::block_number() * 1000);
         Session::on_initialize(System::block_number());
     }

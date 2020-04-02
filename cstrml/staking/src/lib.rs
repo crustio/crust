@@ -41,8 +41,8 @@ use sp_runtime::{Deserialize, Serialize};
 
 // Crust runtime modules
 // TODO: using tee passing into `Trait` like Currency?
+use crate::StakerStatus::{Guarantor, Validator};
 use tee;
-use crate::StakerStatus::{Validator, Guarantor};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_NOMINATIONS: usize = 16;
@@ -122,7 +122,7 @@ impl<AccountId> Default for Validations<AccountId> {
     fn default() -> Self {
         Validations {
             commission: Default::default(),
-            guarantors: vec![]
+            guarantors: vec![],
         }
     }
 }
@@ -767,8 +767,10 @@ decl_module! {
                 }
 
                 let era = Self::current_era() + T::BondingDuration::get();
+                let stake_limit = Self::stake_limit(&ledger.stash).unwrap_or_default();
+
                 ledger.unlocking.push(UnlockChunk { value, era });
-                ledger.valid = ledger.active;
+                ledger.valid = ledger.active.min(stake_limit);
 
                 Self::update_ledger(&controller, &ledger);
             }
@@ -1113,10 +1115,14 @@ impl<T: Trait> Module<T> {
             .unwrap();
 
         // total_workloads cannot be zero, or system go panic!
-        let workloads_to_stakes = ((own_workloads * total_issuance / total_workloads / 2) as u128)
-            .min(u64::max_value() as u128);
+        if total_workloads == 0 {
+            Zero::zero()
+        } else {
+            let workloads_to_stakes = ((own_workloads * total_issuance / total_workloads / 2) as u128)
+                .min(u64::max_value() as u128);
 
-        workloads_to_stakes.try_into().ok().unwrap()
+            workloads_to_stakes.try_into().ok().unwrap()
+        }
     }
 
     // MUTABLES (DANGEROUS)
@@ -1156,9 +1162,11 @@ impl<T: Trait> Module<T> {
     /// - 2n+5 DB entry.
     /// MAX(n) = MAX_NOMINATIONS
     /// # </weight>
-    fn upsert_guarantee(v_stash: &T::AccountId,
-                        g_stash: &T::AccountId,
-                        g_votes: BalanceOf<T>) -> (bool, BalanceOf<T>) {
+    fn upsert_guarantee(
+        v_stash: &T::AccountId,
+        g_stash: &T::AccountId,
+        g_votes: BalanceOf<T>,
+    ) -> (bool, BalanceOf<T>) {
         if !<Validators<T>>::exists(v_stash) || g_stash == v_stash {
             // v_stash is not validator or you want to vote your self
             // you vote NOTHING 🙂
@@ -1172,11 +1180,11 @@ impl<T: Trait> Module<T> {
             // 1. Existed edge
             if g_old_votes == g_votes {
                 // a. safe and sound, do NOTHING 🙂
-                return (true, g_votes)
+                return (true, g_votes);
             } else if g_old_votes > g_votes {
                 // b. guarantor reduce his stake: just update edge's weight
                 <GuaranteeRel<T>>::insert(&edge, g_votes);
-                return (true, g_votes)
+                return (true, g_votes);
             } else {
                 // c. guarantor increase his stake: remove it first
                 new_guarantors.remove_item(g_stash);
@@ -1202,18 +1210,18 @@ impl<T: Trait> Module<T> {
             // a. New validator
             let new_validations = Validations {
                 commission: validations.commission,
-                guarantors: new_guarantors
+                guarantors: new_guarantors,
             };
             <Validators<T>>::insert(v_stash, new_validations);
 
             // c. New edge
             let new_weight = (v_limit - v_total_stakes).min(g_votes);
             <GuaranteeRel<T>>::insert(&edge, new_weight);
-            return (true, new_weight)
+            return (true, new_weight);
         }
 
         // Or insert failed, cause there has no credit
-        return (false, Zero::zero())
+        return (false, Zero::zero());
     }
 
     /// Insert new or update old stake limit
@@ -1450,13 +1458,12 @@ impl<T: Trait> Module<T> {
             // and let the chain keep producing blocks until we can decide on a sufficiently
             // substantial set.
             // TODO: #2494(paritytech/substrate)
-            return (Self::slot_stake(), None)
+            return (Self::slot_stake(), None);
         }
 
         let to_votes =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
-        let to_balance =
-            |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
+        let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
         // I. Traverse validators, get `IndividualExposure` and update guarantors
         for (v_stash, validations) in &validators {
@@ -1524,8 +1531,8 @@ impl<T: Trait> Module<T> {
             } else {
                 let v_own_votes = to_votes(v_own_stakes);
                 // b. total_votes should less than balance max value
-                let v_total_votes = (v_own_votes + v_guarantors_votes)
-                    .min(u64::max_value() as u128);
+                let v_total_votes =
+                    (v_own_votes + v_guarantors_votes).min(u64::max_value() as u128);
 
                 // c. build struct `Exposure`
                 let exposure = Exposure {
@@ -1544,7 +1551,7 @@ impl<T: Trait> Module<T> {
                 // e. UPDATE NODE: `Validator`
                 let new_validations = Validations {
                     commission: validations.commission,
-                    guarantors: new_guarantors
+                    guarantors: new_guarantors,
                 };
                 <Validators<T>>::insert(v_stash, new_validations);
             }
@@ -1647,7 +1654,8 @@ impl<T: Trait> Module<T> {
         if let Some(ledger) = Self::ledger(&controller) {
             Self::upsert_stake_limit(
                 &ledger.stash,
-                Self::stake_limit_of(own_workloads, total_workloads));
+                Self::stake_limit_of(own_workloads, total_workloads),
+            );
         }
     }
 

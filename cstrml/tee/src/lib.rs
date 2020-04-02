@@ -76,8 +76,8 @@ decl_storage! {
         pub WorkReports get(fn work_reports) config(): map
             (T::AccountId, u64)  => Option<WorkReport>;
 
-        /// The current report slot index.
-        pub CurrentReportSlot get(fn current_report_slot) config(): u64;
+        /// The old report slot block number.
+        pub LastReportSlot get(fn last_report_slot) config(): u64;
 
         /// The meaningful workload, used for calculating stake limit in the end of era
         /// default is 0
@@ -180,14 +180,23 @@ impl<T: Trait> Module<T> {
     /// TC = O(n)
     /// DB try is 2n+1
     pub fn update_identities() {
+        let current_rs = Self::current_report_slot();
+        let last_rs = Self::last_report_slot();
+
+        // 1. Report slot did not change, it should not trigger updating
+        if last_rs == current_rs {
+            return;
+        }
+
+        // 2. Update last report slot be current
+        LastReportSlot::mutate(|rs| *rs = current_rs);
+
+        // 3. Slot changed, update all identities
         let ids: Vec<(T::AccountId, Identity<T::AccountId>)> =
             <TeeIdentities<T>>::enumerate().collect();
 
-        // Increment current report slot
-        CurrentReportSlot::mutate(|rs| *rs += 1);
-
         for (controller, _) in ids {
-            let own_workload = Self::update_and_get_workload(&controller);
+            let own_workload = Self::update_and_get_workload(&controller, current_rs);
             let total_workload = Self::meaningful_workload() + Self::empty_workload();
 
             // Update stake limit
@@ -235,23 +244,21 @@ impl<T: Trait> Module<T> {
     /// Get updated workload by controller account,
     /// this function should only be called in the new era
     /// otherwise, it will be an void in this recursive loop
-    fn update_and_get_workload(controller: &T::AccountId) -> u128 {
+    fn update_and_get_workload(controller: &T::AccountId, current_rs: u64) -> u128 {
         // 1. Get current era
-        // TODO: there has safety issue, if current_report_block - current_block >= TEE sending frequency
-        // TODO: move it out of for each
-        let current_report_block = Self::current_report_slot() * REPORT_SLOT;
-        let former_report_block = current_report_block - REPORT_SLOT;
+        let last_rs = current_rs - REPORT_SLOT;
 
         // 2. Judge if this controller reported works in the former era
-        if let Some(wr) = Self::work_reports((controller, former_report_block)) {
+        if let Some(wr) = Self::work_reports((controller, last_rs)) {
             // a. Remove former era's work report
-            <WorkReports<T>>::remove((controller, former_report_block));
+            <WorkReports<T>>::remove((controller, last_rs));
 
             // b. Did report works in the former era
-            if wr.block_number == former_report_block {
+            if wr.block_number == last_rs {
                 // Extend the former work report(if not exist) into this new report slot
-                if !<WorkReports<T>>::exists((controller, current_report_block)) {
-                    <WorkReports<T>>::insert((controller, current_report_block), &wr);
+                if !<WorkReports<T>>::exists((controller, current_rs)) {
+                    // This should already be true
+                    <WorkReports<T>>::insert((controller, current_rs), &wr);
                 }
                 (wr.empty_workload + wr.meaningful_workload) as u128
             // c. Did not report anything in the former era
@@ -291,10 +298,8 @@ impl<T: Trait> Module<T> {
         );
 
         // 2. Check work report timing
-        let current_block_numeric = Self::current_block_number();
-        let current_report_slot = current_block_numeric / REPORT_SLOT;
         ensure!(
-            wr.block_number == 1 || wr.block_number == current_report_slot * REPORT_SLOT,
+            wr.block_number == 1 || wr.block_number == Self::current_report_slot(),
             "work report is outdated or beforehand"
         );
 
@@ -314,9 +319,11 @@ impl<T: Trait> Module<T> {
         )
     }
 
-    fn current_block_number() -> u64 {
+    fn current_report_slot() -> u64 {
         let current_block_number = <system::Module<T>>::block_number();
-        TryInto::<u64>::try_into(current_block_number).ok().unwrap()
+        let current_block_numeric = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
+        let current_report_index = current_block_numeric / REPORT_SLOT;
+        current_report_index * REPORT_SLOT
     }
 }
 

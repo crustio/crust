@@ -15,9 +15,9 @@ fn get_valid_identity() -> Identity<AccountId> {
             .expect("valid ss58 address");
     let validator: AccountId = Sr25519Keyring::Alice.to_account_id();
 
-    let a_pk = hex::decode("921d7f8dd38cb2ad1e6ea10c489bd7e04b5cd6c1684267a96fbfcceddf46beafe50792e7dde0f17376902213dff06b913c675181df9d9863ab88ea289619d2a3").unwrap();
-    let v_pk = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
-    let sig= hex::decode("cfb8bc08cdcc8b1b03ccb7a4af94783a693de038a93c249124964b89d83f57827b36807382f9c402791ff4984cf601e7e908fa67c46eb403f071cf3a13769c81").expect("Invalid hex");
+    let a_pk = hex::decode("e9e055da2ad974421c5cf73b466b75ba24910091759a5ddc51adeff5d7bf3c16b345aefbb244a02a4643ea1ca862c888a3acf28ee7528e0a6abccf666621a24a").unwrap();
+    let v_pk = hex::decode("0fb42b36f26b69b7bbd3f60b2e377e66a4dacf0284877731bb59ca2cc9ce2759390dfb4b7023986e238d74df027f0f7f34b51f4b0dbf60e5f0ac90812d977499").unwrap();
+    let sig= hex::decode("1d41cea5287fcc6e2ce91eea3fb6fb0fa93ce1c784e159d2e240395dad0d3c28769308f75cd70f2dab4b1b1d9577a4055f0ac3c10443fd289d54669e720a5cd2").expect("Invalid hex");
 
     Identity {
         pub_key: a_pk.clone(),
@@ -29,15 +29,15 @@ fn get_valid_identity() -> Identity<AccountId> {
 }
 
 fn get_valid_work_report() -> WorkReport {
-    let pub_key = hex::decode("8d61578381b5def81a39332a2dfe1afb88c8da1cb45f5322e9b3856cec5fe5b2d1231a1e0f93f3424e2cdf27f23a7e850cd140e8fd79b104a87428988914be62").unwrap();
+    let pub_key = hex::decode("0fb42b36f26b69b7bbd3f60b2e377e66a4dacf0284877731bb59ca2cc9ce2759390dfb4b7023986e238d74df027f0f7f34b51f4b0dbf60e5f0ac90812d977499").unwrap();
     let block_hash = [0; 32].to_vec();
     let empty_root =
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-    let sig = hex::decode("f6c64850383176a0c195bff219f44ad2e38259161eb8525298503ba6ac859cee6ea1944928ba37cf9d1e0203726bce1de34aa299475a9b778b0f201cc8824bce").unwrap();
+    let sig = hex::decode("d178f20e2f2abfa72d056ce7689fab358977597b961bdf530b33e1e0da0f447e87ef414cf687d12aa6a63739c471de207e435d147900fe43f66bcff19668b955").unwrap();
 
     WorkReport {
         pub_key,
-        block_number: 100,
+        block_number: 300,
         block_hash,
         empty_root,
         empty_workload: 4294967296,
@@ -153,7 +153,7 @@ fn test_for_identity_sig_check_failed() {
 fn test_for_report_works_success() {
     new_test_ext().execute_with(|| {
         // generate 53 blocks first
-        run_to_block(103);
+        run_to_block(303);
 
         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
 
@@ -166,7 +166,8 @@ fn test_for_report_works_success() {
         ));
 
         // Check workloads after work report
-        assert_eq!(Tee::empty_workload(), 5971233576);
+        assert_eq!(Tee::empty_workload(), 4294967296);
+        assert_eq!(Tee::meaningful_workload(), 1676266280);
     });
 }
 
@@ -277,35 +278,93 @@ fn test_for_work_report_sig_check_failed() {
 fn test_for_oudated_work_reports() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
-        // generate 103 blocks first
-        run_to_block(103);
+        // generate 303 blocks first
+        run_to_block(303);
 
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
             get_valid_work_report()
         ));
 
+        // check work report and workload
+        assert_eq!(Tee::update_and_get_workload(&account, 300), 0);
+        assert_eq!(
+            Tee::work_reports((&account, 300)),
+            Some(get_valid_work_report())
+        );
+        // Check workloads
+        assert_eq!(Tee::empty_workload(), 4294967296);
+        assert_eq!(Tee::meaningful_workload(), 1676266280);
+
         // generate 401 blocks, wr still valid
         run_to_block(401);
-        assert_eq!(Tee::update_and_get_workload(&account), 5971233576);
         assert_eq!(
             Tee::work_reports((&account, 300)),
             Some(get_valid_work_report())
         );
 
-        // Check workloads
-        assert_eq!(Tee::empty_workload(), 4294967296);
-        assert_eq!(Tee::meaningful_workload(), 1676266280);
-
-        // generate 402 blocks then wr outdated
+        // generate 602 blocks, 300 work report should be removed
         run_to_block(602);
 
-        assert_eq!(Tee::update_and_get_workload(&account), 0);
+        assert_eq!(Tee::update_and_get_workload(&account, 600), 5971233576);
+        assert_eq!(
+            Tee::work_reports((&account, 300)),
+            None
+        );
+        assert_eq!(
+            Tee::work_reports((&account, 600)),
+            Some(get_valid_work_report())
+        );
+
+        run_to_block(903);
+        assert_eq!(Tee::update_and_get_workload(&account, 900), 0);
+        assert_eq!(
+            Tee::work_reports((&account, 600)),
+            None
+        );
+        assert_eq!(
+            Tee::work_reports((&account, 900)),
+            None
+        );
 
         // Check workloads
         assert_eq!(Tee::empty_workload(), 0);
         assert_eq!(Tee::meaningful_workload(), 0);
-
-        assert_eq!(Tee::work_reports((&account, 600)), None);
     });
+}
+
+#[test]
+fn test_abnormal_era() {
+    new_test_ext().execute_with(|| {
+        let account: AccountId = Sr25519Keyring::Alice.to_account_id();
+
+        // If new era happens in 101, next work is not reported, we should keep last work report
+        run_to_block(101);
+        Tee::update_identities();
+        assert_eq!(
+            Tee::work_reports((&account, 0)),
+            Some(Default::default())
+        );
+        assert_eq!(
+            Tee::last_report_slot(),
+            0
+        );
+
+        // If new era happens in 301, we should update work report and last report slot
+        run_to_block(301);
+        Tee::update_identities();
+        assert_eq!(
+            Tee::work_reports((&account, 0)),
+            None
+        );
+        assert_eq!(
+            Tee::work_reports((&account, 300)),
+            Some(Default::default())
+        );
+        assert_eq!(
+            Tee::last_report_slot(),
+            300
+        );
+
+    })
 }

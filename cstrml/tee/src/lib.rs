@@ -195,12 +195,15 @@ impl<T: Trait> Module<T> {
         let ids: Vec<(T::AccountId, Identity<T::AccountId>)> =
             <TeeIdentities<T>>::enumerate().collect();
 
-        for (controller, _) in ids {
-            let own_workload = Self::update_and_get_workload(&controller, current_rs);
-            let total_workload = Self::meaningful_workload() + Self::empty_workload();
+        // 4. Update id's work report, get id's workload and total workload
+        let workload_map: Vec<(&T::AccountId, u128)> = ids.iter().map(|(controller, _)| {
+            (controller, Self::update_and_get_workload(&controller, current_rs))
+        }).collect();
+        let total_workload = Self::meaningful_workload() + Self::empty_workload();
 
-            // Update stake limit
-            T::OnReportWorks::on_report_works(&controller, own_workload, total_workload);
+        // 5. Update stake limit
+        for (controller, own_workload) in workload_map {
+            T::OnReportWorks::on_report_works(controller, own_workload, total_workload);
         }
     }
 
@@ -253,15 +256,25 @@ impl<T: Trait> Module<T> {
             // a. Remove former era's work report
             <WorkReports<T>>::remove((controller, last_rs));
 
-            // b. Did report works in the former era
+            // b. Did report works in the last era
+            // ...
+            // 889(600): (123,300){wr300} ✅ | (123, 300){wr0} ❌
+            // 889(600): (123, 300){wr300} -> (123, 600){wr300}
+            // 1080(900): (123, 600){wr600} ✅ | (123, 600){wr300} ❌
+            // 1080(900): (123, 600){wr600} -> (123, 900){wr600}
+            // ...
+            // old(old_old) <- new
+            // new(old) <- new_new
+            // TODO: between the extended current_rs wr and the real current_rs wr contains a void,
+            // it may mislead storage order
             if wr.block_number == last_rs {
-                // Extend the former work report(if not exist) into this new report slot
+                // Extend the last work report(if not exist) into this new report slot
                 if !<WorkReports<T>>::exists((controller, current_rs)) {
                     // This should already be true
                     <WorkReports<T>>::insert((controller, current_rs), &wr);
                 }
                 (wr.empty_workload + wr.meaningful_workload) as u128
-            // c. Did not report anything in the former era
+            // c. Did not report anything in the last era
             } else {
                 // Cut workload
                 MeaningfulWorkload::mutate(|mw| *mw -= wr.meaningful_workload as u128);

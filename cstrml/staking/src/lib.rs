@@ -1487,7 +1487,7 @@ impl<T: Trait> Module<T> {
 
                 // 1. There still has credit for guarantors
                 // we should using `FILO` rule to calculate others
-                if remains > 0 {
+                if remains > 0 && votes > 0 {
                     let g_real_votes = remains.min(votes);
                     let g_vote_stakes = to_balance(g_real_votes);
 
@@ -1509,6 +1509,7 @@ impl<T: Trait> Module<T> {
                 // and remove `GuaranteeRel`
                 } else {
                     // a. UPDATE NODE: update `Guarantors`
+                    // TODO: this can merge into II's logic, that will be more efficient
                     if let Some(mut nominations) = Self::guarantors(guarantor) {
                         nominations.targets.remove_item(v_stash);
                         <Guarantors<T>>::insert(guarantor, nominations);
@@ -1524,17 +1525,15 @@ impl<T: Trait> Module<T> {
 
             // 4. Update next era's snapshot `Stakers` and `Validators`
             <Stakers<T>>::remove(v_stash);
+            <Validators<T>>::remove(v_stash);
 
-            if v_ledger.valid == Zero::zero() {
-                // a. remove validator if valid stake goes 0
-                <Validators<T>>::remove(v_stash);
-            } else {
+            if v_ledger.valid != Zero::zero() {
                 let v_own_votes = to_votes(v_own_stakes);
-                // b. total_votes should less than balance max value
+                // a. total_votes should less than balance max value
                 let v_total_votes =
                     (v_own_votes + v_guarantors_votes).min(u64::max_value() as u128);
 
-                // c. build struct `Exposure`
+                // b. build struct `Exposure`
                 let exposure = Exposure {
                     own: v_own_stakes,
                     // This might reasonably saturate and we cannot do much about it. The sum of
@@ -1545,10 +1544,10 @@ impl<T: Trait> Module<T> {
                     others,
                 };
 
-                // d. update snapshot
+                // c. update snapshot
                 <Stakers<T>>::insert(v_stash, exposure);
 
-                // e. UPDATE NODE: `Validator`
+                // d. UPDATE NODE: `Validator`
                 let new_validations = Validations {
                     commission: validations.commission,
                     guarantors: new_guarantors,
@@ -1607,7 +1606,7 @@ impl<T: Trait> Module<T> {
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
         // 2. If there's no validators, be as same as little validators
-        if to_elect < 1 {
+        if to_elect < minimum_validator_count {
             return (Self::slot_stake(), None);
         }
 

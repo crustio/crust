@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-staking"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Crustio"]
 edition = "2018"
 

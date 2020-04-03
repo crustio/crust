@@ -2,7 +2,7 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-runtime'
-version = '0.2.1'
+version = '0.2.2'
 build = 'build.rs'
 
 [dependencies]
@@ -105,12 +105,6 @@ git = 'https://github.com/paritytech/substrate.git'
 package = 'pallet-membership'
 rev = '3e651110aa06aa835790df63410a29676243fc54'
 version = '2.0.0'
-
-[dependencies.treasury]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-package = 'pallet-treasury'
-branch = 'polkadot-master'
 
 [dependencies.grandpa]
 default-features = false
@@ -296,7 +290,6 @@ std = [
     'session/std',
     'system/std',
     'timestamp/std',
-    'treasury/std',
     'transaction-payment/std',
     'sp-runtime-interface/std',
     'tee/std',

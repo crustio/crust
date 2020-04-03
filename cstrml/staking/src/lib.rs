@@ -1525,9 +1525,10 @@ impl<T: Trait> Module<T> {
 
             // 4. Update next era's snapshot `Stakers` and `Validators`
             <Stakers<T>>::remove(v_stash);
-            <Validators<T>>::remove(v_stash);
 
-            if v_ledger.valid != Zero::zero() {
+            if v_ledger.valid == Zero::zero() {
+                <Validators<T>>::remove(v_stash);
+            } else {
                 let v_own_votes = to_votes(v_own_stakes);
                 // a. total_votes should less than balance max value
                 let v_total_votes =

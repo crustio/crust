@@ -10,7 +10,8 @@ use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchRes
 	}};
 use sp_std::{str, vec::Vec};
 use system::ensure_signed;
-use sp_runtime::traits::StaticLookup;
+use sp_runtime::{traits::StaticLookup};
+use tee;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -29,16 +30,16 @@ pub type BalanceOf<T> =
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct StorageOrder { // Need to confirm this name. FileOrder?
+pub struct StorageOrder<T> { // Need to confirm this name. FileOrder?
     pub file_indetifier: MerkleRoot,
     pub file_size: u64,
     pub expired_duration: u64,
     pub expired_on: u64,
-    pub destination: AccountId
+    pub destination: T
 }
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait {
+pub trait Trait: system::Trait + tee:: Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
     type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
@@ -49,7 +50,7 @@ pub trait Trait: system::Trait {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Storage {
-        pub StorageOrders get(fn storage_orders) config(): map (T::AccountId, MerkleRoot) => Option<StorageOrder>;
+        pub StorageOrders get(fn storage_orders) config(): map (T::AccountId, MerkleRoot) => Option<StorageOrder<T::AccountId>>;
     }
 }
 
@@ -75,7 +76,7 @@ decl_module! {
                 let dest = T::Lookup::lookup(dest)?;
                 T::Currency::transfer(&who, &dest, value, ExistenceRequirement::AllowDeath);
 
-                let storage_order = StorageOrder {
+                let storage_order = StorageOrder::<T::AccountId> {
                     file_indetifier,
                     file_size,
                     expired_duration,
@@ -83,10 +84,11 @@ decl_module! {
                     destination: dest
                 };
                 // 1. Do check and should do something
+
                 ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
 
                 // 2. Store the storage order
-                <StorageOrders<T>>::insert(&who, &storage_order);
+                <StorageOrders<T>>::insert((&who, &storage_order.file_indetifier), &storage_order);
 
                 // // 3. Emit storage order event
                 // Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
@@ -97,13 +99,12 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // IMMUTABLE PUBLIC
-    pub fn storage_order_check_pub(so: &StorageOrder) -> DispatchResult {
-        Ok(())
-    }
-
     // private function can be built in here
-    fn storage_order_check(so: &StorageOrder) -> DispatchResult {
+    fn storage_order_check(so: &StorageOrder<T::AccountId>) -> DispatchResult {
+        ensure!(
+            &<tee::Module<T>>::get_last_work_report(&so.destination).unwrap().empty_workload >= &so.file_size,
+            "Cannot find work report or empty work load is not enough!"
+        );
         Ok(())
     }
 }
@@ -113,6 +114,6 @@ decl_event!(
     where
         AccountId = <T as system::Trait>::AccountId,
     {
-        ReportStorageOrders(AccountId, StorageOrder),
+        ReportStorageOrders(AccountId, StorageOrder<AccountId>),
     }
 );

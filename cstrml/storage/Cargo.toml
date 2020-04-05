@@ -21,6 +21,7 @@ system = { package = 'frame-system', default-features = false, git = 'https://gi
 
 # Crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
+tee = { package = "cstrml-tee", path = "../tee", default-features = false }
 
 [features]
 default = ['std']

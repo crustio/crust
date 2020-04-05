@@ -208,6 +208,11 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    pub fn get_last_work_report(who: &T::AccountId) -> Option<WorkReport> {
+        let last_rs = Self::last_report_slot();
+        <WorkReports<T>>::get((who, last_rs))
+    }
+
     // PRIVATE IMMUTABLES
     fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport) -> bool {
         // 1. Current block always be 300*n(n >= 1) + 4(for Alphanet)

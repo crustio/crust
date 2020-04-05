@@ -43,11 +43,7 @@ pub use timestamp::Call as TimestampCall;
 /// Crust primitives
 use primitives::{constants::time::*, *};
 
-use cstrml_staking as staking;
-/// Crust runtime modules
-use cstrml_tee as tee;
-
-use cstrml_storage as storage_order;
+use storage as storage_order;
 
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;

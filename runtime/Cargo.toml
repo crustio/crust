@@ -293,14 +293,9 @@ std = [
     'timestamp/std',
     'transaction-payment/std',
     'sp-runtime-interface/std',
-<<<<<<< HEAD
     'tee/std',
     'staking/std',
-=======
-    'cstrml-tee/std',
-    'cstrml-storage/std',
-    'cstrml-staking/std',
->>>>>>> 7bb72da... add dependency
+    'storage/std',
     'primitives/std'
 ]
 

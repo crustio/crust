@@ -1,5 +1,5 @@
 [package]
-name = "cstrml-storage"
+name = "cstrml-storage-order"
 version = "0.1.0"
 authors = ["crustio"]
 edition = "2018"
@@ -36,6 +36,7 @@ std = [
     'system/std',
     'sp-runtime-interface/std',
     'primitives/std',
+    'tee/std'
 ]
 
 [dev-dependencies]

@@ -43,7 +43,7 @@ pub use timestamp::Call as TimestampCall;
 /// Crust primitives
 use primitives::{constants::time::*, *};
 
-use storage as storage_order;
+use storage_order;
 
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;

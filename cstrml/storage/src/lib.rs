@@ -30,10 +30,11 @@ pub type BalanceOf<T> =
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct StorageOrder { // Need to confirm this name. FileOrder?
-    // pub file_indetify: MerkleRoot,
+    pub file_indetifier: MerkleRoot,
     pub file_size: u64,
     pub expired_duration: u64,
-    pub expired_on: u64
+    pub expired_on: u64,
+    pub destination: AccountId
 }
 
 /// The module's configuration trait.
@@ -48,7 +49,7 @@ pub trait Trait: system::Trait {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Storage {
-        pub StorageOrders get(fn storage_orders) config(): map T::AccountId => Option<StorageOrder>; //这个结构要再考虑一下 List of Option?
+        pub StorageOrders get(fn storage_orders) config(): map (T::AccountId, MerkleRoot) => Option<StorageOrder>;
     }
 }
 
@@ -64,6 +65,7 @@ decl_module! {
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
             #[compact] value: BalanceOf<T>,
+            file_indetifier: MerkleRoot,
             file_size: u64,
             expired_duration: u64,
             expired_on: u64
@@ -74,9 +76,11 @@ decl_module! {
                 T::Currency::transfer(&who, &dest, value, ExistenceRequirement::AllowDeath);
 
                 let storage_order = StorageOrder {
+                    file_indetifier,
                     file_size,
                     expired_duration,
-                    expired_on
+                    expired_on,
+                    destination: dest
                 };
                 // 1. Do check and should do something
                 ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");

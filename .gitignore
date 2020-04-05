@@ -13,3 +13,4 @@ Cargo.lock
 ## ide
 .vscode
 .idea
+.vs

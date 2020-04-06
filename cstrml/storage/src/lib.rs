@@ -28,7 +28,7 @@ mod tests;
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct StorageOrder<T> {
-    pub file_indetifier: MerkleRoot,
+    pub file_indetifier: u64,
     pub file_size: u64,
     pub expired_duration: u64,
     pub expired_on: u64,
@@ -75,7 +75,7 @@ decl_module! {
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
             #[compact] value: Balance,
-            file_indetifier: MerkleRoot,
+            file_indetifier: u64,
             file_size: u64,
             expired_duration: u64,
             expired_on: u64
@@ -83,22 +83,19 @@ decl_module! {
             {
                 let who = ensure_signed(origin)?;
                 let dest = T::Lookup::lookup(dest)?;
-                let fee_id = T::OnOrderStroage::storage_fee_transfer(&who, &dest, value);
-
                 let storage_order = StorageOrder::<T::AccountId> {
                     file_indetifier,
                     file_size,
                     expired_duration,
                     expired_on,
-                    destination: dest
+                    destination: dest.clone()
                 };
                 // 1. Do check and should do something
 
-                // ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
+                ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
 
-                // 2. Store the storage order
-                <StorageOrders<T>>::insert((&who, &fee_id), &storage_order);
-
+                Self::transfer_fee_and_store_order(&who, &dest, value, &storage_order);
+                
                 // // 3. Emit storage order event
                 // Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
 
@@ -115,6 +112,11 @@ impl<T: Trait> Module<T> {
             "Cannot find work report or empty work load is not enough!"
         );
         Ok(())
+    }
+
+    fn transfer_fee_and_store_order(source: &T::AccountId, dest: &T::AccountId, value: Balance, so: &StorageOrder<T::AccountId>) {
+        let fee_id = T::OnOrderStroage::storage_fee_transfer(&source, &dest, value);
+        <StorageOrders<T>>::insert((&source, &fee_id), &so);
     }
 }
 

@@ -46,4 +46,5 @@ balances = { package = 'pallet-balances', version = "2.0.0", git = 'https://gith
 timestamp = { package = 'pallet-timestamp', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 pallet-staking-reward-curve = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
 keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
+staking = { package = "cstrml-staking", path = "../staking", default-features = false }
 hex = '0.4.0'

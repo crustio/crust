@@ -30,7 +30,7 @@ pub type BalanceOf<T> =
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct StorageOrder<T> { // Need to confirm this name. FileOrder?
+pub struct StorageOrder<T> {
     pub file_indetifier: MerkleRoot,
     pub file_size: u64,
     pub expired_duration: u64,
@@ -38,11 +38,23 @@ pub struct StorageOrder<T> { // Need to confirm this name. FileOrder?
     pub destination: T
 }
 
+
+/// An event handler for 
+pub trait OnOrderStroage<AccountId, T> {
+    fn storage_fee_transfer(transactor: &AccountId, dest: &AccountId, value: BalanceOf<T>) => u64
+}
+
+impl<AId, T> OnOrderStroage<AId, T> for () {
+    fn storage_fee_transfer(_: &AId, _: &AId, _: BalanceOf<T>){
+        0
+    }
+}
+
 /// The module's configuration trait.
-pub trait Trait: system::Trait + tee:: Trait {
+pub trait Trait: system::Trait + tee::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-    type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+    type OnOrderStroage: OnOrderStroage<Self::AccountId, Self>;
     // To do. Support work report check
 }
 
@@ -50,7 +62,7 @@ pub trait Trait: system::Trait + tee:: Trait {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Storage {
-        pub StorageOrders get(fn storage_orders) config(): map (T::AccountId, MerkleRoot) => Option<StorageOrder<T::AccountId>>;
+        pub StorageOrders get(fn storage_orders) config(): map (T::AccountId, u64) => Option<StorageOrder<T::AccountId>>; // Cannot use MerkleRoot as the key. cannot open the apps
     }
 }
 
@@ -74,7 +86,7 @@ decl_module! {
             {
                 let who = ensure_signed(origin)?;
                 let dest = T::Lookup::lookup(dest)?;
-                T::Currency::transfer(&who, &dest, value, ExistenceRequirement::AllowDeath);
+                let fee_id = T::OnOrderStroage::storage_fee_transfer(&who, &dest, value);
 
                 let storage_order = StorageOrder::<T::AccountId> {
                     file_indetifier,
@@ -88,7 +100,7 @@ decl_module! {
                 ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
 
                 // 2. Store the storage order
-                <StorageOrders<T>>::insert((&who, &storage_order.file_indetifier), &storage_order);
+                <StorageOrders<T>>::insert((&who, &fee_id), &storage_order);
 
                 // // 3. Emit storage order event
                 // Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));

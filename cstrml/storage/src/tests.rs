@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::mock::{new_test_ext, run_to_block, Origin, Tee, Storage};
+use crate::mock::{new_test_ext, run_to_block, Origin, Storage};
 use frame_support::assert_ok;
 use hex;
 use keyring::Sr25519Keyring;
@@ -47,235 +47,65 @@ fn get_valid_work_report() -> tee::WorkReport {
 }
 
 #[test]
-fn test_for_report_works_success() {
+fn test_for_storage_order_show_work() {
     new_test_ext().execute_with(|| {
-        // generate 303 blocks first
-        run_to_block(303);
+        // generate 50 blocks first
+        run_to_block(50);
 
-        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-
-        // Check workloads
-        assert_eq!(Tee::empty_workload(), 0);
-
-        assert_ok!(Tee::report_works(
-            Origin::signed(account.clone()),
-            get_valid_work_report()
-        ));
-
-        // Check workloads after work report
-        assert_eq!(Tee::empty_workload(), 4294967296);
-        assert_eq!(Tee::meaningful_workload(), 1676266280);
-
-        let source: AccountId = Sr25519Keyring::Alice.to_account_id();
+        let source = 0;
         let file_indetifier = 
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let destination: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let file_size = 16;
+        let destination = 100;
+        let file_size = 16; // should less than destination
         let expired_duration = 16;
         let expired_on = 20;
         let fee = 10;
-        let order_id = 0;
         assert_ok!(Storage::store_storage_order(
             Origin::signed(source.clone()), destination, fee,
-            order_id, file_indetifier, file_size, expired_duration, expired_on
+            file_indetifier, file_size, expired_duration, expired_on
         ));
     });
 }
 
-// #[test]
-// fn test_for_report_works_failed_by_pub_key_is_not_found() {
-//     new_test_ext().execute_with(|| {
-//         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
 
-//         let mut works = get_valid_work_report();
-//         works.pub_key = "another_pub_key".as_bytes().to_vec();
+#[test]
+fn test_for_storage_order_show_fail_due_to_file_size() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
 
-//         assert!(Tee::report_works(Origin::signed(account), works).is_err());
-//     });
-// }
+        let source = 0;
+        let file_indetifier = 
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let destination = 100;
+        let file_size = 200; // should less than destination
+        let expired_duration = 16;
+        let expired_on = 20;
+        let fee = 10;
+        assert!(Storage::store_storage_order(
+            Origin::signed(source.clone()), destination, fee,
+            file_indetifier, file_size, expired_duration, expired_on
+        ).is_err());
+    });
+}
 
-// #[test]
-// fn test_for_report_works_failed_by_reporter_is_not_registered() {
-//     new_test_ext().execute_with(|| {
-//         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
+#[test]
+fn test_for_storage_order_show_fail_due_to_exist_of_wr() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
 
-//         let works = WorkReport {
-//             pub_key: "pub_key_bob".as_bytes().to_vec(),
-//             block_number: 50,
-//             block_hash: "block_hash".as_bytes().to_vec(),
-//             empty_root: "merkle_root_bob".as_bytes().to_vec(),
-//             empty_workload: 2000,
-//             meaningful_workload: 2000,
-//             sig: "sig_key_bob".as_bytes().to_vec(),
-//         };
-
-//         assert!(Tee::report_works(Origin::signed(account), works).is_err());
-//     });
-// }
-
-// #[test]
-// fn test_for_work_report_timing_check_failed_by_wrong_hash() {
-//     new_test_ext().execute_with(|| {
-//         // generate 50 blocks first
-//         run_to_block(50);
-
-//         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-//         let block_hash = [1; 32].to_vec();
-
-//         let works = WorkReport {
-//             pub_key: "pub_key_alice".as_bytes().to_vec(),
-//             block_number: 50,
-//             block_hash,
-//             empty_root: "merkle_root_alice".as_bytes().to_vec(),
-//             empty_workload: 0,
-//             meaningful_workload: 1000,
-//             sig: "sig_key_alice".as_bytes().to_vec(),
-//         };
-
-//         assert!(Tee::report_works(Origin::signed(account), works).is_err());
-//     });
-// }
-
-// #[test]
-// fn test_for_work_report_timing_check_failed_by_slot_outdated() {
-//     new_test_ext().execute_with(|| {
-//         // generate 50 blocks first
-//         run_to_block(103);
-
-//         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-//         let block_hash = [0; 32].to_vec();
-
-//         let works = WorkReport {
-//             pub_key: "pub_key_alice".as_bytes().to_vec(),
-//             block_number: 50,
-//             block_hash,
-//             empty_root: "merkle_root_alice".as_bytes().to_vec(),
-//             empty_workload: 5000,
-//             meaningful_workload: 1000,
-//             sig: "sig_key_alice".as_bytes().to_vec(),
-//         };
-
-//         assert!(Tee::report_works(Origin::signed(account), works).is_err());
-//     });
-// }
-
-// #[test]
-// fn test_for_work_report_sig_check_failed() {
-//     new_test_ext().execute_with(|| {
-//         // generate 53 blocks first
-//         run_to_block(53);
-
-//         let account: AccountId32 = Sr25519Keyring::Alice.to_account_id();
-//         let pub_key = hex::decode("19817c0e3be0793b9c27b6064aeac6a82df3335a2ccdac7ea3d4c56e96a315a1e4dfe23491330c1ba11347ca4d6474151636ec15a7fc45d219d034eb9a33bb75").unwrap();
-//         let block_hash= [0; 32].to_vec();
-//         let empty_root = hex::decode("ae56f97320fbebbd1dd44d573486261709f5497d9d8391b2b2b6c23287927f5d").unwrap();
-//         let sig = hex::decode("4b23f3a95015387c735100dae6fdcb78445a2db50d08e19713bff900b69bc8c0719bf62750b30b92d082adfe8e0fa705a6cbe909c09961b4d0cc5f22d5c91599").unwrap();
-
-//         let works = WorkReport {
-//             pub_key,
-//             block_number: 50,
-//             block_hash,
-//             empty_root,
-//             empty_workload: 4294967296,
-//             meaningful_workload: 1676266280,
-//             sig
-//         };
-
-//         assert!(Tee::report_works(Origin::signed(account), works).is_err());
-//     });
-// }
-
-// #[test]
-// fn test_for_oudated_work_reports() {
-//     new_test_ext().execute_with(|| {
-//         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
-//         // generate 303 blocks first
-//         run_to_block(303);
-
-//         assert_ok!(Tee::report_works(
-//             Origin::signed(account.clone()),
-//             get_valid_work_report()
-//         ));
-
-//         // check work report and workload
-//         assert_eq!(Tee::update_and_get_workload(&account, 300), 0);
-//         assert_eq!(
-//             Tee::work_reports((&account, 300)),
-//             Some(get_valid_work_report())
-//         );
-//         // Check workloads
-//         assert_eq!(Tee::empty_workload(), 4294967296);
-//         assert_eq!(Tee::meaningful_workload(), 1676266280);
-
-//         // generate 401 blocks, wr still valid
-//         run_to_block(401);
-//         assert_eq!(
-//             Tee::work_reports((&account, 300)),
-//             Some(get_valid_work_report())
-//         );
-
-//         // generate 602 blocks, 300 work report should be removed
-//         run_to_block(602);
-
-//         assert_eq!(Tee::update_and_get_workload(&account, 600), 5971233576);
-//         assert_eq!(
-//             Tee::work_reports((&account, 300)),
-//             None
-//         );
-//         assert_eq!(
-//             Tee::work_reports((&account, 600)),
-//             Some(get_valid_work_report())
-//         );
-
-//         run_to_block(903);
-//         assert_eq!(Tee::update_and_get_workload(&account, 900), 0);
-//         assert_eq!(
-//             Tee::work_reports((&account, 600)),
-//             None
-//         );
-//         assert_eq!(
-//             Tee::work_reports((&account, 900)),
-//             None
-//         );
-
-//         // Check workloads
-//         assert_eq!(Tee::empty_workload(), 0);
-//         assert_eq!(Tee::meaningful_workload(), 0);
-//     });
-// }
-
-// #[test]
-// fn test_abnormal_era() {
-//     new_test_ext().execute_with(|| {
-//         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
-
-//         // If new era happens in 101, next work is not reported, we should keep last work report
-//         run_to_block(101);
-//         Tee::update_identities();
-//         assert_eq!(
-//             Tee::work_reports((&account, 0)),
-//             Some(Default::default())
-//         );
-//         assert_eq!(
-//             Tee::last_report_slot(),
-//             0
-//         );
-
-//         // If new era happens in 301, we should update work report and last report slot
-//         run_to_block(301);
-//         Tee::update_identities();
-//         assert_eq!(
-//             Tee::work_reports((&account, 0)),
-//             None
-//         );
-//         assert_eq!(
-//             Tee::work_reports((&account, 300)),
-//             Some(Default::default())
-//         );
-//         assert_eq!(
-//             Tee::last_report_slot(),
-//             300
-//         );
-
-//     })
-// }
+        let source = 0;
+        let file_indetifier = 
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let destination = 400; // Invalid destination. No work report
+        let file_size = 200;
+        let expired_duration = 16;
+        let expired_on = 20;
+        let fee = 10;
+        assert!(Storage::store_storage_order(
+            Origin::signed(source.clone()), destination, fee,
+            file_indetifier, file_size, expired_duration, expired_on
+        ).is_err());
+    });
+}

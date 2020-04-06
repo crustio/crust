@@ -9,8 +9,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
     Perbill,
 };
-pub type Balance = u128;
-type AccountId = AccountId32;
+pub type AccountId = u64;
 
 impl_outer_origin! {
     pub enum Origin for Test {}
@@ -57,37 +56,13 @@ impl tee::Trait for Test {
     type OnReportWorks = ();
 }
 
-parameter_types! {
-    pub const ExistentialDeposit: u128 = 500;
-    pub const TransferFee: u128 = 0;
-    pub const CreationFee: u128 = 0;
-}
-
-impl balances::Trait for Test {
-    /// The type for recording an account's balance.
-    type Balance = Balance;
-    /// What to do if an account's free balance gets zeroed.
-    type OnFreeBalanceZero = ();
-    /// What to do if a new account is created.
-    type OnNewAccount = ();
-    /// The ubiquitous event type.
-    type Event = ();
-    type DustRemoval = ();
-    type TransferPayment = ();
-    type ExistentialDeposit = ExistentialDeposit;
-    type TransferFee = TransferFee;
-    type CreationFee = CreationFee;
-}
-
 impl Trait for Test {
     type Event = ();
-    type Currency = Balances;
+    type OnOrderStroage = ();
 }
 
 pub type Storage = Module<Test>;
-pub type Tee = tee::Module<Test>;
 pub type System = system::Module<Test>;
-pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
@@ -97,7 +72,24 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .unwrap();
 
     // tee genesis
-    let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
+    let identities: Vec<u64> = vec![0, 100, 200];
+    let mut work_reports: Vec<((u64, u64), tee::WorkReport)> = identities
+            .iter()
+            .map(|id| {
+                (
+                    (*id, 0),
+                    tee::WorkReport {
+                        pub_key: vec![],
+                        block_number: 0,
+                        block_hash: vec![],
+                        empty_root: vec![],
+                        empty_workload: *id,
+                        meaningful_workload: 0,
+                        sig: vec![],
+                    },
+                )
+            })
+            .collect();
 
     let _ = tee::GenesisConfig::<Test> {
         last_report_slot: 0,
@@ -107,7 +99,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             .collect(),
         work_reports
     }
-    .assimilate_storage(&mut storage);
+    .assimilate_storage(&mut t);
+
     t.into()
 }
 

@@ -17,7 +17,7 @@ use tee;
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{MerkleRoot, Balance};
+use primitives::{MerkleRoot, Balance, BlockNumber};
 
 #[cfg(test)]
 mod mock;
@@ -28,10 +28,10 @@ mod tests;
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct StorageOrder<T> {
-    pub file_indetifier: u64,
+    pub file_indetifier: MerkleRoot,
     pub file_size: u64,
-    pub expired_duration: u64,
-    pub expired_on: u64,
+    pub expired_duration: BlockNumber,
+    pub expired_on: BlockNumber,
     pub destination: T
 }
 
@@ -75,10 +75,10 @@ decl_module! {
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
             #[compact] value: Balance,
-            file_indetifier: u64,
+            file_indetifier: MerkleRoot,
             file_size: u64,
-            expired_duration: u64,
-            expired_on: u64
+            expired_duration: BlockNumber,
+            expired_on: BlockNumber
         ) -> DispatchResult
             {
                 let who = ensure_signed(origin)?;

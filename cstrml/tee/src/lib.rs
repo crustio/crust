@@ -77,7 +77,7 @@ decl_storage! {
             (T::AccountId, u64)  => Option<WorkReport>;
 
         /// The old report slot block number.
-        pub LastReportSlot get(fn last_report_slot) config(): u64;
+        pub CurrentReportSlot get(fn current_report_slot) config(): u64;
 
         /// The meaningful workload, used for calculating stake limit in the end of era
         /// default is 0
@@ -180,16 +180,17 @@ impl<T: Trait> Module<T> {
     /// TC = O(n)
     /// DB try is 2n+1
     pub fn update_identities() {
+        // Ideally, reported_rs should be current_rs + 1
+        let reported_rs = Self::get_reported_slot();
         let current_rs = Self::current_report_slot();
-        let last_rs = Self::last_report_slot();
 
         // 1. Report slot did not change, it should not trigger updating
-        if last_rs == current_rs {
+        if current_rs == reported_rs {
             return;
         }
 
         // 2. Update last report slot be current
-        LastReportSlot::mutate(|rs| *rs = current_rs);
+        CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
         // 3. Slot changed, update all identities
         let ids: Vec<(T::AccountId, Identity<T::AccountId>)> =
@@ -197,7 +198,7 @@ impl<T: Trait> Module<T> {
 
         // 4. Update id's work report, get id's workload and total workload
         let workload_map: Vec<(&T::AccountId, u128)> = ids.iter().map(|(controller, _)| {
-            (controller, Self::update_and_get_workload(&controller, current_rs))
+            (controller, Self::update_and_get_workload(&controller, reported_rs))
         }).collect();
         let total_workload = Self::meaningful_workload() + Self::empty_workload();
 
@@ -209,12 +210,14 @@ impl<T: Trait> Module<T> {
 
     // PRIVATE IMMUTABLES
     fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport) -> bool {
-        // 1. Get current era
+        // 1. Current block always be 300*n(n >= 1) + 4(for Alphanet)
+        let current_rs = Self::current_report_slot();
+
+        // 2. Judge if wr on current_rs is existed
         let mut old_m_workload: u128 = 0;
         let mut old_e_workload: u128 = 0;
 
-        // 2. Judge if wr existed
-        if let Some(old_wr) = Self::work_reports((who, wr.block_number)) {
+        if let Some(old_wr) = Self::work_reports((who, current_rs)) {
             if &old_wr == wr {
                 return false;
             } else {
@@ -223,7 +226,7 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        // 3. Upsert workload
+        // 3. Upsert work report
         <WorkReports<T>>::insert((who, wr.block_number), wr);
 
         // 4. Upsert workload
@@ -312,7 +315,7 @@ impl<T: Trait> Module<T> {
 
         // 2. Check work report timing
         ensure!(
-            wr.block_number == 1 || wr.block_number == Self::current_report_slot(),
+            wr.block_number == 1 || wr.block_number == Self::get_reported_slot(),
             "work report is outdated or beforehand"
         );
 
@@ -332,7 +335,7 @@ impl<T: Trait> Module<T> {
         )
     }
 
-    fn current_report_slot() -> u64 {
+    fn get_reported_slot() -> u64 {
         let current_block_number = <system::Module<T>>::block_number();
         let current_block_numeric = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
         let current_report_index = current_block_numeric / REPORT_SLOT;

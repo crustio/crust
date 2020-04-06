@@ -87,7 +87,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .collect();
 
     GenesisConfig::<Test> {
-        last_report_slot: 0,
+        current_report_slot: 0,
         tee_identities,
         work_reports,
     }

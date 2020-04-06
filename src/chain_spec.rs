@@ -220,7 +220,7 @@ fn testnet_genesis(
         im_online: Some(Default::default()),
         authority_discovery: Some(AuthorityDiscoveryConfig { keys: vec![] }),
         tee: Some(TeeConfig {
-            last_report_slot: 0,
+            current_report_slot: 0,
             tee_identities: endowed_accounts
                 .iter()
                 .map(|x| (x.clone(), Default::default()))

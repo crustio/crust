@@ -345,8 +345,9 @@ fn test_abnormal_era() {
             Tee::work_reports((&account, 0)),
             Some(Default::default())
         );
+        assert_eq!(Tee::empty_workload(), 0);
         assert_eq!(
-            Tee::last_report_slot(),
+            Tee::current_report_slot(),
             0
         );
 
@@ -362,9 +363,38 @@ fn test_abnormal_era() {
             Some(Default::default())
         );
         assert_eq!(
-            Tee::last_report_slot(),
+            Tee::current_report_slot(),
             300
         );
 
+        // Then report works
+        // empty_workload: 4294967296,
+        // meaningful_workload: 1676266280,
+        run_to_block(304);
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            get_valid_work_report()
+        ));
+        assert_eq!(
+            Tee::work_reports((&account, 300)),
+            Some(get_valid_work_report())
+        );
+        assert_eq!(Tee::empty_workload(), 4294967296);
+        assert_eq!(Tee::meaningful_workload(), 1676266280);
+
+        // If abnormal era end happens in 589
+        run_to_block(589);
+        // nothing should happen cause report slot not change
+        Tee::update_identities();
+        assert_eq!(
+            Tee::current_report_slot(),
+            300
+        );
+        assert_eq!(
+            Tee::work_reports((&account, 300)),
+            Some(get_valid_work_report())
+        );
+        assert_eq!(Tee::empty_workload(), 4294967296);
+        assert_eq!(Tee::meaningful_workload(), 1676266280);
     })
 }

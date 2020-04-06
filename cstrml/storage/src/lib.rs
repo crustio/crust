@@ -108,8 +108,12 @@ impl<T: Trait> Module<T> {
     // private function can be built in here
     fn storage_order_check(so: &StorageOrder<T::AccountId>) -> DispatchResult {
         ensure!(
+            &<tee::Module<T>>::get_last_work_report(&so.destination).is_some(),
+            "Cannot find work report!"
+        );
+        ensure!(
             &<tee::Module<T>>::get_last_work_report(&so.destination).unwrap().empty_workload >= &so.file_size,
-            "Cannot find work report or empty work load is not enough!"
+            "Empty work load is not enough!"
         );
         Ok(())
     }

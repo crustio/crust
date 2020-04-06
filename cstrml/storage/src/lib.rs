@@ -17,16 +17,13 @@ use tee;
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{MerkleRoot};
+use primitives::{MerkleRoot, Balance};
 
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
-
-pub type BalanceOf<T> =
-    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -40,12 +37,12 @@ pub struct StorageOrder<T> {
 
 
 /// An event handler for 
-pub trait OnOrderStroage<AccountId, T> {
-    fn storage_fee_transfer(transactor: &AccountId, dest: &AccountId, value: BalanceOf<T>) => u64
+pub trait OnOrderStroage<AccountId> {
+    fn storage_fee_transfer(transactor: &AccountId, dest: &AccountId, value: Balance) -> u64;
 }
 
-impl<AId, T> OnOrderStroage<AId, T> for () {
-    fn storage_fee_transfer(_: &AId, _: &AId, _: BalanceOf<T>){
+impl<AId> OnOrderStroage<AId> for () {
+    fn storage_fee_transfer(_: &AId, _: &AId, _: Balance) -> u64 {
         0
     }
 }
@@ -54,7 +51,7 @@ impl<AId, T> OnOrderStroage<AId, T> for () {
 pub trait Trait: system::Trait + tee::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-    type OnOrderStroage: OnOrderStroage<Self::AccountId, Self>;
+    type OnOrderStroage: OnOrderStroage<Self::AccountId>;
     // To do. Support work report check
 }
 
@@ -77,7 +74,7 @@ decl_module! {
         fn store_storage_order(
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
-            #[compact] value: BalanceOf<T>,
+            #[compact] value: Balance,
             file_indetifier: MerkleRoot,
             file_size: u64,
             expired_duration: u64,
@@ -97,7 +94,7 @@ decl_module! {
                 };
                 // 1. Do check and should do something
 
-                ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
+                // ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
 
                 // 2. Store the storage order
                 <StorageOrders<T>>::insert((&who, &fee_id), &storage_order);

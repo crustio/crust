@@ -209,8 +209,8 @@ impl<T: Trait> Module<T> {
     }
 
     pub fn get_last_work_report(who: &T::AccountId) -> Option<WorkReport> {
-        let last_rs = Self::last_report_slot();
-        <WorkReports<T>>::get((who, last_rs))
+        let current_rs = Self::current_report_slot();
+        <WorkReports<T>>::get((who, current_rs))
     }
 
     // PRIVATE IMMUTABLES

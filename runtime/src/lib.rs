@@ -505,7 +505,7 @@ construct_runtime!(
 
         // Crust modules
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
-        Storage: storage_order::{Module, Call, Storage, Event<T>, Config<T>},
+        StorageOrder: storage_order::{Module, Call, Storage, Event<T>, Config<T>},
     }
 );
 

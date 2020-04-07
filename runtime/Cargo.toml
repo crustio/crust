@@ -8,7 +8,7 @@ build = 'build.rs'
 [dependencies]
 tee = { package = 'cstrml-tee', path = '../cstrml/tee', default_features = false }
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default_features = false }
-storage-order = { package = 'cstrml-storage-order', path = '../cstrml/storage', default_features = false }
+storage-order = { package = 'cstrml-storage-order', path = '../cstrml/storage_order', default_features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default_features = false }
 
 

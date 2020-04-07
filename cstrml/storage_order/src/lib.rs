@@ -58,7 +58,7 @@ pub trait Trait: system::Trait + tee::Trait {
 // TODO: add add_extra_genesis to unify chain_spec
 // This module's storage items.
 decl_storage! {
-    trait Store for Module<T: Trait> as Storage {
+    trait StoreOrder for Module<T: Trait> as StoreOrder {
         pub StorageOrders get(fn storage_orders) config(): map (T::AccountId, u64) => Option<StorageOrder<T::AccountId>>; // Cannot use MerkleRoot as the key. cannot open the apps
     }
 }
@@ -96,8 +96,8 @@ decl_module! {
 
                 Self::transfer_fee_and_store_order(&who, &dest, value, &storage_order);
                 
-                // // 3. Emit storage order event
-                // Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
+                // 3. Emit storage order event
+                Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
 
                 Ok(())
             }

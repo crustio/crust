@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::mock::{new_test_ext, run_to_block, Origin, Storage};
+use crate::mock::{new_test_ext, run_to_block, Origin, StorageOrder};
 use frame_support::assert_ok;
 use hex;
 use keyring::Sr25519Keyring;
@@ -60,7 +60,7 @@ fn test_for_storage_order_show_work() {
         let expired_duration = 16;
         let expired_on = 20;
         let fee = 10;
-        assert_ok!(Storage::store_storage_order(
+        assert_ok!(StorageOrder::store_storage_order(
             Origin::signed(source.clone()), destination, fee,
             file_indetifier, file_size, expired_duration, expired_on
         ));
@@ -82,7 +82,7 @@ fn test_for_storage_order_show_fail_due_to_file_size() {
         let expired_duration = 16;
         let expired_on = 20;
         let fee = 10;
-        assert!(Storage::store_storage_order(
+        assert!(StorageOrder::store_storage_order(
             Origin::signed(source.clone()), destination, fee,
             file_indetifier, file_size, expired_duration, expired_on
         ).is_err());
@@ -103,7 +103,7 @@ fn test_for_storage_order_show_fail_due_to_exist_of_wr() {
         let expired_duration = 16;
         let expired_on = 20;
         let fee = 10;
-        assert!(Storage::store_storage_order(
+        assert!(StorageOrder::store_storage_order(
             Origin::signed(source.clone()), destination, fee,
             file_indetifier, file_size, expired_duration, expired_on
         ).is_err());

@@ -61,7 +61,7 @@ impl Trait for Test {
     type OnOrderStroage = ();
 }
 
-pub type Storage = Module<Test>;
+pub type StorageOrder = Module<Test>;
 pub type System = system::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to

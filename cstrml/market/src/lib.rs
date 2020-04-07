@@ -4,11 +4,8 @@
 #![feature(option_result_contains)]
 
 use codec::{Decode, Encode};
-use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure,
-    traits::{
-        Currency, ExistenceRequirement, LockableCurrency,
-	}};
-use sp_std::{str, vec::Vec};
+use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure};
+use sp_std::{str};
 use system::ensure_signed;
 use sp_runtime::{traits::StaticLookup};
 use tee;
@@ -36,12 +33,12 @@ pub struct StorageOrder<T> {
 }
 
 
-/// An event handler for 
-pub trait OnOrderStroage<AccountId> {
+/// An event handler for sending storage order
+pub trait OnOrderStorage<AccountId> {
     fn storage_fee_transfer(transactor: &AccountId, dest: &AccountId, value: Balance) -> u64;
 }
 
-impl<AId> OnOrderStroage<AId> for () {
+impl<AId> OnOrderStorage<AId> for () {
     fn storage_fee_transfer(_: &AId, _: &AId, _: Balance) -> u64 {
         // transfer the fee and return order id
         0
@@ -52,14 +49,13 @@ impl<AId> OnOrderStroage<AId> for () {
 pub trait Trait: system::Trait + tee::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-    type OnOrderStroage: OnOrderStroage<Self::AccountId>;
+    type OnOrderStorage: OnOrderStorage<Self::AccountId>;
 }
 
-// TODO: add add_extra_genesis to unify chain_spec
 // This module's storage items.
 decl_storage! {
-    trait StoreOrder for Module<T: Trait> as StoreOrder {
-        pub StorageOrders get(fn storage_orders) config(): map (T::AccountId, u64) => Option<StorageOrder<T::AccountId>>; // Cannot use MerkleRoot as the key. cannot open the apps
+    trait Store for Module<T: Trait> as Market {
+        pub StorageOrders get(fn storage_orders): map (T::AccountId, u64) => Option<StorageOrder<T::AccountId>>; // Cannot use MerkleRoot as the key. cannot open the apps
     }
 }
 
@@ -70,7 +66,7 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
-
+        /// TODO: organize these parameters into a struct.
         fn store_storage_order(
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
@@ -92,9 +88,9 @@ decl_module! {
                 };
                 // 1. Do check and should do something
 
-                ensure!(Self::storage_order_check(&storage_order).is_ok(), "Storage Order is invalid!");
+                ensure!(Self::check_storage_order(&storage_order).is_ok(), "Storage Order is invalid!");
 
-                Self::transfer_fee_and_store_order(&who, &dest, value, &storage_order);
+                Self::maybe_insert_sorder(&who, &dest, value, &storage_order);
                 
                 // 3. Emit storage order event
                 Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
@@ -106,20 +102,20 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     // private function can be built in here
-    fn storage_order_check(so: &StorageOrder<T::AccountId>) -> DispatchResult {
+    fn check_storage_order(so: &StorageOrder<T::AccountId>) -> DispatchResult {
         ensure!(
-            &<tee::Module<T>>::get_last_work_report(&so.destination).is_some(),
+            &<tee::Module<T>>::get_work_report(&so.destination).is_some(),
             "Cannot find work report!"
         );
         ensure!(
-            &<tee::Module<T>>::get_last_work_report(&so.destination).unwrap().empty_workload >= &so.file_size,
+            &<tee::Module<T>>::get_work_report(&so.destination).unwrap().empty_workload >= &so.file_size,
             "Empty work load is not enough!"
         );
         Ok(())
     }
-
-    fn transfer_fee_and_store_order(source: &T::AccountId, dest: &T::AccountId, value: Balance, so: &StorageOrder<T::AccountId>) {
-        let fee_id = T::OnOrderStroage::storage_fee_transfer(&source, &dest, value);
+    // sorder is equal to storage order
+    fn maybe_insert_sorder(source: &T::AccountId, dest: &T::AccountId, value: Balance, so: &StorageOrder<T::AccountId>) {
+        let fee_id = T::OnOrderStorage::storage_fee_transfer(&source, &dest, value);
         <StorageOrders<T>>::insert((&source, &fee_id), &so);
     }
 }

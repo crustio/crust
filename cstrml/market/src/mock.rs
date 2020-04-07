@@ -1,9 +1,7 @@
 use super::*;
 
-use frame_support::{impl_outer_origin, parameter_types, weights::Weight, traits::Get};
-use keyring::Sr25519Keyring;
-use sp_core::{crypto::AccountId32, H256};
-use sp_std::cell::RefCell;
+use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
+use sp_core::H256;
 use sp_runtime::{
     testing::Header,
     traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
@@ -20,10 +18,6 @@ impl_outer_origin! {
 // configuration traits of modules we want to use.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Test;
-
-thread_local! {
-    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
-}
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
@@ -58,10 +52,10 @@ impl tee::Trait for Test {
 
 impl Trait for Test {
     type Event = ();
-    type OnOrderStroage = ();
+    type OnOrderStorage = ();
 }
 
-pub type StorageOrder = Module<Test>;
+pub type Market = Module<Test>;
 pub type System = system::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
@@ -73,7 +67,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     // tee genesis
     let identities: Vec<u64> = vec![0, 100, 200];
-    let mut work_reports: Vec<((u64, u64), tee::WorkReport)> = identities
+    let work_reports: Vec<((u64, u64), tee::WorkReport)> = identities
             .iter()
             .map(|id| {
                 (

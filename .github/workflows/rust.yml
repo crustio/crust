@@ -60,4 +60,4 @@ jobs:
         with:
           use-cross: false
           command: test
-          args: --package cstrml-storage-order --lib tests
+          args: --package cstrml-market --lib tests

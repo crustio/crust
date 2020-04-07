@@ -243,6 +243,5 @@ fn testnet_genesis(
                 })
                 .collect(),
         }),
-        storage_order: Some(Default::default()),
     }
 }

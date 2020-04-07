@@ -208,7 +208,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    pub fn get_last_work_report(who: &T::AccountId) -> Option<WorkReport> {
+    pub fn get_work_report(who: &T::AccountId) -> Option<WorkReport> {
         let current_rs = Self::current_report_slot();
         <WorkReports<T>>::get((who, current_rs))
     }

@@ -43,6 +43,7 @@ pub trait OnOrderStroage<AccountId> {
 
 impl<AId> OnOrderStroage<AId> for () {
     fn storage_fee_transfer(_: &AId, _: &AId, _: Balance) -> u64 {
+        // transfer the fee and return order id
         0
     }
 }
@@ -52,7 +53,6 @@ pub trait Trait: system::Trait + tee::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
     type OnOrderStroage: OnOrderStroage<Self::AccountId>;
-    // To do. Support work report check
 }
 
 // TODO: add add_extra_genesis to unify chain_spec
@@ -74,7 +74,7 @@ decl_module! {
         fn store_storage_order(
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
-            #[compact] value: Balance,
+            #[compact] value: Balance, // Keep it now and refactor it later
             file_indetifier: MerkleRoot,
             file_size: u64,
             expired_duration: BlockNumber,

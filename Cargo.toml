@@ -8,29 +8,20 @@ license = "GPL-3.0"
 homepage = "https://crust.network"
 repository = "https://github.com/crustio/crust/"
 
-[workspace]
-members = ['runtime']
-
-[profile.release]
-panic = 'unwind'
-
-[build-dependencies]
-vergen = '3.0.4'
-build-script-utils = { version = "2.0.0-alpha.5", package = "substrate-build-script-utils" }
+[[bin]]
+name = 'crust'
 
 [dependencies]
 # third parity dependencies
 futures = "0.3.4"
-log = '0.4.8'
-parking_lot = '0.10.0'
-tokio = '0.2.22'
-trie-root = '0.16.0'
-structopt = { version = '0.3.8', optional = true }
+log = "0.4.8"
+structopt = "0.3.8"
 
 # substrate client dependencies
+babe = { version = '0.8.0-alpha.5', package = 'sc-consensus-babe' }
+grandpa = { version = "0.8.0-alpha.5", package = "sc-finality-grandpa" }
+sc-basic-authorship = '0.8.0-alpha.5'
 sc-authority-discovery = '0.8.0-alpha.5'
-sc-basic-authority = '0.8.0-alpha.5'
-sc-consensus-babe = '0.8.0-alpha.5'
 sc-client = '0.8.0-alpha.5'
 sc-client-api = '2.0.0-alpha.5'
 sc-cli = '0.8.0-alpha.5'
@@ -38,7 +29,6 @@ sc-executor = '0.8.0-alpha.5'
 sc-network = '0.8.0-alpha.5'
 sc-service = '0.8.0-alpha.5'
 sc-transaction-pool = '2.0.0-alpha.5'
-grandpa = { version = "0.8.0-alpha.5", package = "sc-finality-grandpa" }
 
 # substrate primitives
 sp-transaction-pool = '2.0.0-alpha.5'
@@ -48,7 +38,7 @@ sp-consensus-babe = '0.8.0-alpha.5'
 sp-inherents = '2.0.0-alpha.5'
 sp-io = '2.0.0-alpha.5'
 sp-runtime = '2.0.0-alpha.5'
-grandpa-primitives = { pacakge = 'sp-finality-grandpa', version = '2.0.0-alpha.5' }
+grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-alpha.5' }
 
 # crust runtime modules
 crust-runtime = { path = 'runtime', version = '0.3.0' }
@@ -56,5 +46,6 @@ cstrml-staking = { path = 'cstrml/staking', version = '0.3.0' }
 cstrml-tee = { path = 'cstrml/tee', version = '0.3.0' }
 primitives = { package = 'cst-primitives', path = 'primitives', version = '0.3.0' }
 
-[[bin]]
-name = 'crust'
+[build-dependencies]
+vergen = '3.0.4'
+build-script-utils = { version = "2.0.0-alpha.5", package = "substrate-build-script-utils" }

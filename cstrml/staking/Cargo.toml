@@ -35,7 +35,9 @@ sp-core = '2.0.0-alpha.5'
 pallet-balances = '2.0.0-alpha.5'
 pallet-timestamp = '2.0.0-alpha.5'
 pallet-staking-reward-curve = '2.0.0-alpha.5'
-substrate-test-utils = '2.0.0-alpha.5'
+
+# private crate inside substrate
+substrate-test-utils = { version = '2.0.0-alpha.5', git = 'https://github.com/paritytech/substrate.git', rev = 'd1b9ccad107e4899978858de5ddd2868b9777aab'}
 
 [features]
 equalize = []

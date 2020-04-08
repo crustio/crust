@@ -5,7 +5,7 @@
 
 use codec::{Decode, Encode};
 use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure};
-use sp_std::{str};
+use sp_std::str;
 use system::ensure_signed;
 use sp_runtime::{traits::StaticLookup};
 use tee;
@@ -86,10 +86,11 @@ decl_module! {
                     expired_on,
                     destination: dest.clone()
                 };
-                // 1. Do check and should do something
 
+                // 1. Do check and should do something
                 ensure!(Self::check_storage_order(&storage_order).is_ok(), "Storage Order is invalid!");
 
+                // 2. Cut fee and (maybe) add storage order
                 Self::maybe_insert_sorder(&who, &dest, value, &storage_order);
                 
                 // 3. Emit storage order event

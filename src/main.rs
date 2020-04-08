@@ -1,25 +1,23 @@
-//! Substrate Node CLI library.
-
+//! Substrate Node Template CLI library.
 #![warn(missing_docs)]
-#![warn(unused_extern_crates)]
 
 mod chain_spec;
 #[macro_use]
 mod service;
 mod cli;
+mod command;
 
-pub use sc_cli::{error, IntoExit, VersionInfo};
-
-fn main() -> Result<(), cli::error::Error> {
-    let version = VersionInfo {
+fn main() -> sc_cli::Result<()> {
+    let version = sc_cli::VersionInfo {
         name: "Crust ALPHA Node",
         commit: env!("VERGEN_SHA_SHORT"),
         version: env!("CARGO_PKG_VERSION"),
         executable_name: "crust",
-        author: "crustio",
-        description: "crust alpha testnet",
-        support_url: "crustcloud.io",
+        author: "Crustio",
+        description: "Crust alpha testnet node",
+        support_url: "https://github.com/crustio/crust/issues/new",
+        copyright_start_year: 2020,
     };
 
-    cli::run(std::env::args(), cli::Exit, version)
+    command::run(version)
 }

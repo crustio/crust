@@ -37,6 +37,7 @@ session = { default-features = false, package = 'pallet-session', version = '2.0
 pallet-staking-reward-curve = { default-features = false, version = '2.0.0-alpha.5' }
 timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-alpha.5' }
 transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-alpha.5' }
+offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-alpha.5' }
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-alpha.5' }
@@ -73,6 +74,7 @@ std = [
     'frame-executive/std',
     'frame-support/std',
     'grandpa/std',
+    'offences/std',
     'finality-tracker/std',
     'im-online/std',
     'indices/std',

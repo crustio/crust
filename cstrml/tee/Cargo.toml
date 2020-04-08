@@ -30,10 +30,6 @@ sp-std = { default-features = false, version = '2.0.0-alpha.5' }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-sp-staking = '2.0.0-alpha.5'
-balances = { package = 'pallet-balances', version = '2.0.0-alpha.5' }
-timestamp = { package = 'pallet-timestamp', version = '2.0.0-alpha.5' }
-pallet-staking-reward-curve = '2.0.0-alpha.5'
 keyring = { package = "sp-keyring", version = '2.0.0-alpha.5' }
 hex = '0.4.2'
 

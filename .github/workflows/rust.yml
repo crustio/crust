@@ -55,3 +55,9 @@ jobs:
           use-cross: false
           command: test
           args: --package cstrml-tee --lib tests
+      - name: Cargo test storage order
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: test
+          args: --package cstrml-market --lib tests

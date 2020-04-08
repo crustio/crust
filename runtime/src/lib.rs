@@ -43,6 +43,8 @@ pub use timestamp::Call as TimestampCall;
 /// Crust primitives
 use primitives::{constants::time::*, *};
 
+use market;
+
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;
 
@@ -337,6 +339,13 @@ impl tee::Trait for Runtime {
     type OnReportWorks = Staking;
 }
 
+
+impl market::Trait for Runtime {
+    type Event = Event;
+    // TODO: Bonding with balance module
+    type OnOrderStorage = ();
+}
+
 construct_runtime!(
     pub enum Runtime where
         Block = Block,
@@ -366,6 +375,7 @@ construct_runtime!(
 
         // Crust modules
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
+        Market: market::{Module, Call, Storage, Event<T>},
     }
 );
 

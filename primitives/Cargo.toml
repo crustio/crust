@@ -1,15 +1,21 @@
 [package]
 name = "cst-primitives"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["crustio"]
 edition = "2018"
+license = "GPL-3.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
 
 [dependencies]
-serde = { version = "1.0.102", optional = true, features = ["derive"] }
-parity-scale-codec = { version = "1.1.0", default-features = false, features = ["bit-vec", "derive"] }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0', default-features = false }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0', default-features = false }
-sp-std = { git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0', default-features = false }
+# third party dependencies
+serde = { version = "1.0.106", optional = true, features = ["derive"] }
+parity-scale-codec = { version = "1.2.0", default-features = false, features = ["bit-vec", "derive"] }
+
+# substrate primitives
+sp-runtime = { version = '2.0.0-alpha.5', default-features = false }
+sp-core = { version = '2.0.0-alpha.5', default-features = false }
+sp-std = { version = '2.0.0-alpha.5', default-features = false }
 
 [features]
 default = ["std"]

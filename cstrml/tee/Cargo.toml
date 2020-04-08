@@ -1,25 +1,41 @@
 [package]
 name = "cstrml-tee"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["crustio"]
 edition = "2018"
+license = "GPL-3.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
 
 [dependencies]
-codec = { default-features = false, package = 'parity-scale-codec', version = '1.0.0' }
-frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-serde = { optional = true, version = '1.0.101' }
-serde_json = "1.0.44"
+# third party dependencies
+codec = { default-features = false, package = 'parity-scale-codec', version = '1.2.0' }
+serde = { optional = true, version = '1.0.106' }
+serde_json = "1.0.51"
 signatory = "0.18.0"
 signatory-ring = "0.18.0"
-sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-sp-runtime-interface = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-system = { package = 'frame-system', default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
 
-# Crust runtime modules
+# substrate frame dependencies
+frame-support = { default-features = false, version = '2.0.0-alpha.5' }
+system = { package = 'frame-system', default-features = false, version = '2.0.0-alpha.5' }
+
+# substrate primitives
+sp-core = { default-features = false, version = '2.0.0-alpha.5' }
+sp-io = { default-features = false, version = '2.0.0-alpha.5' }
+sp-runtime = { default-features = false, version = '2.0.0-alpha.5' }
+sp-runtime-interface = { default-features = false, version = '2.0.0-alpha.5' }
+sp-std = { default-features = false, version = '2.0.0-alpha.5' }
+
+# crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
+
+[dev-dependencies]
+sp-staking = '2.0.0-alpha.5'
+balances = { package = 'pallet-balances', version = '2.0.0-alpha.5' }
+timestamp = { package = 'pallet-timestamp', version = '2.0.0-alpha.5' }
+pallet-staking-reward-curve = '2.0.0-alpha.5'
+keyring = { package = "sp-keyring", version = '2.0.0-alpha.5' }
+hex = '0.4.2'
 
 [features]
 default = ['std']
@@ -35,11 +51,3 @@ std = [
     'sp-runtime-interface/std',
     'primitives/std'
 ]
-
-[dev-dependencies]
-sp-staking = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-balances = { package = 'pallet-balances', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-timestamp = { package = 'pallet-timestamp', version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-pallet-staking-reward-curve = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54', version = '2.0.0' }
-hex = '0.4.0'

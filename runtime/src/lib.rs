@@ -205,10 +205,9 @@ impl timestamp::Trait for Runtime {
 }
 
 parameter_types! {
-    pub const UncleGenerations: u32 = 0;
+	pub const UncleGenerations: BlockNumber = 5;
 }
 
-// TODO: substrate#2986 implement this properly
 impl authorship::Trait for Runtime {
     type FindAuthor = session::FindAccountFromAuthorIndex<Self, Babe>;
     type UncleGenerations = UncleGenerations;
@@ -297,127 +296,6 @@ impl staking::Trait for Runtime {
     type RewardCurve = RewardCurve;
 }
 
-// TODO: self-governance stuff
-/*
-parameter_types! {
-    pub const LaunchPeriod: BlockNumber = 7 * DAYS;
-    pub const VotingPeriod: BlockNumber = 7 * DAYS;
-    pub const EmergencyVotingPeriod: BlockNumber = 3 * HOURS;
-    pub const MinimumDeposit: Balance = 1 * DOLLARS;
-    pub const EnactmentPeriod: BlockNumber = 8 * DAYS;
-    pub const CooloffPeriod: BlockNumber = 7 * DAYS;
-    // One cent: $10,000 / MB
-    pub const PreimageByteDeposit: Balance = 10 * MILLICENTS;
-}
-
-impl democracy::Trait for Runtime {
-    type Proposal = Call;
-    type Event = Event;
-    type Currency = Balances;
-    type EnactmentPeriod = EnactmentPeriod;
-    type LaunchPeriod = LaunchPeriod;
-    type VotingPeriod = VotingPeriod;
-    type MinimumDeposit = MinimumDeposit;
-    /// A straight majority of the council can decide what their next motion is.
-    type ExternalOrigin = collective::EnsureProportionAtLeast<_1, _2, AccountId, CouncilCollective>;
-    /// A majority can have the next scheduled referendum be a straight majority-carries vote.
-    type ExternalMajorityOrigin = collective::EnsureProportionAtLeast<_1, _2, AccountId, CouncilCollective>;
-    /// A unanimous council can have the next scheduled referendum be a straight default-carries
-    /// (NTB) vote.
-    type ExternalDefaultOrigin = collective::EnsureProportionAtLeast<_1, _1, AccountId, CouncilCollective>;
-    /// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
-    /// be tabled immediately and with a shorter voting/enactment period.
-    type FastTrackOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, TechnicalCollective>;
-    type EmergencyVotingPeriod = EmergencyVotingPeriod;
-    // To cancel a proposal which has been passed, 2/3 of the council must agree to it.
-    type CancellationOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, CouncilCollective>;
-    // Any single technical committee member may veto a coming council proposal, however they can
-    // only do it once and it lasts only for the cooloff period.
-    type VetoOrigin = collective::EnsureMember<AccountId, TechnicalCollective>;
-    type CooloffPeriod = CooloffPeriod;
-    type PreimageByteDeposit = PreimageByteDeposit;
-    type Slash = Treasury;
-}
-
-type CouncilCollective = collective::Instance1;
-impl collective::Trait<CouncilCollective> for Runtime {
-    type Origin = Origin;
-    type Proposal = Call;
-    type Event = Event;
-}
-
-parameter_types! {
-    pub const CandidacyBond: Balance = 1 * DOLLARS;
-    pub const VotingBond: Balance = 5 * CENTS;
-    /// Daily council elections.
-    pub const TermDuration: BlockNumber = 24 * HOURS;
-    pub const DesiredMembers: u32 = 13;
-    pub const DesiredRunnersUp: u32 = 7;
-}
-
-impl elections_phragmen::Trait for Runtime {
-    type Event = Event;
-    type Currency = Balances;
-    type ChangeMembers = Council;
-
-    // TODO: add currency vote here
-    type CurrencyToVote = CurrencyToVote;
-    type CandidacyBond = CandidacyBond;
-    type VotingBond = VotingBond;
-    type LoserCandidate = Treasury;
-    type BadReport = Treasury;
-    type KickedMember = Treasury;
-    type DesiredMembers = DesiredMembers;
-    type DesiredRunnersUp = DesiredRunnersUp;
-    type TermDuration = TermDuration;
-}
-
-type TechnicalCollective = collective::Instance2;
-impl collective::Trait<TechnicalCollective> for Runtime {
-    type Origin = Origin;
-    type Proposal = Call;
-    type Event = Event;
-}
-
-impl membership::Trait<membership::Instance1> for Runtime {
-    type Event = Event;
-    type AddOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
-    type RemoveOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
-    type SwapOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
-    type ResetOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
-    type MembershipInitialized = TechnicalCommittee;
-    type MembershipChanged = TechnicalCommittee;
-}
-
-parameter_types! {
-    pub const ProposalBond: Permill = Permill::from_percent(5);
-    pub const ProposalBondMinimum: Balance = 20 * DOLLARS;
-    pub const SpendPeriod: BlockNumber = 6 * DAYS;
-    pub const Burn: Permill = Permill::from_percent(0);
-
-    pub const TipCountdown: BlockNumber = 1 * DAYS;
-    pub const TipFindersFee: Percent = Percent::from_percent(20);
-    pub const TipReportDepositBase: Balance = 1 * DOLLARS;
-    pub const TipReportDepositPerByte: Balance = 1 * CENTS;
-}
-
-impl treasury::Trait for Runtime {
-    type Currency = Balances;
-    type ApproveOrigin = collective::EnsureProportionAtLeast<_3, _5, AccountId, CouncilCollective>;
-    type RejectOrigin = collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>;
-    type Tippers = ElectionsPhragmen;
-    type TipCountdown = TipCountdown;
-    type TipFindersFee = TipFindersFee;
-    type TipReportDepositBase = TipReportDepositBase;
-    type TipReportDepositPerByte = TipReportDepositPerByte;
-    type Event = Event;
-    type ProposalRejection = Treasury;
-    type ProposalBond = ProposalBond;
-    type ProposalBondMinimum = ProposalBondMinimum;
-    type SpendPeriod = SpendPeriod;
-    type Burn = Burn;
-}*/
-
 parameter_types! {
     pub const ExistentialDeposit: u128 = 500;
     pub const TransferFee: u128 = 0;
@@ -431,10 +309,10 @@ impl balances::Trait for Runtime {
     type OnFreeBalanceZero = Staking;
     /// What to do if a new account is created.
     type OnNewAccount = Indices;
+    type TransferPayment = ();
+    type DustRemoval = ();
     /// The ubiquitous event type.
     type Event = Event;
-    type DustRemoval = ();
-    type TransferPayment = ();
     type ExistentialDeposit = ExistentialDeposit;
     type TransferFee = TransferFee;
     type CreationFee = CreationFee;
@@ -485,15 +363,6 @@ construct_runtime!(
         Grandpa: grandpa::{Module, Call, Storage, Config, Event},
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: authority_discovery::{Module, Call, Config},
-
-        // TODO: [Remove] Governance stuff; uncallable initially.
-        // Do not need right now, will add in the future
-        /*Democracy: democracy::{Module, Call, Storage, Config, Event<T>},
-        Council: collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
-        TechnicalCommittee: collective::<Instance2>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
-        ElectionsPhragmen: elections_phragmen::{Module, Call, Storage, Event<T>},
-        TechnicalMembership: membership::<Instance1>::{Module, Call, Storage, Event<T>, Config<T>},
-        Treasury: treasury::{Module, Call, Storage, Event<T>},*/
 
         // Crust modules
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},

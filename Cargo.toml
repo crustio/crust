@@ -21,7 +21,7 @@ structopt = "0.3.8"
 babe = { version = '0.8.0-alpha.5', package = 'sc-consensus-babe' }
 grandpa = { version = "0.8.0-alpha.5", package = "sc-finality-grandpa" }
 sc-basic-authorship = '0.8.0-alpha.5'
-sc-authority-discovery = '0.8.0-alpha.5'
+authority-discovery = { version = '0.8.0-alpha.5', pacakge= 'sc-authority-discovery' }
 sc-client = '0.8.0-alpha.5'
 sc-client-api = '2.0.0-alpha.5'
 sc-cli = '0.8.0-alpha.5'

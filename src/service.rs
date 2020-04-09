@@ -36,7 +36,7 @@ macro_rules! new_full_start {
 		let inherent_data_providers = sp_inherents::InherentDataProviders::new();
 
 		let builder = sc_service::ServiceBuilder::new_full::<
-			node_template_runtime::opaque::Block, node_template_runtime::RuntimeApi, crate::service::Executor
+			crust_runtime::opaque::Block, crust_runtime::RuntimeApi, crate::service::Executor
 		>($config)?
 			.with_select_chain(|_config, backend| {
 				Ok(sc_client::LongestChain::new(backend.clone()))
@@ -47,45 +47,31 @@ macro_rules! new_full_start {
 			})?
 			.with_import_queue(|_config, client, mut select_chain, _transaction_pool| {
 				let select_chain = select_chain.take()
-					.ok_or_else(|| service::Error::SelectChainRequired)?;
-
-				let grandpa_hard_forks = if config.chain_spec.is_kusama() {
-					grandpa_support::kusama_hard_forks()
-				} else {
-					Vec::new()
-				};
+					.ok_or_else(|| sc_service::Error::SelectChainRequired)?;
 
 				let (grandpa_block_import, grandpa_link) =
-					grandpa::block_import_with_authority_set_hard_forks(
-						client.clone(),
-						&(client.clone() as Arc<_>),
-						select_chain,
-						grandpa_hard_forks,
-					)?;
+					sc_finality_grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain)?;
 
-				let justification_import = grandpa_block_import.clone();
+				let (babe_block_import, babe_link) = babe::block_import(
+                    babe::Config::get_or_compute(&*client)?,
+                    grandpa_block_import,
+                    client.clone(),
+                    client.clone(),
+                )?;
 
-				let (block_import, babe_link) = babe::block_import(
-					babe::Config::get_or_compute(&*client)?,
-					grandpa_block_import,
-					client.clone(),
-				)?;
-
-				let import_queue = babe::import_queue(
+				let import_queue = sc_consensus_aura::import_queue::<_, _, _, AuraPair>(
 					babe_link.clone(),
-					block_import.clone(),
-					Some(Box::new(justification_import)),
+					babe_block_import.clone(),
+					Some(Box::new(grandpa_block_import.clone())),
 					None,
 					client,
 					inherent_data_providers.clone(),
 				)?;
 
-				import_setup = Some((block_import, grandpa_link, babe_link));
+				import_setup = Some((babe_block_import, grandpa_link, babe_link));
+
 				Ok(import_queue)
 			})?
-			.with_rpc_extensions(|builder| -> Result<polkadot_rpc::RpcExtension, _> {
-				Ok(polkadot_rpc::create_full(builder.client().clone(), builder.pool()))
-			})?;
 
         (builder, import_setup, inherent_data_providers)
     }}
@@ -95,6 +81,9 @@ macro_rules! new_full_start {
 pub fn new_full(config: Configuration)
                 -> Result<impl AbstractService, ServiceError>
 {
+    use sc_network::Event;
+    use futures::stream::StreamExt;
+
     let role = config.role.clone();
     let force_authoring = config.force_authoring;
     let name = config.name.clone();
@@ -102,8 +91,7 @@ pub fn new_full(config: Configuration)
 
     let (builder, mut import_setup, inherent_data_providers) = new_full_start!(config);
 
-    let (block_import, grandpa_link) =
-        import_setup.take()
+    let (block_import, grandpa_link, babe_link) = import_setup.take()
             .expect("Link Half and Block Import are present for Full Services or setup failed before. qed");
 
     let service = builder
@@ -125,22 +113,42 @@ pub fn new_full(config: Configuration)
         let can_author_with =
             sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone());
 
-        let aura = sc_consensus_aura::start_aura::<_, _, _, _, _, AuraPair, _, _, _>(
-            sc_consensus_aura::slot_duration(&*client)?,
+        let babe_config = babe::BabeParams {
+            keystore: service.keystore(),
             client,
             select_chain,
+            env: proposer,
             block_import,
-            proposer,
-            service.network(),
-            inherent_data_providers.clone(),
+            sync_oracle: service.network(),
+            inherent_data_providers: inherent_data_providers.clone(),
             force_authoring,
-            service.keystore(),
+            babe_link,
             can_author_with,
-        )?;
+        };
 
-        // the AURA authoring task is considered essential, i.e. if it
+        let babe = babe::start_babe(babe_config)?;
+
+        // the BABE authoring task is considered essential, i.e. if it
         // fails we take down the service with it.
-        service.spawn_essential_task("aura", aura);
+        service.spawn_essential_task(babe);
+
+        // Authority discovery: this module runs to promise authorities' connection
+        // TODO: 2 modes? enable or not?
+        let network = service.network();
+        let network_event_stream = network.event_stream();
+        let dht_event_stream = network_event_stream.filter_map(|e| async move { match e {
+            Event::Dht(e) => Some(e),
+            _ => None,
+        }}).boxed();
+        let authority_discovery = authority_discovery::AuthorityDiscovery::new(
+            service.client(),
+            network,
+            sentry_nodes.clone(),
+            service.keystore(),
+            dht_event_stream,
+            service.prometheus_registry(),
+        );
+        service.spawn_task("authority-discovery", authority_discovery);
     }
 
     // if the node isn't actively participating in consensus then it doesn't
@@ -152,7 +160,7 @@ pub fn new_full(config: Configuration)
     };
 
     let grandpa_config = sc_finality_grandpa::Config {
-        // FIXME #1578 make this available through chainspec
+        // FIXME substrate/issues#1578 make this available through chainspec
         gossip_duration: Duration::from_millis(333),
         justification_period: 512,
         name: Some(name),
@@ -169,7 +177,9 @@ pub fn new_full(config: Configuration)
         // and vote data availability than the observer. The observer has not
         // been tested extensively yet and having most nodes in a network run it
         // could lead to finality stalls.
-        let grandpa_config = sc_finality_grandpa::GrandpaParams {
+        // TODO: Aiming the stalls problem, maybe we could refer polkadot solution
+        // in (https://github.com/paritytech/polkadot/blob/master/service/src/lib.rs#L507-L521)
+        let grandpa_config = grandpa::GrandpaParams {
             config: grandpa_config,
             link: grandpa_link,
             network: service.network(),
@@ -183,10 +193,10 @@ pub fn new_full(config: Configuration)
         // if it fails we take down the service with it.
         service.spawn_essential_task(
             "grandpa-voter",
-            sc_finality_grandpa::run_grandpa_voter(grandpa_config)?
+            grandpa::run_grandpa_voter(grandpa_config)?
         );
     } else {
-        sc_finality_grandpa::setup_disabled_grandpa(
+        grandpa::setup_disabled_grandpa(
             service.client(),
             &inherent_data_providers,
             service.network(),
@@ -197,68 +207,62 @@ pub fn new_full(config: Configuration)
 }
 
 /// Builds a new service for a light client.
-pub fn new_light<C: Send + Default + 'static>(
-    config: Configuration<C, GenesisConfig>,
-) -> Result<impl AbstractService, ServiceError> {
+pub fn new_light(config: Configuration)
+                 -> Result<impl AbstractService, ServiceError>
+{
     let inherent_data_providers = InherentDataProviders::new();
 
     ServiceBuilder::new_light::<Block, RuntimeApi, Executor>(config)?
-        .with_select_chain(|_config, backend| Ok(LongestChain::new(backend.clone())))?
+        .with_select_chain(|_config, backend| {
+            Ok(LongestChain::new(backend.clone()))
+        })?
         .with_transaction_pool(|config, client, fetcher| {
             let fetcher = fetcher
                 .ok_or_else(|| "Trying to start light transaction pool without active fetcher")?;
+
             let pool_api = sc_transaction_pool::LightChainApi::new(client.clone(), fetcher.clone());
-            let pool = sc_transaction_pool::BasicPool::new(config, pool_api);
-            let maintainer = sc_transaction_pool::LightBasicPoolMaintainer::with_defaults(
-                pool.pool().clone(),
-                client,
-                fetcher,
+            let pool = sc_transaction_pool::BasicPool::with_revalidation_type(
+                config, Arc::new(pool_api), sc_transaction_pool::RevalidationType::Light,
             );
-            let maintainable_pool =
-                sp_transaction_pool::MaintainableTransactionPool::new(pool, maintainer);
-            Ok(maintainable_pool)
+            Ok(pool)
         })?
-        .with_import_queue_and_fprb(
-            |_config, client, backend, fetcher, _select_chain, _tx_pool| {
-                let fetch_checker = fetcher
-                    .map(|fetcher| fetcher.checker().clone())
-                    .ok_or_else(|| {
-                        "Trying to start light import queue without active fetch checker"
-                    })?;
-                let grandpa_block_import = grandpa::light_block_import::<_, _, _, RuntimeApi>(
-                    client.clone(),
-                    backend,
-                    &*client.clone(),
-                    Arc::new(fetch_checker),
-                )?;
-                let finality_proof_import = grandpa_block_import.clone();
-                let finality_proof_request_builder =
-                    finality_proof_import.create_finality_proof_request_builder();
+        .with_import_queue_and_fprb(|_config, client, backend, fetcher, _select_chain, _tx_pool| {
+            let fetch_checker = fetcher
+                .map(|fetcher| fetcher.checker().clone())
+                .ok_or_else(|| "Trying to start light import queue without active fetch checker")?;
+            let grandpa_block_import = sc_finality_grandpa::light_block_import(
+                client.clone(),
+                backend,
+                &(client.clone() as Arc<_>),
+                Arc::new(fetch_checker),
+            )?;
+            let finality_proof_import = grandpa_block_import.clone();
+            let finality_proof_request_builder =
+                finality_proof_import.create_finality_proof_request_builder();
 
-                let (babe_block_import, babe_link) = sc_consensus_babe::block_import(
-                    sc_consensus_babe::Config::get_or_compute(&*client)?,
-                    grandpa_block_import,
-                    client.clone(),
-                    client.clone(),
-                )?;
+            let (babe_block_import, babe_link) = sc_consensus_babe::block_import(
+                sc_consensus_babe::Config::get_or_compute(&*client)?,
+                grandpa_block_import,
+                client.clone(),
+                client.clone(),
+            )?;
 
-                // FIXME: pruning task isn't started since light client doesn't do `AuthoritySetup`.
-                let import_queue = sc_consensus_babe::import_queue(
-                    babe_link,
-                    babe_block_import,
-                    None,
-                    Some(Box::new(finality_proof_import)),
-                    client.clone(),
-                    client,
-                    inherent_data_providers.clone(),
-                )?;
+            // FIXME: pruning task isn't started since light client doesn't do `AuthoritySetup`.
+            let import_queue = babe::import_queue(
+                babe_link,
+                babe_block_import,
+                None,
+                Some(Box::new(finality_proof_import)),
+                client,
+                inherent_data_providers.clone(),
+            )?;
 
-                Ok((import_queue, finality_proof_request_builder))
-            },
-        )?
-        .with_network_protocol(|_| Ok(NodeProtocol::new()))?
+            Ok((import_queue, finality_proof_request_builder))
+        })?
         .with_finality_proof_provider(|client, backend| {
-            Ok(Arc::new(GrandpaFinalityProofProvider::new(backend, client)) as _)
+            // GenesisAuthoritySetProvider is implemented for StorageAndProofProvider
+            let provider = client as Arc<dyn StorageAndProofProvider<_, _>>;
+            Ok(Arc::new(GrandpaFinalityProofProvider::new(backend, provider)) as _)
         })?
         .build()
 }

@@ -21,7 +21,7 @@ structopt = "0.3.8"
 babe = { version = '0.8.0-alpha.5', package = 'sc-consensus-babe' }
 grandpa = { version = "0.8.0-alpha.5", package = "sc-finality-grandpa" }
 sc-basic-authorship = '0.8.0-alpha.5'
-authority-discovery = { version = '0.8.0-alpha.5', pacakge= 'sc-authority-discovery' }
+authority-discovery = { version = '0.8.0-alpha.5', package= 'sc-authority-discovery' }
 sc-client = '0.8.0-alpha.5'
 sc-client-api = '2.0.0-alpha.5'
 sc-cli = '0.8.0-alpha.5'
@@ -47,5 +47,5 @@ cstrml-tee = { path = 'cstrml/tee', version = '0.3.0' }
 primitives = { package = 'cst-primitives', path = 'primitives', version = '0.3.0' }
 
 [build-dependencies]
-vergen = '3.0.4'
+vergen = '3.1.0'
 build-script-utils = { version = "2.0.0-alpha.5", package = "substrate-build-script-utils" }

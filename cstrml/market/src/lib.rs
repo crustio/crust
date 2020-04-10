@@ -55,7 +55,9 @@ pub trait Trait: system::Trait + tee::Trait {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Market {
-        pub StorageOrders get(fn storage_orders): map (T::AccountId, u64) => Option<StorageOrder<T::AccountId>>; // Cannot use MerkleRoot as the key. cannot open the apps
+        // Cannot use MerkleRoot as the key. cannot open the apps
+        pub StorageOrders get(fn storage_orders):
+        map hasher(blake2_128_concat) (T::AccountId, u64) => Option<StorageOrder<T::AccountId>>;
     }
 }
 

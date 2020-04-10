@@ -15,7 +15,6 @@ version = '1.0.5'
 [dependencies]
 # third party dependencies
 codec = { default-features = false, features = ['derive'], package = 'parity-scale-codec', version = '1.3.0' }
-safe-mix = { default-features = false, version = '1.0.0' }
 serde = { features = ['derive'], optional = true, version = '1.0.106' }
 
 # substrate frame dependencies
@@ -79,7 +78,6 @@ std = [
     'im-online/std',
     'indices/std',
     'randomness-collective-flip/std',
-    'safe-mix/std',
     'serde',
     'sp-api/std',
     'sp-block-builder/std',

@@ -21,7 +21,7 @@ pallet-authorship = { version = '2.0.0-alpha.5', default-features = false }
 
 # substrate primitives
 sp-keyring = { optional = true, version = '2.0.0-alpha.5' }
-sp-std = '2.0.0-alpha.5'
+sp-std = { version = '2.0.0-alpha.5', default-features = false }
 sp-phragmen = { version = '2.0.0-alpha.5', default-features = false }
 sp-io ={ version = '2.0.0-alpha.5', default-features = false }
 sp-runtime = { version = '2.0.0-alpha.5', default-features = false }

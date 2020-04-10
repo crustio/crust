@@ -9,7 +9,6 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use sp_core::OpaqueMetadata;
-use sp_core::u32_trait::{_1, _2, _3, _4, _5};
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::traits::{
     BlakeTwo256, Block as BlockT, Convert, ConvertInto, NumberFor, OpaqueKeys, SaturatedConversion,

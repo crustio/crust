@@ -62,7 +62,7 @@ pub trait Crypto {
         .concat();
 
         // 2. do p256 sig check
-        Self::verify_p256_sig(validator_pk, &data, sig)
+        verify_p256_sig(validator_pk, &data, sig)
     }
 
     fn verify_work_report_sig(
@@ -99,6 +99,6 @@ pub trait Crypto {
         .concat();
 
         // 3. do p256 sig check
-        Self::verify_p256_sig(pk, &data, sig)
+        verify_p256_sig(pk, &data, sig)
     }
 }

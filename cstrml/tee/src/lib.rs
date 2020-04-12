@@ -74,11 +74,12 @@ decl_storage! {
     trait Store for Module<T: Trait> as Tee {
         /// The TEE identities, mapping from controller to optional identity value
         pub TeeIdentities get(fn tee_identities) config():
-        map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
+            map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
         /// Node's work report, mapping from (controller, block_number) to optional work_report
+        // TODO: Change to double_map to avoid tuple key(low performance)
         pub WorkReports get(fn work_reports) config():
-        map hasher(blake2_128_concat) (T::AccountId, u64)  => Option<WorkReport>;
+            map hasher(blake2_128_concat) (T::AccountId, u64)  => Option<WorkReport>;
 
         /// The old report slot block number.
         pub CurrentReportSlot get(fn current_report_slot) config(): u64;

@@ -183,7 +183,6 @@ fn testnet_genesis(
                 .cloned()
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
-            vesting: vec![],
         }),
         session: Some(SessionConfig {
             keys: initial_authorities
@@ -191,13 +190,13 @@ fn testnet_genesis(
                 .map(|x| {
                     (
                         x.0.clone(),
+                        x.0.clone(),
                         session_keys(x.2.clone(), x.3.clone(), x.4.clone(), x.5.clone()),
                     )
                 })
                 .collect::<Vec<_>>(),
         }),
         staking: Some(StakingConfig {
-            current_era: 0,
             validator_count: 4,
             minimum_validator_count: 2,
             stakers: initial_authorities

@@ -3,9 +3,9 @@ panic = 'unwind'
 
 [workspace]
 members = [
-    'node',
-    'runtime',
     'cstrml/staking',
     'cstrml/tee',
-    'cstrml/market'
+    'cstrml/market',
+    'runtime',
+    'node',
 ]

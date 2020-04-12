@@ -11,7 +11,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use sp_core::OpaqueMetadata;
 use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::traits::{
-    BlakeTwo256, Block as BlockT, Convert, ConvertInto, NumberFor, OpaqueKeys, SaturatedConversion,
+    BlakeTwo256, Block as BlockT, Convert, ConvertInto, OpaqueKeys, SaturatedConversion,
     IdentityLookup
 };
 use sp_runtime::transaction_validity::TransactionValidity;
@@ -39,6 +39,8 @@ pub use im_online::sr25519::AuthorityId as ImOnlineId;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use system::offchain::TransactionSubmitter;
+use session::{historical as session_historical};
+
 pub use timestamp::Call as TimestampCall;
 
 /// Crust primitives
@@ -350,7 +352,7 @@ impl market::Trait for Runtime {
     type OnOrderStorage = ();
 }
 
-construct_runtime!(
+construct_runtime! {
     pub enum Runtime where
         Block = Block,
         NodeBlock = opaque::Block,
@@ -364,13 +366,13 @@ construct_runtime!(
         Babe: babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
-        Indices: indices,
-        Balances: balances,
+        Indices: indices::{Module, Call, Storage, Config<T>, Event<T>},
+        Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
 
         // Consensus support
         Authorship: authorship::{Module, Call, Storage},
-        Staking: staking,
+        Staking: staking::{Module, Call, Storage, Config<T>, Event<T>, ValidateUnsigned},
         Historical: session_historical::{Module},
         Session: session::{Module, Call, Storage, Event, Config<T>},
         FinalityTracker: finality_tracker::{Module, Call, Inherent},
@@ -380,9 +382,9 @@ construct_runtime!(
 
         // Crust modules
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
-        Market: market::{Module, Call, Storage, Event<T>},
+        Market: market::{Module, Call, Storage, Event<T>, Config<T>},
     }
-);
+}
 
 /// The address format for describing accounts.
 pub type Address = AccountId;
@@ -458,13 +460,10 @@ impl_runtime_apis! {
     }
 
     impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
-        fn validate_transaction(
-			source: TransactionSource,
-			tx: <Block as BlockT>::Extrinsic,
-		) -> TransactionValidity {
-			Executive::validate_transaction(source, tx)
+		fn validate_transaction(tx: <Block as BlockT>::Extrinsic) -> TransactionValidity {
+			Executive::validate_transaction(tx)
 		}
-    }
+	}
 
     impl babe_primitives::BabeApi<Block> for Runtime {
         fn configuration() -> babe_primitives::BabeConfiguration {

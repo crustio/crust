@@ -599,7 +599,9 @@ decl_error! {
         /// Can not bond with more than limit
         ExceedLimit,
         /// Can not validate without workloads
-        NoWorkloads
+        NoWorkloads,
+        /// Attempting to target a stash that still has funds.
+		FundedTarget,
     }
 }
 
@@ -1089,6 +1091,20 @@ decl_module! {
 
             <Self as Store>::UnappliedSlashes::insert(&era, &unapplied);
         }
+
+        /// Remove all data structure concerning a staker/stash once its balance is zero.
+		/// This is essentially equivalent to `withdraw_unbonded` except it can be called by anyone
+		/// and the target `stash` must have no funds left.
+		///
+		/// This can be called from any origin.
+		///
+		/// - `stash`: The stash account to reap. Its balance must be zero.
+		#[weight = frame_support::weights::SimpleDispatchInfo::default()]
+		fn reap_stash(_origin, stash: T::AccountId) {
+			ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
+			Self::kill_stash(&stash);
+			T::Currency::remove_lock(STAKING_ID, &stash);
+		}
     }
 }
 
@@ -1296,9 +1312,7 @@ impl<T: Trait> Module<T> {
     /// with the exposure of the prior validator set.
     fn new_session(
         session_index: SessionIndex,
-    ) -> Option<(
-        Vec<T::AccountId>
-    )> {
+    ) -> Option<Vec<T::AccountId>> {
         if Self::current_era().is_some() {
             let era_length = session_index
                 .checked_sub(Self::current_era_start_session_index())

@@ -17,7 +17,7 @@ use system::ensure_signed;
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature};
+use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -76,29 +76,30 @@ decl_storage! {
         pub TeeIdentities get(fn tee_identities) config():
             map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
-        /// Node's work report, mapping from (controller, block_number) to optional work_report
-        // TODO: Change to double_map to avoid tuple key(low performance)
+        /// Node's work report, mapping from controller to optional work_report
         pub WorkReports get(fn work_reports) config():
-            map hasher(blake2_128_concat) (T::AccountId, u64)  => Option<WorkReport>;
+            map hasher(blake2_128_concat) T::AccountId  => Option<WorkReport>;
 
-        /// The old report slot block number.
-        pub CurrentReportSlot get(fn current_report_slot) config(): u64;
+        /// The current report slot block number, this value should be a multiple of era block
+        pub CurrentReportSlot get(fn current_report_slot) config(): ReportSlot;
+
+        /// Recording whether the validator reported works of each era
+        /// We leave it keep all era's report info
+        /// cause B-tree won't build index on key2(ReportSlot)
+        pub ReportedInSlot get(fn reported_in_slot) build(|config: &GenesisConfig<T>| {
+            config.work_reports.iter().map(|(account_id, _)|
+                (account_id.clone(), 0, true)
+            ).collect::<Vec<_>>()
+        }): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) ReportSlot
+        => bool = false;
 
         /// The meaningful workload, used for calculating stake limit in the end of era
         /// default is 0
-        pub MeaningfulWorkload get(fn meaningful_workload) build(|config: &GenesisConfig<T>| {
-            config.work_reports.iter().fold(0, |acc, (_, work_report)|
-                acc + work_report.meaningful_workload as u128
-            )
-        }): u128 = 0;
+        pub MeaningfulWorkload get(fn meaningful_workload): u128 = 0;
 
         /// The empty workload, used for calculating stake limit in the end of era
         /// default is 0
-        pub EmptyWorkload get(fn empty_workload) build(|config: &GenesisConfig<T>| {
-            config.work_reports.iter().fold(0, |acc, (_, work_report)|
-                acc + work_report.empty_workload as u128
-            )
-        }): u128 = 0;
+        pub EmptyWorkload get(fn empty_workload): u128 = 0;
     }
 }
 
@@ -185,46 +186,42 @@ impl<T: Trait> Module<T> {
     /// TC = O(n)
     /// DB try is 2n+1
     pub fn update_identities() {
-        // Ideally, reported_rs should be current_rs + 1
-        let reported_rs = Self::get_reported_slot();
+        // 1. Update id's work rzeport, get id's workload and total workload
+        let mut total_meaningful_workload = 0;
+        let mut total_empty_workload = 0;
         let current_rs = Self::current_report_slot();
 
-        // 1. Report slot did not change, it should not trigger updating
-        if current_rs == reported_rs {
-            return;
-        }
-
-        // 2. Update last report slot be current
-        CurrentReportSlot::mutate(|crs| *crs = reported_rs);
-
-        // 3. Slot changed, update all identities
-        // Update id's work report, get id's workload and total workload
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
-            (controller.clone(), Self::update_and_get_workload(&controller, reported_rs))
+            let (e_workload, m_workload) = Self::update_and_get_workload(&controller, current_rs);
+            total_meaningful_workload += m_workload;
+            total_empty_workload += e_workload;
+            (controller.clone(), m_workload + e_workload)
         }).collect();
-        let total_workload = Self::meaningful_workload() + Self::empty_workload();
 
-        // 4. Update stake limit
+        MeaningfulWorkload::put(total_meaningful_workload);
+        EmptyWorkload::put(total_empty_workload);
+        let total_workload = total_meaningful_workload + total_empty_workload;
+
+        // 2. Update current report slot
+        CurrentReportSlot::mutate(|crs| *crs = Self::get_reported_slot());
+
+        // 3. Update stake limit
         for (controller, own_workload) in workload_map {
             T::OnReportWorks::on_report_works(&controller, own_workload, total_workload);
         }
     }
 
     pub fn get_work_report(who: &T::AccountId) -> Option<WorkReport> {
-        let current_rs = Self::current_report_slot();
-        <WorkReports<T>>::get((who, current_rs))
+        <WorkReports<T>>::get(who)
     }
 
     // PRIVATE IMMUTABLES
     fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport) -> bool {
-        // 1. Current block always be 300*n(n >= 1) + 4(for Alphanet)
-        let current_rs = Self::current_report_slot();
-
-        // 2. Judge if wr on current_rs is existed
         let mut old_m_workload: u128 = 0;
         let mut old_e_workload: u128 = 0;
+        let rs = Self::get_reported_slot();
 
-        if let Some(old_wr) = Self::work_reports((who, current_rs)) {
+        if let Some(old_wr) = Self::work_reports(who) {
             if &old_wr == wr {
                 return false;
             } else {
@@ -233,8 +230,9 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        // 3. Upsert work report
-        <WorkReports<T>>::insert((who, wr.block_number), wr);
+        // 3. Upsert work report and mark reported this (report)slot
+        <WorkReports<T>>::insert(who, wr);
+        <ReportedInSlot<T>>::insert(who, rs, true);
 
         // 4. Upsert workload
         let m_workload = wr.meaningful_workload as u128;
@@ -257,42 +255,20 @@ impl<T: Trait> Module<T> {
     /// Get updated workload by controller account,
     /// this function should only be called in the new era
     /// otherwise, it will be an void in this recursive loop
-    fn update_and_get_workload(controller: &T::AccountId, current_rs: u64) -> u128 {
-        // 1. Get current era
-        let last_rs = current_rs - REPORT_SLOT;
-
-        // 2. Judge if this controller reported works in the former era
-        if let Some(wr) = Self::work_reports((controller, last_rs)) {
-            // a. Remove former era's work report
-            <WorkReports<T>>::remove((controller, last_rs));
-
-            // b. Did report works in the last era
-            // ...
-            // 889(600): (123,300){wr300} ✅ | (123, 300){wr0} ❌
-            // 889(600): (123, 300){wr300} -> (123, 600){wr300}
-            // 1080(900): (123, 600){wr600} ✅ | (123, 600){wr300} ❌
-            // 1080(900): (123, 600){wr600} -> (123, 900){wr600}
-            // ...
-            // old(old_old) <- new
-            // new(old) <- new_new
-            // TODO: between the extended current_rs wr and the real current_rs wr contains a void,
-            // it may mislead storage order
-            if wr.block_number == last_rs {
-                // Extend the last work report(if not exist) into this new report slot
-                if !<WorkReports<T>>::contains_key((controller, current_rs)) {
-                    // This should already be true
-                    <WorkReports<T>>::insert((controller, current_rs), &wr);
-                }
-                (wr.empty_workload + wr.meaningful_workload) as u128
-            // c. Did not report anything in the last era
+    fn update_and_get_workload(controller: &T::AccountId, current_rs: u64) -> (u128, u128) {
+        // 1. Judge if this controller reported works in this current era
+        if let Some(wr) = Self::work_reports(controller) {
+            if Self::reported_in_slot(controller, current_rs) {
+                (wr.empty_workload as u128, wr.meaningful_workload as u128)
             } else {
-                // Cut workload
-                MeaningfulWorkload::mutate(|mw| *mw -= wr.meaningful_workload as u128);
-                EmptyWorkload::mutate(|ew| *ew -= wr.empty_workload as u128);
-                0
+                // Remove work report when wr IS outdated
+                if wr.block_number < current_rs {
+                    <WorkReports<T>>::remove(controller);
+                }
+                (0, 0)
             }
         } else {
-            0
+            (0, 0)
         }
     }
 

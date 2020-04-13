@@ -387,11 +387,11 @@ impl ExtBuilder {
         }
         .assimilate_storage(&mut storage);
 
-        let mut work_reports: Vec<((u64, u64), tee::WorkReport)> = identities
+        let mut work_reports: Vec<(u64, tee::WorkReport)> = identities
             .iter()
             .map(|id| {
                 (
-                    (*id, 0),
+                    *id,
                     tee::WorkReport {
                         pub_key: vec![],
                         block_number: 0,

@@ -222,7 +222,7 @@ fn testnet_genesis(
                 .iter()
                 .map(|x| {
                     (
-                        (x.clone(), 0),
+                        x.clone(),
                         WorkReport {
                             pub_key: vec![],
                             block_number: 0,

@@ -367,7 +367,7 @@ construct_runtime! {
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
         Indices: indices::{Module, Call, Storage, Config<T>, Event<T>},
-        Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
 
         // Consensus support
@@ -382,7 +382,7 @@ construct_runtime! {
 
         // Crust modules
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
-        Market: market::{Module, Call, Storage, Event<T>, Config<T>},
+        Market: market::{Module, Call, Storage, Event<T>},
     }
 }
 

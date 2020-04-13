@@ -441,7 +441,8 @@ decl_storage! {
 
         /// The map from {guarantor, candidate} edge to vote stakes of all guarantors.
         GuaranteeRel get(fn guarantee_rel):
-            map hasher(twox_64_concat) Vec<(T::AccountId, T::AccountId)> => Option<BalanceOf<T>>;
+            double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) T::AccountId
+            => Option<BalanceOf<T>>;
 
         /// The current era index.
         pub CurrentEra get(fn current_era): Option<EraIndex>;
@@ -915,10 +916,9 @@ decl_module! {
             // 2. Delete an edge
             for deleted_target in deleted_targets {
                 let mut validations = Self::validators(&deleted_target);
-                let deleted_edge = vec![(g_stash.clone(), deleted_target.clone())];
                 validations.guarantors.remove_item(&g_stash);
                 <Validators<T>>::insert(&deleted_target, validations);
-                <GuaranteeRel<T>>::remove(&deleted_edge);
+                <GuaranteeRel<T>>::remove(&g_stash, &deleted_target);
             }
 
             ensure!(!targets.is_empty(), Error::<T>::EmptyTargets);
@@ -1142,8 +1142,7 @@ impl<T: Trait> Module<T> {
         let validations = Self::validators(v_stash);
 
         for guarantor in validations.guarantors {
-            let edge = vec![(guarantor, v_stash.clone())];
-            <GuaranteeRel<T>>::remove(&edge);
+            <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
         }
 
         <Validators<T>>::remove(v_stash);
@@ -1153,8 +1152,7 @@ impl<T: Trait> Module<T> {
     fn chill_guarantor(g_stash: &T::AccountId) {
         if let Some(nominations) = Self::guarantors(g_stash) {
             for target in nominations.targets {
-                let edge = vec![(g_stash.clone(), target)];
-                <GuaranteeRel<T>>::remove(&edge);
+                <GuaranteeRel<T>>::remove(&g_stash, &target);
             }
 
             <Guarantors<T>>::remove(g_stash);
@@ -1182,18 +1180,17 @@ impl<T: Trait> Module<T> {
             // you vote NOTHING 🙂
             return (false, Zero::zero());
         }
-        let edge = vec![(g_stash.clone(), v_stash.clone())];
         let validations = Self::validators(v_stash);
         let mut new_guarantors = validations.guarantors;
 
-        if let Some(g_old_votes) = Self::guarantee_rel(&edge) {
+        if let Some(g_old_votes) = Self::guarantee_rel(&g_stash, &v_stash) {
             // 1. Existed edge
             if g_old_votes == g_votes {
                 // a. safe and sound, do NOTHING 🙂
                 return (true, g_votes);
             } else if g_old_votes > g_votes {
                 // b. guarantor reduce his stake: just update edge's weight
-                <GuaranteeRel<T>>::insert(&edge, g_votes);
+                <GuaranteeRel<T>>::insert(&g_stash, &v_stash, g_votes);
                 return (true, g_votes);
             } else {
                 // c. guarantor increase his stake: remove it first
@@ -1207,8 +1204,7 @@ impl<T: Trait> Module<T> {
 
         // Sum all current edge weight
         let v_total_stakes = new_guarantors.iter().fold(v_own_stakes, |total, g| {
-            let e = vec![(g.clone(), v_stash.clone())];
-            let w = Self::guarantee_rel(&e).unwrap_or_default();
+            let w = Self::guarantee_rel(&g, &v_stash).unwrap_or_default();
             w + total
         });
         let v_limit = Self::stake_limit(&v_stash).unwrap_or_default();
@@ -1226,7 +1222,7 @@ impl<T: Trait> Module<T> {
 
             // c. New edge
             let new_weight = (v_limit - v_total_stakes).min(g_votes);
-            <GuaranteeRel<T>>::insert(&edge, new_weight);
+            <GuaranteeRel<T>>::insert(&g_stash, &v_stash, new_weight);
             return (true, new_weight);
         }
 
@@ -1480,8 +1476,7 @@ impl<T: Trait> Module<T> {
             let guarantors = &validations.guarantors;
 
             for guarantor in guarantors {
-                let edge = vec![(guarantor.clone(), v_stash.clone())];
-                let votes = to_votes(Self::guarantee_rel(&edge).unwrap_or_default());
+                let votes = to_votes(Self::guarantee_rel(&guarantor, &v_stash).unwrap_or_default());
 
                 // 1. There still has credit for guarantors
                 // we should using `FILO` rule to calculate others
@@ -1500,7 +1495,7 @@ impl<T: Trait> Module<T> {
                     v_guarantors_votes += g_real_votes;
 
                     // c. UPDATE EDGE: (maybe) update GuaranteeRel
-                    <GuaranteeRel<T>>::insert(&edge, g_vote_stakes);
+                    <GuaranteeRel<T>>::insert(&guarantor, &v_stash, g_vote_stakes);
 
                 // 2. There has no credit for later guarantors
                 // or guarantor already chilled, update `Guarantors`
@@ -1513,7 +1508,7 @@ impl<T: Trait> Module<T> {
                         <Guarantors<T>>::insert(guarantor, nominations);
                     }
                     // b. UPDATE EDGE: delete edge
-                    <GuaranteeRel<T>>::remove(&edge);
+                    <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
                 }
             }
 
@@ -1579,8 +1574,7 @@ impl<T: Trait> Module<T> {
 
             // 2. Sum up all valid votes
             for v_stash in targets {
-                let edge = vec![(g_stash.clone(), v_stash)];
-                g_valid_stake_votes += Self::guarantee_rel(&edge).unwrap_or_default();
+                g_valid_stake_votes += Self::guarantee_rel(&g_stash, &v_stash).unwrap_or_default();
             }
 
             // 3. Update guarantor's ledger

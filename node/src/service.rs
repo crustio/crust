@@ -1,12 +1,10 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use crust_runtime::{self, opaque::Block, GenesisConfig, RuntimeApi};
-use grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider};
-use sc_basic_authority;
+use crust_runtime::{self, opaque::Block, RuntimeApi};
+use grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider, StorageAndProofProvider};
 use sc_client::LongestChain;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
-use sc_network::construct_simple_protocol;
 use sc_service::{error::Error as ServiceError, AbstractService, Configuration, ServiceBuilder};
 use sp_inherents::InherentDataProviders;
 use std::sync::Arc;
@@ -19,11 +17,6 @@ native_executor_instance!(
     crust_runtime::native_version,
     cstrml_tee::api::crypto::HostFunctions
 );
-
-construct_simple_protocol! {
-    /// Demo protocol attachment for substrate.
-    pub struct NodeProtocol where Block = Block { }
-}
 
 /// Starts a `ServiceBuilder` for a full service.
 ///
@@ -50,31 +43,31 @@ macro_rules! new_full_start {
 					.ok_or_else(|| sc_service::Error::SelectChainRequired)?;
 
 				let (grandpa_block_import, grandpa_link) =
-					sc_finality_grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain)?;
+					grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain)?;
+
+                let justification_import = grandpa_block_import.clone();
 
 				let (babe_block_import, babe_link) = babe::block_import(
                     babe::Config::get_or_compute(&*client)?,
                     grandpa_block_import,
                     client.clone(),
-                    client.clone(),
                 )?;
 
-				let import_queue = sc_consensus_aura::import_queue::<_, _, _, AuraPair>(
+				let import_queue = babe::import_queue(
 					babe_link.clone(),
 					babe_block_import.clone(),
-					Some(Box::new(grandpa_block_import.clone())),
+					Some(Box::new(justification_import)),
 					None,
 					client,
 					inherent_data_providers.clone(),
 				)?;
 
 				import_setup = Some((babe_block_import, grandpa_link, babe_link));
-
 				Ok(import_queue)
-			})?
+			})?;
 
         (builder, import_setup, inherent_data_providers)
-    }}
+    }};
 }
 
 /// Builds a new service for a full client.
@@ -82,12 +75,19 @@ pub fn new_full(config: Configuration)
                 -> Result<impl AbstractService, ServiceError>
 {
     use sc_network::Event;
+    use sc_client_api::ExecutorProvider;
     use futures::stream::StreamExt;
 
-    let role = config.role.clone();
+    let is_authority = config.roles.is_authority();
     let force_authoring = config.force_authoring;
     let name = config.name.clone();
     let disable_grandpa = config.disable_grandpa;
+    let sentry_nodes = config.network.sentry_nodes.clone();
+
+    // sentry nodes announce themselves as authorities to the network
+	// and should run the same protocols authorities do, but it should
+	// never actively participate in any consensus process.
+	let participates_in_consensus = is_authority && !config.sentry_mode;
 
     let (builder, mut import_setup, inherent_data_providers) = new_full_start!(config);
 
@@ -102,7 +102,7 @@ pub fn new_full(config: Configuration)
         })?
         .build()?;
 
-    if role.is_authority() {
+    if participates_in_consensus {
         let proposer =
             sc_basic_authorship::ProposerFactory::new(service.client(), service.transaction_pool());
 
@@ -130,7 +130,7 @@ pub fn new_full(config: Configuration)
 
         // the BABE authoring task is considered essential, i.e. if it
         // fails we take down the service with it.
-        service.spawn_essential_task(babe);
+        service.spawn_essential_task("babe", babe);
 
         // Authority discovery: this module runs to promise authorities' connection
         // TODO: 2 modes? enable or not?
@@ -153,20 +153,20 @@ pub fn new_full(config: Configuration)
 
     // if the node isn't actively participating in consensus then it doesn't
     // need a keystore, regardless of which protocol we use below.
-    let keystore = if role.is_authority() {
+    let keystore = if participates_in_consensus {
         Some(service.keystore())
     } else {
         None
     };
 
-    let grandpa_config = sc_finality_grandpa::Config {
+    let grandpa_config = grandpa::Config {
         // FIXME substrate/issues#1578 make this available through chainspec
         gossip_duration: Duration::from_millis(333),
         justification_period: 512,
         name: Some(name),
         observer_enabled: false,
         keystore,
-        is_authority: role.is_network_authority(),
+        is_authority,
     };
 
     let enable_grandpa = !disable_grandpa;
@@ -185,7 +185,7 @@ pub fn new_full(config: Configuration)
             network: service.network(),
             inherent_data_providers: inherent_data_providers.clone(),
             telemetry_on_connect: Some(service.telemetry_on_connect_stream()),
-            voting_rule: sc_finality_grandpa::VotingRulesBuilder::default().build(),
+            voting_rule: grandpa::VotingRulesBuilder::default().build(),
             prometheus_registry: service.prometheus_registry()
         };
 
@@ -230,7 +230,7 @@ pub fn new_light(config: Configuration)
             let fetch_checker = fetcher
                 .map(|fetcher| fetcher.checker().clone())
                 .ok_or_else(|| "Trying to start light import queue without active fetch checker")?;
-            let grandpa_block_import = sc_finality_grandpa::light_block_import(
+            let grandpa_block_import = grandpa::light_block_import(
                 client.clone(),
                 backend,
                 &(client.clone() as Arc<_>),
@@ -240,10 +240,9 @@ pub fn new_light(config: Configuration)
             let finality_proof_request_builder =
                 finality_proof_import.create_finality_proof_request_builder();
 
-            let (babe_block_import, babe_link) = sc_consensus_babe::block_import(
-                sc_consensus_babe::Config::get_or_compute(&*client)?,
+            let (babe_block_import, babe_link) = babe::block_import(
+                babe::Config::get_or_compute(&*client)?,
                 grandpa_block_import,
-                client.clone(),
                 client.clone(),
             )?;
 

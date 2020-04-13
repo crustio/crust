@@ -10,7 +10,7 @@ use grandpa_primitives::AuthorityId as GrandpaId;
 use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
 use sc_service;
-use sp_runtime::traits::{Verify, IdentifyAccount};
+use sp_runtime::{traits::{Verify, IdentifyAccount}, Perbill};
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server
@@ -175,7 +175,7 @@ fn testnet_genesis(
             changes_trie_config: Default::default(),
         }),
         indices: Some(IndicesConfig {
-            ids: endowed_accounts.clone(),
+            indices: vec![],
         }),
         balances: Some(BalancesConfig {
             balances: endowed_accounts

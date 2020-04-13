@@ -45,6 +45,7 @@ sp-block-builder = { default-features = false, version = '2.0.0-alpha.5' }
 sp-core = { default-features = false, version = '2.0.0-alpha.5' }
 sp-inherents = { default-features = false, version = '2.0.0-alpha.5' }
 sp-io = { default-features = false, version = '2.0.0-alpha.5' }
+sp-offchain = { default-features = false, version = '2.0.0-alpha.5' }
 sp-runtime = { default-features = false, version = '2.0.0-alpha.5' }
 sp-session = { default-features = false, version = '2.0.0-alpha.5' }
 sp-staking = { default-features = false, version = '2.0.0-alpha.5' }
@@ -84,6 +85,7 @@ std = [
     'sp-core/std',
     'sp-inherents/std',
     'sp-io/std',
+    'sp-offchain/std',
     'sp-runtime/std',
     'sp-session/std',
     'sp-staking/std',

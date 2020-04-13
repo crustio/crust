@@ -359,7 +359,7 @@ construct_runtime! {
         UncheckedExtrinsic = UncheckedExtrinsic
     {
         // Basic stuff; balances is uncallable initially.
-        System: system::{Module, Call, Storage, Config, Event},
+        System: system::{Module, Call, Storage, Config, Event<T>},
         RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
 
         // Must be before session.
@@ -372,7 +372,7 @@ construct_runtime! {
 
         // Consensus support
         Authorship: authorship::{Module, Call, Storage},
-        Staking: staking::{Module, Call, Storage, Config<T>, Event<T>, ValidateUnsigned},
+        Staking: staking::{Module, Call, Storage, Config<T>, Event<T>},
         Historical: session_historical::{Module},
         Session: session::{Module, Call, Storage, Event, Config<T>},
         FinalityTracker: finality_tracker::{Module, Call, Inherent},
@@ -462,6 +462,12 @@ impl_runtime_apis! {
     impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
 		fn validate_transaction(tx: <Block as BlockT>::Extrinsic) -> TransactionValidity {
 			Executive::validate_transaction(tx)
+		}
+    }
+    
+    impl sp_offchain::OffchainWorkerApi<Block> for Runtime {
+		fn offchain_worker(header: &<Block as BlockT>::Header) {
+			Executive::offchain_worker(header)
 		}
 	}
 

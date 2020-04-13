@@ -1,33 +1,43 @@
 [package]
 name = "cstrml-staking"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Crustio"]
 edition = "2018"
+license = "GPL-3.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
 
 [dependencies]
-serde = { version = "1.0.101", optional = true }
+# third party dependencies
+serde = { version = "1.0.106", optional = true }
 safe-mix = { version = "1.0.0", default-features = false }
-codec = { package = "parity-scale-codec", version = "1.0.0", default-features = false, features = ["derive"] }
-sp-keyring = { optional = true, version = '2.0.0', git = "https://github.com/paritytech/substrate", rev = '3e651110aa06aa835790df63410a29676243fc54' }
-sp-std = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-sp-phragmen = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-sp-io ={ version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-sp-runtime = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-sp-staking = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-frame-support = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-frame-system = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-pallet-session = { version = "2.0.0", features = ["historical"], git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54', default-features = false }
-pallet-authorship = { version = "2.0.0", default-features = false, git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
 
-# Crust runtime modules
+# substrate frame dependencies
+frame-support = { version = '2.0.0-alpha.5', default-features = false }
+frame-system = { version = '2.0.0-alpha.5', default-features = false }
+pallet-session = { version = '2.0.0-alpha.5', features = ["historical"], default-features = false }
+pallet-authorship = { version = '2.0.0-alpha.5', default-features = false }
+
+# substrate primitives
+sp-keyring = { optional = true, version = '2.0.0-alpha.5' }
+sp-std = { version = '2.0.0-alpha.5', default-features = false }
+sp-phragmen = { version = '2.0.0-alpha.5', default-features = false }
+sp-io ={ version = '2.0.0-alpha.5', default-features = false }
+sp-runtime = { version = '2.0.0-alpha.5', default-features = false }
+sp-staking = { version = '2.0.0-alpha.5', default-features = false }
+
+# crust runtime modules
 tee = { package = "cstrml-tee", path = "../tee", default-features = false }
 
 [dev-dependencies]
-sp-core = { version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-pallet-balances = { version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-pallet-timestamp = { version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-pallet-staking-reward-curve = { version = "2.0.0",  git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
-substrate-test-utils = { version = "2.0.0", git = 'https://github.com/paritytech/substrate.git', rev = '3e651110aa06aa835790df63410a29676243fc54' }
+sp-core = '2.0.0-alpha.5'
+pallet-balances = '2.0.0-alpha.5'
+pallet-timestamp = '2.0.0-alpha.5'
+pallet-staking-reward-curve = '2.0.0-alpha.5'
+
+# private crate inside substrate
+substrate-test-utils = { version = '2.0.0-alpha.5', git = 'https://github.com/paritytech/substrate.git', rev = 'd1b9ccad107e4899978858de5ddd2868b9777aab'}
 
 [features]
 equalize = []
@@ -49,4 +59,3 @@ std = [
 	"pallet-authorship/std",
 	"tee/std"
 ]
-

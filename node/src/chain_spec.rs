@@ -1,26 +1,23 @@
+use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
     AuthorityDiscoveryConfig, AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
     IndicesConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig, SystemConfig,
-    TeeConfig, WASM_BINARY,
+    TeeConfig, WASM_BINARY
 };
 use cstrml_staking::Forcing;
 use cstrml_tee::WorkReport;
 use grandpa_primitives::AuthorityId as GrandpaId;
+use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
 use sc_service;
-use sp_consensus_babe::AuthorityId as BabeId;
-use sp_core::{sr25519, Pair, Public};
-use sp_runtime::{
-    traits::{IdentifyAccount, Verify},
-    Perbill,
-};
+use sp_runtime::{traits::{Verify, IdentifyAccount}, Perbill};
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
 // Note this is the URL for the telemetry server
 //const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
-pub type ChainSpec = sc_service::ChainSpec<GenesisConfig>;
+pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
 
 /// The chain specification option. This is expected to come in from the CLI and
 /// is little more than one of a number of alternatives which can easily be converted
@@ -43,17 +40,14 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 type AccountPublic = <Signature as Verify>::Signer;
 
 /// Helper function to generate an account ID from seed
-pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
-where
+pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
     AccountPublic: From<<TPublic::Pair as Pair>::Public>,
 {
     AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
 /// Helper function to generate stash, controller and session key from seed
-pub fn get_authority_keys_from_seed(
-    seed: &str,
-) -> (
+pub fn get_authority_keys_from_seed(seed: &str) -> (
     AccountId,
     AccountId,
     GrandpaId,
@@ -181,7 +175,7 @@ fn testnet_genesis(
             changes_trie_config: Default::default(),
         }),
         indices: Some(IndicesConfig {
-            ids: endowed_accounts.clone(),
+            indices: vec![],
         }),
         balances: Some(BalancesConfig {
             balances: endowed_accounts
@@ -189,7 +183,6 @@ fn testnet_genesis(
                 .cloned()
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
-            vesting: vec![],
         }),
         session: Some(SessionConfig {
             keys: initial_authorities
@@ -197,13 +190,13 @@ fn testnet_genesis(
                 .map(|x| {
                     (
                         x.0.clone(),
+                        x.0.clone(),
                         session_keys(x.2.clone(), x.3.clone(), x.4.clone(), x.5.clone()),
                     )
                 })
                 .collect::<Vec<_>>(),
         }),
         staking: Some(StakingConfig {
-            current_era: 0,
             validator_count: 4,
             minimum_validator_count: 2,
             stakers: initial_authorities
@@ -244,4 +237,11 @@ fn testnet_genesis(
                 .collect(),
         }),
     }
+}
+
+pub fn load_spec(id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+    Ok(match Alternative::from(id) {
+        Some(spec) => Box::new(spec.load()?),
+        None => Box::new(ChainSpec::from_json_file(std::path::PathBuf::from(id))?),
+    })
 }

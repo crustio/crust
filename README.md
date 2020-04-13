@@ -1,6 +1,6 @@
 # Crust
 
-Implementation of a [Crust protocol](https://crustcloud.io/en) node with [substrate](https://github.com/paritytech/substrate).
+Implementation of a [Crust protocol](https://crust.network) node with [substrate](https://github.com/paritytech/substrate).
 
 ## Join to play
 

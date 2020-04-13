@@ -43,6 +43,9 @@ impl system::Trait for Test {
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
     type ModuleToIndex = ();
+    type AccountData = ();
+    type OnNewAccount = ();
+    type OnKilledAccount = ();
 }
 
 impl tee::Trait for Test {
@@ -99,6 +102,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 /// Run until a particular block.
+// TODO: make it into util?
 pub fn run_to_block(n: u64) {
     while System::block_number() < n {
         if System::block_number() > 1 {

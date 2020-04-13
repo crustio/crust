@@ -4,7 +4,11 @@
 #![feature(option_result_contains)]
 
 use codec::{Decode, Encode};
-use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure};
+use frame_support::{
+    decl_event, decl_module, decl_storage, ensure,
+    dispatch::DispatchResult,
+    storage::IterableStorageMap
+};
 use sp_std::convert::TryInto;
 use sp_std::{str, vec::Vec};
 use system::ensure_signed;
@@ -69,12 +73,13 @@ pub trait Trait: system::Trait {
 decl_storage! {
     trait Store for Module<T: Trait> as Tee {
         /// The TEE identities, mapping from controller to optional identity value
-        pub TeeIdentities get(fn tee_identities) config(): linked_map
-            T::AccountId => Option<Identity<T::AccountId>>;
+        pub TeeIdentities get(fn tee_identities) config():
+            map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
         /// Node's work report, mapping from (controller, block_number) to optional work_report
-        pub WorkReports get(fn work_reports) config(): map
-            (T::AccountId, u64)  => Option<WorkReport>;
+        // TODO: Change to double_map to avoid tuple key(low performance)
+        pub WorkReports get(fn work_reports) config():
+            map hasher(blake2_128_concat) (T::AccountId, u64)  => Option<WorkReport>;
 
         /// The old report slot block number.
         pub CurrentReportSlot get(fn current_report_slot) config(): u64;
@@ -130,7 +135,7 @@ decl_module! {
             ensure!(applier_pk != validator_pk, "You cannot verify yourself");
 
             // 3. v_account_id should been validated before
-            ensure!(<TeeIdentities<T>>::exists(validator), "Validator needs to be validated before");
+            ensure!(<TeeIdentities<T>>::contains_key(validator), "Validator needs to be validated before");
             ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key not found");
 
             // 4. Verify sig
@@ -152,7 +157,7 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            ensure!(<TeeIdentities<T>>::exists(&who), "Reporter must be registered before");
+            ensure!(<TeeIdentities<T>>::contains_key(&who), "Reporter must be registered before");
             ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, "Validator public key not found");
 
             // 2. Do timing check
@@ -193,18 +198,15 @@ impl<T: Trait> Module<T> {
         CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
         // 3. Slot changed, update all identities
-        let ids: Vec<(T::AccountId, Identity<T::AccountId>)> =
-            <TeeIdentities<T>>::enumerate().collect();
-
-        // 4. Update id's work report, get id's workload and total workload
-        let workload_map: Vec<(&T::AccountId, u128)> = ids.iter().map(|(controller, _)| {
-            (controller, Self::update_and_get_workload(&controller, reported_rs))
+        // Update id's work report, get id's workload and total workload
+        let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
+            (controller.clone(), Self::update_and_get_workload(&controller, reported_rs))
         }).collect();
         let total_workload = Self::meaningful_workload() + Self::empty_workload();
 
-        // 5. Update stake limit
+        // 4. Update stake limit
         for (controller, own_workload) in workload_map {
-            T::OnReportWorks::on_report_works(controller, own_workload, total_workload);
+            T::OnReportWorks::on_report_works(&controller, own_workload, total_workload);
         }
     }
 
@@ -277,7 +279,7 @@ impl<T: Trait> Module<T> {
             // it may mislead storage order
             if wr.block_number == last_rs {
                 // Extend the last work report(if not exist) into this new report slot
-                if !<WorkReports<T>>::exists((controller, current_rs)) {
+                if !<WorkReports<T>>::contains_key((controller, current_rs)) {
                     // This should already be true
                     <WorkReports<T>>::insert((controller, current_rs), &wr);
                 }

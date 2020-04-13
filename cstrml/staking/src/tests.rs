@@ -80,7 +80,7 @@ fn basic_setup_works() {
 
         // Validations are default
         assert_eq!(
-            <Validators<Test>>::enumerate().collect::<Vec<_>>(),
+            <Validators<Test>>::iter().collect::<Vec<_>>(),
             vec![
                 (31, Validations::default()),
                 (
@@ -170,7 +170,7 @@ fn basic_setup_works() {
         assert_eq!(Staking::validator_count(), 2);
 
         // Initial Era and session
-        assert_eq!(Staking::current_era(), 0);
+        assert_eq!(Staking::current_era().unwrap_or(0), 0);
 
         // Account 10 has `balance_factor` free balance
         assert_eq!(Balances::free_balance(&10), 1);
@@ -190,13 +190,13 @@ fn change_controller_works() {
     ExtBuilder::default().build().execute_with(|| {
         assert_eq!(Staking::bonded(&11), Some(10));
 
-        assert!(<Validators<Test>>::enumerate()
+        assert!(<Validators<Test>>::iter()
             .map(|(c, _)| c)
             .collect::<Vec<u64>>()
             .contains(&11));
         // 10 can control 11 who is initially a validator.
         assert_ok!(Staking::chill(Origin::signed(10)));
-        assert!(!<Validators<Test>>::enumerate()
+        assert!(!<Validators<Test>>::iter()
             .map(|(c, _)| c)
             .collect::<Vec<u64>>()
             .contains(&11));
@@ -238,7 +238,7 @@ fn rewards_should_work() {
             ));
 
             // Initial config should be correct
-            assert_eq!(Staking::current_era(), 0);
+            assert_eq!(Staking::current_era().unwrap_or(0), 0);
             assert_eq!(Session::current_index(), 0);
 
             // Add a dummy guarantor.
@@ -262,7 +262,7 @@ fn rewards_should_work() {
             System::set_block_number(block);
             Timestamp::set_timestamp(block * 5000); // on time.
             Session::on_initialize(System::block_number());
-            assert_eq!(Staking::current_era(), 0);
+            assert_eq!(Staking::current_era().unwrap_or(0), 0);
             assert_eq!(Session::current_index(), 1);
             <Module<Test>>::reward_by_ids(vec![(11, 50)]);
             <Module<Test>>::reward_by_ids(vec![(11, 50)]);
@@ -284,14 +284,14 @@ fn rewards_should_work() {
             System::set_block_number(block);
             Timestamp::set_timestamp(block * 5000 + delay); // a little late.
             Session::on_initialize(System::block_number());
-            assert_eq!(Staking::current_era(), 0);
+            assert_eq!(Staking::current_era().unwrap_or(0), 0);
             assert_eq!(Session::current_index(), 2);
 
             block = 9; // Block 9 => Session 3 => Era 1
             System::set_block_number(block);
             Timestamp::set_timestamp(block * 5000); // back to being on time. no delays
             Session::on_initialize(System::block_number());
-            assert_eq!(Staking::current_era(), 1);
+            assert_eq!(Staking::current_era().unwrap_or(0), 1);
             assert_eq!(Session::current_index(), 3);
 
             // 11 validator has 2/3 of the total rewards and half half for it and its guarantor
@@ -336,7 +336,7 @@ fn multi_era_reward_should_work() {
             start_session(2);
             start_session(3);
 
-            assert_eq!(Staking::current_era(), 1);
+            assert_eq!(Staking::current_era().unwrap_or(0), 1);
             assert_eq!(
                 Balances::total_balance(&10),
                 init_balance_10 + total_payout_0
@@ -403,7 +403,7 @@ fn staking_should_work() {
 
             // --- Block 3: the validators will now be queued.
             start_session(3);
-            assert_eq!(Staking::current_era(), 1);
+            assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
             // --- Block 4: the validators will now be changed.
             start_session(4);
@@ -419,9 +419,9 @@ fn staking_should_work() {
 
             // --- Block 6: all validators should be removed
             start_session(7);
-            assert!(!<Validators<Test>>::exists(&11));
-            assert!(!<Validators<Test>>::exists(&21));
-            assert!(!<Validators<Test>>::exists(&3));
+            assert!(!<Validators<Test>>::contains_key(&11));
+            assert!(!<Validators<Test>>::contains_key(&21));
+            assert!(!<Validators<Test>>::contains_key(&3));
             assert_eq_uvec!(validator_controllers(), vec![4, 20]);
 
             // Note: the stashed value of 4 is still lock, and valid will not be updated, cause all
@@ -941,42 +941,42 @@ fn double_controlling_should_fail() {
 #[test]
 fn session_and_eras_work() {
     ExtBuilder::default().build().execute_with(|| {
-        assert_eq!(Staking::current_era(), 0);
+        assert_eq!(Staking::current_era().unwrap_or(0), 0);
 
         // Block 1: No change.
         start_session(0);
         assert_eq!(Session::current_index(), 1);
-        assert_eq!(Staking::current_era(), 0);
+        assert_eq!(Staking::current_era().unwrap_or(0), 0);
 
         // Block 2: Simple era change.
         start_session(2);
         assert_eq!(Session::current_index(), 3);
-        assert_eq!(Staking::current_era(), 1);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // Block 3: Schedule an era length change; no visible changes.
         start_session(3);
         assert_eq!(Session::current_index(), 4);
-        assert_eq!(Staking::current_era(), 1);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // Block 4: Era change kicks in.
         start_session(5);
         assert_eq!(Session::current_index(), 6);
-        assert_eq!(Staking::current_era(), 2);
+        assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // Block 5: No change.
         start_session(6);
         assert_eq!(Session::current_index(), 7);
-        assert_eq!(Staking::current_era(), 2);
+        assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // Block 6: No change.
         start_session(7);
         assert_eq!(Session::current_index(), 8);
-        assert_eq!(Staking::current_era(), 2);
+        assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // Block 7: Era increment.
         start_session(8);
         assert_eq!(Session::current_index(), 9);
-        assert_eq!(Staking::current_era(), 3);
+        assert_eq!(Staking::current_era().unwrap_or(0), 3);
     });
 }
 
@@ -984,50 +984,50 @@ fn session_and_eras_work() {
 fn forcing_new_era_works() {
     ExtBuilder::default().build().execute_with(|| {
         // normal flow of session.
-        assert_eq!(Staking::current_era(), 0);
+        assert_eq!(Staking::current_era().unwrap_or(0), 0);
         start_session(0);
-        assert_eq!(Staking::current_era(), 0);
+        assert_eq!(Staking::current_era().unwrap_or(0), 0);
         start_session(1);
-        assert_eq!(Staking::current_era(), 0);
+        assert_eq!(Staking::current_era().unwrap_or(0), 0);
         start_session(2);
-        assert_eq!(Staking::current_era(), 1);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // no era change.
         ForceEra::put(Forcing::ForceNone);
         start_session(3);
-        assert_eq!(Staking::current_era(), 1);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
         start_session(4);
-        assert_eq!(Staking::current_era(), 1);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
         start_session(5);
-        assert_eq!(Staking::current_era(), 1);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
         start_session(6);
-        assert_eq!(Staking::current_era(), 1);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // back to normal.
         // this immediately starts a new session.
         ForceEra::put(Forcing::NotForcing);
         start_session(7);
-        assert_eq!(Staking::current_era(), 2);
+        assert_eq!(Staking::current_era().unwrap_or(0), 2);
         start_session(8);
-        assert_eq!(Staking::current_era(), 2);
+        assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // forceful change
         ForceEra::put(Forcing::ForceAlways);
         start_session(9);
-        assert_eq!(Staking::current_era(), 3);
+        assert_eq!(Staking::current_era().unwrap_or(0), 3);
         start_session(10);
-        assert_eq!(Staking::current_era(), 4);
+        assert_eq!(Staking::current_era().unwrap_or(0), 4);
         start_session(11);
-        assert_eq!(Staking::current_era(), 5);
+        assert_eq!(Staking::current_era().unwrap_or(0), 5);
 
         // just one forceful change
         ForceEra::put(Forcing::ForceNew);
         start_session(12);
-        assert_eq!(Staking::current_era(), 6);
+        assert_eq!(Staking::current_era().unwrap_or(0), 6);
 
         assert_eq!(ForceEra::get(), Forcing::NotForcing);
         start_session(13);
-        assert_eq!(Staking::current_era(), 6);
+        assert_eq!(Staking::current_era().unwrap_or(0), 6);
     });
 }
 
@@ -1205,7 +1205,7 @@ fn reward_destination_works() {
             assert_eq!(Balances::free_balance(&10), 1);
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_payout_2 = (0);
+            let total_payout_2 = 0;
             assert_eq!(total_payout_2, 0); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
@@ -1297,7 +1297,7 @@ fn bond_extra_works() {
     // See `bond_extra_and_withdraw_unbonded_works` for more details and updates on `Exposure`.
     ExtBuilder::default().build().execute_with(|| {
         // Check that account 10 is a validator
-        assert!(<Validators<Test>>::exists(11));
+        assert!(<Validators<Test>>::contains_key(11));
         // Check that account 10 is bonded to account 11
         assert_eq!(Staking::bonded(&11), Some(10));
         // Check how much is at stake
@@ -1384,7 +1384,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
             let _ = Balances::make_free_balance_be(&11, 1000000);
 
             // Initial config should be correct
-            assert_eq!(Staking::current_era(), 0);
+            assert_eq!(Staking::current_era().unwrap_or(0), 0);
             assert_eq!(Session::current_index(), 0);
 
             // check the balance of a validator accounts.
@@ -1439,7 +1439,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
             // trigger next era.
             Timestamp::set_timestamp(10);
             start_era(2);
-            assert_eq!(Staking::current_era(), 2);
+            assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
             // ledger should be the same.
             assert_eq!(
@@ -1576,7 +1576,7 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
             // Confirm validator count is 2
             assert_eq!(Staking::validator_count(), 2);
             // Confirm account 10 and 20 are validators
-            assert!(<Validators<Test>>::exists(&11) && <Validators<Test>>::exists(&21));
+            assert!(<Validators<Test>>::contains_key(&11) && <Validators<Test>>::contains_key(&21));
 
             assert_eq!(Staking::stakers(&11).total, 1000);
             assert_eq!(Staking::stakers(&21).total, 2000);
@@ -1657,10 +1657,10 @@ fn on_free_balance_zero_stash_removes_validator() {
             ));
 
             // Check storage items that should be cleaned up
-            assert!(<Ledger<Test>>::exists(&10));
-            assert!(<Bonded<Test>>::exists(&11));
-            assert!(<Validators<Test>>::exists(&11));
-            assert!(<Payee<Test>>::exists(&11));
+            assert!(<Ledger<Test>>::contains_key(&10));
+            assert!(<Bonded<Test>>::contains_key(&11));
+            assert!(<Validators<Test>>::contains_key(&11));
+            assert!(<Payee<Test>>::contains_key(&11));
 
             // Reduce free_balance of controller to 0
             let _ = Balances::slash(&10, u64::max_value());
@@ -1671,22 +1671,25 @@ fn on_free_balance_zero_stash_removes_validator() {
             assert_eq!(Staking::bonded(&11), Some(10));
 
             // Check storage items have not changed
-            assert!(<Ledger<Test>>::exists(&10));
-            assert!(<Bonded<Test>>::exists(&11));
-            assert!(<Validators<Test>>::exists(&11));
-            assert!(<Payee<Test>>::exists(&11));
+            assert!(<Ledger<Test>>::contains_key(&10));
+            assert!(<Bonded<Test>>::contains_key(&11));
+            assert!(<Validators<Test>>::contains_key(&11));
+            assert!(<Payee<Test>>::contains_key(&11));
 
             // Reduce free_balance of stash to 0
             let _ = Balances::slash(&11, u64::max_value());
             // Check total balance of stash
             assert_eq!(Balances::total_balance(&11), 0);
 
+            // Reap the stash
+            assert_ok!(Staking::reap_stash(Origin::NONE, 11));
+
             // Check storage items do not exist
-            assert!(!<Ledger<Test>>::exists(&10));
-            assert!(!<Bonded<Test>>::exists(&11));
-            assert!(!<Validators<Test>>::exists(&11));
-            assert!(!<Guarantors<Test>>::exists(&11));
-            assert!(!<Payee<Test>>::exists(&11));
+            assert!(!<Ledger<Test>>::contains_key(&10));
+            assert!(!<Bonded<Test>>::contains_key(&11));
+            assert!(!<Validators<Test>>::contains_key(&11));
+            assert!(!<Guarantors<Test>>::contains_key(&11));
+            assert!(!<Payee<Test>>::contains_key(&11));
         });
 }
 
@@ -1701,7 +1704,7 @@ fn on_free_balance_zero_stash_removes_guarantor() {
             // Make 10 a guarantor
             assert_ok!(Staking::guarantee(Origin::signed(10), vec![(21, 100)]));
             // Check that account 10 is a guarantor
-            assert!(<Guarantors<Test>>::exists(11));
+            assert!(<Guarantors<Test>>::contains_key(11));
             // Check the balance of the guarantor account
             assert_eq!(Balances::free_balance(&10), 256);
             // Check the balance of the stash account
@@ -1714,10 +1717,10 @@ fn on_free_balance_zero_stash_removes_guarantor() {
             ));
 
             // Check storage items that should be cleaned up
-            assert!(<Ledger<Test>>::exists(&10));
-            assert!(<Bonded<Test>>::exists(&11));
-            assert!(<Guarantors<Test>>::exists(&11));
-            assert!(<Payee<Test>>::exists(&11));
+            assert!(<Ledger<Test>>::contains_key(&10));
+            assert!(<Bonded<Test>>::contains_key(&11));
+            assert!(<Guarantors<Test>>::contains_key(&11));
+            assert!(<Payee<Test>>::contains_key(&11));
 
             // Reduce free_balance of controller to 0
             let _ = Balances::slash(&10, u64::max_value());
@@ -1730,22 +1733,25 @@ fn on_free_balance_zero_stash_removes_guarantor() {
             assert_eq!(Staking::bonded(&11), Some(10));
 
             // Check storage items have not changed
-            assert!(<Ledger<Test>>::exists(&10));
-            assert!(<Bonded<Test>>::exists(&11));
-            assert!(<Guarantors<Test>>::exists(&11));
-            assert!(<Payee<Test>>::exists(&11));
+            assert!(<Ledger<Test>>::contains_key(&10));
+            assert!(<Bonded<Test>>::contains_key(&11));
+            assert!(<Guarantors<Test>>::contains_key(&11));
+            assert!(<Payee<Test>>::contains_key(&11));
 
             // Reduce free_balance of stash to 0
             let _ = Balances::slash(&11, u64::max_value());
             // Check total balance of stash
             assert_eq!(Balances::total_balance(&11), 0);
 
+            // Reap the stash
+            assert_ok!(Staking::reap_stash(Origin::NONE, 11));
+
             // Check storage items do not exist
-            assert!(!<Ledger<Test>>::exists(&10));
-            assert!(!<Bonded<Test>>::exists(&11));
-            assert!(!<Validators<Test>>::exists(&11));
-            assert!(!<Guarantors<Test>>::exists(&11));
-            assert!(!<Payee<Test>>::exists(&11));
+            assert!(!<Ledger<Test>>::contains_key(&10));
+            assert!(!<Bonded<Test>>::contains_key(&11));
+            assert!(!<Validators<Test>>::contains_key(&11));
+            assert!(!<Guarantors<Test>>::contains_key(&11));
+            assert!(!<Payee<Test>>::contains_key(&11));
         });
 }
 
@@ -1756,7 +1762,6 @@ fn switching_roles() {
         .guarantee(false)
         .build()
         .execute_with(|| {
-            Timestamp::set_timestamp(1); // Initialize time.
             Staking::upsert_stake_limit(&5, u64::max_value());
 
             // Reset reward destination
@@ -2304,7 +2309,7 @@ fn era_is_always_same_length() {
         let session = Session::current_index();
         ForceEra::put(Forcing::ForceNew);
         advance_session();
-        assert_eq!(Staking::current_era(), 3);
+        assert_eq!(Staking::current_era().unwrap_or(0), 3);
         assert_eq!(Staking::current_era_start_session_index(), session + 1);
 
         start_era(4);
@@ -2350,7 +2355,7 @@ fn offence_ensures_new_era_without_clobbering() {
 #[test]
 fn offence_deselects_validator_when_slash_is_zero() {
     ExtBuilder::default().build().execute_with(|| {
-        assert!(<Validators<Test>>::exists(11));
+        assert!(<Validators<Test>>::contains_key(11));
         on_offence_now(
             &[OffenceDetails {
                 offender: (11, Staking::stakers(&11)),
@@ -2359,7 +2364,7 @@ fn offence_deselects_validator_when_slash_is_zero() {
             &[Perbill::from_percent(0)],
         );
         assert_eq!(Staking::force_era(), Forcing::ForceNew);
-        assert!(!<Validators<Test>>::exists(11));
+        assert!(!<Validators<Test>>::contains_key(11));
     });
 }
 
@@ -2396,7 +2401,7 @@ fn slash_in_old_span_does_not_deselect() {
     ExtBuilder::default().build().execute_with(|| {
         start_era(1);
 
-        assert!(<Validators<Test>>::exists(11));
+        assert!(<Validators<Test>>::contains_key(11));
         on_offence_now(
             &[OffenceDetails {
                 offender: (11, Staking::stakers(&11)),
@@ -2405,13 +2410,13 @@ fn slash_in_old_span_does_not_deselect() {
             &[Perbill::from_percent(0)],
         );
         assert_eq!(Staking::force_era(), Forcing::ForceNew);
-        assert!(!<Validators<Test>>::exists(11));
+        assert!(!<Validators<Test>>::contains_key(11));
 
         start_era(2);
 
         Staking::validate(Origin::signed(10), Default::default()).unwrap();
         assert_eq!(Staking::force_era(), Forcing::NotForcing);
-        assert!(<Validators<Test>>::exists(11));
+        assert!(<Validators<Test>>::contains_key(11));
 
         start_era(3);
 
@@ -2430,7 +2435,7 @@ fn slash_in_old_span_does_not_deselect() {
         // not for zero-slash.
         assert_eq!(Staking::force_era(), Forcing::NotForcing);
         // 11 should be remove, cause 11's work report is outdated
-        assert!(!<Validators<Test>>::exists(11));
+        assert!(!<Validators<Test>>::contains_key(11));
 
         on_offence_in_era(
             &[OffenceDetails {
@@ -2444,7 +2449,7 @@ fn slash_in_old_span_does_not_deselect() {
         // or non-zero.
         assert_eq!(Staking::force_era(), Forcing::NotForcing);
         // 11 should be remove, cause 11's work report is outdated
-        assert!(!<Validators<Test>>::exists(11));
+        assert!(!<Validators<Test>>::contains_key(11));
         assert_ledger_consistent(11);
     });
 }
@@ -2642,7 +2647,7 @@ fn only_slash_for_max_in_era() {
 #[test]
 fn garbage_collection_after_slashing() {
     ExtBuilder::default()
-        .existential_deposit(1)
+        .existential_deposit(2)
         .build()
         .execute_with(|| {
             assert_eq!(Balances::free_balance(&11), 256_000);
@@ -2674,6 +2679,9 @@ fn garbage_collection_after_slashing() {
             // so we don't test those here.
 
             assert_eq!(Balances::free_balance(&11), 0);
+            assert_eq!(Balances::total_balance(&11), 0);
+
+            assert_ok!(Staking::reap_stash(Origin::NONE, 11));
             assert!(<Staking as crate::Store>::SlashingSpans::get(&11).is_none());
             assert_eq!(
                 <Staking as crate::Store>::SpanSlash::get(&(11, 0)).amount_slashed(),
@@ -2701,7 +2709,7 @@ fn garbage_collection_on_window_pruning() {
             &[Perbill::from_percent(10)],
         );
 
-        let now = Staking::current_era();
+        let now = Staking::current_era().unwrap_or(0);
 
         assert_eq!(Balances::free_balance(&11), 900);
         assert_eq!(Balances::free_balance(&101), 2000 - (guaranteed_value / 10));
@@ -3060,16 +3068,6 @@ fn remove_multi_deferred() {
 }
 
 #[test]
-fn version_initialized() {
-    ExtBuilder::default().build().execute_with(|| {
-        assert_eq!(
-            <Staking as Store>::StorageVersion::get(),
-            crate::migration::CURRENT_VERSION
-        );
-    });
-}
-
-#[test]
 fn update_stakers_should_work_new_era() {
     ExtBuilder::default().build().execute_with(|| {
         start_session(0);
@@ -3100,8 +3098,6 @@ fn guarantee_limit_should_work() {
         .guarantee(false)
         .build()
         .execute_with(|| {
-            Timestamp::set_timestamp(1); // Initialize time.
-
             // put some money in account that we'll use.
             for i in 1..7 {
                 let _ = Balances::deposit_creating(&i, 5000);

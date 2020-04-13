@@ -46,3 +46,6 @@ pub type TeeSignature = Vec<u8>;
 
 /// Work report empty workload/storage merkle root
 pub type MerkleRoot = Vec<u8>;
+
+/// Report index, always be a multiple of era number
+pub type ReportSlot = u64;

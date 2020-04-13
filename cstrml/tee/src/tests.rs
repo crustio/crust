@@ -281,17 +281,20 @@ fn test_for_oudated_work_reports() {
         // generate 303 blocks first
         run_to_block(303);
 
+        // report works should ok
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
             get_valid_work_report()
         ));
-
-        // check work report and workload
-        assert_eq!(Tee::update_and_get_workload(&account, 300), 0);
         assert_eq!(
-            Tee::work_reports((&account, 300)),
+            Tee::work_reports(&account),
             Some(get_valid_work_report())
         );
+
+        // check work report and workload, current_report_slot updating should work
+        assert_eq!(Tee::current_report_slot(), 0);
+        Tee::update_identities();
+        assert_eq!(Tee::current_report_slot(), 300);
         // Check workloads
         assert_eq!(Tee::empty_workload(), 4294967296);
         assert_eq!(Tee::meaningful_workload(), 1676266280);
@@ -299,35 +302,33 @@ fn test_for_oudated_work_reports() {
         // generate 401 blocks, wr still valid
         run_to_block(401);
         assert_eq!(
-            Tee::work_reports((&account, 300)),
+            Tee::work_reports(&account),
             Some(get_valid_work_report())
         );
+        assert!(Tee::reported_in_slot(&account, 300));
 
-        // generate 602 blocks, 300 work report should be removed
+        // generate 602 blocks
         run_to_block(602);
-
-        assert_eq!(Tee::update_and_get_workload(&account, 600), 5971233576);
+        assert_eq!(Tee::current_report_slot(), 300);
+        Tee::update_identities();
+        assert_eq!(Tee::current_report_slot(), 600);
         assert_eq!(
-            Tee::work_reports((&account, 300)),
-            None
-        );
-        assert_eq!(
-            Tee::work_reports((&account, 600)),
+            Tee::work_reports(&account),
             Some(get_valid_work_report())
         );
-
-        run_to_block(903);
-        assert_eq!(Tee::update_and_get_workload(&account, 900), 0);
-        assert_eq!(
-            Tee::work_reports((&account, 600)),
-            None
-        );
-        assert_eq!(
-            Tee::work_reports((&account, 900)),
-            None
-        );
+        assert!(!Tee::reported_in_slot(&account, 600));
 
         // Check workloads
+        assert_eq!(Tee::empty_workload(), 4294967296);
+        assert_eq!(Tee::meaningful_workload(), 1676266280);
+
+        run_to_block(903);
+        assert_eq!(Tee::current_report_slot(), 600);
+        Tee::update_identities();
+        assert_eq!(Tee::current_report_slot(), 900);
+
+        // Check workloads
+        assert_eq!(Tee::work_reports(&account), None);
         assert_eq!(Tee::empty_workload(), 0);
         assert_eq!(Tee::meaningful_workload(), 0);
     });
@@ -338,28 +339,21 @@ fn test_abnormal_era() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Alice.to_account_id();
 
-        // If new era happens in 101, next work is not reported, we should keep last work report
+        // If new era happens in 101, next work is not reported
         run_to_block(101);
         Tee::update_identities();
         assert_eq!(
-            Tee::work_reports((&account, 0)),
+            Tee::work_reports(&account),
             Some(Default::default())
         );
         assert_eq!(Tee::empty_workload(), 0);
-        assert_eq!(
-            Tee::current_report_slot(),
-            0
-        );
+        assert_eq!(Tee::current_report_slot(), 0);
 
-        // If new era happens in 301, we should update work report and last report slot
+        // If new era happens in 301, we should update work report and current report slot
         run_to_block(301);
         Tee::update_identities();
         assert_eq!(
-            Tee::work_reports((&account, 0)),
-            None
-        );
-        assert_eq!(
-            Tee::work_reports((&account, 300)),
+            Tee::work_reports(&account),
             Some(Default::default())
         );
         assert_eq!(
@@ -375,25 +369,16 @@ fn test_abnormal_era() {
             Origin::signed(account.clone()),
             get_valid_work_report()
         ));
-        assert_eq!(
-            Tee::work_reports((&account, 300)),
-            Some(get_valid_work_report())
-        );
+        assert_eq!(Tee::work_reports(&account), Some(get_valid_work_report()));
+        // total workload should keep same, cause we only updated in a new era
         assert_eq!(Tee::empty_workload(), 4294967296);
         assert_eq!(Tee::meaningful_workload(), 1676266280);
 
         // If abnormal era end happens in 589
         run_to_block(589);
-        // nothing should happen cause report slot not change
         Tee::update_identities();
-        assert_eq!(
-            Tee::current_report_slot(),
-            300
-        );
-        assert_eq!(
-            Tee::work_reports((&account, 300)),
-            Some(get_valid_work_report())
-        );
+        assert_eq!(Tee::current_report_slot(), 300);
+        assert_eq!(Tee::work_reports(&account), Some(get_valid_work_report()));
         assert_eq!(Tee::empty_workload(), 4294967296);
         assert_eq!(Tee::meaningful_workload(), 1676266280);
     })

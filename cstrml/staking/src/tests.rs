@@ -111,8 +111,8 @@ fn basic_setup_works() {
             })
         );
         assert_eq!(Staking::guarantors(101).unwrap().targets, vec![11, 21]);
-        assert_eq!(Staking::guarantee_rel(vec![(101, 11)]), Some(250));
-        assert_eq!(Staking::guarantee_rel(vec![(101, 21)]), Some(250));
+        assert_eq!(Staking::guarantee_rel(101, 11), Some(250));
+        assert_eq!(Staking::guarantee_rel(101, 21), Some(250));
 
         if cfg!(feature = "equalize") {
             assert_eq!(
@@ -3133,7 +3133,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(vec![(1, 5)]), Some(500));
+            assert_eq!(Staking::guarantee_rel(1, 5), Some(500));
 
             // After a era, valid stake should updated.
             start_era(1);
@@ -3146,7 +3146,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(vec![(1, 5)]), Some(500));
+            assert_eq!(Staking::guarantee_rel(1, 5), Some(500));
 
             assert_eq!(
                 Staking::ledger(&2),
@@ -3169,7 +3169,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(vec![(1, 5)]), Some(2000));
+            assert_eq!(Staking::guarantee_rel(1, 5), Some(2000));
 
             // Next era, wr should be outdated
             start_era(2);
@@ -3182,7 +3182,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(vec![(1, 5)]), None);
+            assert_eq!(Staking::guarantee_rel(1, 5), None);
 
             assert_eq!(
                 Staking::ledger(&2),

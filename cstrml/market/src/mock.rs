@@ -70,11 +70,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     // tee genesis
     let identities: Vec<u64> = vec![0, 100, 200];
-    let work_reports: Vec<((u64, u64), tee::WorkReport)> = identities
+    let work_reports: Vec<(u64, tee::WorkReport)> = identities
             .iter()
             .map(|id| {
                 (
-                    (*id, 0),
+                    *id,
                     tee::WorkReport {
                         pub_key: vec![],
                         block_number: 0,

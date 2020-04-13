@@ -261,8 +261,10 @@ impl<T: Trait> Module<T> {
             if Self::reported_in_slot(controller, current_rs) {
                 (wr.empty_workload as u128, wr.meaningful_workload as u128)
             } else {
-                // Remove work report
-                <WorkReports<T>>::remove(controller);
+                // Remove work report when wr IS outdated
+                if wr.block_number < current_rs {
+                    <WorkReports<T>>::remove(controller);
+                }
                 (0, 0)
             }
         } else {

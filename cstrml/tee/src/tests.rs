@@ -349,7 +349,7 @@ fn test_abnormal_era() {
         assert_eq!(Tee::empty_workload(), 0);
         assert_eq!(Tee::current_report_slot(), 0);
 
-        // If new era happens in 301, we should update work report and current report slot
+        // If new era happens on 301, we should update work report and current report slot
         run_to_block(301);
         Tee::update_identities();
         assert_eq!(
@@ -360,6 +360,21 @@ fn test_abnormal_era() {
             Tee::current_report_slot(),
             300
         );
+        assert!(Tee::reported_in_slot(&account, 0));
+
+        // If next new era happens on 303, then nothing should happen
+        run_to_block(303);
+        Tee::update_identities();
+        assert_eq!(
+            Tee::work_reports(&account),
+            Some(Default::default())
+        );
+        assert_eq!(
+            Tee::current_report_slot(),
+            300
+        );
+        assert!(Tee::reported_in_slot(&account, 0));
+        assert!(!Tee::reported_in_slot(&account, 300));
 
         // Then report works
         // empty_workload: 4294967296,
@@ -373,13 +388,6 @@ fn test_abnormal_era() {
         // total workload should keep same, cause we only updated in a new era
         assert_eq!(Tee::empty_workload(), 4294967296);
         assert_eq!(Tee::meaningful_workload(), 1676266280);
-
-        // If abnormal era end happens in 589
-        run_to_block(589);
-        Tee::update_identities();
-        assert_eq!(Tee::current_report_slot(), 300);
-        assert_eq!(Tee::work_reports(&account), Some(get_valid_work_report()));
-        assert_eq!(Tee::empty_workload(), 4294967296);
-        assert_eq!(Tee::meaningful_workload(), 1676266280);
+        assert!(Tee::reported_in_slot(&account, 300));
     })
 }

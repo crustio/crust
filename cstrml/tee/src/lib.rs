@@ -186,10 +186,17 @@ impl<T: Trait> Module<T> {
     /// TC = O(n)
     /// DB try is 2n+1
     pub fn update_identities() {
-        // 1. Update id's work rzeport, get id's workload and total workload
+        // Ideally, reported_rs should be current_rs + 1
+        let reported_rs = Self::get_reported_slot();
+        let current_rs = Self::current_report_slot();
+        // 1. Report slot did not change, it should not trigger updating
+        if current_rs == reported_rs {
+            return;
+        }
+
+        // 2. Update id's work rzeport, get id's workload and total workload
         let mut total_meaningful_workload = 0;
         let mut total_empty_workload = 0;
-        let current_rs = Self::current_report_slot();
 
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
             let (e_workload, m_workload) = Self::update_and_get_workload(&controller, current_rs);
@@ -202,10 +209,10 @@ impl<T: Trait> Module<T> {
         EmptyWorkload::put(total_empty_workload);
         let total_workload = total_meaningful_workload + total_empty_workload;
 
-        // 2. Update current report slot
-        CurrentReportSlot::mutate(|crs| *crs = Self::get_reported_slot());
+        // 3. Update current report slot
+        CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
-        // 3. Update stake limit
+        // 4. Update stake limit
         for (controller, own_workload) in workload_map {
             T::OnReportWorks::on_report_works(&controller, own_workload, total_workload);
         }

@@ -1313,6 +1313,7 @@ impl<T: Trait> Module<T> {
             let era_length = session_index
                 .checked_sub(Self::current_era_start_session_index())
                 .unwrap_or(0);
+            // TODO: remove ForceNew? cause this will make work report update invalid
             match ForceEra::get() {
                 Forcing::ForceNew => ForceEra::kill(),
                 Forcing::ForceAlways => (),

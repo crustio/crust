@@ -2412,11 +2412,12 @@ fn slash_in_old_span_does_not_deselect() {
         assert_eq!(Staking::force_era(), Forcing::ForceNew);
         assert!(!<Validators<Test>>::contains_key(11));
 
+        // ForceNew, this will trigger update on CurrentEraStartSessionIndex, this will not
+        // trigger wr outdated, so we actually won't support ForceNew strategy
         start_era(2);
 
-        // Report should outdated, so validate should be failed
-        assert!(Staking::validate(Origin::signed(10), Default::default()).is_err());
-        /*assert_eq!(Staking::force_era(), Forcing::NotForcing);
+        Staking::validate(Origin::signed(10), Default::default()).unwrap();
+        assert_eq!(Staking::force_era(), Forcing::NotForcing);
         assert!(<Validators<Test>>::contains_key(11));
 
         start_era(3);
@@ -2451,7 +2452,7 @@ fn slash_in_old_span_does_not_deselect() {
         assert_eq!(Staking::force_era(), Forcing::NotForcing);
         // 11 should be remove, cause 11's work report is outdated
         assert!(!<Validators<Test>>::contains_key(11));
-        assert_ledger_consistent(11);*/
+        assert_ledger_consistent(11);
     });
 }
 

@@ -41,6 +41,7 @@ use sp_runtime::{Deserialize, Serialize};
 
 // Crust runtime modules
 use tee;
+use primitives::constants::{currency::*, time::*};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_NOMINATIONS: usize = 16;
@@ -55,6 +56,7 @@ pub type Points = u32;
 
 /// Reward points of an era. Used to split era total payout between validators.
 #[derive(Encode, Decode, Default)]
+// TODO: change to `ErasRewardPoints` for not using index corresponds
 pub struct EraPoints {
     /// Total number of points. Equals the sum of reward points for each validator.
     total: Points,
@@ -1328,14 +1330,74 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    /// End a session potentially ending an era.
+    fn end_session(session_index: SessionIndex) {
+        if Self::current_era().is_some() {
+            let era_length = session_index
+                .checked_sub(Self::current_era_start_session_index())
+                .unwrap_or(0);
+            // End of era
+            if era_length == T::SessionsPerEra::get() - 1 {
+                Self::end_era();
+            }
+        }
+    }
+
     /// The era has changed - enact new staking set.
     ///
     /// NOTE: This always happens immediately before a session change to ensure that new validators
     /// get a chance to set their session keys.
     /// This also checks stake limitation based on work reports
     fn new_era(start_session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
+        // Increment current era.
+        let current_era = CurrentEra::mutate(|s| {
+            *s = Some(s.map(|s| s + 1).unwrap_or(0));
+            s.unwrap()
+        });
+
+        CurrentEraStartSessionIndex::mutate(|v| {
+            *v = start_session_index;
+        });
+        let bonding_duration = T::BondingDuration::get();
+
+        // Slashing
+        // TODO: put slashing into start_era(judging at start_session) like Kusama does?
+        BondedEras::mutate(|bonded| {
+            bonded.push((current_era, start_session_index));
+
+            if current_era > bonding_duration {
+                let first_kept = current_era - bonding_duration;
+
+                // prune out everything that's from before the first-kept index.
+                let n_to_prune = bonded
+                    .iter()
+                    .take_while(|&&(era_idx, _)| era_idx < first_kept)
+                    .count();
+
+                // kill slashing metadata.
+                for (pruned_era, _) in bonded.drain(..n_to_prune) {
+                    slashing::clear_era_metadata::<T>(pruned_era);
+                }
+
+                if let Some(&(_, first_session)) = bonded.first() {
+                    T::SessionInterface::prune_historical_up_to(first_session);
+                }
+            }
+        });
+
+        // Reassign all stakers.
+        let (_slot_stake, maybe_new_validators) = Self::select_validators();
+        Self::apply_unapplied_slashes(current_era);
+
+        maybe_new_validators
+    }
+
+    /// Compute payout for era.
+    fn end_era() {
         // Payout
         let points = CurrentEraPointsEarned::take();
+        let current_era = Self::current_era().unwrap_or(0);
+
         let now = T::Time::now();
         let previous_era_start = <CurrentEraStart<T>>::mutate(|v| sp_std::mem::replace(v, now));
         let era_duration = now - previous_era_start;
@@ -1372,46 +1434,27 @@ impl<T: Trait> Module<T> {
             T::Reward::on_unbalanced(total_imbalance);
             T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
         }
+    }
 
-        // Increment current era.
-        let current_era = CurrentEra::mutate(|s| {
-            *s = Some(s.map(|s| s + 1).unwrap_or(0));
-            s.unwrap()
-        });
-
-        CurrentEraStartSessionIndex::mutate(|v| {
-            *v = start_session_index;
-        });
-        let bonding_duration = T::BondingDuration::get();
-
-        BondedEras::mutate(|bonded| {
-            bonded.push((current_era, start_session_index));
-
-            if current_era > bonding_duration {
-                let first_kept = current_era - bonding_duration;
-
-                // prune out everything that's from before the first-kept index.
-                let n_to_prune = bonded
-                    .iter()
-                    .take_while(|&&(era_idx, _)| era_idx < first_kept)
-                    .count();
-
-                // kill slashing metadata.
-                for (pruned_era, _) in bonded.drain(..n_to_prune) {
-                    slashing::clear_era_metadata::<T>(pruned_era);
-                }
-
-                if let Some(&(_, first_session)) = bonded.first() {
-                    T::SessionInterface::prune_historical_up_to(first_session);
-                }
+    /// Staking rewards per era
+    fn staking_rewards_in_era(current_era: EraIndex) -> BalanceOf<T> {
+        // 1 year = 365d * 24h * 2era(30 min) = 17,088 eras
+        let mut maybe_rewards_this_year = FIRST_YEAR_REWARDS ;
+        let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
+            .ok()
+            .unwrap();
+        let year_in_era = (365 * 24 * 3600) / (MILLISECS_PER_BLOCK / 1000) / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get());
+        let year_num = (current_era-1) / year_in_era;
+        for i in 0..year_num {
+            // If inflation <= 1%, stop reduce
+            if maybe_rewards_this_year <= total_issuance / 100 {
+                break;
             }
-        });
 
-        // Reassign all Stakers.
-        let (_slot_stake, maybe_new_validators) = Self::select_validators();
-        Self::apply_unapplied_slashes(current_era);
+            maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
+        }
 
-        maybe_new_validators
+        maybe_rewards_this_year.try_into().ok().unwrap()
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
@@ -1717,9 +1760,9 @@ impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
         }
         Self::new_session(idx)
     }
-    fn end_session(_end_index: SessionIndex) {
+    fn end_session(end_index: SessionIndex) {
         // Do nothing
-        // TODO: Upgrade staking to newest NPoS mechanism
+        Self::end_session(end_index);
     }
     fn start_session(_start_index: SessionIndex) {
         // Do nothing

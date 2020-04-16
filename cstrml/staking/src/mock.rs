@@ -42,6 +42,8 @@ thread_local! {
     static SESSION: RefCell<(Vec<AccountId>, HashSet<AccountId>)> = RefCell::new(Default::default());
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
     static SLASH_DEFER_DURATION: RefCell<EraIndex> = RefCell::new(0);
+    static OWN_WORKLOAD: RefCell<u128> = RefCell::new(0);
+    static TOTAL_WORKLOAD: RefCell<u128> = RefCell::new(0);
 }
 
 pub struct TestSessionHandler;
@@ -182,9 +184,18 @@ impl pallet_timestamp::Trait for Test {
     type OnTimestampSet = ();
     type MinimumPeriod = MinimumPeriod;
 }
+pub struct TestStaking;
+impl tee::OnReportWorks<AccountId> for TestStaking {
+    fn on_report_works(controller: &AccountId, own_workload: u128, total_workload: u128) {
+        // Disable work report in mock test
+        let _own_workload: u128 = OWN_WORKLOAD.with(|v| *v.borrow());
+        let _total_workload: u128 = TOTAL_WORKLOAD.with(|v| *v.borrow());
+        Staking::update_stake_limit(controller, _own_workload, _total_workload);
+    }
+}
 impl tee::Trait for Test {
     type Event = ();
-    type OnReportWorks = Staking;
+    type OnReportWorks = TestStaking;
 }
 pallet_staking_reward_curve::build! {
 	const I_NPOS: PiecewiseLinear<'static> = curve!(
@@ -229,6 +240,8 @@ pub struct ExtBuilder {
     fair: bool,
     num_validators: Option<u32>,
     invulnerables: Vec<u64>,
+    own_workload: u128,
+    total_workload: u128
 }
 
 impl Default for ExtBuilder {
@@ -243,6 +256,8 @@ impl Default for ExtBuilder {
             fair: true,
             num_validators: None,
             invulnerables: vec![],
+            own_workload: 3000,
+            total_workload: 3000,
         }
     }
 }
@@ -250,6 +265,14 @@ impl Default for ExtBuilder {
 impl ExtBuilder {
     pub fn existential_deposit(mut self, existential_deposit: u64) -> Self {
         self.existential_deposit = existential_deposit;
+        self
+    }
+    pub fn own_workload(mut self, own_workload: u128) -> Self {
+        self.own_workload = own_workload;
+        self
+    }
+    pub fn total_workload(mut self, total_workload: u128) -> Self {
+        self.total_workload = total_workload;
         self
     }
     pub fn validator_pool(mut self, validator_pool: bool) -> Self {
@@ -287,6 +310,8 @@ impl ExtBuilder {
     pub fn set_associated_consts(&self) {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow_mut() = self.existential_deposit);
         SLASH_DEFER_DURATION.with(|v| *v.borrow_mut() = self.slash_defer_duration);
+        OWN_WORKLOAD.with(|v| *v.borrow_mut() = self.own_workload);
+        TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = self.total_workload);
     }
     pub fn build(self) -> sp_io::TestExternalities {
         self.set_associated_consts();
@@ -606,4 +631,19 @@ pub fn on_offence_now(
 ) {
     let now = Staking::current_era().unwrap_or(0);
     on_offence_in_era(offenders, slash_fraction, now)
+}
+
+pub fn set_own_workload(own_workload: u128) {
+    OWN_WORKLOAD.with(|v| *v.borrow_mut() = own_workload);
+}
+
+pub fn set_total_workload(total_workload: u128) {
+    TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = total_workload);
+}
+
+pub fn start_era_with_new_workloads(era_index: EraIndex, own_workload: u128, total_workload: u128) {
+    TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = total_workload);
+    OWN_WORKLOAD.with(|v| *v.borrow_mut() = own_workload);
+    start_session((era_index * 3).into());
+    assert_eq!(Staking::current_era().unwrap_or(0), era_index);
 }

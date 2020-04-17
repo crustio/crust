@@ -72,7 +72,7 @@ macro_rules! new_full_start {
 
 /// Builds a new service for a full client.
 pub fn new_full(config: Configuration)
-                -> Result<impl AbstractService, ServiceError>
+    -> Result<impl AbstractService, ServiceError>
 {
     use sc_network::Event;
     use sc_client_api::ExecutorProvider;
@@ -104,7 +104,10 @@ pub fn new_full(config: Configuration)
 
     if participates_in_consensus {
         let proposer =
-            sc_basic_authorship::ProposerFactory::new(service.client(), service.transaction_pool());
+            sc_basic_authorship::ProposerFactory::new(
+                service.client(),
+                service.transaction_pool()
+            );
 
         let client = service.client();
         let select_chain = service.select_chain()

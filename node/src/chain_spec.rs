@@ -1,8 +1,8 @@
 use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
-    AuthorityDiscoveryConfig, AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
-    IndicesConfig, SessionConfig, SessionKeys, StakerStatus, StakingConfig, SystemConfig,
-    TeeConfig, WASM_BINARY
+    AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
+    AuthorityDiscoveryConfig, SessionConfig, SessionKeys, StakerStatus,
+    StakingConfig, SystemConfig, TeeConfig, WASM_BINARY
 };
 use cstrml_staking::Forcing;
 use cstrml_tee::WorkReport;
@@ -86,21 +86,19 @@ impl Alternative {
             Alternative::Development => ChainSpec::from_genesis(
                 "Development",
                 "dev",
-                || {
-                    testnet_genesis(
-                        vec![get_authority_keys_from_seed("Alice")],
+                || testnet_genesis(
+                    vec![get_authority_keys_from_seed("Alice")],
+                    get_account_id_from_seed::<sr25519::Public>("Alice"),
+                    vec![
                         get_account_id_from_seed::<sr25519::Public>("Alice"),
-                        vec![
-                            get_account_id_from_seed::<sr25519::Public>("Alice"),
-                            get_account_id_from_seed::<sr25519::Public>("Bob"),
-                            get_account_id_from_seed::<sr25519::Public>("Charlie"),
-                            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-                            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-                            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-                        ],
-                        true,
-                    )
-                },
+                        get_account_id_from_seed::<sr25519::Public>("Bob"),
+                        get_account_id_from_seed::<sr25519::Public>("Charlie"),
+                        get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+                        get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+                        get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+                    ],
+                    true,
+                ),
                 vec![],
                 None,
                 Some(DEFAULT_PROTOCOL_ID),
@@ -110,30 +108,28 @@ impl Alternative {
             Alternative::LocalTestnet => ChainSpec::from_genesis(
                 "Local Testnet",
                 "local_testnet",
-                || {
-                    testnet_genesis(
-                        vec![
-                            get_authority_keys_from_seed("Alice"),
-                            get_authority_keys_from_seed("Bob"),
-                        ],
+                || testnet_genesis(
+                    vec![
+                        get_authority_keys_from_seed("Alice"),
+                        get_authority_keys_from_seed("Bob"),
+                    ],
+                    get_account_id_from_seed::<sr25519::Public>("Alice"),
+                    vec![
                         get_account_id_from_seed::<sr25519::Public>("Alice"),
-                        vec![
-                            get_account_id_from_seed::<sr25519::Public>("Alice"),
-                            get_account_id_from_seed::<sr25519::Public>("Bob"),
-                            get_account_id_from_seed::<sr25519::Public>("Charlie"),
-                            get_account_id_from_seed::<sr25519::Public>("Dave"),
-                            get_account_id_from_seed::<sr25519::Public>("Eve"),
-                            get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-                            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-                            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-                            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-                            get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-                            get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-                            get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-                        ],
-                        true,
-                    )
-                },
+                        get_account_id_from_seed::<sr25519::Public>("Bob"),
+                        get_account_id_from_seed::<sr25519::Public>("Charlie"),
+                        get_account_id_from_seed::<sr25519::Public>("Dave"),
+                        get_account_id_from_seed::<sr25519::Public>("Eve"),
+                        get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+                        get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+                        get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+                        get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+                        get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+                        get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
+                        get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+                    ],
+                    true,
+                ),
                 vec![],
                 None,
                 Some(DEFAULT_PROTOCOL_ID),
@@ -174,9 +170,6 @@ fn testnet_genesis(
             code: WASM_BINARY.to_vec(),
             changes_trie_config: Default::default(),
         }),
-        indices: Some(IndicesConfig {
-            indices: vec![],
-        }),
         balances: Some(BalancesConfig {
             balances: endowed_accounts
                 .iter()
@@ -211,7 +204,9 @@ fn testnet_genesis(
         babe: Some(Default::default()),
         grandpa: Some(Default::default()),
         im_online: Some(Default::default()),
-        authority_discovery: Some(AuthorityDiscoveryConfig { keys: vec![] }),
+        authority_discovery: Some(AuthorityDiscoveryConfig { 
+            keys: vec![] 
+        }),
         tee: Some(TeeConfig {
             current_report_slot: 0,
             tee_identities: endowed_accounts

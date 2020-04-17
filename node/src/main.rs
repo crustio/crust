@@ -16,7 +16,7 @@ fn main() -> sc_cli::Result<()> {
         author: "Crustio",
         description: "Crust alpha testnet node",
         support_url: "https://github.com/crustio/crust/issues/new",
-        copyright_start_year: 2020,
+        copyright_start_year: 2019,
     };
 
     command::run(version)

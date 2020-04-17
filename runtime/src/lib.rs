@@ -196,13 +196,6 @@ parameter_types! {
 	pub const IndexDeposit: Balance = 1 * DOLLARS;
 }
 
-impl indices::Trait for Runtime {
-    type AccountIndex = AccountIndex;
-    type Currency = Balances;
-    type Deposit = IndexDeposit;
-    type Event = Event;
-}
-
 parameter_types! {
     pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
@@ -328,8 +321,6 @@ impl balances::Trait for Runtime {
 parameter_types! {
 	pub const TransactionBaseFee: Balance = 1 * CENTS;
 	pub const TransactionByteFee: Balance = 10 * MILLICENTS;
-	// for a sane configuration, this should always be less than `AvailableBlockRatio`.
-	pub const TargetBlockFullness: Perbill = Perbill::from_percent(25);
 }
 
 impl transaction_payment::Trait for Runtime {
@@ -360,13 +351,12 @@ construct_runtime! {
     {
         // Basic stuff; balances is uncallable initially.
         System: system::{Module, Call, Storage, Config, Event<T>},
-        RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
+        RandomnessCollectiveFlip: randomness_collective_flip::{Module, Storage},
 
         // Must be before session.
         Babe: babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
-        Indices: indices::{Module, Call, Storage, Config<T>, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
 

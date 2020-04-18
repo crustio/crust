@@ -725,8 +725,6 @@ dependencies = [
  "pallet-finality-tracker",
  "pallet-grandpa",
  "pallet-im-online",
- "pallet-indices",
- "pallet-offences",
  "pallet-randomness-collective-flip",
  "pallet-session",
  "pallet-staking-reward-curve",
@@ -3133,39 +3131,6 @@ dependencies = [
  "sp-application-crypto",
  "sp-core",
  "sp-io",
- "sp-runtime",
- "sp-staking",
- "sp-std",
-]
-
-[[package]]
-name = "pallet-indices"
-version = "2.0.0-alpha.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be7290d7e65f8412b7237e41aff0ca4330b90253299184acded9ccccf6414305"
-dependencies = [
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "serde",
- "sp-core",
- "sp-io",
- "sp-keyring",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
-name = "pallet-offences"
-version = "2.0.0-alpha.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "228b65c3973fa662df1c76e56e69b629ceea830f05be53954385aa175996b86d"
-dependencies = [
- "frame-support",
- "frame-system",
- "pallet-balances",
- "parity-scale-codec",
- "serde",
  "sp-runtime",
  "sp-staking",
  "sp-std",

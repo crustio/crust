@@ -186,11 +186,11 @@ impl pallet_timestamp::Trait for Test {
 }
 pub struct TestStaking;
 impl tee::OnReportWorks<AccountId> for TestStaking {
-    fn on_report_works(controller: &AccountId, own_workload: u128, total_workload: u128) {
+    fn on_report_works(controller: &AccountId, _own_workload: u128, _total_workload: u128) {
         // Disable work report in mock test
-        let _own_workload: u128 = OWN_WORKLOAD.with(|v| *v.borrow());
-        let _total_workload: u128 = TOTAL_WORKLOAD.with(|v| *v.borrow());
-        Staking::update_stake_limit(controller, _own_workload, _total_workload);
+        Staking::update_stake_limit(controller,
+            OWN_WORKLOAD.with(|v| *v.borrow()),
+            TOTAL_WORKLOAD.with(|v| *v.borrow()));
     }
 }
 impl tee::Trait for Test {
@@ -412,7 +412,7 @@ impl ExtBuilder {
         }
         .assimilate_storage(&mut storage);
 
-        let mut work_reports: Vec<(u64, tee::WorkReport)> = identities
+        let work_reports: Vec<(u64, tee::WorkReport)> = identities
             .iter()
             .map(|id| {
                 (
@@ -642,8 +642,8 @@ pub fn set_total_workload(total_workload: u128) {
 }
 
 pub fn start_era_with_new_workloads(era_index: EraIndex, own_workload: u128, total_workload: u128) {
-    TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = total_workload);
-    OWN_WORKLOAD.with(|v| *v.borrow_mut() = own_workload);
+    set_own_workload(own_workload);
+    set_total_workload(total_workload);
     start_session((era_index * 3).into());
     assert_eq!(Staking::current_era().unwrap_or(0), era_index);
 }

@@ -86,14 +86,14 @@ fn basic_setup_works() {
                 (
                     21,
                     Validations {
-                        commission: Perbill::default(),
+                        guarantee_fee: Perbill::default(),
                         guarantors: vec![101]
                     }
                 ),
                 (
                     11,
                     Validations {
-                        commission: Perbill::default(),
+                        guarantee_fee: Perbill::default(),
                         guarantors: vec![101]
                     }
                 )
@@ -1275,7 +1275,7 @@ fn validator_payment_prefs_work() {
         <Validators<Test>>::insert(
             &11,
             Validations {
-                commission: Perbill::from_percent(50),
+                guarantee_fee: Perbill::from_percent(50),
                 guarantors: vec![],
             },
         );
@@ -3355,7 +3355,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![1, 3]
                 }
             );
@@ -3365,7 +3365,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![3, 1]
                 }
             );
@@ -3376,7 +3376,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![3, 1]
                 }
             );
@@ -3451,7 +3451,7 @@ fn new_era_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![1, 3]
                 }
             );
@@ -3462,7 +3462,7 @@ fn new_era_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![1]
                 }
             );

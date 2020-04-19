@@ -1409,6 +1409,8 @@ impl<T: Trait> Module<T> {
             let validators = Self::current_elected();
             let total_authoring_payout: BalanceOf<T> = BLOCK_AUTHORING_REWARDS.try_into().ok().unwrap();
             let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+            let to_num =
+                |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
 
             // 1. Block authoring payout
             for (v, p) in validators.iter().zip(points.individual.into_iter()) {
@@ -1424,7 +1426,7 @@ impl<T: Trait> Module<T> {
             let total_staking_payout = Self::staking_rewards_in_era(current_era);
             let total_stakes = Self::total_stakes();
             <Stakers<T>>::iter().for_each(|(v, e)| {
-                let staking_reward = Perbill::from_rational_approximation(&e.total, &total_stakes) * total_staking_payout;
+                let staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
                 total_imbalance.subsume(Self::reward_validator(&v, staking_reward));
             });
 
@@ -1451,7 +1453,7 @@ impl<T: Trait> Module<T> {
         // 1 year = (365d * 24h * 3600s) / (sec_in_era = block_time * blocks_num_in_era)
         let year_in_era = (365 * 24 * 3600) / (MILLISECS_PER_BLOCK / 1000) / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
         let year_num = (current_era-1) as u64 / year_in_era;
-        for i in 0..year_num {
+        for _ in 0..year_num {
             // If inflation <= 1%, stop reduce
             if maybe_rewards_this_year <= total_issuance / 100 {
                 break;

@@ -1452,7 +1452,7 @@ impl<T: Trait> Module<T> {
 
         // 1 year = (365d * 24h * 3600s) / (sec_in_era = block_time * blocks_num_in_era)
         let year_in_era = (365 * 24 * 3600) / (MILLISECS_PER_BLOCK / 1000) / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        let year_num = (current_era-1) as u64 / year_in_era;
+        let year_num = current_era as u64 / year_in_era;
         for _ in 0..year_num {
             // If inflation <= 1%, stop reduce
             if maybe_rewards_this_year <= total_issuance / 100 {

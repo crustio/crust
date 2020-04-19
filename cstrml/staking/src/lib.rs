@@ -1129,7 +1129,7 @@ impl<T: Trait> Module<T> {
         if total_workloads == 0 {
             Zero::zero()
         } else {
-            let workloads_to_stakes = ((own_workloads * total_issuance / total_workloads / 2) as u128)
+            let workloads_to_stakes = (( own_workloads.wrapping_mul(total_issuance) / total_workloads / 2) as u128)
                 .min(u64::max_value() as u128);
 
             workloads_to_stakes.try_into().ok().unwrap()

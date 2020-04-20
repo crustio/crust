@@ -557,13 +557,6 @@ decl_storage! {
                         )
                     }, _ => Ok(())
                 };
-
-                // Init stakers
-                <Stakers<T>>::insert(stash, Exposure {
-                    own: balance,
-                    total: balance,
-                    others: vec![],
-                });
             }
         });
     }

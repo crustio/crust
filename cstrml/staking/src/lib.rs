@@ -1462,7 +1462,9 @@ impl<T: Trait> Module<T> {
             maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
         }
 
-        maybe_rewards_this_year.try_into().ok().unwrap()
+        let reward_this_era = maybe_rewards_this_year / year_in_era as u128;
+
+        reward_this_era.try_into().ok().unwrap()
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.

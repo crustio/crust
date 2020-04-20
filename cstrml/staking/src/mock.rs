@@ -9,7 +9,6 @@ use frame_support::{
 };
 use sp_core::{crypto::key_types, H256};
 use sp_io;
-use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::testing::{Header, UintAuthorityId};
 use sp_runtime::traits::{Convert, IdentityLookup, OnInitialize, OpaqueKeys, SaturatedConversion};
 use sp_runtime::{KeyTypeId, Perbill};
@@ -197,21 +196,10 @@ impl tee::Trait for Test {
     type Event = ();
     type OnReportWorks = TestStaking;
 }
-pallet_staking_reward_curve::build! {
-	const I_NPOS: PiecewiseLinear<'static> = curve!(
-		min_inflation: 0_025_000,
-		max_inflation: 0_100_000,
-		ideal_stake: 0_500_000,
-		falloff: 0_050_000,
-		max_piece_count: 40,
-		test_precision: 0_005_000,
-	);
-}
 
 parameter_types! {
     pub const SessionsPerEra: SessionIndex = 3;
     pub const BondingDuration: EraIndex = 3;
-    pub const RewardCurve: &'static PiecewiseLinear<'static> = &I_NPOS;
     pub const MaxNominatorRewardedPerValidator: u32 = 64;
 }
 impl Trait for Test {
@@ -227,7 +215,6 @@ impl Trait for Test {
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type RewardCurve = RewardCurve;
 }
 
 pub struct ExtBuilder {
@@ -547,34 +534,26 @@ pub fn bond_guarantor(acc: u64, val: u64, target: Vec<(u64, u64)>) {
 
 pub fn advance_session() {
     let current_index = Session::current_index();
-    start_session(current_index + 1);
+    start_session(current_index + 1, false);
 }
 
-pub fn start_session(session_index: SessionIndex) {
+pub fn start_session(session_index: SessionIndex, with_reward: bool) {
     // Compensate for session delay
     let session_index = session_index + 1;
     for i in Session::current_index()..session_index {
         System::set_block_number(((i+1)*100).into());
-        Timestamp::set_timestamp(System::block_number() * 1000);
+        if with_reward {
+            Timestamp::set_timestamp(System::block_number() * 1000);
+        }
         Session::on_initialize(System::block_number());
     }
 
     assert_eq!(Session::current_index(), session_index);
 }
 
-pub fn start_era(era_index: EraIndex) {
-    start_session((era_index * 3).into());
+pub fn start_era(era_index: EraIndex, with_reward: bool) {
+    start_session((era_index * 3).into(), with_reward);
     assert_eq!(Staking::current_era().unwrap_or(0), era_index);
-}
-
-pub fn current_total_payout_for_duration(duration: u64) -> u64 {
-    inflation::compute_total_payout(
-        <Test as Trait>::RewardCurve::get(),
-        <Module<Test>>::slot_stake() * 2,
-        Balances::total_issuance(),
-        duration,
-    )
-    .0
 }
 
 pub fn reward_all_elected() {
@@ -641,9 +620,9 @@ pub fn set_total_workload(total_workload: u128) {
     TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = total_workload);
 }
 
-pub fn start_era_with_new_workloads(era_index: EraIndex, own_workload: u128, total_workload: u128) {
+pub fn start_era_with_new_workloads(era_index: EraIndex, with_reward: bool, own_workload: u128, total_workload: u128) {
     set_own_workload(own_workload);
     set_total_workload(total_workload);
-    start_session((era_index * 3).into());
+    start_session((era_index * 3).into(), with_reward);
     assert_eq!(Staking::current_era().unwrap_or(0), era_index);
 }

@@ -1407,7 +1407,7 @@ impl<T: Trait> Module<T> {
         if !era_duration.is_zero() {
             let points = CurrentEraPointsEarned::take();
             let validators = Self::current_elected();
-            let total_authoring_payout: BalanceOf<T> = BLOCK_AUTHORING_REWARDS.try_into().ok().unwrap();
+            let total_authoring_payout = Self::authoring_rewards_in_era();
             let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
             let to_num =
                 |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
@@ -1443,6 +1443,18 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    /// Block authoring rewards per era, this won't be changed in every era
+    fn authoring_rewards_in_era() -> BalanceOf<T> {
+        // Milliseconds per year for the Julian year (365.25 days).
+        const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+        // Initial with total rewards per year
+        let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+
+        let reward_this_era = BLOCK_AUTHORING_REWARDS / year_in_eras as u128;
+
+        reward_this_era.try_into().ok().unwrap()
+    }
+
     /// Staking rewards per era
     fn staking_rewards_in_era(current_era: EraIndex) -> BalanceOf<T> {
         let mut maybe_rewards_this_year = FIRST_YEAR_REWARDS ;
@@ -1450,9 +1462,11 @@ impl<T: Trait> Module<T> {
             .ok()
             .unwrap();
 
-        // 1 year = (365d * 24h * 3600s) / (sec_in_era = block_time * blocks_num_in_era)
-        let year_in_era = (365 * 24 * 3600) / (MILLISECS_PER_BLOCK / 1000) / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        let year_num = current_era as u64 / year_in_era;
+        // Milliseconds per year for the Julian year (365.25 days).
+        const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+        // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+        let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+        let year_num = current_era as u64 / year_in_eras;
         for _ in 0..year_num {
             // If inflation <= 1%, stop reduce
             if maybe_rewards_this_year <= total_issuance / 100 {
@@ -1462,7 +1476,7 @@ impl<T: Trait> Module<T> {
             maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
         }
 
-        let reward_this_era = maybe_rewards_this_year / year_in_era as u128;
+        let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
 
         reward_this_era.try_into().ok().unwrap()
     }

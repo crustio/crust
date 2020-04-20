@@ -8,8 +8,10 @@ pub mod currency {
     pub const MILLICENTS: Balance = CENTS / 1_000;
 
     pub const INITIAL_ISSUANCE: Balance = 15_000_000 * CRUS;
+    // Staking rewards in the first year
     pub const FIRST_YEAR_REWARDS: Balance = 5_000_000 * CRUS;
-    pub const BLOCK_AUTHORING_REWARDS: Balance = 100_000 * CRUS / 365 / 24 / 2;
+    // Block authoring rewards per year
+    pub const BLOCK_AUTHORING_REWARDS: Balance = 100_000 * CRUS;
 }
 
 /// Time and blocks.

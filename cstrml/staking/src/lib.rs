@@ -25,7 +25,7 @@ use sp_runtime::{
     Perbill, PerThing, RuntimeDebug,
     traits::{
         Convert, Zero, One, StaticLookup, CheckedSub, Saturating, AtLeast32Bit,
-        EnsureOrigin
+        EnsureOrigin, CheckedAdd
     },
 };
 use sp_staking::{
@@ -1505,8 +1505,9 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> Option<Vec<T::AccountId>> {
-        // Update all tee identities work report
+        // Update all tee identities work report and clear stakers
         <tee::Module<T>>::update_identities();
+        Self::clear_stakers();
 
         let validators: Vec<(T::AccountId, Validations<T::AccountId>)> =
             <Validators<T>>::iter().collect();
@@ -1584,9 +1585,7 @@ impl<T: Trait> Module<T> {
             v_ledger.valid = v_own_stakes;
             Self::update_ledger(&v_controller, &v_ledger);
 
-            // 4. Update next era's snapshot `Stakers` and `Validators`
-            <Stakers<T>>::remove(v_stash);
-
+            // 4. (Maybe)Insert new validator and staker
             if v_ledger.valid == Zero::zero() {
                 <Validators<T>>::remove(v_stash);
             } else {
@@ -1658,7 +1657,11 @@ impl<T: Trait> Module<T> {
         let mut total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes = <Stakers<T>>::iter()
             .map(|(stash, exposure)| {
-                total_stakes += exposure.total;
+                if let Some(maybe_total_stakes) = total_stakes.checked_add(&exposure.total) {
+                    total_stakes = maybe_total_stakes;
+                } else {
+                    total_stakes = to_balance(u64::max_value() as u128);
+                }
                 (stash, to_votes(exposure.total))
             })
             .collect::<Vec<(T::AccountId, u128)>>();
@@ -1682,13 +1685,21 @@ impl<T: Trait> Module<T> {
         <CurrentElected<T>>::put(&elected_stashes);
 
         // Update slot stake.
-        <TotalStakes<T>>::put(&total_stakes);
+        <TotalStakes<T>>::put(total_stakes);
 
         // In order to keep the property required by `n_session_ending`
         // that we must return the new validator set even if it's the same as the old,
         // as long as any underlying economic conditions have changed, we don't attempt
         // to do any optimization where we compare against the prior set.
         Some(elected_stashes)
+    }
+
+    /// Remove all old stakers, this function only be used in `select_validators`
+    fn clear_stakers() {
+        let old_vs: Vec<T::AccountId> = <Stakers<T>>::iter().map(|(v_stash, _)| v_stash).collect();
+        for v in old_vs {
+            <Stakers<T>>::remove(&v);
+        }
     }
 
     /// Remove all associated data of a stash account from the staking system.

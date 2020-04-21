@@ -4,13 +4,13 @@ use crate::*;
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     StorageValue, IterableStorageMap,
-    traits::{Currency, Get, FindAuthor},
+    traits::{Currency, Get, FindAuthor, OnInitialize},
     weights::Weight,
 };
 use sp_core::{crypto::key_types, H256};
 use sp_io;
 use sp_runtime::testing::{Header, UintAuthorityId};
-use sp_runtime::traits::{Convert, IdentityLookup, OnInitialize, OpaqueKeys, SaturatedConversion};
+use sp_runtime::traits::{Convert, IdentityLookup, OpaqueKeys, SaturatedConversion};
 use sp_runtime::{KeyTypeId, Perbill};
 use sp_staking::{
     offence::{OffenceDetails, OnOffenceHandler},
@@ -159,6 +159,7 @@ impl pallet_session::Trait for Test {
     type ValidatorId = AccountId;
     type ValidatorIdOf = crate::StashOf<Test>;
     type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
+    type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
     type SessionManager = pallet_session::historical::NoteHistoricalRoot<Test, Staking>;
     type SessionHandler = TestSessionHandler;
     type Keys = UintAuthorityId;
@@ -583,7 +584,7 @@ pub fn on_offence_in_era(
     let bonded_eras = crate::BondedEras::get();
     for &(bonded_era, start_session) in bonded_eras.iter() {
         if bonded_era == era {
-            Staking::on_offence(offenders, slash_fraction, start_session);
+            let _ = Staking::on_offence(offenders, slash_fraction, start_session);
             return;
         } else if bonded_era > era {
             break;
@@ -591,7 +592,7 @@ pub fn on_offence_in_era(
     }
 
     if Staking::current_era().unwrap_or(0) == era {
-        Staking::on_offence(
+        let _ = Staking::on_offence(
             offenders,
             slash_fraction,
             Staking::current_era_start_session_index(),

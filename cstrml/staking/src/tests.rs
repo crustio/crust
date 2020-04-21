@@ -5,11 +5,11 @@ use crate::mock::*;
 use frame_support::{
     assert_noop, assert_ok,
     dispatch::DispatchError,
-    traits::{Currency, ReservableCurrency},
+    traits::{Currency, ReservableCurrency, OnInitialize},
 };
 use sp_runtime::{
     assert_eq_error_rate,
-    traits::{BadOrigin, OnInitialize},
+    traits::BadOrigin,
 };
 use sp_staking::offence::OffenceDetails;
 use substrate_test_utils::assert_eq_uvec;
@@ -369,8 +369,7 @@ fn multi_era_reward_should_work() {
             );
             assert_eq!(
                 Balances::total_balance(&21) / 1000000,
-                (init_balance_21 + total_staking_payout_0 * 1000 / 2001 +
-                    Perbill::from_rational_approximation(stakes_21, 142667657428421) * total_staking_payout_1) / 1000000
+                (stakes_21 + Perbill::from_rational_approximation(stakes_21, 142667657428421) * total_staking_payout_1) / 1000000
             );
         });
 }

@@ -1,5 +1,3 @@
-use super::*;
-
 use crate::mock::{new_test_ext, run_to_block, Origin, Market};
 use frame_support::assert_ok;
 use hex;

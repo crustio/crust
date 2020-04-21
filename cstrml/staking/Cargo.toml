@@ -29,6 +29,7 @@ sp-staking = { version = '2.0.0-alpha.5', default-features = false }
 
 # crust runtime modules
 tee = { package = "cstrml-tee", path = "../tee", default-features = false }
+primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
 sp-core = '2.0.0-alpha.5'

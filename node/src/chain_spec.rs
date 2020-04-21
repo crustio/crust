@@ -191,7 +191,7 @@ fn testnet_genesis(
         }),
         staking: Some(StakingConfig {
             validator_count: 4,
-            minimum_validator_count: 2,
+            minimum_validator_count: 1,
             stakers: initial_authorities
                 .iter()
                 .map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))

@@ -256,7 +256,6 @@ parameter_types! {
     pub const BondingDuration: staking::EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).
     pub const SlashDeferDuration: staking::EraIndex = 28;
-    pub const RewardCurve: &'static PiecewiseLinear<'static> = &REWARD_CURVE;
 }
 
 // TODO: add vote logic here
@@ -294,14 +293,13 @@ impl staking::Trait for Runtime {
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type RewardCurve = RewardCurve;
 }
 
 parameter_types! {
     pub const ExistentialDeposit: u128 = 1 * CENTS;
 }
 
-/// TODO: enable this function when reward settle down
+/// TODO: re-think about this
 /*pub type DealWithFees = SplitTwoWays<
     Balance,
     NegativeImbalance<Runtime>,

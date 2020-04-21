@@ -86,14 +86,14 @@ fn basic_setup_works() {
                 (
                     21,
                     Validations {
-                        commission: Perbill::default(),
+                        guarantee_fee: Perbill::one(),
                         guarantors: vec![101]
                     }
                 ),
                 (
                     11,
                     Validations {
-                        commission: Perbill::default(),
+                        guarantee_fee: Perbill::one(),
                         guarantors: vec![101]
                     }
                 )
@@ -137,8 +137,8 @@ fn basic_setup_works() {
                     }]
                 }
             );
-            // initial slot_stake
-            assert_eq!(Staking::slot_stake(), 1250);
+            // initial total_stakes = 1250+1250+1
+            assert_eq!(Staking::total_stakes(), 2501);
         } else {
             assert_eq!(
                 Staking::stakers(11),
@@ -162,8 +162,8 @@ fn basic_setup_works() {
                     }]
                 }
             );
-            // initial slot_stake
-            assert_eq!(Staking::slot_stake(), 1125);
+            // initial total_stakes = 1125+1375+1
+            assert_eq!(Staking::total_stakes(), 2501);
         }
 
         // The number of validators required.
@@ -203,7 +203,7 @@ fn change_controller_works() {
 
         assert_ok!(Staking::set_controller(Origin::signed(11), 5));
 
-        start_era(1);
+        start_era(1, false);
 
         assert_noop!(
             Staking::validate(Origin::signed(10), Perbill::default()),
@@ -272,10 +272,9 @@ fn rewards_should_work() {
             <Module<Test>>::reward_by_ids(vec![(1001, 10_000)]);
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_payout = current_total_payout_for_duration(9 * 5 * 1000);
-            assert!(total_payout > 10); // Test is meaningful if reward something
-
-            // No reward yet
+            let staking_reward = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            let authoring_reward = Staking::authoring_rewards_in_era();
+            assert_eq!(Staking::total_stakes(), 2001);
             assert_eq!(Balances::total_balance(&2), init_balance_2);
             assert_eq!(Balances::total_balance(&10), init_balance_10);
             assert_eq!(Balances::total_balance(&11), init_balance_11);
@@ -296,13 +295,13 @@ fn rewards_should_work() {
 
             // 11 validator has 2/3 of the total rewards and half half for it and its guarantor
             assert_eq_error_rate!(
-                Balances::total_balance(&2),
-                init_balance_2 + total_payout / 3,
+                Balances::total_balance(&2) / 1000000,
+                (init_balance_2 + staking_reward * 500 / 2001) / 1000000,
                 1
             );
             assert_eq_error_rate!(
-                Balances::total_balance(&10),
-                init_balance_10 + total_payout / 3,
+                Balances::total_balance(&10) / 1000000,
+                (init_balance_10 + authoring_reward * 2 / 3 + staking_reward * 500 / 2001) / 1000000,
                 1
             );
             assert_eq!(Balances::total_balance(&11), init_balance_11);
@@ -313,12 +312,13 @@ fn rewards_should_work() {
 fn multi_era_reward_should_work() {
     // Should check that:
     // The value of current_session_reward is set at the end of each era, based on
-    // slot_stake and session_reward.
+    // total_stakes and session_reward.
     ExtBuilder::default()
         .guarantee(false)
         .build()
         .execute_with(|| {
             let init_balance_10 = Balances::total_balance(&10);
+            let init_balance_21 = Balances::total_balance(&21);
 
             // Set payee to controller
             assert_ok!(Staking::set_payee(
@@ -327,34 +327,50 @@ fn multi_era_reward_should_work() {
             ));
 
             // Compute now as other parameter won't change
-            let total_payout_0 = current_total_payout_for_duration(3000 * 100);
-            assert!(total_payout_0 > 10); // Test is meaningfull if reward something
+            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
+            assert_eq!(Staking::total_stakes(), 2001);
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
-            start_session(0);
-            start_session(1);
-            start_session(2);
-            start_session(3);
+            start_session(0, true);
+            start_session(1, true);
+            start_session(2, true);
+            start_session(3, true);
 
             assert_eq!(Staking::current_era().unwrap_or(0), 1);
+            // rewards may round to 0.000001
             assert_eq!(
-                Balances::total_balance(&10),
-                init_balance_10 + total_payout_0
+                Balances::total_balance(&10) / 1000000,
+                (init_balance_10 + total_authoring_payout + total_staking_payout_0 * 1000 / 2001) / 1000000
             );
+            let stakes_21 = Balances::total_balance(&21);
+            // candidates should have rewards
+            assert_eq!(
+                stakes_21 / 1000000,
+                (init_balance_21 + total_staking_payout_0 * 1000 / 2001) / 1000000
+            );
+            assert_eq!(Staking::total_stakes(), 142667657428421);
 
-            start_session(4);
+            start_session(4, true);
 
-            let total_payout_1 = current_total_payout_for_duration(3000 * 100);
-            assert!(total_payout_1 > 10); // Test is meaningfull if reward something
-            <Module<Test>>::reward_by_ids(vec![(11, 101)]);
+            let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_1 > 10); // Test is meaningful if reward something
+            <Module<Test>>::reward_by_ids(vec![(11, 101)]); // meaningless points
 
             // new era is triggered here.
-            start_session(5);
+            start_session(5, true);
 
             // pay time
             assert_eq!(
-                Balances::total_balance(&10),
-                init_balance_10 + total_payout_0 + total_payout_1
+                Balances::total_balance(&10) / 1000000,
+                (init_balance_10 + total_authoring_payout + total_staking_payout_0 * 1000 / 2001
+                    + 0/*small fraction on staking rewards is 0(total_staking_payout_1 * 1000 / 142667657428421)*/) / 1000000
+            );
+            assert_eq!(
+                Balances::total_balance(&21) / 1000000,
+                (init_balance_21 + total_staking_payout_0 * 1000 / 2001 +
+                    Perbill::from_rational_approximation(stakes_21, 142667657428421) * total_staking_payout_1) / 1000000
             );
         });
 }
@@ -370,8 +386,6 @@ fn staking_should_work() {
         .fair(false) // to give 20 more staked value
         .build()
         .execute_with(|| {
-            Timestamp::set_timestamp(1); // Initialize time.
-
             // remember + compare this along with the test.
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
@@ -381,7 +395,7 @@ fn staking_should_work() {
             }
 
             // --- Block 1:
-            start_session(1);
+            start_session(1, false);
             // add a new candidate for being a validator. account 3 controlled by 4.
             assert_ok!(Staking::bond(
                 Origin::signed(3),
@@ -390,23 +404,23 @@ fn staking_should_work() {
                 RewardDestination::Controller
             ));
             Staking::upsert_stake_limit(&3, 3000);
-            assert_ok!(Staking::validate(Origin::signed(4), Perbill::default()));
+            assert_ok!(Staking::validate(Origin::signed(4), Perbill::one()));
 
             // No effects will be seen so far.
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // --- Block 2:
-            start_session(2);
+            start_session(2, false);
 
             // No effects will be seen so far. Era has not been yet triggered.
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // --- Block 3: the validators will now be queued.
-            start_session(3);
+            start_session(3, false);
             assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
             // --- Block 4: the validators will now be changed.
-            start_session(4);
+            start_session(4, false);
 
             assert_eq_uvec!(validator_controllers(), vec![4, 20]);
             // --- Block 4: Unstake 4 as a validator, freeing up the balance stashed in 3
@@ -414,11 +428,11 @@ fn staking_should_work() {
             Staking::chill(Origin::signed(4)).unwrap();
 
             // --- Block 5: nothing. 4 is still there.
-            start_session(5);
+            start_session(5, false);
             assert_eq_uvec!(validator_controllers(), vec![4, 20]);
 
             // --- Block 6: since we are using TestStaking instead of real Staking for Tee, 11 and 21 would still be in Validators.
-            start_session(7);
+            start_session(7, false);
             assert!(<Validators<Test>>::contains_key(&11));
             assert!(<Validators<Test>>::contains_key(&21));
             assert!(!<Validators<Test>>::contains_key(&3));
@@ -462,7 +476,7 @@ fn less_than_needed_candidates_works() {
             assert_eq!(Staking::minimum_validator_count(), 1);
             assert_eq_uvec!(validator_controllers(), vec![30, 20, 10]);
 
-            start_era(1);
+            start_era(1, false);
 
             // Previous set is selected. NO election algorithm is even executed.
             assert_eq_uvec!(validator_controllers(), vec![30, 20, 10]);
@@ -508,42 +522,7 @@ fn no_candidate_emergency_condition() {
 }
 
 #[test]
-fn nominating_and_rewards_should_work() {
-    // PHRAGMEN OUTPUT: running this test with the reference impl gives:
-    //
-    // Sequential Phragmén gives
-    // 10  is elected with stake  2200.0 and score  0.0003333333333333333
-    // 20  is elected with stake  1800.0 and score  0.0005555555555555556
-
-    // 10  has load  0.0003333333333333333 and supported
-    // 10  with stake  1000.0
-    // 20  has load  0.0005555555555555556 and supported
-    // 20  with stake  1000.0
-    // 30  has load  0 and supported
-    // 30  with stake  0
-    // 40  has load  0 and supported
-    // 40  with stake  0
-    // 2  has load  0.0005555555555555556 and supported
-    // 10  with stake  600.0 20  with stake  400.0 30  with stake  0.0
-    // 4  has load  0.0005555555555555556 and supported
-    // 10  with stake  600.0 20  with stake  400.0 40  with stake  0.0
-
-    // Sequential Phragmén with post processing gives
-    // 10  is elected with stake  2000.0 and score  0.0003333333333333333
-    // 20  is elected with stake  2000.0 and score  0.0005555555555555556
-
-    // 10  has load  0.0003333333333333333 and supported
-    // 10  with stake  1000.0
-    // 20  has load  0.0005555555555555556 and supported
-    // 20  with stake  1000.0
-    // 30  has load  0 and supported
-    // 30  with stake  0
-    // 40  has load  0 and supported
-    // 40  with stake  0
-    // 2  has load  0.0005555555555555556 and supported
-    // 10  with stake  400.0 20  with stake  600.0 30  with stake  0
-    // 4  has load  0.0005555555555555556 and supported
-    // 10  with stake  600.0 20  with stake  400.0 40  with stake  0.0
+fn guaranteeing_and_rewards_should_work() {
     ExtBuilder::default()
         .guarantee(false)
         .validator_pool(true)
@@ -601,21 +580,23 @@ fn nominating_and_rewards_should_work() {
             ));
 
             // the total reward for era 0
-            let total_payout_0 = current_total_payout_for_duration(3000 * 100);
-            assert!(total_payout_0 > 100); // Test is meaningfull if reward something
+            let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
+            let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_0 > 100); // Test is meaningful if reward something
             <Module<Test>>::reward_by_ids(vec![(41, 1)]);
             <Module<Test>>::reward_by_ids(vec![(31, 1)]);
             <Module<Test>>::reward_by_ids(vec![(21, 10)]); // must be no-op
             <Module<Test>>::reward_by_ids(vec![(11, 10)]); // must be no-op
 
-            start_era(1);
+            start_era(1, true);
 
-            // 10 and 20 have more votes, they will be chosen by phragmen.
+            // 10 and 20 have more votes, they will be chosen by top-down.
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
+            assert_eq!(Staking::total_stakes(), 5998);
 
             // OLD validators must have already received some rewards.
-            assert_eq!(Balances::total_balance(&40), 1 + total_payout_0 / 2);
-            assert_eq!(Balances::total_balance(&30), 1 + total_payout_0 / 2);
+            assert_eq!(Balances::total_balance(&40), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
+            assert_eq!(Balances::total_balance(&30), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
 
             // ------ check the staked value of all parties.
 
@@ -712,21 +693,21 @@ fn nominating_and_rewards_should_work() {
 
             // the total reward for era 1
             // TODO: tmp change for equalize strategy(with voting to candidates)
-            // TODO: rewards will be changed later
-            /*let total_payout_1 = (3000);
-            assert!(total_payout_1 > 100); // Test is meaningfull if reward something
+            // TODO: add era_2 for guarantor's rewards
+            /*let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_1 > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(41, 10)]); // must be no-op
             <Module<Test>>::reward_by_ids(vec![(31, 10)]); // must be no-op
             <Module<Test>>::reward_by_ids(vec![(21, 2)]);
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
-            start_era(2);
+            start_era(2, true);
 
             // nothing else will happen, era ends and rewards are paid again,
             // it is expected that guarantors will also be paid. See below
 
-            let payout_for_10 = total_payout_1 / 3;
-            let payout_for_20 = 2 * total_payout_1 / 3;
+            let payout_for_10 = total_authoring_payout_0 / 3;
+            let payout_for_20 = 2 * total_authoring_payout_0 / 3;
             if cfg!(feature = "equalize") {
                 // Guarantor 2: has [333 / 2000 ~ 1 / 5 from 10] + [333 / 2000 ~ 3 / 10 from 20]'s reward.
                 assert_eq_error_rate!(
@@ -832,12 +813,12 @@ fn guarantors_also_get_slashed() {
                 }
             );
 
-            let total_payout = current_total_payout_for_duration(3000 * 100);
+            let total_payout = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_payout > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
             // new era, pay rewards,
-            start_era(1);
+            start_era(1, false);
 
             // Guarantor stash didn't collect any.
             assert_eq!(Balances::total_balance(&2), initial_balance);
@@ -912,7 +893,7 @@ fn double_staking_should_fail() {
         ));
         assert_eq!(Staking::guarantee_rel(1, 11), Some(750));
         assert_eq!(Staking::guarantee_rel(101, 11), Some(250));
-        start_era(1);
+        start_era(1, true);
         assert_eq!(
             Staking::ledger(&2),
             Some(StakingLedger {
@@ -958,37 +939,37 @@ fn session_and_eras_work() {
         assert_eq!(Staking::current_era().unwrap_or(0), 0);
 
         // Block 1: No change.
-        start_session(0);
+        start_session(0, false);
         assert_eq!(Session::current_index(), 1);
         assert_eq!(Staking::current_era().unwrap_or(0), 0);
 
         // Block 2: Simple era change.
-        start_session(2);
+        start_session(2, false);
         assert_eq!(Session::current_index(), 3);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // Block 3: Schedule an era length change; no visible changes.
-        start_session(3);
+        start_session(3, false);
         assert_eq!(Session::current_index(), 4);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // Block 4: Era change kicks in.
-        start_session(5);
+        start_session(5, false);
         assert_eq!(Session::current_index(), 6);
         assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // Block 5: No change.
-        start_session(6);
+        start_session(6, false);
         assert_eq!(Session::current_index(), 7);
         assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // Block 6: No change.
-        start_session(7);
+        start_session(7, false);
         assert_eq!(Session::current_index(), 8);
         assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // Block 7: Era increment.
-        start_session(8);
+        start_session(8, false);
         assert_eq!(Session::current_index(), 9);
         assert_eq!(Staking::current_era().unwrap_or(0), 3);
     });
@@ -999,48 +980,48 @@ fn forcing_new_era_works() {
     ExtBuilder::default().build().execute_with(|| {
         // normal flow of session.
         assert_eq!(Staking::current_era().unwrap_or(0), 0);
-        start_session(0);
+        start_session(0, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 0);
-        start_session(1);
+        start_session(1, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 0);
-        start_session(2);
+        start_session(2, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // no era change.
         ForceEra::put(Forcing::ForceNone);
-        start_session(3);
+        start_session(3, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
-        start_session(4);
+        start_session(4, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
-        start_session(5);
+        start_session(5, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
-        start_session(6);
+        start_session(6, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // back to normal.
         // this immediately starts a new session.
         ForceEra::put(Forcing::NotForcing);
-        start_session(7);
+        start_session(7, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 2);
-        start_session(8);
+        start_session(8, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
         // forceful change
         ForceEra::put(Forcing::ForceAlways);
-        start_session(9);
+        start_session(9, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 3);
-        start_session(10);
+        start_session(10, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 4);
-        start_session(11);
+        start_session(11, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 5);
 
         // just one forceful change
         ForceEra::put(Forcing::ForceNew);
-        start_session(12);
+        start_session(12, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 6);
 
         assert_eq!(ForceEra::get(), Forcing::NotForcing);
-        start_session(13);
+        start_session(13, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 6);
     });
 }
@@ -1132,7 +1113,8 @@ fn cannot_reserve_staked_balance() {
 }
 
 #[test]
-fn reward_destination_works() {
+// TODO: destination is duplicate with other test cases, but we should check it separately
+/*fn reward_destination_works() {
     // Rewards go to the correct destination as determined in Payee
     ExtBuilder::default()
         .guarantee(false)
@@ -1158,25 +1140,30 @@ fn reward_destination_works() {
             );
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_payout_0 = current_total_payout_for_duration(300 * 1000);
-            assert!(total_payout_0 > 100); // Test is meaningfull if reward something
+            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_staking_payout = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
             // After an era, stake limit calculate using last era's reward
-            start_era(1);
+            start_era(1, true);
 
             // Check that RewardDestination is Staked (default)
             assert_eq!(Staking::payee(&11), RewardDestination::Staked);
             // Check that reward went to the stash account of validator
-            assert_eq!(Balances::free_balance(&11), 1000 + total_payout_0);
+            let reward_0 = total_authoring_payout + total_staking_payout * Perbill::from_rational_approximation(1000, 2001);
+            let stakes_11 = Balances::free_balance(&11);
+            let total_stakes = Staking::total_stakes();
+            assert_eq!(Balances::free_balance(&11),
+                       1000 + reward_0);
             // Check that amount at stake increased accordingly
             assert_eq!(
                 Staking::ledger(&10),
                 Some(StakingLedger {
                     stash: 11,
-                    total: 1000 + total_payout_0,
-                    active: 1000 + total_payout_0,
-                    valid: 1000 + total_payout_0, // Test should be modified.
+                    total: 1000 + reward_0,
+                    active: 1000 + reward_0,
+                    valid: 1000 + reward_0, // Test should be modified.
                     unlocking: vec![],
                 })
             );
@@ -1185,29 +1172,30 @@ fn reward_destination_works() {
             <Payee<Test>>::insert(&11, RewardDestination::Stash);
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_payout_1 = current_total_payout_for_duration(3000 * 100);
-            assert!(total_payout_1 > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
-            start_era(2);
+            start_era(2, true);
 
             // Check that RewardDestination is Stash
+            let reward_1 = total_authoring_payout*2 + total_staking_payout * Perbill::from_rational_approximation(1000, 2001)
+                + total_staking_payout * Perbill::from_rational_approximation(1000, 2001)
+                + total_staking_payout * Perbill::from_rational_approximation(stakes_11, total_stakes);
             assert_eq!(Staking::payee(&11), RewardDestination::Stash);
             // Check that reward went to the stash account
             assert_eq!(
                 Balances::free_balance(&11),
-                1000 + total_payout_0 + total_payout_1
+                1000 + reward_1
             );
             // Record this value
-            let recorded_stash_balance = 1000 + total_payout_0 + total_payout_1;
+            let recorded_stash_balance = 1000 + reward_1;
             // Check that amount at stake is NOT increased
             assert_eq!(
                 Staking::ledger(&10),
                 Some(StakingLedger {
                     stash: 11,
-                    total: 1000 + total_payout_0,
-                    active: 1000 + total_payout_0,
-                    valid: 1000 + total_payout_0, // Test should be modified.
+                    total: 1000 + reward_0,
+                    active: 1000 + reward_0,
+                    valid: 1000 + reward_0, // Test should be modified.
                     unlocking: vec![],
                 })
             );
@@ -1219,31 +1207,52 @@ fn reward_destination_works() {
             assert_eq!(Balances::free_balance(&10), 1);
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_payout_2 = 0;
+            let total_payout_2 = total_authoring_payout;
             assert_eq!(total_payout_2, 0); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
             // work report should be outdated, and rewards should be 0
-            start_era(3);
+            start_era(3, true);
 
             // Check that RewardDestination is Controller
             assert_eq!(Staking::payee(&11), RewardDestination::Controller);
             // Check that reward went to the controller account
-            assert_eq!(Balances::free_balance(&10), 1 + total_payout_0);
+            assert_eq!(Balances::free_balance(&10), 1 + total_staking_payout);
             // Check that amount at stake is NOT increased
             assert_eq!(
                 Staking::ledger(&10),
                 Some(StakingLedger {
                     stash: 11,
-                    total: 1000 + total_payout_0,
-                    active: 1000 + total_payout_0,
-                    valid: 1000 + total_payout_0, // Test should be modified.
+                    total: 1000 + total_staking_payout,
+                    active: 1000 + total_staking_payout,
+                    valid: 1000 + total_staking_payout, // Test should be modified.
                     unlocking: vec![],
                 })
             );
             // Check that amount in staked account is NOT increased.
             assert_eq!(Balances::free_balance(&11), recorded_stash_balance);
         });
+}*/
+
+#[test]
+fn staking_reward_change_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .build()
+        .execute_with(|| {
+            // Make 1 account be max balance
+            let _ = Balances::make_free_balance_be(&11, Balance::max_value());
+            // If 1 era is 30 min, Julian year should contains 17532 eras.
+            // If era_num < 17532, staking_rewards should be
+            assert_eq!(Staking::staking_rewards_in_era(17530), 285192790326260);
+            assert_eq!(Staking::staking_rewards_in_era(17531), 285192790326260);
+            // era_num >= 17532 & era_num <= 35064, staking_rewards should be
+            assert_eq!(Staking::staking_rewards_in_era(35000), 228154232261008);
+            // TODO: for test case max issue is 18446744
+            // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be
+            assert_eq!(Balances::total_issuance(), u64::max_value());
+            assert_eq!(Staking::staking_rewards_in_era(631152), (184467440737095516 / ((36525*48) / 100)));
+        })
 }
 
 #[test]
@@ -1251,7 +1260,10 @@ fn validator_payment_prefs_work() {
     // Test that validator preferences are correctly honored
     // Note: unstake threshold is being directly tested in slashing tests.
     // This test will focus on validator payment.
-    ExtBuilder::default().build().execute_with(|| {
+    ExtBuilder::default()
+        .guarantee(false)
+        .build()
+        .execute_with(|| {
         // Initial config
         let stash_initial_balance = Balances::total_balance(&11);
 
@@ -1275,29 +1287,31 @@ fn validator_payment_prefs_work() {
         <Validators<Test>>::insert(
             &11,
             Validations {
-                commission: Perbill::from_percent(50),
+                guarantee_fee: Perbill::from_percent(50),
                 guarantors: vec![],
             },
         );
 
         // Compute total payout now for whole duration as other parameter won't change
-        let total_payout_0 = current_total_payout_for_duration(3000 * 100);
-        assert!(total_payout_0 > 100); // Test is meaningfull if reward something
+        let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
+        let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+        assert_eq!(Staking::total_stakes(), 2001); // Test is meaningfull if reward something
         <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
-        start_era(1);
 
-        // whats left to be shared is the sum of 3 rounds minus the validator's cut.
-        let shared_cut = total_payout_0 / 2;
+        start_era(1, true);
+
+        let shared_cut = total_staking_payout_0 * 500 / 2001;
         // Validator's payee is Staked account, 11, reward will be paid here.
+        // Round to 0.000001
         assert_eq!(
-            Balances::total_balance(&11),
-            stash_initial_balance + shared_cut / 2 + shared_cut
+            Balances::total_balance(&11) / 1000000,
+            (stash_initial_balance + shared_cut / 2 + shared_cut + total_authoring_payout_0) / 1000000
         );
         // Controller account will not get any reward.
         assert_eq!(Balances::total_balance(&10), 1);
         // Rest of the reward will be shared and paid to the guarantor in stake.
-        assert_eq!(Balances::total_balance(&2), 500 + shared_cut / 2);
+        assert_eq!(Balances::total_balance(&2) / 1000000, (500 + shared_cut / 2) / 1000000);
 
         check_exposure_all();
         check_guarantor_all();
@@ -1376,7 +1390,7 @@ fn bond_extra_works() {
         );
 
         assert_ok!(Staking::validate(Origin::signed(10), Perbill::default()));
-        start_era(1);
+        start_era(1, false);
 
         assert_eq!(
             Staking::ledger(&10),
@@ -1419,7 +1433,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
             assert_eq!(Balances::total_balance(&10), 1);
 
             // confirm that 10 is a normal validator and gets paid at the end of the era.
-            start_era(1);
+            start_era(1, false);
 
             // Initial state of 10
             assert_eq!(
@@ -1466,7 +1480,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
 
             // trigger next era.
             Timestamp::set_timestamp(10);
-            start_era(2);
+            start_era(2, false);
             assert_eq!(Staking::current_era().unwrap_or(0), 2);
 
             // ledger should be the same.
@@ -1523,7 +1537,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
             );
 
             // trigger next era.
-            start_era(3);
+            start_era(3, false);
 
             // nothing yet
             Staking::withdraw_unbonded(Origin::signed(10)).unwrap();
@@ -1542,7 +1556,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
             );
 
             // trigger next era.
-            start_era(5);
+            start_era(5, false);
 
             Staking::withdraw_unbonded(Origin::signed(10)).unwrap();
             // Now the value is free and the staking ledger is updated.
@@ -1567,7 +1581,7 @@ fn too_many_unbond_calls_should_not_work() {
             assert_ok!(Staking::unbond(Origin::signed(10), 1));
         }
 
-        start_era(1);
+        start_era(1, false);
 
         // locked at era 1 until 4
         assert_ok!(Staking::unbond(Origin::signed(10), 1));
@@ -1577,7 +1591,7 @@ fn too_many_unbond_calls_should_not_work() {
             Error::<Test>::NoMoreChunks
         );
 
-        start_era(3);
+        start_era(3, false);
 
         assert_noop!(
             Staking::unbond(Origin::signed(10), 1),
@@ -1593,9 +1607,10 @@ fn too_many_unbond_calls_should_not_work() {
 }
 
 #[test]
-fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment() {
-    // Test that slot_stake is determined by the least staked validator
-    // Test that slot_stake is the maximum punishment that can happen to a validator
+// TODO: tmp comment for duplicate to other test cases
+/*fn total_stakes_is_least_staked_validator_and_exposure_defines_maximum_punishment() {
+    // Test that total_stakes is determined by the least staked validator
+    // Test that total_stakes is the maximum punishment that can happen to a validator
     ExtBuilder::default()
         .guarantee(false)
         .fair(false)
@@ -1613,8 +1628,8 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
             let _ = Balances::make_free_balance_be(&10, 1000);
             let _ = Balances::make_free_balance_be(&20, 1000);
 
-            // We confirm initialized slot_stake is this value
-            assert_eq!(Staking::slot_stake(), Staking::stakers(&11).total);
+            // We confirm initialized total_stakes is this value
+            assert_eq!(Staking::total_stakes(), 2000 + 1000 + 1);
 
             // Now lets lower account 20 stake
             <Stakers<Test>>::insert(
@@ -1638,29 +1653,33 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
             );
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_payout_0 = current_total_payout_for_duration(3000 * 100);
-            assert!(total_payout_0 > 100); // Test is meaningfull if reward something
+            let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
+            let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_0 > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
             <Module<Test>>::reward_by_ids(vec![(21, 1)]);
 
             // New era --> rewards are paid --> stakes are changed
-            start_era(1);
+            start_era(1, true);
 
             // -- new balances + reward
             // 11's stake limit is 45454556881, 21's stake limit is 4000
-            assert_eq!(Staking::stakers(&11).total, 1000 + total_payout_0 / 2);
+            // round to 0.000001
+            assert_eq!(Staking::stakers(&11).total / 1000000,
+                       (1000 + total_authoring_payout_0 / 2 + total_staking_payout_0 * 1000 / 3001) / 1000000);
             assert_eq!(Staking::stakers(&21).total, 4000);
 
             let _11_balance = Balances::free_balance(&11);
-            assert_eq!(_11_balance, 1000 + total_payout_0 / 2);
+            assert_eq!(_11_balance / 1000000,
+                       (1000 + total_authoring_payout_0 / 2 + total_staking_payout_0 * 1000 / 3001) / 1000000);
 
             // -- slot stake should also be updated.
-            assert_eq!(Staking::slot_stake(), 4000);
+            assert_eq!(Staking::total_stakes(), 4000);
 
             check_exposure_all();
             check_guarantor_all();
         });
-}
+}*/
 
 #[test]
 fn on_free_balance_zero_stash_removes_validator() {
@@ -1840,19 +1859,19 @@ fn switching_roles() {
             ));
 
             // new block
-            start_session(1);
+            start_session(1, false);
 
             // no change
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // new block
-            start_session(2);
+            start_session(2, false);
 
             // no change
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // new block --> ne era --> new validators
-            start_session(3);
+            start_session(3, false);
 
             // with current guarantors 10 and 5 have the most stake
             assert_eq_uvec!(validator_controllers(), vec![6, 10]);
@@ -1866,14 +1885,14 @@ fn switching_roles() {
             // 2 : 2000 self vote + 250 vote.
             // Winners: 20 and 2
 
-            start_session(4);
+            start_session(4, false);
             assert_eq_uvec!(validator_controllers(), vec![6, 10]);
 
-            start_session(5);
+            start_session(5, false);
             assert_eq_uvec!(validator_controllers(), vec![6, 10]);
 
             // ne era
-            start_session(6);
+            start_session(6, false);
             assert_eq_uvec!(validator_controllers(), vec![2, 20]);
 
             check_exposure_all();
@@ -1916,7 +1935,7 @@ fn wrong_vote_is_null() {
             ));
 
             // new block
-            start_era(1);
+            start_era(1, false);
 
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
         });
@@ -1960,15 +1979,15 @@ fn bond_with_no_staked_value() {
                 })
             );
 
-            start_era(1);
-            start_era(2);
+            start_era(1, false);
+            start_era(2, false);
 
             // not yet removed.
             assert_ok!(Staking::withdraw_unbonded(Origin::signed(2)));
             assert!(Staking::ledger(2).is_some());
             assert_eq!(Balances::locks(&1)[0].amount, 5);
 
-            start_era(3);
+            start_era(3, false);
 
             // poof. Account 1 is removed from the staking system.
             assert_ok!(Staking::withdraw_unbonded(Origin::signed(2)));
@@ -1978,7 +1997,7 @@ fn bond_with_no_staked_value() {
 }
 
 #[test]
-fn bond_with_little_staked_value_bounded_by_slot_stake() {
+fn bond_with_little_staked_value_bounded_by_total_stakes() {
     // Behavior when someone bonds with little staked value.
     // Particularly when she votes and the candidate is elected.
     ExtBuilder::default()
@@ -2000,99 +2019,56 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                1,
+                2,
                 RewardDestination::Controller
             ));
             Staking::upsert_stake_limit(&1, u64::max_value());
             assert_ok!(Staking::validate(Origin::signed(2), Perbill::default()));
 
-            let total_payout_0 = current_total_payout_for_duration(3000 * 100);
-            assert!(total_payout_0 > 100); // Test is meaningfull if reward something
+            let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            assert_eq!(total_staking_payout_0, 285192790326260);
+            assert_eq!(total_authoring_payout, 5703855806525);
             reward_all_elected();
-            start_era(1);
+            start_era(1, true);
 
             // 2 is elected.
             // and fucks up the slot stake.
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
-            assert_eq!(Staking::slot_stake(), 1);
+            assert_eq!(Staking::total_stakes(), 144426417598396);
 
-            // Old ones are rewarded.
+            // Old ones are rewarded, round to 0.000001 CRU
             assert_eq!(
-                Balances::free_balance(&10),
-                init_balance_10 + total_payout_0 / 3 + 1
+                Balances::free_balance(&10) / 1000000,
+                (init_balance_10 + total_authoring_payout / 3 + total_staking_payout_0 * 1000 / 2001) / 1000000
             );
             // no rewards paid to 2. This was initial election.
             assert_eq!(Balances::free_balance(&2), init_balance_2);
 
-            let total_payout_1 = current_total_payout_for_duration(3000 * 100);
-            assert!(total_payout_1 > 100); // Test is meaningfull if reward something
+            let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert_eq!(total_staking_payout_1, 285192790326260); // Test is meaningfull if reward something
             reward_all_elected();
-            start_era(2);
+            start_era(2, true);
 
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
-            assert_eq!(Staking::slot_stake(), 1);
+            assert_eq!(Staking::total_stakes(), 291396645848756);
 
+            // round to 0.000001 CRU
             assert_eq!(
-                Balances::free_balance(&2),
-                init_balance_2 + total_payout_1 / 3 + 1
+                Balances::free_balance(&2) / 1000000,
+                (init_balance_2 + total_authoring_payout / 3 + total_staking_payout_1 * 2 / 144426417598397) / 1000000
             );
+            // round to 0.000001 CRU
             assert_eq!(
-                Balances::free_balance(&10),
-                init_balance_10 + total_payout_0 / 3 + total_payout_1 / 3 + 2,
+                Balances::free_balance(&10) / 1000000,
+                (init_balance_10 + total_authoring_payout / 3 * 2 +
+                    total_staking_payout_0 * 1000 / 2001 + total_staking_payout_1 * 1000 / 144426417598397) / 1000000 - 1,
             );
             check_exposure_all();
             check_guarantor_all();
         });
 }
 
-#[cfg(feature = "equalize")]
-#[test]
-// TODO: fill with our validator election algorithm
-/*fn phragmen_linear_worse_case_equalize() {
-    ExtBuilder::default()
-        .guarantee(false)
-        .validator_pool(true)
-        .fair(true)
-        .build()
-        .execute_with(|| {
-            bond_validator(50, 1000);
-            bond_validator(60, 1000);
-            bond_validator(70, 1000);
-
-            bond_guarantor(2, 2000, vec![11]);
-            bond_guarantor(4, 1000, vec![11, 21]);
-            bond_guarantor(6, 1000, vec![21, 31]);
-            bond_guarantor(8, 1000, vec![31, 41]);
-            bond_guarantor(110, 1000, vec![41, 51]);
-            bond_guarantor(120, 1000, vec![51, 61]);
-            bond_guarantor(130, 1000, vec![61, 71]);
-
-            for i in &[10, 20, 30, 40, 50, 60, 70] {
-                assert_ok!(Staking::set_payee(
-                    Origin::signed(*i),
-                    RewardDestination::Controller
-                ));
-            }
-
-            assert_eq_uvec!(validator_controllers(), vec![40, 30]);
-            assert_ok!(Staking::set_validator_count(Origin::ROOT, 7));
-
-            start_era(1);
-
-            assert_eq_uvec!(validator_controllers(), vec![10, 60, 40, 20, 50, 30, 70]);
-
-            assert_eq_error_rate!(Staking::stakers(11).total, 3000, 2);
-            assert_eq_error_rate!(Staking::stakers(21).total, 2255, 2);
-            assert_eq_error_rate!(Staking::stakers(31).total, 2255, 2);
-            assert_eq_error_rate!(Staking::stakers(41).total, 1925, 2);
-            assert_eq_error_rate!(Staking::stakers(51).total, 1870, 2);
-            assert_eq_error_rate!(Staking::stakers(61).total, 1890, 2);
-            assert_eq_error_rate!(Staking::stakers(71).total, 1800, 2);
-
-            check_exposure_all();
-            check_guarantor_all();
-        })
-}*/
 #[test]
 fn new_era_elects_correct_number_of_validators() {
     ExtBuilder::default()
@@ -2129,7 +2105,7 @@ fn topdown_should_not_overflow_validators() {
             bond_validator(4, u64::max_value());
 
             // TODO: this will broken the stake limit of mock set
-            start_era(1);
+            start_era(1, false);
 
             assert_eq_uvec!(validator_controllers(), vec![4, 2]);
 
@@ -2154,7 +2130,7 @@ fn topdown_should_not_overflow_guarantors() {
             bond_validator(2, u64::max_value() / 8);
             bond_validator(4, u64::max_value() / 8);
 
-            start_era(1);
+            start_era(1, false);
 
             assert_eq_uvec!(validator_controllers(), vec![4, 2]);
 
@@ -2169,7 +2145,7 @@ fn topdown_should_not_overflow_guarantors() {
             bond_guarantor(8,
                 u64::max_value(),
                 vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
-            start_era(2);
+            start_era(2, false);
 
             assert_eq_uvec!(validator_controllers(), vec![4, 2]);
         })
@@ -2300,13 +2276,13 @@ fn era_is_always_same_length() {
     // This ensures that the sessions is always of the same length if there is no forcing no
     // session changes.
     ExtBuilder::default().build().execute_with(|| {
-        start_era(1);
+        start_era(1, false);
         assert_eq!(
             Staking::current_era_start_session_index(),
             SessionsPerEra::get()
         );
 
-        start_era(2);
+        start_era(2, false);
         assert_eq!(
             Staking::current_era_start_session_index(),
             SessionsPerEra::get() * 2
@@ -2318,7 +2294,7 @@ fn era_is_always_same_length() {
         assert_eq!(Staking::current_era().unwrap_or(0), 3);
         assert_eq!(Staking::current_era_start_session_index(), session + 1);
 
-        start_era(4);
+        start_era(4, false);
         assert_eq!(
             Staking::current_era_start_session_index(),
             session + SessionsPerEra::get() + 1
@@ -2407,7 +2383,7 @@ fn slash_in_old_span_does_not_deselect() {
     ExtBuilder::default()
     .build()
     .execute_with(|| {
-        start_era(1);
+        start_era(1, false);
 
         assert!(<Validators<Test>>::contains_key(11));
         on_offence_now(
@@ -2422,13 +2398,13 @@ fn slash_in_old_span_does_not_deselect() {
 
         // ForceNew, this will trigger update on CurrentEraStartSessionIndex, this will not
         // trigger wr outdated, so we actually won't support ForceNew strategy
-        start_era(2);
+        start_era(2, false);
 
         Staking::validate(Origin::signed(10), Default::default()).unwrap();
         assert_eq!(Staking::force_era(), Forcing::NotForcing);
         assert!(<Validators<Test>>::contains_key(11));
 
-        start_era(3);
+        start_era(3, false);
 
         // this staker is in a new slashing span now, having re-registered after
         // their prior slash.
@@ -2701,7 +2677,7 @@ fn garbage_collection_after_slashing() {
 #[test]
 fn garbage_collection_on_window_pruning() {
     ExtBuilder::default().build().execute_with(|| {
-        start_era(1);
+        start_era(1, false);
 
         assert_eq!(Balances::free_balance(&11), 1000);
 
@@ -2730,7 +2706,7 @@ fn garbage_collection_on_window_pruning() {
             assert!(<Staking as crate::Store>::ValidatorSlashInEra::get(&now, &11).is_some());
             assert!(<Staking as crate::Store>::GuarantorSlashInEra::get(&now, &101).is_some());
 
-            start_era(era);
+            start_era(era, false);
         }
 
         assert!(<Staking as crate::Store>::ValidatorSlashInEra::get(&now, &11).is_none());
@@ -2922,7 +2898,7 @@ fn deferred_slashes_are_deferred() {
         .slash_defer_duration(2)
         .build()
         .execute_with(|| {
-            start_era(1);
+            start_era(1, false);
 
             assert_eq!(Balances::free_balance(&11), 1000);
 
@@ -2941,19 +2917,19 @@ fn deferred_slashes_are_deferred() {
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
 
-            start_era(2);
+            start_era(2, false);
 
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
 
-            start_era(3);
+            start_era(3, false);
 
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
 
             // at the start of era 4, slashes from era 1 are processed,
             // after being deferred for at least 2 full eras.
-            start_era(4);
+            start_era(4, false);
 
             assert_eq!(Balances::free_balance(&11), 900);
             assert_eq!(Balances::free_balance(&101), 2000 - (guaranteed_value / 10));
@@ -2966,7 +2942,7 @@ fn remove_deferred() {
         .slash_defer_duration(2)
         .build()
         .execute_with(|| {
-            start_era(1);
+            start_era(1, false);
 
             assert_eq!(Balances::free_balance(&11), 1000);
 
@@ -2985,7 +2961,7 @@ fn remove_deferred() {
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
 
-            start_era(2);
+            start_era(2, false);
 
             on_offence_in_era(
                 &[OffenceDetails {
@@ -3001,20 +2977,20 @@ fn remove_deferred() {
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
 
-            start_era(3);
+            start_era(3, false);
 
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
 
             // at the start of era 4, slashes from era 1 are processed,
             // after being deferred for at least 2 full eras.
-            start_era(4);
+            start_era(4, false);
 
             // the first slash for 10% was cancelled, so no effect.
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
 
-            start_era(5);
+            start_era(5, false);
 
             let slash_10 = Perbill::from_percent(10);
             let slash_15 = Perbill::from_percent(15);
@@ -3035,7 +3011,7 @@ fn remove_multi_deferred() {
         .slash_defer_duration(2)
         .build()
         .execute_with(|| {
-            start_era(1);
+            start_era(1, false);
 
             assert_eq!(Balances::free_balance(&11), 1000);
 
@@ -3082,8 +3058,6 @@ fn update_stakers_should_work_new_era() {
     .fair(false) // to give 20 more staked value
     .build()
     .execute_with(|| {
-        Timestamp::set_timestamp(1); // Initialize time.
-
         assert!(!<Stakers<Test>>::contains_key(&5));
 
         // remember + compare this along with the test.
@@ -3095,7 +3069,7 @@ fn update_stakers_should_work_new_era() {
         }
 
         // --- Block 1:
-        start_session(1);
+        start_session(1, false);
         // add a new candidate for being a validator. account 3 controlled by 4.
         assert_ok!(Staking::bond(
             Origin::signed(5),
@@ -3141,14 +3115,14 @@ fn update_stakers_should_work_new_era() {
         assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
         // --- Block 2:
-        start_session(2);
+        start_session(2, false);
 
         // --- Block 3: the validators will now be queued.
-        start_session(3);
+        start_session(3, false);
         assert_eq!(Staking::current_era().unwrap_or(0), 1);
 
         // --- Block 4: the validators will now be changed.
-        start_session(4);
+        start_session(4, false);
 
         assert_eq_uvec!(validator_controllers(), vec![4, 20]);
         assert!(<Stakers<Test>>::contains_key(&5));
@@ -3220,7 +3194,7 @@ fn guarantee_limit_should_work() {
             assert_eq!(Staking::guarantee_rel(1, 5), Some(500));
 
             // After a era, valid stake should updated.
-            start_era_with_new_workloads(1, 1000, 3000);
+            start_era_with_new_workloads(1, false, 1000, 3000);
 
             assert_eq!(
                 Staking::guarantors(&1),
@@ -3256,7 +3230,7 @@ fn guarantee_limit_should_work() {
             assert_eq!(Staking::guarantee_rel(1, 5), Some(2000));
 
             // Next era, wr should be outdated
-            start_era(2);
+            start_era(2, false);
 
             assert_eq!(
                 Staking::guarantors(&1),
@@ -3355,7 +3329,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![1, 3]
                 }
             );
@@ -3365,7 +3339,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![3, 1]
                 }
             );
@@ -3376,7 +3350,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Default::default(),
                     guarantors: vec![3, 1]
                 }
             );
@@ -3396,9 +3370,9 @@ fn new_era_with_stake_limit_should_work() {
                 let _ = Balances::deposit_creating(&i, 5000);
             }
 
-            start_era(1);
+            start_era(1, false);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 5000);
-            start_era(4);
+            start_era(4, false);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 5000);
             // add guarantor
             assert_ok!(Staking::bond(
@@ -3451,18 +3425,18 @@ fn new_era_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Perbill::one(),
                     guarantors: vec![1, 3]
                 }
             );
 
-            start_era_with_new_workloads(5, 1, 200000000);
+            start_era_with_new_workloads(5, false, 1, 200000000);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 2500);
             // 3 would be removed from validators due to stake limite
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
-                    commission: Default::default(),
+                    guarantee_fee: Perbill::one(),
                     guarantors: vec![1]
                 }
             );

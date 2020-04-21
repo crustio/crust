@@ -23,10 +23,9 @@ use frame_support::{
 use pallet_session::historical;
 use sp_runtime::{
     Perbill, PerThing, RuntimeDebug,
-    curve::PiecewiseLinear,
     traits::{
-        Convert, Zero, One, StaticLookup, CheckedSub, Saturating, SaturatedConversion, AtLeast32Bit,
-        EnsureOrigin
+        Convert, Zero, One, StaticLookup, CheckedSub, Saturating, AtLeast32Bit,
+        EnsureOrigin, CheckedAdd
     },
 };
 use sp_staking::{
@@ -41,6 +40,7 @@ use sp_runtime::{Deserialize, Serialize};
 
 // Crust runtime modules
 use tee;
+use primitives::constants::{currency::*, time::*};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_NOMINATIONS: usize = 16;
@@ -55,6 +55,7 @@ pub type Points = u32;
 
 /// Reward points of an era. Used to split era total payout between validators.
 #[derive(Encode, Decode, Default)]
+// TODO: change to `ErasRewardPoints` for not using index corresponds
 pub struct EraPoints {
     /// Total number of points. Equals the sum of reward points for each validator.
     total: Points,
@@ -111,7 +112,10 @@ pub struct Validations<AccountId> {
     /// Reward that validator takes up-front; only the rest is split between themselves and
     /// guarantors.
     #[codec(compact)]
-    pub commission: Perbill,
+    pub guarantee_fee: Perbill,
+
+    // TODO: add reversal fee, let validator can give more reward to guarantors
+
     /// Record who vote me, this is used for guarantors to change their voting behaviour
     pub guarantors: Vec<AccountId>,
 }
@@ -119,7 +123,8 @@ pub struct Validations<AccountId> {
 impl<AccountId> Default for Validations<AccountId> {
     fn default() -> Self {
         Validations {
-            commission: Default::default(),
+            // The default guarantee fee is 100%
+            guarantee_fee: Perbill::one(),
             guarantors: vec![],
         }
     }
@@ -376,9 +381,6 @@ pub trait Trait: frame_system::Trait + tee::Trait {
 
     /// Interface for interacting with a session module.
     type SessionInterface: self::SessionInterface<Self::AccountId>;
-
-    /// The NPoS reward curve to use.
-    type RewardCurve: Get<&'static PiecewiseLinear<'static>>;
 }
 
 /// Mode of era-forcing.
@@ -444,9 +446,6 @@ decl_storage! {
             double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) T::AccountId
             => Option<BalanceOf<T>>;
 
-        /// The current era index.
-        pub CurrentEra get(fn current_era): Option<EraIndex>;
-
         /// Guarantors for a particular account that is in action right now. You can't iterate
         /// through candidates here, but you can find them using Validators.
         ///
@@ -463,6 +462,9 @@ decl_storage! {
         /// The currently elected validator set keyed by stash account ID.
         pub CurrentElected get(fn current_elected): Vec<T::AccountId>;
 
+        /// The current era index.
+        pub CurrentEra get(fn current_era): Option<EraIndex>;
+
         /// The start of the current era.
         pub CurrentEraStart get(fn current_era_start): MomentOf<T>;
 
@@ -475,8 +477,8 @@ decl_storage! {
         /// The amount of balance actively at stake for each validator slot, currently.
         ///
         /// This is used to derive rewards and punishments.
-        pub SlotStake get(fn slot_stake) build(|config: &GenesisConfig<T>| {
-            config.stakers.iter().map(|&(_, _, value, _)| value).min().unwrap_or_default()
+        pub TotalStakes get(fn total_stakes) build(|config: &GenesisConfig<T>| {
+            config.stakers.iter().fold(Zero::zero(), |acc, &(_, _, value, _)| acc + value.clone())
         }): BalanceOf<T>;
 
         /// True if the next session change will be a new era regardless of index.
@@ -546,7 +548,7 @@ decl_storage! {
                     StakerStatus::Validator => {
                         <Module<T>>::validate(
                             T::Origin::from(Some(controller.clone()).into()),
-                            Default::default(),
+                            Perbill::one(),
                         )
                     },
                     StakerStatus::Guarantor(votes) => {
@@ -565,7 +567,7 @@ decl_event!(
     pub enum Event<T> where Balance = BalanceOf<T>, <T as frame_system::Trait>::AccountId {
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
-        Reward(Balance, Balance),
+        Reward(Balance),
         /// One validator (and its guarantors) has been slashed by the given amount.
         Slash(AccountId, Balance),
         /// An old slashing report from a prior era was discarded because it could
@@ -840,7 +842,7 @@ decl_module! {
             }
 
             let mut validations = Validations {
-                commission: prefs,
+                guarantee_fee: prefs,
                 guarantors: vec![]
             };
 
@@ -1215,7 +1217,7 @@ impl<T: Trait> Module<T> {
 
             // a. New validator
             let new_validations = Validations {
-                commission: validations.commission,
+                guarantee_fee: validations.guarantee_fee,
                 guarantors: new_guarantors,
             };
             <Validators<T>>::insert(v_stash, new_validations);
@@ -1277,29 +1279,37 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// Reward a given validator by a specific amount. Add the reward to the validator's, and its
+    /// Reward a given block author by a specific amount. Add reward to the block author's
+    fn reward_author(stash: &T::AccountId, reward: BalanceOf<T>) -> PositiveImbalanceOf<T> {
+          Self::make_payout(stash, reward).unwrap_or(<PositiveImbalanceOf<T>>::zero())
+    }
+
+    /// Reward a given (maybe)validator by a specific amount. Add the reward to the validator's, and its
     /// guarantors' balance, pro-rata based on their exposure, after having removed the validator's
     /// pre-payout cut.
     fn reward_validator(stash: &T::AccountId, reward: BalanceOf<T>) -> PositiveImbalanceOf<T> {
-        let off_the_table = Self::validators(stash).commission * reward;
-        let reward = reward.saturating_sub(off_the_table);
+        // let reward = reward.saturating_sub(off_the_table);
         let mut imbalance = <PositiveImbalanceOf<T>>::zero();
         let validator_cut = if reward.is_zero() {
             Zero::zero()
         } else {
             let exposure = Self::stakers(stash);
             let total = exposure.total.max(One::one());
+            let total_rewards = Self::validators(stash).guarantee_fee * reward;
+            let mut guarantee_rewards = Zero::zero();
 
             for i in &exposure.others {
                 let per_u64 = Perbill::from_rational_approximation(i.value, total);
-                imbalance.maybe_subsume(Self::make_payout(&i.who, per_u64 * reward));
+                // Reward guarantors
+                guarantee_rewards += per_u64 * total_rewards;
+                imbalance.maybe_subsume(Self::make_payout(&i.who, per_u64 * total_rewards));
             }
 
-            let per_u64 = Perbill::from_rational_approximation(exposure.own, total);
-            per_u64 * reward
+            guarantee_rewards
         };
 
-        imbalance.maybe_subsume(Self::make_payout(stash, validator_cut + off_the_table));
+        // assert!(reward == imbalance)
+        imbalance.maybe_subsume(Self::make_payout(stash, reward - validator_cut));
 
         imbalance
     }
@@ -1328,51 +1338,25 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    /// End a session potentially ending an era.
+    fn end_session(session_index: SessionIndex) {
+        if Self::current_era().is_some() {
+            let era_length = session_index
+                .checked_sub(Self::current_era_start_session_index())
+                .unwrap_or(0);
+            // End of era
+            if era_length == T::SessionsPerEra::get() - 1 {
+                Self::end_era();
+            }
+        }
+    }
+
     /// The era has changed - enact new staking set.
     ///
     /// NOTE: This always happens immediately before a session change to ensure that new validators
     /// get a chance to set their session keys.
     /// This also checks stake limitation based on work reports
     fn new_era(start_session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
-        // Payout
-        let points = CurrentEraPointsEarned::take();
-        let now = T::Time::now();
-        let previous_era_start = <CurrentEraStart<T>>::mutate(|v| sp_std::mem::replace(v, now));
-        let era_duration = now - previous_era_start;
-        if !era_duration.is_zero() {
-            let validators = Self::current_elected();
-
-            let validator_len: BalanceOf<T> = (validators.len() as u32).into();
-            let total_rewarded_stake = Self::slot_stake() * validator_len;
-
-            let (total_payout, max_payout) = inflation::compute_total_payout(
-                &T::RewardCurve::get(),
-                total_rewarded_stake.clone(),
-                T::Currency::total_issuance(),
-                // Duration of era; more than u64::MAX is rewarded as u64::MAX.
-                era_duration.saturated_into::<u64>(),
-            );
-
-            let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
-
-            for (v, p) in validators.iter().zip(points.individual.into_iter()) {
-                if p != 0 {
-                    let reward =
-                        Perbill::from_rational_approximation(p, points.total) * total_payout;
-                    total_imbalance.subsume(Self::reward_validator(v, reward));
-                }
-            }
-
-            // assert!(total_imbalance.peek() == total_payout)
-            let total_payout = total_imbalance.peek();
-
-            let rest = max_payout.saturating_sub(total_payout);
-            Self::deposit_event(RawEvent::Reward(total_payout, rest));
-
-            T::Reward::on_unbalanced(total_imbalance);
-            T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
-        }
-
         // Increment current era.
         let current_era = CurrentEra::mutate(|s| {
             *s = Some(s.map(|s| s + 1).unwrap_or(0));
@@ -1384,6 +1368,8 @@ impl<T: Trait> Module<T> {
         });
         let bonding_duration = T::BondingDuration::get();
 
+        // Slashing
+        // TODO: put slashing into start_era(judging at start_session) like Kusama does?
         BondedEras::mutate(|bonded| {
             bonded.push((current_era, start_session_index));
 
@@ -1407,11 +1393,95 @@ impl<T: Trait> Module<T> {
             }
         });
 
-        // Reassign all Stakers.
-        let (_slot_stake, maybe_new_validators) = Self::select_validators();
+        // Reassign all stakers.
+        let maybe_new_validators = Self::select_validators();
         Self::apply_unapplied_slashes(current_era);
 
         maybe_new_validators
+    }
+
+    /// Compute payout for era.
+    fn end_era() {
+        // Payout
+        let now = T::Time::now();
+        let previous_era_start = <CurrentEraStart<T>>::mutate(|v| sp_std::mem::replace(v, now));
+        let era_duration = now - previous_era_start;
+        if !era_duration.is_zero() {
+            let points = CurrentEraPointsEarned::take();
+            let validators = Self::current_elected();
+            let total_authoring_payout = Self::authoring_rewards_in_era();
+            let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+            let to_num =
+                |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
+
+            // 1. Block authoring payout
+            for (v, p) in validators.iter().zip(points.individual.into_iter()) {
+                if p != 0 {
+                    let authoring_reward =
+                        Perbill::from_rational_approximation(p, points.total) * total_authoring_payout;
+                    total_imbalance.subsume(Self::reward_author(v, authoring_reward));
+                }
+            }
+
+            // 2. Staking payout
+            let current_era = Self::current_era().unwrap_or(0);
+            let total_staking_payout = Self::staking_rewards_in_era(current_era);
+            let total_stakes = Self::total_stakes();
+            <Stakers<T>>::iter().for_each(|(v, e)| {
+                let staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
+                total_imbalance.subsume(Self::reward_validator(&v, staking_reward));
+            });
+
+            // 3. assert!(total_imbalance.peek() == total_payout)
+            // This actually should be equal
+            let total_payout = total_imbalance.peek();
+
+            // 4. Deposit event
+            Self::deposit_event(RawEvent::Reward(total_payout));
+
+            T::Reward::on_unbalanced(total_imbalance);
+            // This is not been used
+            //T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+        }
+    }
+
+    /// Block authoring rewards per era, this won't be changed in every era
+    fn authoring_rewards_in_era() -> BalanceOf<T> {
+        // Milliseconds per year for the Julian year (365.25 days).
+        const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+        // Initial with total rewards per year
+        let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+
+        let reward_this_era = BLOCK_AUTHORING_REWARDS / year_in_eras as u128;
+
+        reward_this_era.try_into().ok().unwrap()
+    }
+
+    /// Staking rewards per era
+    fn staking_rewards_in_era(current_era: EraIndex) -> BalanceOf<T> {
+        let mut maybe_rewards_this_year = FIRST_YEAR_REWARDS ;
+        let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
+            .ok()
+            .unwrap();
+
+        // Milliseconds per year for the Julian year (365.25 days).
+        const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+        // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+        let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+        let year_num = current_era as u64 / year_in_eras;
+        for _ in 0..year_num {
+            // If inflation <= 1%, stop reduce
+            if maybe_rewards_this_year <= total_issuance / 100 {
+                maybe_rewards_this_year = total_issuance / 100;
+                break;
+            }
+
+            maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
+        }
+
+        let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
+
+        reward_this_era.try_into().ok().unwrap()
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
@@ -1434,12 +1504,13 @@ impl<T: Trait> Module<T> {
 
     /// Select a new validator set from the assembled stakers and their role preferences.
     ///
-    /// Returns the new `SlotStake` value and a set of newly selected _stash_ IDs.
+    /// Returns the new `TotalStakes` value and a set of newly selected _stash_ IDs.
     ///
     /// Assumes storage is coherent with the declaration.
-    fn select_validators() -> (BalanceOf<T>, Option<Vec<T::AccountId>>) {
-        // Update all tee identities work report
+    fn select_validators() -> Option<Vec<T::AccountId>> {
+        // Update all tee identities work report and clear stakers
         <tee::Module<T>>::update_identities();
+        Self::clear_stakers();
 
         let validators: Vec<(T::AccountId, Validations<T::AccountId>)> =
             <Validators<T>>::iter().collect();
@@ -1453,7 +1524,7 @@ impl<T: Trait> Module<T> {
             // and let the chain keep producing blocks until we can decide on a sufficiently
             // substantial set.
             // TODO: #2494(paritytech/substrate)
-            return (Self::slot_stake(), None);
+            return None;
         }
 
         let to_votes =
@@ -1517,9 +1588,7 @@ impl<T: Trait> Module<T> {
             v_ledger.valid = v_own_stakes;
             Self::update_ledger(&v_controller, &v_ledger);
 
-            // 4. Update next era's snapshot `Stakers` and `Validators`
-            <Stakers<T>>::remove(v_stash);
-
+            // 4. (Maybe)Insert new validator and staker
             if v_ledger.valid == Zero::zero() {
                 <Validators<T>>::remove(v_stash);
             } else {
@@ -1544,7 +1613,7 @@ impl<T: Trait> Module<T> {
 
                 // d. UPDATE NODE: `Validator`
                 let new_validations = Validations {
-                    commission: validations.commission,
+                    guarantee_fee: validations.guarantee_fee,
                     guarantors: new_guarantors,
                 };
                 <Validators<T>>::insert(v_stash, new_validations);
@@ -1588,10 +1657,15 @@ impl<T: Trait> Module<T> {
         // - time complex is O(2n)
         // - DB try is n
         // 1. Populate elections and figure out the minimum stake behind a slot.
-        let mut validators_stakes = <Validators<T>>::iter()
-            .map(|(stash, _pref)| {
-                let stakers = Self::stakers(&stash);
-                (stash, to_votes(stakers.total))
+        let mut total_stakes: BalanceOf<T> = Zero::zero();
+        let mut validators_stakes = <Stakers<T>>::iter()
+            .map(|(stash, exposure)| {
+                if let Some(maybe_total_stakes) = total_stakes.checked_add(&exposure.total) {
+                    total_stakes = maybe_total_stakes;
+                } else {
+                    total_stakes = to_balance(u64::max_value() as u128);
+                }
+                (stash, to_votes(exposure.total))
             })
             .collect::<Vec<(T::AccountId, u128)>>();
 
@@ -1601,10 +1675,9 @@ impl<T: Trait> Module<T> {
 
         // 2. If there's no validators, be as same as little validators
         if to_elect < minimum_validator_count {
-            return (Self::slot_stake(), None);
+            return None;
         }
 
-        let slot_stake = to_balance(validators_stakes[to_elect - 1].1);
         let elected_stashes = validators_stakes[0..to_elect]
             .iter()
             .map(|(who, _stakes)| who.clone())
@@ -1615,13 +1688,21 @@ impl<T: Trait> Module<T> {
         <CurrentElected<T>>::put(&elected_stashes);
 
         // Update slot stake.
-        <SlotStake<T>>::put(&slot_stake);
+        <TotalStakes<T>>::put(total_stakes);
 
         // In order to keep the property required by `n_session_ending`
         // that we must return the new validator set even if it's the same as the old,
         // as long as any underlying economic conditions have changed, we don't attempt
         // to do any optimization where we compare against the prior set.
-        (slot_stake, Some(elected_stashes))
+        Some(elected_stashes)
+    }
+
+    /// Remove all old stakers, this function only be used in `select_validators`
+    fn clear_stakers() {
+        let old_vs: Vec<T::AccountId> = <Stakers<T>>::iter().map(|(v_stash, _)| v_stash).collect();
+        for v in old_vs {
+            <Stakers<T>>::remove(&v);
+        }
     }
 
     /// Remove all associated data of a stash account from the staking system.
@@ -1717,9 +1798,9 @@ impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
         }
         Self::new_session(idx)
     }
-    fn end_session(_end_index: SessionIndex) {
+    fn end_session(end_index: SessionIndex) {
         // Do nothing
-        // TODO: Upgrade staking to newest NPoS mechanism
+        Self::end_session(end_index);
     }
     fn start_session(_start_index: SessionIndex) {
         // Do nothing

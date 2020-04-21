@@ -793,6 +793,7 @@ dependencies = [
 name = "cstrml-staking"
 version = "0.3.0"
 dependencies = [
+ "cst-primitives",
  "cstrml-tee",
  "frame-support",
  "frame-system",

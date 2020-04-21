@@ -1472,6 +1472,7 @@ impl<T: Trait> Module<T> {
         for _ in 0..year_num {
             // If inflation <= 1%, stop reduce
             if maybe_rewards_this_year <= total_issuance / 100 {
+                maybe_rewards_this_year = total_issuance / 100;
                 break;
             }
 

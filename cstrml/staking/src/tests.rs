@@ -1235,6 +1235,27 @@ fn cannot_reserve_staked_balance() {
 }*/
 
 #[test]
+fn staking_reward_change_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .build()
+        .execute_with(|| {
+            // Make 1 account be max balance
+            let _ = Balances::make_free_balance_be(&11, Balance::max_value());
+            // If 1 era is 30 min, Julian year should contains 17532 eras.
+            // If era_num < 17532, staking_rewards should be
+            assert_eq!(Staking::staking_rewards_in_era(17530), 285192790326260);
+            assert_eq!(Staking::staking_rewards_in_era(17531), 285192790326260);
+            // era_num >= 17532 & era_num <= 35064, staking_rewards should be
+            assert_eq!(Staking::staking_rewards_in_era(35000), 228154232261008);
+            // TODO: for test case max issue is 18446744
+            // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be
+            assert_eq!(Balances::total_issuance(), u64::max_value());
+            assert_eq!(Staking::staking_rewards_in_era(631152), (184467440737095516 / ((36525*48) / 100)));
+        })
+}
+
+#[test]
 fn validator_payment_prefs_work() {
     // Test that validator preferences are correctly honored
     // Note: unstake threshold is being directly tested in slashing tests.

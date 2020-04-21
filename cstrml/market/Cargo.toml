@@ -14,14 +14,14 @@ serde = { optional = true, version = '1.0.106' }
 serde_json = "1.0.51"
 
 # substrate frames
-system = { package = 'frame-system', default-features = false, version = '2.0.0-alpha.5' }
-frame-support = { default-features = false, version = '2.0.0-alpha.5' }
+system = { package = 'frame-system', default-features = false, version = '2.0.0-alpha.6' }
+frame-support = { default-features = false, version = '2.0.0-alpha.6' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-alpha.5' }
-sp-io = { default-features = false, version = '2.0.0-alpha.5' }
-sp-runtime = { default-features = false, version = '2.0.0-alpha.5' }
-sp-std = { default-features = false, version = '2.0.0-alpha.5' }
+sp-core = { default-features = false, version = '2.0.0-alpha.6' }
+sp-io = { default-features = false, version = '2.0.0-alpha.6' }
+sp-runtime = { default-features = false, version = '2.0.0-alpha.6' }
+sp-std = { default-features = false, version = '2.0.0-alpha.6' }
 
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }

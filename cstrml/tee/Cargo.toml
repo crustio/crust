@@ -16,21 +16,21 @@ signatory = "0.18.0"
 signatory-ring = "0.18.0"
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = '2.0.0-alpha.5' }
-system = { package = 'frame-system', default-features = false, version = '2.0.0-alpha.5' }
+frame-support = { default-features = false, version = '2.0.0-alpha.6' }
+system = { package = 'frame-system', default-features = false, version = '2.0.0-alpha.6' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-alpha.5' }
-sp-io = { default-features = false, version = '2.0.0-alpha.5' }
-sp-runtime = { default-features = false, version = '2.0.0-alpha.5' }
-sp-runtime-interface = { default-features = false, version = '2.0.0-alpha.5' }
-sp-std = { default-features = false, version = '2.0.0-alpha.5' }
+sp-core = { default-features = false, version = '2.0.0-alpha.6' }
+sp-io = { default-features = false, version = '2.0.0-alpha.6' }
+sp-runtime = { default-features = false, version = '2.0.0-alpha.6' }
+sp-runtime-interface = { default-features = false, version = '2.0.0-alpha.6' }
+sp-std = { default-features = false, version = '2.0.0-alpha.6' }
 
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-keyring = { package = "sp-keyring", version = '2.0.0-alpha.5' }
+keyring = { package = "sp-keyring", version = '2.0.0-alpha.6' }
 hex = '0.4.2'
 
 [features]

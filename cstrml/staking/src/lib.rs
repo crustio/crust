@@ -123,7 +123,8 @@ pub struct Validations<AccountId> {
 impl<AccountId> Default for Validations<AccountId> {
     fn default() -> Self {
         Validations {
-            guarantee_fee: Default::default(),
+            // The default guarantee fee is 100%
+            guarantee_fee: Perbill::one(),
             guarantors: vec![],
         }
     }
@@ -547,7 +548,7 @@ decl_storage! {
                     StakerStatus::Validator => {
                         <Module<T>>::validate(
                             T::Origin::from(Some(controller.clone()).into()),
-                            Default::default(),
+                            Perbill::one(),
                         )
                     },
                     StakerStatus::Guarantor(votes) => {
@@ -1294,16 +1295,17 @@ impl<T: Trait> Module<T> {
         } else {
             let exposure = Self::stakers(stash);
             let total = exposure.total.max(One::one());
-            let guarantee_reward = Self::validators(stash).guarantee_fee * reward;
+            let total_rewards = Self::validators(stash).guarantee_fee * reward;
+            let mut guarantee_rewards = Zero::zero();
 
             for i in &exposure.others {
                 let per_u64 = Perbill::from_rational_approximation(i.value, total);
-
                 // Reward guarantors
-                imbalance.maybe_subsume(Self::make_payout(&i.who, per_u64 * guarantee_reward));
+                guarantee_rewards += per_u64 * total_rewards;
+                imbalance.maybe_subsume(Self::make_payout(&i.who, per_u64 * total_rewards));
             }
 
-            guarantee_reward
+            guarantee_rewards
         };
 
         // assert!(reward == imbalance)

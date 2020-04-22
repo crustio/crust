@@ -17,15 +17,15 @@ use frame_support::{
     storage::IterableStorageMap,
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
-        Time,
+        Time, EnsureOrigin
     }
 };
 use pallet_session::historical;
 use sp_runtime::{
-    Perbill, PerThing, RuntimeDebug,
+    Perbill, RuntimeDebug,
     traits::{
         Convert, Zero, One, StaticLookup, CheckedSub, Saturating, AtLeast32Bit,
-        EnsureOrigin, CheckedAdd
+        CheckedAdd
     },
 };
 use sp_staking::{
@@ -1891,7 +1891,7 @@ impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::Ident
         >],
         slash_fraction: &[Perbill],
         slash_session: SessionIndex,
-    ) {
+    ) -> Result<(), ()> {
         let reward_proportion = SlashRewardFraction::get();
 
         let era_now = Self::current_era().unwrap_or(0);
@@ -1911,7 +1911,7 @@ impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::Ident
                 .filter(|&&(_, ref sesh)| sesh <= &slash_session)
                 .next()
             {
-                None => return, // before bonding period. defensive - should be filtered out.
+                None => return Ok(()), // before bonding period. defensive - should be filtered out.
                 Some(&(ref slash_era, _)) => *slash_era,
             }
         };
@@ -1956,6 +1956,11 @@ impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::Ident
                 }
             }
         }
+        Ok(())
+    }
+
+    fn can_report() -> bool {
+        true
     }
 }
 

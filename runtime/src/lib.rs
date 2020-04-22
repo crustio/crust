@@ -9,13 +9,14 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use sp_core::OpaqueMetadata;
-use sp_runtime::curve::PiecewiseLinear;
 use sp_runtime::traits::{
     BlakeTwo256, Block as BlockT, Convert, ConvertInto, OpaqueKeys, SaturatedConversion,
     IdentityLookup
 };
-use sp_runtime::transaction_validity::TransactionValidity;
-use sp_runtime::{create_runtime_str, generic, impl_opaque_keys, ApplyExtrinsicResult, Perbill};
+use sp_runtime::{
+    create_runtime_str, generic, impl_opaque_keys, ApplyExtrinsicResult, Perbill,
+    transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority}
+};
 use sp_std::prelude::*;
 
 use grandpa::{fg_primitives, AuthorityList as GrandpaAuthorityList};
@@ -80,7 +81,7 @@ impl_opaque_keys! {
 /// This runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
-    impl_name: create_runtime_str!("crust"),
+    impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
     spec_version: 1,
     impl_version: 1,
@@ -160,12 +161,28 @@ impl babe::Trait for Runtime {
     type EpochChangeTrigger = babe::ExternalTrigger;
 }
 
+parameter_types! {
+	pub const IndexDeposit: Balance = 1 * DOLLARS;
+}
+
+impl indices::Trait for Runtime {
+    type AccountIndex = AccountIndex;
+    type Currency = Balances;
+    type Deposit = IndexDeposit;
+    type Event = Event;
+}
+
 impl authority_discovery::Trait for Runtime {}
 
 type SubmitTransaction = TransactionSubmitter<ImOnlineId, Runtime, UncheckedExtrinsic>;
 
 parameter_types! {
     pub const SessionDuration: BlockNumber = EPOCH_DURATION_IN_BLOCKS as _;
+}
+
+parameter_types! {
+	pub const StakingUnsignedPriority: TransactionPriority = TransactionPriority::max_value() / 2;
+	pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
 }
 
 impl im_online::Trait for Runtime {
@@ -175,6 +192,7 @@ impl im_online::Trait for Runtime {
     type SubmitTransaction = SubmitTransaction;
     type SessionDuration = SessionDuration;
     type ReportUnresponsiveness = ();
+    type UnsignedPriority = StakingUnsignedPriority;
 }
 
 impl grandpa::Trait for Runtime {
@@ -193,10 +211,6 @@ impl finality_tracker::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const IndexDeposit: Balance = 1 * DOLLARS;
-}
-
-parameter_types! {
     pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
 
@@ -208,7 +222,7 @@ impl timestamp::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const UncleGenerations: BlockNumber = 5;
+	pub const UncleGenerations: BlockNumber = 0;
 }
 
 impl authorship::Trait for Runtime {
@@ -227,6 +241,7 @@ impl session::Trait for Runtime {
     type ValidatorId = AccountId;
     type ValidatorIdOf = staking::StashOf<Self>;
     type ShouldEndSession = Babe;
+    type NextSessionRotation = Babe;
     type SessionManager = Staking;
     type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
@@ -236,17 +251,6 @@ impl session::Trait for Runtime {
 impl session::historical::Trait for Runtime {
     type FullIdentification = staking::Exposure<AccountId, Balance>;
     type FullIdentificationOf = staking::ExposureOf<Runtime>;
-}
-
-pallet_staking_reward_curve::build! {
-    const REWARD_CURVE: PiecewiseLinear<'static> = curve!(
-        min_inflation: 0_025_000,
-        max_inflation: 0_100_000,
-        ideal_stake: 0_500_000,
-        falloff: 0_050_000,
-        max_piece_count: 40,
-        test_precision: 0_005_000,
-    );
 }
 
 parameter_types! {
@@ -355,6 +359,7 @@ construct_runtime! {
         Babe: babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
+        Indices: indices::{Module, Call, Storage, Config<T>, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
 
@@ -448,8 +453,10 @@ impl_runtime_apis! {
     }
 
     impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
-		fn validate_transaction(tx: <Block as BlockT>::Extrinsic) -> TransactionValidity {
-			Executive::validate_transaction(tx)
+		fn validate_transaction(
+		    source: TransactionSource,
+		    tx: <Block as BlockT>::Extrinsic) -> TransactionValidity {
+			Executive::validate_transaction(source, tx)
 		}
     }
     

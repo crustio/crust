@@ -1,11 +1,14 @@
 use super::*;
 
-use frame_support::{impl_outer_origin, parameter_types, weights::Weight};
+use frame_support::{
+    impl_outer_origin, parameter_types, weights::Weight,
+    traits::{ OnInitialize, OnFinalize }
+};
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup, OnFinalize, OnInitialize},
+    traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
 

@@ -1,9 +1,7 @@
-use vergen::{generate_cargo_keys, ConstantsFlags};
-
-const ERROR_MSG: &str = "Failed to generate metadata files";
+use build_script_utils::{generate_cargo_keys, rerun_if_git_head_changed};
 
 fn main() {
-    generate_cargo_keys(ConstantsFlags::SHA_SHORT).expect(ERROR_MSG);
+    generate_cargo_keys();
 
-    build_script_utils::rerun_if_git_head_changed();
+    rerun_if_git_head_changed();
 }

@@ -5,7 +5,7 @@ use grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider, Stora
 use sc_client::LongestChain;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
-use sc_service::{error::Error as ServiceError, AbstractService, Configuration, ServiceBuilder};
+use sc_service::{error::Error as ServiceError, AbstractService, Configuration, ServiceBuilder, Role};
 use sp_inherents::InherentDataProviders;
 use std::sync::Arc;
 use std::time::Duration;
@@ -78,21 +78,12 @@ pub fn new_full(config: Configuration)
     use sc_client_api::ExecutorProvider;
     use futures::stream::StreamExt;
 
-    let is_authority = config.roles.is_authority();
+    let role = config.role.clone();
     let force_authoring = config.force_authoring;
-    let name = config.name.clone();
+    let name = config.network.node_name.clone();
     let disable_grandpa = config.disable_grandpa;
-    let sentry_nodes = config.network.sentry_nodes.clone();
-
-    // sentry nodes announce themselves as authorities to the network
-	// and should run the same protocols authorities do, but it should
-	// never actively participate in any consensus process.
-	let participates_in_consensus = is_authority && !config.sentry_mode;
 
     let (builder, mut import_setup, inherent_data_providers) = new_full_start!(config);
-
-    let (block_import, grandpa_link, babe_link) = import_setup.take()
-            .expect("Link Half and Block Import are present for Full Services or setup failed before. qed");
 
     let service = builder
         .with_finality_proof_provider(|client, backend| {
@@ -102,7 +93,10 @@ pub fn new_full(config: Configuration)
         })?
         .build()?;
 
-    if participates_in_consensus {
+    let (block_import, grandpa_link, babe_link) = import_setup.take()
+        .expect("Link Half and Block Import are present for Full Services or setup failed before. qed");
+
+    if let Role::Authority { sentry_nodes } = &role {
         let proposer =
             sc_basic_authorship::ProposerFactory::new(
                 service.client(),
@@ -133,30 +127,34 @@ pub fn new_full(config: Configuration)
 
         // the BABE authoring task is considered essential, i.e. if it
         // fails we take down the service with it.
-        service.spawn_essential_task("babe", babe);
+        service.spawn_essential_task("babe-proposer", babe);
 
         // Authority discovery: this module runs to promise authorities' connection
-        // TODO: 2 modes? enable or not?
-        let network = service.network();
-        let network_event_stream = network.event_stream();
-        let dht_event_stream = network_event_stream.filter_map(|e| async move { match e {
-            Event::Dht(e) => Some(e),
-            _ => None,
-        }}).boxed();
-        let authority_discovery = authority_discovery::AuthorityDiscovery::new(
-            service.client(),
-            network,
-            sentry_nodes.clone(),
-            service.keystore(),
-            dht_event_stream,
-            service.prometheus_registry(),
-        );
-        service.spawn_task("authority-discovery", authority_discovery);
+        // TODO: refine sentry mode using updated substrate code
+        if matches!(role, Role::Authority{..} | Role::Sentry{..}) {
+            let network = service.network();
+            let network_event_stream = network.event_stream("authority-discovery");
+            let dht_event_stream = network_event_stream.filter_map(|e| async move {
+                match e {
+                    Event::Dht(e) => Some(e),
+                    _ => None,
+                }
+            }).boxed();
+            let authority_discovery = authority_discovery::AuthorityDiscovery::new(
+                service.client(),
+                network,
+                sentry_nodes.clone(),
+                service.keystore(),
+                dht_event_stream,
+                service.prometheus_registry(),
+            );
+            service.spawn_task("authority-discovery", authority_discovery);
+        }
     }
 
     // if the node isn't actively participating in consensus then it doesn't
     // need a keystore, regardless of which protocol we use below.
-    let keystore = if participates_in_consensus {
+    let keystore = if role.is_authority() {
         Some(service.keystore())
     } else {
         None
@@ -169,7 +167,7 @@ pub fn new_full(config: Configuration)
         name: Some(name),
         observer_enabled: false,
         keystore,
-        is_authority,
+        is_authority: role.is_network_authority(),
     };
 
     let enable_grandpa = !disable_grandpa;

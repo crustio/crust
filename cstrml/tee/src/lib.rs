@@ -111,7 +111,8 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
+        #[weight = frame_support::weights::SimpleDispatchInfo::default()]
+        pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 0. Genesis validators have rights to register themselves
@@ -154,6 +155,7 @@ decl_module! {
             Ok(())
         }
 
+        #[weight = frame_support::weights::SimpleDispatchInfo::default()]
         fn report_works(origin, work_report: WorkReport) -> DispatchResult {
             let who = ensure_signed(origin)?;
 

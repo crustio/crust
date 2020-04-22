@@ -68,7 +68,9 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
+
         /// TODO: organize these parameters into a struct.
+        #[weight = frame_support::weights::SimpleDispatchInfo::default()]
         fn store_storage_order(
             origin,
             dest: <T::Lookup as StaticLookup>::Source,

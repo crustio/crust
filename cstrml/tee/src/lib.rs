@@ -40,8 +40,6 @@ pub struct Identity<T> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-// TODO: change block_number & block_hash to standard data type
-// TODO: change workload to u128
 pub struct WorkReport {
     pub pub_key: PubKey,
     pub block_number: u64,
@@ -112,6 +110,7 @@ decl_module! {
         fn deposit_event() = default;
 
         #[weight = frame_support::weights::SimpleDispatchInfo::default()]
+        // FIXME: issues#58 check bonding relation is unique
         pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -284,7 +283,6 @@ impl<T: Trait> Module<T> {
     fn identity_sig_check(id: &Identity<T::AccountId>) -> bool {
         let applier_id = id.account_id.encode();
         let validator_id = id.validator_account_id.encode();
-        // TODO: concat data inside runtime for saving PassBy params number
         api::crypto::verify_identity_sig(
             &id.pub_key,
             &applier_id,
@@ -315,7 +313,6 @@ impl<T: Trait> Module<T> {
     }
 
     fn work_report_sig_check(wr: &WorkReport) -> bool {
-        // TODO: concat data inside runtime for saving PassBy params number
         api::crypto::verify_work_report_sig(
             &wr.pub_key,
             wr.block_number,

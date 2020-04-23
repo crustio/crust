@@ -262,7 +262,6 @@ parameter_types! {
     pub const SlashDeferDuration: staking::EraIndex = 28;
 }
 
-// TODO: add vote logic here
 /// Simple structure that exposes how u64 currency can be represented as... u64.
 pub struct CurrencyToVoteHandler;
 impl Convert<u64, u64> for CurrencyToVoteHandler {

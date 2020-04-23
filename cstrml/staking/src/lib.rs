@@ -115,7 +115,6 @@ pub struct Validations<AccountId> {
     pub guarantee_fee: Perbill,
 
     // TODO: add reversal fee, let validator can give more reward to guarantors
-
     /// Record who vote me, this is used for guarantors to change their voting behaviour
     pub guarantors: Vec<AccountId>,
 }
@@ -348,7 +347,7 @@ pub trait Trait: frame_system::Trait + tee::Trait {
 
     /// Convert a balance into a number used for election calculation.
     /// This must fit into a `u64` but is allowed to be sensibly lossy.
-    /// TODO: #1377
+    /// TODO: [Substrate]substrate#1377
     /// The backward convert should be removed as the new Phragmen API returns ratio.
     /// The post-processing needs it but will be moved to off-chain. TODO: #2908
     type CurrencyToVote: Convert<BalanceOf<Self>, u64> + Convert<u128, BalanceOf<Self>>;
@@ -450,7 +449,6 @@ decl_storage! {
         /// through candidates here, but you can find them using Validators.
         ///
         /// This is keyed by the stash account.
-        // TODO: Change name to snapshot?
         pub Stakers get(fn stakers):
             map hasher(twox_64_concat) T::AccountId => Exposure<T::AccountId, BalanceOf<T>>;
 
@@ -567,6 +565,7 @@ decl_event!(
     pub enum Event<T> where Balance = BalanceOf<T>, <T as frame_system::Trait>::AccountId {
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
+        // TODO: show reward link to account_id
         Reward(Balance),
         /// One validator (and its guarantors) has been slashed by the given amount.
         Slash(AccountId, Balance),
@@ -574,7 +573,7 @@ decl_event!(
         /// not be processed.
         OldSlashingReportDiscarded(SessionIndex),
 
-        // TODO: add stake limitation check event
+        // TODO: add stake limitation change event
     }
 );
 
@@ -1523,7 +1522,7 @@ impl<T: Trait> Module<T> {
             // We should probably disable all functionality except for block production
             // and let the chain keep producing blocks until we can decide on a sufficiently
             // substantial set.
-            // TODO: #2494(paritytech/substrate)
+            // TODO: [Substrate]substrate#2494
             return None;
         }
 
@@ -1764,7 +1763,6 @@ impl<T: Trait> Module<T> {
     /// For each element in the iterator the given number of points in u32 is added to the
     /// validator, thus duplicates are handled.
     pub fn reward_by_indices(validators_points: impl IntoIterator<Item = (u32, u32)>) {
-        // TODO: This can be optimised once #3302 is implemented.
         let current_elected_len = <Module<T>>::current_elected().len() as u32;
 
         CurrentEraPointsEarned::mutate(|rewards| {
@@ -1804,7 +1802,6 @@ impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
     }
     fn start_session(_start_index: SessionIndex) {
         // Do nothing
-        // TODO: Upgrade staking to newest NPoS mechanism
     }
 }
 

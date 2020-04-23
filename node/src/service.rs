@@ -130,7 +130,7 @@ pub fn new_full(config: Configuration)
         service.spawn_essential_task("babe-proposer", babe);
 
         // Authority discovery: this module runs to promise authorities' connection
-        // TODO: refine sentry mode using updated substrate code
+        // TODO: [Substrate]refine sentry mode using updated substrate code
         if matches!(role, Role::Authority{..} | Role::Sentry{..}) {
             let network = service.network();
             let network_event_stream = network.event_stream("authority-discovery");
@@ -161,7 +161,7 @@ pub fn new_full(config: Configuration)
     };
 
     let grandpa_config = grandpa::Config {
-        // FIXME substrate/issues#1578 make this available through chainspec
+        // FIXME: [Substrate]substrate/issues#1578 make this available through chainspec
         gossip_duration: Duration::from_millis(333),
         justification_period: 512,
         name: Some(name),
@@ -173,13 +173,15 @@ pub fn new_full(config: Configuration)
     let enable_grandpa = !disable_grandpa;
     if enable_grandpa {
         // start the full GRANDPA voter
-        // NOTE: non-authorities could run the GRANDPA observer protocol, but at
-        // this point the full voter should provide better guarantees of block
-        // and vote data availability than the observer. The observer has not
-        // been tested extensively yet and having most nodes in a network run it
-        // could lead to finality stalls.
-        // TODO: Aiming the stalls problem, maybe we could refer polkadot solution
-        // in (https://github.com/paritytech/polkadot/blob/master/service/src/lib.rs#L507-L521)
+        // NOTE: unlike in substrate we are currently running the full
+        // GRANDPA voter protocol for all full nodes (regardless of whether
+        // they're validators or not). at this point the full voter should
+        // provide better guarantees of block and vote data availability than
+        // the observer.
+
+        // add a custom voting rule to temporarily stop voting for new blocks
+        // after the given pause block is finalized and restarting after the
+        // given delay.
         let grandpa_config = grandpa::GrandpaParams {
             config: grandpa_config,
             link: grandpa_link,
@@ -247,7 +249,8 @@ pub fn new_light(config: Configuration)
                 client.clone(),
             )?;
 
-            // FIXME: pruning task isn't started since light client doesn't do `AuthoritySetup`.
+            // FIXME: [Substrate]pruning task isn't started since light client doesn't do `AuthoritySetup`.
+            // (keep eyes on polkadot service)
             let import_queue = babe::import_queue(
                 babe_link,
                 babe_block_import,

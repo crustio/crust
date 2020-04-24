@@ -1,4 +1,4 @@
-# Crust
+# Crust &middot; [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/crustio/crust/Crust%20CI?label=Actions&logo=github&branch=master)](https://github.com/crustio/crust/actions?query=workflow%3A%22Crust+CI%22) [![Substrate version](https://img.shields.io/badge/Substrate-2.0.0-blue?logo=Parity%20Substrate)](https://substrate.dev/) [![GitHub license](https://img.shields.io/github/license/crustio/crust)](LICENSE)
 
 Implementation of a [Crust protocol](https://crust.network) node with [substrate](https://github.com/paritytech/substrate).
 

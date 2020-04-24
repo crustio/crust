@@ -1509,6 +1509,7 @@ impl<T: Trait> Module<T> {
     fn select_validators() -> Option<Vec<T::AccountId>> {
         // Update all tee identities work report and clear stakers
         <tee::Module<T>>::update_identities();
+        Self::clear_stakers();
 
         let validators: Vec<(T::AccountId, Validations<T::AccountId>)> =
             <Validators<T>>::iter().collect();
@@ -1522,7 +1523,6 @@ impl<T: Trait> Module<T> {
             // and let the chain keep producing blocks until we can decide on a sufficiently
             // substantial set.
             // TODO: [Substrate]substrate#2494
-            Self::clear_stakers();
             return None;
         }
 

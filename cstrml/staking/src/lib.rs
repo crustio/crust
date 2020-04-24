@@ -1509,7 +1509,6 @@ impl<T: Trait> Module<T> {
     fn select_validators() -> Option<Vec<T::AccountId>> {
         // Update all tee identities work report and clear stakers
         <tee::Module<T>>::update_identities();
-        Self::clear_stakers();
 
         let validators: Vec<(T::AccountId, Validations<T::AccountId>)> =
             <Validators<T>>::iter().collect();
@@ -1523,6 +1522,7 @@ impl<T: Trait> Module<T> {
             // and let the chain keep producing blocks until we can decide on a sufficiently
             // substantial set.
             // TODO: [Substrate]substrate#2494
+            Self::clear_stakers();
             return None;
         }
 
@@ -1590,6 +1590,7 @@ impl<T: Trait> Module<T> {
             // 4. (Maybe)Insert new validator and staker
             if v_ledger.valid == Zero::zero() {
                 <Validators<T>>::remove(v_stash);
+                <Stakers<T>>::remove(v_stash);
             } else {
                 let v_own_votes = to_votes(v_own_stakes);
                 // a. total_votes should less than balance max value
@@ -1700,7 +1701,10 @@ impl<T: Trait> Module<T> {
     fn clear_stakers() {
         let old_vs: Vec<T::AccountId> = <Stakers<T>>::iter().map(|(v_stash, _)| v_stash).collect();
         for v in old_vs {
-            <Stakers<T>>::remove(&v);
+            // Only remove those who aren't be V
+            if !<Validators<T>>::contains_key(&v) {
+                <Stakers<T>>::remove(&v);
+            }
         }
     }
 

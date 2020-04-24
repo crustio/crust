@@ -229,6 +229,7 @@ impl<T: Trait> Module<T> {
         let mut old_e_workload: u128 = 0;
         let rs = Self::get_reported_slot();
 
+        // 1. Judge if wr exists
         if let Some(old_wr) = Self::work_reports(who) {
             if &old_wr == wr {
                 return false;
@@ -238,11 +239,11 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        // 3. Upsert work report and mark reported this (report)slot
+        // 2. Upsert work report and mark reported this (report)slot
         <WorkReports<T>>::insert(who, wr);
         <ReportedInSlot<T>>::insert(who, rs, true);
 
-        // 4. Upsert workload
+        // 3. Upsert workload
         let m_workload = wr.meaningful_workload as u128;
         let e_workload = wr.empty_workload as u128;
         let m_total_workload = Self::meaningful_workload() - old_m_workload + m_workload;
@@ -251,7 +252,7 @@ impl<T: Trait> Module<T> {
         MeaningfulWorkload::put(m_total_workload);
         EmptyWorkload::put(e_total_workload);
 
-        // 5. Call `on_report_works` handler
+        // 4. Call `on_report_works` handler
         T::OnReportWorks::on_report_works(
             &who,
             m_workload + e_workload,

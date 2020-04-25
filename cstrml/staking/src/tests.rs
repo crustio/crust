@@ -111,8 +111,8 @@ fn basic_setup_works() {
             })
         );
         assert_eq!(Staking::guarantors(101).unwrap().targets, vec![11, 21]);
-        assert_eq!(Staking::guarantee_rel(101, 11), Some(250));
-        assert_eq!(Staking::guarantee_rel(101, 21), Some(250));
+        assert_eq!(Staking::guarantee_rel(101, 11).unwrap().total, 250);
+        assert_eq!(Staking::guarantee_rel(101, 21).unwrap().total, 250);
 
         if cfg!(feature = "equalize") {
             assert_eq!(
@@ -890,8 +890,8 @@ fn double_staking_should_fail() {
             Origin::signed(2),
             vec![(11, arbitrary_value),]
         ));
-        assert_eq!(Staking::guarantee_rel(1, 11), Some(750));
-        assert_eq!(Staking::guarantee_rel(101, 11), Some(250));
+        assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 750);
+        assert_eq!(Staking::guarantee_rel(101, 11).unwrap().total, 250);
         start_era(1, true);
         assert_eq!(
             Staking::ledger(&2),
@@ -3190,7 +3190,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5), Some(500));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 500);
 
             // After a era, valid stake should updated.
             start_era_with_new_workloads(1, false, 1000, 3000);
@@ -3203,7 +3203,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5), Some(500));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 500);
 
             assert_eq!(
                 Staking::ledger(&2),
@@ -3226,7 +3226,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5), Some(2000));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 2000);
 
             // Next era, wr should be outdated
             start_era(2, false);
@@ -3239,7 +3239,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5), Some(2000));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 2000);
 
             assert_eq!(
                 Staking::ledger(&2),
@@ -3304,7 +3304,7 @@ fn guarantee_order_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5), Some(1000));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 1000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3314,7 +3314,7 @@ fn guarantee_order_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(3, 5), Some(1000));
+            assert_eq!(Staking::guarantee_rel(3, 5).unwrap().total, 1000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3400,7 +3400,7 @@ fn new_era_with_stake_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 11), Some(2000));
+            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 2000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3410,7 +3410,7 @@ fn new_era_with_stake_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(3, 11), Some(2000));
+            assert_eq!(Staking::guarantee_rel(3, 11).unwrap().total, 2000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3439,7 +3439,7 @@ fn new_era_with_stake_limit_should_work() {
                     guarantors: vec![1]
                 }
             );
-            assert_eq!(Staking::guarantee_rel(1, 11), Some(1500));
+            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 1500);
             assert_eq!(
                 Staking::stakers(11),
                 Exposure {

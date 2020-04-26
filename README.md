@@ -1,6 +1,6 @@
 # Crust &middot; [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/crustio/crust/Crust%20CI?label=Actions&logo=github&branch=master)](https://github.com/crustio/crust/actions?query=workflow%3A%22Crust+CI%22) [![Substrate version](https://img.shields.io/badge/Substrate-2.0.0-blue?logo=Parity%20Substrate)](https://substrate.dev/) [![GitHub license](https://img.shields.io/github/license/crustio/crust)](LICENSE)
 
-<a href='https://web3.foundation/'><img width='150' alt='Funded by web3 foundation' src='docs/img/web3f_grants_badge.png'></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='https://builders.parity.io/'><img width='180' src='docs/img/sbp_grants_badge.png'></a>
+<a href='https://web3.foundation/'><img width='160' alt='Funded by web3 foundation' src='docs/img/web3f_grants_badge.png'></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='https://builders.parity.io/'><img width='180' src='docs/img/sbp_grants_badge.png'></a>
 
 Implementation of a [Crust protocol](https://crust.network) node with [substrate](https://github.com/paritytech/substrate).
 

@@ -110,7 +110,6 @@ decl_module! {
         fn deposit_event() = default;
 
         #[weight = frame_support::weights::SimpleDispatchInfo::default()]
-        // FIXME: issues#58 check bonding relation is unique
         pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -139,10 +138,13 @@ decl_module! {
             ensure!(<TeeIdentities<T>>::contains_key(validator), "Validator needs to be validated before");
             ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key not found");
 
-            // 4. Verify sig
+            // 4. Check pub_key is unique
+            ensure!(Self::pub_key_is_unique(applier_pk), "Public key already be registered");
+
+            // 5. Verify sig
             ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
 
-            // 5. applier is new add or needs to be updated
+            // 6. applier is new add or needs to be updated
             if !Self::tee_identities(applier).contains(&identity) {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
@@ -180,7 +182,6 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     // PUBLIC MUTABLES
-
     /// This function is for updating all identities' work report, mainly aimed to check if it is outdated
     /// and it should be called in the start of era.
     ///
@@ -223,7 +224,7 @@ impl<T: Trait> Module<T> {
         <WorkReports<T>>::get(who)
     }
 
-    // PRIVATE IMMUTABLES
+    // PRIVATE MUTABLES
     fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport) -> bool {
         let mut old_m_workload: u128 = 0;
         let mut old_e_workload: u128 = 0;
@@ -279,6 +280,23 @@ impl<T: Trait> Module<T> {
         } else {
             (0, 0)
         }
+    }
+
+    // PRIVATE IMMUTABLES
+    /// This function is judging if the pub_key already be registered
+    /// TC is O(n)
+    /// DB try is O(1)
+    fn pub_key_is_unique(pk: &PubKey) -> bool {
+        let mut is_unique = true;
+
+        for (_, id) in <TeeIdentities<T>>::iter() {
+            if &id.pub_key == pk {
+                is_unique = false;
+                break
+            }
+        }
+
+        is_unique
     }
 
     fn identity_sig_check(id: &Identity<T::AccountId>) -> bool {

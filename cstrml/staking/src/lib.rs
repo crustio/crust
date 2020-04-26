@@ -295,6 +295,7 @@ pub struct StakeVoteEdge<Balance: HasCompact> {
     /// The total of valid votes.
     pub total: Balance,
     /// The details of valid votes.
+    /// index is the relative index in Valiation.guarantors for each guarantor
     pub records: BTreeMap<u32, Balance>,
 }
 
@@ -1168,7 +1169,7 @@ impl<T: Trait> Module<T> {
                 let mut validations = Self::validators(&target);
                 let mut new_guarantors = vec![];
                 for value in validations.guarantors {
-                    if &value != g_stash {
+                    if &value != g_stash { // chill all guarantors in Validations.guarantors
                         new_guarantors.push(value.clone());
                     }
                 }
@@ -1217,17 +1218,17 @@ impl<T: Trait> Module<T> {
                 };
                 new_edge.total = g_votes.clone();
                 let new_total = g_votes.clone();
-                let mut g_index: usize = 0;
+                let mut g_index: usize = 0; // used for removing guarantors from new_guarantors since g_stash doesn't vote anymore.
                 for (index, votes) in g_old_edge.records.iter() {
-                    while &new_guarantors[g_index] != g_stash {
+                    while &new_guarantors[g_index] != g_stash { // found matching guarantor
                         g_index += 1;
                     }
                     if g_votes == Zero::zero() {
-                        new_guarantors.remove(g_index.clone());
+                        new_guarantors.remove(g_index.clone()); // remove one item -> don't add g_index by one
                     } else {
                         let real_votes = g_votes.min(votes.clone());
                         g_votes -= real_votes;
-                        new_edge.records.insert(index.clone(), real_votes);
+                        new_edge.records.insert(index.clone(), real_votes); // upsert real votes
                         g_index += 1;
                     }
                 }
@@ -1269,7 +1270,7 @@ impl<T: Trait> Module<T> {
 
             // c. New edge
             let mut edge = Self::guarantee_rel(&g_stash, &v_stash).unwrap_or_default();
-            let rel_index = edge.records.len() as u32;
+            let rel_index = edge.records.len() as u32; // default index is 0
             let g_extra_votes = g_votes - edge.total;
             let real_extra_votes = (v_limit - v_total_stakes).min(g_extra_votes);
             edge.total += real_extra_votes;
@@ -1598,7 +1599,7 @@ impl<T: Trait> Module<T> {
             let mut remains = to_votes(v_limit_stakes - v_own_stakes);
             let guarantors = &validations.guarantors;
             // 1. Update GuaranteeRel
-            let mut rel_indexes: BTreeMap<T::AccountId, u32> = BTreeMap::new();
+            let mut rel_indexes: BTreeMap<T::AccountId, u32> = BTreeMap::new(); // used to calculate index in edge.records
             for guarantor in guarantors {
                 let mut edge = Self::guarantee_rel(&guarantor, &v_stash).unwrap_or_default();
                 if !rel_indexes.contains_key(&guarantor) {

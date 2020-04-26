@@ -3389,6 +3389,23 @@ fn guarantee_order_should_work() {
             assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(4 as u32)), None);
             assert_eq!(Staking::guarantee_rel(3, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
             assert_eq!(Staking::guarantee_rel(7, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
+
+
+            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 1000)]));
+            assert_eq!(
+                Staking::validators(&5),
+                Validations{
+                    guarantee_fee: Default::default(),
+                    guarantors: vec![1, 7, 1, 3, 1]
+                }
+            );
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(0 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(1 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(2 as u32)), Some(&(500 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(3 as u32)), None);
+            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(4 as u32)), None);
+            assert_eq!(Staking::guarantee_rel(3, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
+            assert_eq!(Staking::guarantee_rel(7, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
         });
 }
 

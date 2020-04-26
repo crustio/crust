@@ -150,6 +150,34 @@ fn test_for_identity_sig_check_failed() {
 }
 
 #[test]
+fn test_for_identity_failed_by_duplicate_pk() {
+    new_test_ext().execute_with(|| {
+        // 1. Register applier
+        let applier: AccountId =
+            AccountId::from_ss58check("5HZFQohYpN4MVyGjiq8bJhojt9yCVa8rXd4Kt9fmh5gAbQqA")
+                .expect("valid ss58 address");
+        let id = get_valid_identity();
+
+        assert_ok!(Tee::register_identity(
+            Origin::signed(applier.clone()),
+            id.clone()
+        ));
+
+        let id_registered = Tee::tee_identities(applier.clone()).unwrap();
+
+        assert_eq!(id.clone(), id_registered);
+
+        // 2. Register same pk applier
+        let dup_id = get_valid_identity();
+        assert!(Tee::register_identity(
+            Origin::signed(applier.clone()),
+            dup_id.clone()
+        ).is_err());
+    });
+}
+
+
+#[test]
 fn test_for_report_works_success() {
     new_test_ext().execute_with(|| {
         // generate 53 blocks first

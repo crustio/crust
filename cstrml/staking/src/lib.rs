@@ -1210,20 +1210,26 @@ impl<T: Trait> Module<T> {
                 // a. safe and sound, do NOTHING 🙂
                 return (true, g_votes);
             } else if g_old_edge.total > g_votes {
-                // b. guarantor reduce his stake: just update edge's weight
+                // b. guarantor reduce his stake: just update edge's weight           
                 let mut new_edge = StakeVoteEdge::<BalanceOf<T>> {
                     total: Zero::zero(),
                     records: BTreeMap::new()
                 };
                 new_edge.total = g_votes.clone();
                 let new_total = g_votes.clone();
+                let mut g_index: usize = 0;
                 for (index, votes) in g_old_edge.records.iter() {
-                    if g_votes == Zero::zero() {
-                        new_guarantors.remove(index.clone() as usize);
+                    while &new_guarantors[g_index] != g_stash {
+                        g_index += 1;
                     }
-                    let real_votes = g_votes.min(votes.clone());
-                    g_votes -= real_votes;
-                    new_edge.records.insert(index.clone(), real_votes);
+                    if g_votes == Zero::zero() {
+                        new_guarantors.remove(g_index.clone());
+                    } else {
+                        let real_votes = g_votes.min(votes.clone());
+                        g_votes -= real_votes;
+                        new_edge.records.insert(index.clone(), real_votes);
+                        g_index += 1;
+                    }
                 }
                 <GuaranteeRel<T>>::insert(&g_stash, &v_stash, new_edge);
                 let new_validations = Validations {
@@ -1254,7 +1260,6 @@ impl<T: Trait> Module<T> {
         // Insert new node and new edge
         if v_total_stakes < v_limit {
             new_guarantors.push(g_stash.clone());
-            let rel_index = new_guarantors.len() as u32 - 1;
             // a. New validator
             let new_validations = Validations {
                 guarantee_fee: validations.guarantee_fee,
@@ -1264,6 +1269,7 @@ impl<T: Trait> Module<T> {
 
             // c. New edge
             let mut edge = Self::guarantee_rel(&g_stash, &v_stash).unwrap_or_default();
+            let rel_index = edge.records.len() as u32;
             let g_extra_votes = g_votes - edge.total;
             let real_extra_votes = (v_limit - v_total_stakes).min(g_extra_votes);
             edge.total += real_extra_votes;
@@ -1592,8 +1598,14 @@ impl<T: Trait> Module<T> {
             let mut remains = to_votes(v_limit_stakes - v_own_stakes);
             let guarantors = &validations.guarantors;
             // 1. Update GuaranteeRel
-            for (index, guarantor) in guarantors.iter().enumerate() {
+            let mut rel_indexes: BTreeMap<T::AccountId, u32> = BTreeMap::new();
+            for guarantor in guarantors {
                 let mut edge = Self::guarantee_rel(&guarantor, &v_stash).unwrap_or_default();
+                if !rel_indexes.contains_key(&guarantor) {
+                    let init_index: u32 = 0;
+                    rel_indexes.insert(guarantor.clone(), init_index);
+                }
+                let mut index: u32 = rel_indexes.get(&guarantor).unwrap().clone();
                 let votes = to_votes(edge.records.get(&(index.clone() as u32)).unwrap().clone());
 
                 // There still has credit for guarantors
@@ -1608,7 +1620,7 @@ impl<T: Trait> Module<T> {
                     remains -= g_real_votes;
                     v_guarantors_votes += g_real_votes;
                     // c. UPDATE EDGE: (maybe) update GuaranteeRel
-                    edge.records.insert(new_guarantors.len() as u32 - 1, g_vote_stakes);
+                    edge.records.insert(index.clone(), g_vote_stakes);
                     edge.total = edge.total + g_vote_stakes - to_balance(votes);
                     <GuaranteeRel<T>>::insert(&guarantor, &v_stash, edge);
 
@@ -1618,6 +1630,8 @@ impl<T: Trait> Module<T> {
                     edge.total = edge.total - to_balance(votes);
                     <GuaranteeRel<T>>::insert(&guarantor, &v_stash, edge);
                 }
+                index += 1;
+                rel_indexes.insert(guarantor.clone(), index);
             }
             // 2. Update Validators
             let new_validations = Validations {

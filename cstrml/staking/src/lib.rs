@@ -1232,45 +1232,49 @@ impl<T: Trait> Module<T> {
                 };
                 <Validators<T>>::insert(v_stash, new_validations);
                 return (true, new_total);
-            } else {
-                // 2. New edge or vote_increasing edge
-                // Judge limit and update new edge weight
-                let v_own_stakes = Self::slashable_balance_of(v_stash);
-
-                // Sum all current edge weight
-                let v_total_stakes = new_guarantors.iter().fold(v_own_stakes, |total, g| {
-                    let w = Self::guarantee_rel(&g, &v_stash).unwrap_or_default().total;
-                    w + total
-                });
-                let v_limit = Self::stake_limit(&v_stash).unwrap_or_default();
-
-                // Insert new node and new edge
-                if v_total_stakes < v_limit {
-                    new_guarantors.push(g_stash.clone());
-                    let rel_index = new_guarantors.len() as u32 - 1;
-                    // a. New validator
-                    let new_validations = Validations {
-                        guarantee_fee: validations.guarantee_fee,
-                        guarantors: new_guarantors,
-                    };
-                    <Validators<T>>::insert(v_stash, new_validations);
-
-                    // c. New edge
-                    let new_weight = (v_limit - v_total_stakes).min(g_votes);
-                    let mut edge = Self::guarantee_rel(&g_stash, &v_stash).unwrap_or_default();
-                    edge.total += new_weight;
-                    let new_total = edge.total.clone();
-                    edge.records.insert(rel_index, new_weight);
-                    <GuaranteeRel<T>>::insert(&g_stash, &v_stash, edge);
-                    return (true, new_total);
-                }
-
-                // Or insert failed, cause there has no credit
-                return (false, Zero::zero());
             }
-        } else {
-            return (false, Zero::zero());
+
+            
+        }                 
+        // 2. New edge or vote_increasing edge
+        // Judge limit and update new edge weight
+        let v_own_stakes = Self::slashable_balance_of(v_stash);
+        let mut set_of_guarantors = BTreeSet::new();
+        for guarantor in &new_guarantors {
+            set_of_guarantors.insert(guarantor.clone());
         }
+
+        // Sum all current edge weight
+        let v_total_stakes = set_of_guarantors.iter().fold(v_own_stakes, |total, g| {
+            let w = Self::guarantee_rel(&g, &v_stash).unwrap_or_default().total;
+            w + total
+        });
+        let v_limit = Self::stake_limit(&v_stash).unwrap_or_default();
+
+        // Insert new node and new edge
+        if v_total_stakes < v_limit {
+            new_guarantors.push(g_stash.clone());
+            let rel_index = new_guarantors.len() as u32 - 1;
+            // a. New validator
+            let new_validations = Validations {
+                guarantee_fee: validations.guarantee_fee,
+                guarantors: new_guarantors,
+            };
+            <Validators<T>>::insert(v_stash, new_validations);
+
+            // c. New edge
+            let mut edge = Self::guarantee_rel(&g_stash, &v_stash).unwrap_or_default();
+            let g_extra_votes = g_votes - edge.total;
+            let real_extra_votes = (v_limit - v_total_stakes).min(g_extra_votes);
+            edge.total += real_extra_votes;
+            let new_total = edge.total.clone();
+            edge.records.insert(rel_index, real_extra_votes);
+            <GuaranteeRel<T>>::insert(&g_stash, &v_stash, edge);
+            return (true, new_total);
+        }
+
+        // Or insert failed, cause there has no credit
+        return (false, Zero::zero());
     }
 
     /// Insert new or update old stake limit

@@ -12,6 +12,8 @@ Go to our [Crust Client](https://github.com/crustio/crust-client), follow the RE
 
 ### 1. Install Rust
 
+> If, after installation, running `rustc --version` in the console fails, refer to [it](https://www.rust-lang.org/tools/install) to repair.
+
 ```shell
 curl https://sh.rustup.rs -sSf | sh
 ```

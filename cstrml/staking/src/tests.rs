@@ -111,8 +111,8 @@ fn basic_setup_works() {
             })
         );
         assert_eq!(Staking::guarantors(101).unwrap().targets, vec![11, 21]);
-        assert_eq!(Staking::guarantee_rel(101, 11).unwrap().total, 250);
-        assert_eq!(Staking::guarantee_rel(101, 21).unwrap().total, 250);
+        assert_eq!(Staking::guarantee_rel(101, 11).get(&(0 as u32)), 250);
+        assert_eq!(Staking::guarantee_rel(101, 21).get(&(0 as u32)), 250);
 
         if cfg!(feature = "equalize") {
             assert_eq!(
@@ -564,7 +564,15 @@ fn guaranteeing_and_rewards_should_work() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
-                vec![(11, 333), (21, 333), (31, 333)]
+                (11, 333)]
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (21, 333)]
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (31, 333)]
             ));
             // 4 will guarantee for 10, 20, 40
             assert_ok!(Staking::bond(
@@ -575,7 +583,15 @@ fn guaranteeing_and_rewards_should_work() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(4),
-                vec![(11, 333), (21, 333), (41, 333)]
+                (11, 333)]
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(4),
+                (21, 333)]
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(4),
+                (41, 333)]
             ));
 
             // the total reward for era 0
@@ -804,11 +820,20 @@ fn guarantors_also_get_slashed() {
             ));
             // but it won't work, cause 10&20 are not validators
             assert_noop!(
-                Staking::guarantee(Origin::signed(2), vec![(20, 250), (10, 250)]),
+                Staking::guarantee(Origin::signed(2), (20, 250)),
                 DispatchError::Module {
                     index: 0,
                     error: 4,
-                    message: Some("EmptyTargets"),
+                    message: Some("InvalidTarget"),
+                }
+            );
+
+            assert_noop!(
+                Staking::guarantee(Origin::signed(2), (10, 250)),
+                DispatchError::Module {
+                    index: 0,
+                    error: 4,
+                    message: Some("InvalidTarget"),
                 }
             );
 
@@ -881,17 +906,17 @@ fn double_staking_should_fail() {
         );
         // 1 = stashed => attempting to guarantee should fail.
         assert_noop!(
-            Staking::guarantee(Origin::signed(1), vec![(1, arbitrary_value),]),
+            Staking::guarantee(Origin::signed(1), (1, arbitrary_value)),
             Error::<Test>::NotController
         );
 
         // 2 = controller  => guaranting should work. But only 750 is invalid since stake limit and 100's 250
         assert_ok!(Staking::guarantee(
             Origin::signed(2),
-            vec![(11, arbitrary_value),]
+            (11, arbitrary_value)
         ));
-        assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 750);
-        assert_eq!(Staking::guarantee_rel(101, 11).unwrap().total, 250);
+        assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), 750);
+        assert_eq!(Staking::guarantee_rel(101, 11).get(&(0 as u32)), 250);
         start_era(1, true);
         assert_eq!(
             Staking::ledger(&2),
@@ -1748,7 +1773,7 @@ fn on_free_balance_zero_stash_removes_guarantor() {
         .build()
         .execute_with(|| {
             // Make 10 a guarantor
-            assert_ok!(Staking::guarantee(Origin::signed(10), vec![(21, 100)]));
+            assert_ok!(Staking::guarantee(Origin::signed(10), (21, 100)));
             // Check that account 10 is a guarantor
             assert!(<Guarantors<Test>>::contains_key(11));
             // Check the balance of the guarantor account
@@ -1843,7 +1868,11 @@ fn switching_roles() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
-                vec![(11, 1000), (5, 1000)]
+                (11, 1000)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (5, 1000)
             ));
 
             assert_ok!(Staking::bond(
@@ -1854,7 +1883,11 @@ fn switching_roles() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(4),
-                vec![(21, 250), (1, 250),]
+                (21, 250)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(4),
+                (1, 250)
             ));
 
             // new block
@@ -1922,15 +1955,34 @@ fn wrong_vote_is_null() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
-                vec![
-                    (11, 500),
-                    (21, 500), // good votes
-                    (1, 50),
-                    (2, 50),
-                    (15, 30),
-                    (1000, 500),
-                    (25, 100) // crap votes. No effect.
-                ]
+                (11, 500)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (21, 500)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (1, 50)
+            ));
+
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (2, 50)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (15, 30)
+            ));
+
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (1000, 500)
+            ));
+
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (25, 100)
             ));
 
             // new block
@@ -3100,15 +3152,9 @@ fn update_stakers_should_work_new_era() {
         Staking::upsert_stake_limit(&5, 3000);
         assert_ok!(Staking::validate(Origin::signed(4), Perbill::default()));
 
-        assert_ok!(Staking::guarantee(Origin::signed(2), vec![
-            (5, 500),
-        ]));
-        assert_ok!(Staking::guarantee(Origin::signed(6), vec![
-            (5, 500),
-        ]));
-        assert_ok!(Staking::guarantee(Origin::signed(8), vec![
-            (5, 500),
-        ]));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 500)));
+        assert_ok!(Staking::guarantee(Origin::signed(6), (5, 500)));
+        assert_ok!(Staking::guarantee(Origin::signed(8), (5, 500)));
 
         // No effects will be seen so far.
         assert_eq_uvec!(validator_controllers(), vec![20, 10]);
@@ -3179,7 +3225,7 @@ fn guarantee_limit_should_work() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 1000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 1000)));
 
             // guarantor's info guarantors should ✅
             assert_eq!(
@@ -3190,7 +3236,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 500);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), 500);
 
             // After a era, valid stake should updated.
             start_era_with_new_workloads(1, false, 1000, 3000);
@@ -3203,7 +3249,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 500);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), 500);
 
             assert_eq!(
                 Staking::ledger(&2),
@@ -3217,7 +3263,7 @@ fn guarantee_limit_should_work() {
             );
 
             Staking::upsert_stake_limit(&5, 5000);
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 2000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 2000)));
             assert_eq!(
                 Staking::guarantors(&1),
                 Some(Nominations {
@@ -3226,7 +3272,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 2000);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), 2000);
 
             // Next era, wr should be outdated
             start_era(2, false);
@@ -3239,7 +3285,7 @@ fn guarantee_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 2000);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), 2000);
 
             assert_eq!(
                 Staking::ledger(&2),
@@ -3300,12 +3346,12 @@ fn guarantee_order_should_work() {
                 RewardDestination::Controller
             ));
 
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 250)]));
-            assert_ok!(Staking::guarantee(Origin::signed(8), vec![(5, 1000)]));
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 500)]));
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 750)]));
-            assert_ok!(Staking::guarantee(Origin::signed(4), vec![(5, 1000)]));
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 1000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
+            assert_ok!(Staking::guarantee(Origin::signed(8), (5, 1000)));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 500)));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 750)));
+            assert_ok!(Staking::guarantee(Origin::signed(4), (5, 1000)));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 1000)));
 
             // guarantor's info guarantors should ✅
             assert_eq!(
@@ -3316,7 +3362,7 @@ fn guarantee_order_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().total, 1000);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), 1000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3326,7 +3372,7 @@ fn guarantee_order_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(3, 5).unwrap().total, 1000);
+            assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), 1000);
 
             assert_eq!(
                 Staking::guarantors(&7),
@@ -3336,7 +3382,7 @@ fn guarantee_order_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(7, 5).unwrap().total, 1000);
+            assert_eq!(Staking::guarantee_rel(7, 5).get(&(0 as u32)), 1000);
 
             assert_eq!(
                 Staking::validators(&5),
@@ -3346,7 +3392,7 @@ fn guarantee_order_should_work() {
                 }
             );
             // re-guarantee. The order should change
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 1500)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 1500)));
 
             assert_eq!(
                 Staking::validators(&5),
@@ -3355,17 +3401,17 @@ fn guarantee_order_should_work() {
                     guarantors: vec![1, 7, 1, 1, 3, 1, 1]
                 }
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(0 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(1 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(2 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(3 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(4 as u32)), Some(&(500 as Balance)));
-            assert_eq!(Staking::guarantee_rel(3, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
-            assert_eq!(Staking::guarantee_rel(7, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(2 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(3 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(4 as u32)), Some(&(500 as Balance)));
+            assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
+            assert_eq!(Staking::guarantee_rel(7, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
 
 
             // re-guarantee with same stakes. The order should keep same
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 1500)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 1500)));
 
             assert_eq!(
                 Staking::validators(&5),
@@ -3374,7 +3420,7 @@ fn guarantee_order_should_work() {
                     guarantors: vec![1, 7, 1, 1, 3, 1, 1]
                 }
             );
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 500)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 500)));
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
@@ -3382,16 +3428,16 @@ fn guarantee_order_should_work() {
                     guarantors: vec![1, 7, 1, 3]
                 }
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(0 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(1 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(2 as u32)), None);
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(3 as u32)), None);
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(4 as u32)), None);
-            assert_eq!(Staking::guarantee_rel(3, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
-            assert_eq!(Staking::guarantee_rel(7, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(2 as u32)), None);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(3 as u32)), None);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(4 as u32)), None);
+            assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
+            assert_eq!(Staking::guarantee_rel(7, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
 
 
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(5, 1000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (5, 1000)));
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
@@ -3399,13 +3445,13 @@ fn guarantee_order_should_work() {
                     guarantors: vec![1, 7, 1, 3, 1]
                 }
             );
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(0 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(1 as u32)), Some(&(250 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(2 as u32)), Some(&(500 as Balance)));
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(3 as u32)), None);
-            assert_eq!(Staking::guarantee_rel(1, 5).unwrap().records.get(&(4 as u32)), None);
-            assert_eq!(Staking::guarantee_rel(3, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
-            assert_eq!(Staking::guarantee_rel(7, 5).unwrap().records.get(&(0 as u32)), Some(&(1000 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(2 as u32)), Some(&(500 as Balance)));
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(3 as u32)), None);
+            assert_eq!(Staking::guarantee_rel(1, 5).get(&(4 as u32)), None);
+            assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
+            assert_eq!(Staking::guarantee_rel(7, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
         });
 }
 
@@ -3433,8 +3479,8 @@ fn multi_guarantees_with_stake_limit_should_work() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(11, 250)]));
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(11, 500)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (11, 250)));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (11, 500)));
 
             // add guarantor
             assert_ok!(Staking::bond(
@@ -3443,7 +3489,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
                 1000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::guarantee(Origin::signed(4), vec![(11, 2000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(4), (11, 2000)));
 
             // guarantor's info guarantors should ✅
             assert_eq!(
@@ -3454,7 +3500,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 500);
+            assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), 500);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3464,7 +3510,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(3, 11).unwrap().total, 1000);
+            assert_eq!(Staking::guarantee_rel(3, 11).get(&(0 as u32)), 1000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3483,8 +3529,8 @@ fn multi_guarantees_with_stake_limit_should_work() {
                 }
             );
 
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(11, 250)]));
-            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 250);
+            assert_ok!(Staking::guarantee(Origin::signed(2), (11, 250)));
+            assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), 250);
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
@@ -3494,8 +3540,8 @@ fn multi_guarantees_with_stake_limit_should_work() {
             );
 
 
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(11, 1000)]));
-            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 1000);
+            assert_ok!(Staking::guarantee(Origin::signed(2), (11, 1000)));
+            assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), 1000);
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
@@ -3514,7 +3560,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
                     guarantors: vec![1, 3, 1]
                 }
             );
-            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 500);
+            assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), 500);
             assert_eq!(
                 Staking::stakers(11),
                 Exposure {
@@ -3579,7 +3625,7 @@ fn new_era_with_stake_limit_should_work() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::guarantee(Origin::signed(2), vec![(11, 2000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (11, 2000)));
 
             // add guarantor
             assert_ok!(Staking::bond(
@@ -3588,7 +3634,7 @@ fn new_era_with_stake_limit_should_work() {
                 2000,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::guarantee(Origin::signed(4), vec![(11, 3000)]));
+            assert_ok!(Staking::guarantee(Origin::signed(4), (11, 3000)));
 
             // guarantor's info guarantors should ✅
             assert_eq!(
@@ -3599,7 +3645,7 @@ fn new_era_with_stake_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 2000);
+            assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), 2000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3609,7 +3655,7 @@ fn new_era_with_stake_limit_should_work() {
                     suppressed: false
                 })
             );
-            assert_eq!(Staking::guarantee_rel(3, 11).unwrap().total, 2000);
+            assert_eq!(Staking::guarantee_rel(3, 11).get(&(0 as u32)), 2000);
 
             assert_eq!(
                 Staking::guarantors(&3),
@@ -3638,7 +3684,7 @@ fn new_era_with_stake_limit_should_work() {
                     guarantors: vec![1]
                 }
             );
-            assert_eq!(Staking::guarantee_rel(1, 11).unwrap().total, 1500);
+            assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), 1500);
             assert_eq!(
                 Staking::stakers(11),
                 Exposure {

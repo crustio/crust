@@ -289,15 +289,6 @@ pub struct UnappliedSlash<AccountId, Balance: HasCompact> {
     /// The amount of payout.
     payout: Balance,
 }
-//A stake vote edge record
-#[derive(Encode, Decode, Default, RuntimeDebug)]
-pub struct StakeVoteEdge<Balance: HasCompact> {
-    /// The total of valid votes.
-    pub total: Balance,
-    /// The details of valid votes.
-    /// index is the relative index in Valiation.guarantors for each guarantor
-    pub records: BTreeMap<u32, Balance>,
-}
 
 pub type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
@@ -452,7 +443,7 @@ decl_storage! {
         /// The map from {guarantor, candidate} edge to vote stakes of all guarantors.
         GuaranteeRel get(fn guarantee_rel):
             double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) T::AccountId
-            => Option<StakeVoteEdge<BalanceOf<T>>>;
+            => BTreeMap<u32, BalanceOf<T>>;
 
         /// Guarantors for a particular account that is in action right now. You can't iterate
         /// through candidates here, but you can find them using Validators.
@@ -599,6 +590,8 @@ decl_error! {
         AlreadyPaired,
         /// Targets cannot be empty.
         EmptyTargets,
+        /// Target is invalid due to some errors
+        InvalidTarget,
         /// Duplicate index.
         DuplicateIndex,
         /// Slash record index out of bounds.
@@ -874,70 +867,93 @@ decl_module! {
         /// - Both the reads and writes follow a similar pattern.
         /// # </weight>
         #[weight = SimpleDispatchInfo::FixedNormal(750_000)]
-        fn guarantee(origin, targets: Vec<(<T::Lookup as StaticLookup>::Source, BalanceOf<T>)>) {
+        fn guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)>) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let g_stash = &ledger.stash;
             let mut remain_stake = ledger.total;
-            ensure!(!targets.is_empty(), Error::<T>::EmptyTargets);
 
-            let mut old_targets: Vec<T::AccountId> = vec![];
+            let mut new_targets: Vec<T::AccountId> = vec![];
             if let Some(old_nominations) = Self::guarantors(g_stash) {
-                old_targets = old_nominations.targets;
+                new_targets = old_nominations.targets;
             }
-            let mut deleted_targets = old_targets.clone();
 
             // [LIMIT ACTIVE CHECK] 3:
             // 1. Upserting an edge
-            let targets = targets.into_iter()
-                .take(MAX_NOMINATIONS)
-                .filter_map(|(t, s)|
-                    if let Ok(v_stash) = T::Lookup::lookup(t) {
-                        // Judge if v_stash is old targets
-                        for old_target in &old_targets {
-                            if old_target == &v_stash {
-                                deleted_targets.remove_item(old_target);
-                                break
-                            }
-                        }
-                        if remain_stake == Zero::zero() {
-                            None
-                        } else {
-                            let g_votes = s.min(remain_stake);
+            let (target, votes) = target;
+                
+            if let Ok(v_stash) = T::Lookup::lookup(target) {
+                // Judge if v_stash is old targets
+                if remain_stake != Zero::zero() {
+                    let g_votes = votes.min(remain_stake);
 
-                            let (upserted, real_votes) =
-                            Self::maybe_upsert_guarantee(&v_stash, &g_stash, g_votes);
+                    let (upserted, real_votes) =
+                    Self::increase_guarantee_votes(&v_stash, &g_stash, g_votes);
 
-                            if upserted {
-                                // Update remain_stake
-                                if remain_stake <= real_votes { remain_stake = Zero::zero(); }
-                                else { remain_stake -= real_votes; }
-                                Some(v_stash)
-                            } else {
-                                None
-                            }
+                    if upserted {
+                        // Update remain_stake
+                        if remain_stake <= real_votes { remain_stake = Zero::zero(); }
+                        else { remain_stake -= real_votes; }
+                        if !new_targets.contains(&v_stash) {
+                            new_targets.push(v_stash.clone());
                         }
-                    } else {
-                        None
                     }
-                )
-                .collect::<Vec<T::AccountId>>();
-
-            // 2. Delete an edge
-            for deleted_target in deleted_targets {
-                let mut validations = Self::validators(&deleted_target);
-                while validations.guarantors.remove_item(&g_stash).is_some()
-                {
-
                 }
-                <Validators<T>>::insert(&deleted_target, validations);
-                <GuaranteeRel<T>>::remove(&g_stash, &deleted_target);
+            }
+            ensure!(&remain_stake == &ledger.total, Error::<T>::InvalidTarget);
+            let nominations = Nominations {
+                new_targets,
+                submitted_in: Self::current_era().unwrap_or(0),
+                suppressed: false,
+            };
+
+            <Validators<T>>::remove(g_stash);
+            <Guarantors<T>>::insert(g_stash, nominations);
+        }
+
+        /// Declare the desire to guarantee `targets` for the origin controller.
+        ///
+        /// Effects will be felt at the beginning of the next era.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
+        ///
+        /// # <weight>
+        /// - The transaction's complexity is proportional to the size of `targets`,
+        /// which is capped at `MAX_NOMINATIONS`.
+        /// - Both the reads and writes follow a similar pattern.
+        /// # </weight>
+        #[weight = SimpleDispatchInfo::FixedNormal(750_000)]
+        fn cancel_guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
+            let controller = ensure_signed(origin)?;
+            let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+            let g_stash = &ledger.stash;
+            let mut remain_stake = ledger.total;
+
+            let mut new_targets: Vec<T::AccountId> = vec![];
+            if let Some(old_nominations) = Self::guarantors(g_stash) {
+                new_targets = old_nominations.targets;
             }
 
-            ensure!(!targets.is_empty(), Error::<T>::EmptyTargets);
+            if let Ok(v_stash) = T::Lookup::lookup(target) {
+                // Judge if v_stash is old targets
+                if remain_stake != Zero::zero() {
+                    let g_votes = votes.min(remain_stake);
+
+                    let (upserted, removed) =
+                    Self::decrease_guarantee_votes(&v_stash, &g_stash, g_votes);
+
+                    ensure!(upserted.clone(), Error::<T>::InvalidTarget);
+                    if upserted {
+                        // Update remain_stake
+                        if removed {
+                            new_targets.remove_item(v_stash.clone());
+                        }
+                    }
+                }
+            }
 
             let nominations = Nominations {
-                targets,
+                new_targets,
                 submitted_in: Self::current_era().unwrap_or(0),
                 suppressed: false,
             };
@@ -1192,7 +1208,69 @@ impl<T: Trait> Module<T> {
     /// - 2n+5 DB entry.
     /// MAX(n) = MAX_NOMINATIONS
     /// # </weight>    
-    fn maybe_upsert_guarantee(
+    fn decrease_guarantee_votes(
+        v_stash: &T::AccountId,
+        g_stash: &T::AccountId,
+        mut g_votes: BalanceOf<T>,
+    ) -> (bool, bool) {
+        if !<Validators<T>>::contains_key(v_stash) || g_stash == v_stash {
+            // v_stash is not validator or you want to vote your self
+            // you vote NOTHING 🙂
+            return (false, false);
+        }
+        let validations = Self::validators(v_stash);
+        let mut new_guarantors = validations.guarantors;
+
+        if <GuaranteeRel<T>>::exists(&g_stash, &v_stash) {
+            // 1. Existed edge        
+            let mut records = Self::guarantee_rel(&g_stash, &v_stash);
+            let mut g_index: usize = new_guarantors.len() - 1;
+            let mut r_index: usize = records.len() - 1;
+            while g_votes > Zero::zero() && r_index > 0 {
+                while &validations.guarantors[g_index] != g_stash { // found matching guarantor
+                    g_index -= 1;
+                }
+                let mut votes = records.get(&r_index);
+                let real_votes = g_votes.min(votes);
+                g_votes -= real_votes;
+                votes -= real_votes;
+                if votes > Zero::zero() {
+                    records.insert(r_index.clone(), real_votes); // upsert real votes
+                } else {
+                    records.remove(r_index.clone());
+                    new_guarantors.remove(g_index.clone());
+                }
+                g_index -= 1;
+                r_index -= 1;
+            }
+            if records.len() {
+                <GuaranteeRel<T>>::insert(&g_stash, &v_stash, records);
+            } else {
+                <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
+            }
+            
+            let new_validations = Validations {
+                guarantee_fee: validations.guarantee_fee,
+                guarantors: new_guarantors,
+            };
+            <Validators<T>>::insert(v_stash, new_validations);
+            return (true, !<GuaranteeRel<T>>::exists(&g_stash, &v_stash));  
+        }                 
+    }
+
+
+    /// Update or insert an edge from {validator <-> candidate}
+    /// basically, this update the UWG(Undirected Weighted Graph) with weight-limitation per node
+    ///
+    /// NOTE: this should handle the update of `Validators` and `GuaranteeRel` and return upsert
+    /// successful or not
+    /// # <weight>
+    /// - Independent of the arguments. Insignificant complexity.
+    /// - O(n).
+    /// - 2n+5 DB entry.
+    /// MAX(n) = MAX_NOMINATIONS
+    /// # </weight>    
+    fn increase_guarantee_votes(
         v_stash: &T::AccountId,
         g_stash: &T::AccountId,
         mut g_votes: BalanceOf<T>,
@@ -1205,55 +1283,12 @@ impl<T: Trait> Module<T> {
         let validations = Self::validators(v_stash);
         let mut new_guarantors = validations.guarantors;
 
-        if let Some(g_old_edge) = Self::guarantee_rel(&g_stash, &v_stash) {
-            // 1. Existed edge
-            if g_old_edge.total == g_votes {
-                // a. safe and sound, do NOTHING 🙂
-                return (true, g_votes);
-            } else if g_old_edge.total > g_votes {
-                // b. guarantor reduce his stake: just update edge's weight           
-                let mut new_edge = StakeVoteEdge::<BalanceOf<T>> {
-                    total: Zero::zero(),
-                    records: BTreeMap::new()
-                };
-                new_edge.total = g_votes.clone();
-                let new_total = g_votes.clone();
-                let mut g_index: usize = 0; // used for removing guarantors from new_guarantors since g_stash doesn't vote anymore.
-                for (index, votes) in g_old_edge.records.iter() {
-                    while &new_guarantors[g_index] != g_stash { // found matching guarantor
-                        g_index += 1;
-                    }
-                    if g_votes == Zero::zero() {
-                        new_guarantors.remove(g_index.clone()); // remove one item -> don't add g_index by one
-                    } else {
-                        let real_votes = g_votes.min(votes.clone());
-                        g_votes -= real_votes;
-                        new_edge.records.insert(index.clone(), real_votes); // upsert real votes
-                        g_index += 1;
-                    }
-                }
-                <GuaranteeRel<T>>::insert(&g_stash, &v_stash, new_edge);
-                let new_validations = Validations {
-                    guarantee_fee: validations.guarantee_fee,
-                    guarantors: new_guarantors,
-                };
-                <Validators<T>>::insert(v_stash, new_validations);
-                return (true, new_total);
-            }
-
-            
-        }                 
-        // 2. New edge or vote_increasing edge
-        // Judge limit and update new edge weight
         let v_own_stakes = Self::slashable_balance_of(v_stash);
-        let mut set_of_guarantors = BTreeSet::new();
-        for guarantor in &new_guarantors {
-            set_of_guarantors.insert(guarantor.clone());
-        }
+        let guarantors_with_indexes = Self::calculate_relative_index(&validations.guarantors);
 
         // Sum all current edge weight
-        let v_total_stakes = set_of_guarantors.iter().fold(v_own_stakes, |total, g| {
-            let w = Self::guarantee_rel(&g, &v_stash).unwrap_or_default().total;
+        let v_total_stakes = guarantors_with_indexes.iter().fold(v_own_stakes, |total, (g, index)| {
+            let w = Self::guarantee_rel(&g, &v_stash).get(&index);
             w + total
         });
         let v_limit = Self::stake_limit(&v_stash).unwrap_or_default();
@@ -1268,20 +1303,37 @@ impl<T: Trait> Module<T> {
             };
             <Validators<T>>::insert(v_stash, new_validations);
 
-            // c. New edge
-            let mut edge = Self::guarantee_rel(&g_stash, &v_stash).unwrap_or_default();
-            let rel_index = edge.records.len() as u32; // default index is 0
-            let g_extra_votes = g_votes - edge.total;
-            let real_extra_votes = (v_limit - v_total_stakes).min(g_extra_votes);
-            edge.total += real_extra_votes;
-            let new_total = edge.total.clone();
-            edge.records.insert(rel_index, real_extra_votes);
-            <GuaranteeRel<T>>::insert(&g_stash, &v_stash, edge);
-            return (true, new_total);
+            // c. New record. Maybe new edge.
+            let mut new_records: BTreeMap<u32, BalanceOf<T>> = BTreeMap::new();
+            if <GuaranteeRel<T>>::exists(&g_stash, &v_stash) {
+                new_records = Self::guarantee_rel(&g_stash, &v_stash);
+            }
+            let rel_index = new_records.len() as u32; // default index is 0
+            let real_extra_votes = (v_limit - v_total_stakes).min(g_votes);
+            new_records.insert(rel_index, real_extra_votes.clone());
+            <GuaranteeRel<T>>::insert(&g_stash, &v_stash, new_records);
+            return (true, real_extra_votes);
         }
 
         // Or insert failed, cause there has no credit
         return (false, Zero::zero());
+    }
+
+    fn calculate_relative_index(guarantors: &Vec<T::AccountId>) -> Vec<(T::AccountId, u32)> {
+        let mut rel_indexes: BTreeMap<T::AccountId, u32> = BTreeMap::new(); // used to calculate index in edge.records
+        let guarantors_with_index = guarantors.iter()
+        .map(|g_stash|{
+            if !rel_indexes.contains_key(&g_stash) {
+                let init_index: u32 = 0;
+                rel_indexes.insert(g_stash.clone(), init_index);
+            }
+            let mut rel_index = rel_indexes.get(&g_stash).unwrap();
+            *rel_index += 1;
+            rel_indexes.insert(g_stash.clone(), *rel_index);
+            (g_stash.clone(), rel_index - 1)
+        })
+        .collect::<Vec<(T::AccountId, u32)>>();
+        guarantors_with_index
     }
 
     /// Insert new or update old stake limit
@@ -1597,17 +1649,11 @@ impl<T: Trait> Module<T> {
 
             // TODO: move a separated function
             let mut remains = to_votes(v_limit_stakes - v_own_stakes);
-            let guarantors = &validations.guarantors;
+            let guarantors_with_indexes = Self::calculate_relative_index(&validations.guarantors);
             // 1. Update GuaranteeRel
-            let mut rel_indexes: BTreeMap<T::AccountId, u32> = BTreeMap::new(); // used to calculate index in edge.records
-            for guarantor in guarantors {
-                let mut edge = Self::guarantee_rel(&guarantor, &v_stash).unwrap_or_default();
-                if !rel_indexes.contains_key(&guarantor) {
-                    let init_index: u32 = 0;
-                    rel_indexes.insert(guarantor.clone(), init_index);
-                }
-                let mut index: u32 = rel_indexes.get(&guarantor).unwrap().clone();
-                let votes = to_votes(edge.records.get(&(index.clone() as u32)).unwrap().clone());
+            for (guarantor, index) in guarantors_with_indexes {
+                let mut records = Self::guarantee_rel(&guarantor, &v_stash);
+                let votes = to_votes(records.get(&(index.clone() as u32)).unwrap().clone());
 
                 // There still has credit for guarantors
                 // we should using `FILO` rule to calculate others
@@ -1621,18 +1667,14 @@ impl<T: Trait> Module<T> {
                     remains -= g_real_votes;
                     v_guarantors_votes += g_real_votes;
                     // c. UPDATE EDGE: (maybe) update GuaranteeRel
-                    edge.records.insert(index.clone(), g_vote_stakes);
-                    edge.total = edge.total + g_vote_stakes - to_balance(votes);
-                    <GuaranteeRel<T>>::insert(&guarantor, &v_stash, edge);
+                    records.insert(index.clone(), g_vote_stakes);
+                    <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
 
                 // There has no credit for later guarantors
                 } else {
-                    edge.records.remove(&(index.clone() as u32));
-                    edge.total = edge.total - to_balance(votes);
-                    <GuaranteeRel<T>>::insert(&guarantor, &v_stash, edge);
+                    records.remove(&(index.clone() as u32));
+                    <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
                 }
-                index += 1;
-                rel_indexes.insert(guarantor.clone(), index);
             }
             // 2. Update Validators
             let new_validations = Validations {

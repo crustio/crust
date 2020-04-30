@@ -944,7 +944,8 @@ decl_module! {
             if let Ok(v_stash) = T::Lookup::lookup(target) {
                 // Judge if v_stash is old targets
                 if new_total != Zero::zero() {
-                    let g_votes = votes.min(new_total);
+                    let one_total = Self::calculate_total(&g_stash, &v_stash);
+                    let g_votes = votes.min(one_total);
 
                     let (upserted, removed, removed_votes) =
                     Self::decrease_guarantee_votes(&v_stash, &g_stash, g_votes);
@@ -1236,9 +1237,9 @@ impl<T: Trait> Module<T> {
             let mut records = Self::guarantee_rel(&g_stash, &v_stash);
             let mut g_index: usize = new_guarantors.len() - 1;
             let mut r_index: u32 = records.len() as u32 - 1;
-            while g_votes > Zero::zero() && r_index > 0 {
+            while g_votes > Zero::zero() {
                 while &new_guarantors[g_index] != g_stash { // found matching guarantor
-                    g_index -= 1;
+                    g_index = g_index.saturating_sub(1);
                 }
                 let mut votes = records.get(&r_index).unwrap().clone();
                 let real_votes = g_votes.min(votes);
@@ -1251,8 +1252,8 @@ impl<T: Trait> Module<T> {
                     records.remove(&r_index);
                     new_guarantors.remove(g_index.clone());
                 }
-                g_index -= 1;
-                r_index -= 1;
+                g_index = g_index.saturating_sub(1);
+                r_index = r_index.saturating_sub(1);
             }
             if records.len() > 0 {
                 <GuaranteeRel<T>>::insert(&g_stash, &v_stash, records);

@@ -3702,3 +3702,166 @@ fn new_era_with_stake_limit_should_work() {
             
         });
 }
+
+#[test]
+fn cancel_guarantee_should_work() {
+    ExtBuilder::default()
+    .guarantee(false)
+    .build()
+    .execute_with(|| {
+        // put some money in account that we'll use.
+        for i in 1..10 {
+            let _ = Balances::deposit_creating(&i, 5000);
+        }
+
+        Staking::upsert_stake_limit(&5, 5000);
+        assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 5000);
+        Staking::upsert_stake_limit(&7, 5000);
+        assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 5000);
+
+        // add a new validator candidate
+        assert_ok!(Staking::bond(
+            Origin::signed(5),
+            6,
+            1000,
+            RewardDestination::Controller
+        ));
+        assert_ok!(Staking::validate(Origin::signed(6), Perbill::default()));
+
+        assert_ok!(Staking::bond(
+            Origin::signed(7),
+            8,
+            2000,
+            RewardDestination::Controller
+        ));
+        assert_ok!(Staking::validate(Origin::signed(8), Perbill::default()));
+
+        // add guarantor
+        assert_ok!(Staking::bond(
+            Origin::signed(1),
+            2,
+            2000,
+            RewardDestination::Controller
+        ));
+
+        // add guarantor
+        assert_ok!(Staking::bond(
+            Origin::signed(3),
+            4,
+            2000,
+            RewardDestination::Controller
+        ));
+
+
+
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (7, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (7, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(4), (5, 1000)));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
+
+        // guarantor's info guarantors should ✅
+        assert_eq!(
+            Staking::guarantors(&1),
+            Some(Nominations {
+                targets: vec![5, 7],
+                total: 1250,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+
+        assert_eq!(
+            Staking::guarantors(&3),
+            Some(Nominations {
+                targets: vec![5],
+                total: 1000,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+        assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
+
+        assert_eq!(
+            Staking::validators(&5),
+            Validations{
+                guarantee_fee: Default::default(),
+                guarantors: vec![1, 1, 3, 1]
+            }
+        );
+        // re-guarantee. The order should change
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 500)));
+
+        assert_eq!(
+            Staking::validators(&5),
+            Validations{
+                guarantee_fee: Default::default(),
+                guarantors: vec![1, 1, 3, 1, 1]
+            }
+        );
+
+        assert_ok!(Staking::cancel_guarantee(Origin::signed(2), (5, 1000)));
+        assert_eq!(
+            Staking::validators(&5),
+            Validations{
+                guarantee_fee: Default::default(),
+                guarantors: vec![1, 3]
+            }
+        );
+
+        assert_ok!(Staking::cancel_guarantee(Origin::signed(4), (5, 1000)));
+
+        assert_eq!(
+            Staking::validators(&5),
+            Validations{
+                guarantee_fee: Default::default(),
+                guarantors: vec![1]
+            }
+        );
+
+        assert_ok!(Staking::cancel_guarantee(Origin::signed(2), (7, 1000))); // only 500 is valid
+        assert_noop!(
+            Staking::cancel_guarantee(Origin::signed(2), (7, 1000)),
+            DispatchError::Module {
+                index: 0,
+                error: 4,
+                message: Some("InvalidTarget"),
+            }
+        );
+        assert_eq!(
+            Staking::validators(&7),
+            Validations{
+                guarantee_fee: Default::default(),
+                guarantors: vec![]
+            }
+        );
+        assert_eq!(
+            Staking::guarantors(&1),
+            Some(Nominations {
+                targets: vec![5],
+                total: 250,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 500)));
+        assert_eq!(
+            Staking::validators(&5),
+            Validations{
+                guarantee_fee: Default::default(),
+                guarantors: vec![1, 1]
+            }
+        );
+        assert_eq!(
+            Staking::guarantors(&1),
+            Some(Nominations {
+                targets: vec![5],
+                total: 750,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+    });
+}

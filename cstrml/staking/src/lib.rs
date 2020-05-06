@@ -555,7 +555,7 @@ decl_storage! {
                             <Module<T>>::guarantee(
                                 T::Origin::from(Some(controller.clone()).into()),
                                 (T::Lookup::unlookup(target.clone()), votes.clone()),
-                            );
+                            ).ok();
                         }
                         Ok(())
                     }, _ => Ok(())
@@ -857,16 +857,14 @@ decl_module! {
             <Validators<T>>::insert(stash, validations);
         }
 
-        /// Declare the desire to guarantee `targets` for the origin controller.
+        /// Declare the desire to guarantee one targets for the origin controller.
         ///
         /// Effects will be felt at the beginning of the next era.
         ///
         /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
         ///
         /// # <weight>
-        /// - The transaction's complexity is proportional to the size of `targets`,
-        /// which is capped at `MAX_NOMINATIONS`.
-        /// - Both the reads and writes follow a similar pattern.
+        /// - The transaction's complexity is O(n), n is equal to the length of guarantors.
         /// # </weight>
         #[weight = SimpleDispatchInfo::FixedNormal(750_000)]
         fn guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
@@ -882,10 +880,8 @@ decl_module! {
                 new_total = old_nominations.total;
             }
 
-            // [LIMIT ACTIVE CHECK] 3:
-            // 1. Upserting an edge
-            let (target, votes) = target;
-                
+            let (target, votes) = target;  
+            // 1. Inserting a new edge
             if let Ok(v_stash) = T::Lookup::lookup(target) {
                 // Judge if v_stash is old targets
                 if remain_stake != Zero::zero() {
@@ -898,6 +894,7 @@ decl_module! {
                         // Update remain_stake
                         if remain_stake <= real_votes { remain_stake = Zero::zero(); }
                         else { remain_stake -= real_votes; }
+                        // Update the total votes of a nomination
                         new_total += real_votes;
                         if !new_targets.contains(&v_stash) {
                             new_targets.push(v_stash.clone());
@@ -917,7 +914,7 @@ decl_module! {
             <Guarantors<T>>::insert(g_stash, nominations);
         }
 
-        /// Declare the desire to guarantee `targets` for the origin controller.
+        /// Declare the desire to cut guarantee for the origin controller.
         ///
         /// Effects will be felt at the beginning of the next era.
         ///
@@ -942,21 +939,20 @@ decl_module! {
             }
             let (target, votes) = target;
             if let Ok(v_stash) = T::Lookup::lookup(target) {
-                // Judge if v_stash is old targets
-                if new_total != Zero::zero() {
-                    let one_total = Self::calculate_total(&g_stash, &v_stash);
-                    let g_votes = votes.min(one_total);
+                // Judge if guarantor has guranteed.
+                // total votes from one g_stash to one v_stash
+                let individual_total = Self::calculate_total(&g_stash, &v_stash);
+                let g_votes = votes.min(individual_total);
 
-                    let (upserted, removed, removed_votes) =
-                    Self::decrease_guarantee_votes(&v_stash, &g_stash, g_votes);
+                let (upserted, removed, removed_votes) =
+                Self::decrease_guarantee_votes(&v_stash, &g_stash, g_votes);
 
-                    ensure!(upserted.clone(), Error::<T>::InvalidTarget);
-                    new_total -= removed_votes;
-                    if upserted {
-                        // Update targets
-                        if removed {
-                            new_targets.remove_item(&v_stash);
-                        }
+                ensure!(upserted.clone(), Error::<T>::InvalidTarget);
+                new_total -= removed_votes;
+                if upserted {
+                    // Update targets
+                    if removed {
+                        new_targets.remove_item(&v_stash);
                     }
                 }
             }
@@ -1207,7 +1203,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// Update or insert an edge from {validator <-> candidate}
+    /// Update an edge from {validator <-> candidate}
     /// basically, this update the UWG(Undirected Weighted Graph) with weight-limitation per node
     ///
     /// NOTE: this should handle the update of `Validators` and `GuaranteeRel` and return upsert
@@ -1215,9 +1211,8 @@ impl<T: Trait> Module<T> {
     /// # <weight>
     /// - Independent of the arguments. Insignificant complexity.
     /// - O(n).
-    /// - 2n+5 DB entry.
-    /// MAX(n) = MAX_NOMINATIONS
-    /// # </weight>    
+    /// - 2n+7 DB entry.
+    /// # </weight>
     fn decrease_guarantee_votes(
         v_stash: &T::AccountId,
         g_stash: &T::AccountId,
@@ -1237,6 +1232,7 @@ impl<T: Trait> Module<T> {
             let mut records = Self::guarantee_rel(&g_stash, &v_stash);
             let mut g_index: usize = new_guarantors.len() - 1;
             let mut r_index: u32 = records.len() as u32 - 1;
+            // 2. Travese from the end of the guarantors
             while g_votes > Zero::zero() {
                 while &new_guarantors[g_index] != g_stash { // found matching guarantor
                     g_index = g_index.saturating_sub(1);
@@ -1255,12 +1251,13 @@ impl<T: Trait> Module<T> {
                 g_index = g_index.saturating_sub(1);
                 r_index = r_index.saturating_sub(1);
             }
+            // Update GuaranteeRel
             if records.len() > 0 {
                 <GuaranteeRel<T>>::insert(&g_stash, &v_stash, records);
             } else {
                 <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
             }
-            
+            // Update Validators
             let new_validations = Validations {
                 guarantee_fee: validations.guarantee_fee,
                 guarantors: new_guarantors,
@@ -1273,7 +1270,7 @@ impl<T: Trait> Module<T> {
     }
 
 
-    /// Update or insert an edge from {validator <-> candidate}
+    /// Insert an edge from {validator <-> candidate}
     /// basically, this update the UWG(Undirected Weighted Graph) with weight-limitation per node
     ///
     /// NOTE: this should handle the update of `Validators` and `GuaranteeRel` and return upsert
@@ -1281,9 +1278,8 @@ impl<T: Trait> Module<T> {
     /// # <weight>
     /// - Independent of the arguments. Insignificant complexity.
     /// - O(n).
-    /// - 2n+5 DB entry.
-    /// MAX(n) = MAX_NOMINATIONS
-    /// # </weight>    
+    /// - 2n+6 DB entry.
+    /// # </weight>
     fn increase_guarantee_votes(
         v_stash: &T::AccountId,
         g_stash: &T::AccountId,
@@ -1333,6 +1329,7 @@ impl<T: Trait> Module<T> {
         return (false, Zero::zero());
     }
 
+    /// Calculate relative index for each guarantor in the `guarantors` vec
     fn calculate_relative_index(guarantors: &Vec<T::AccountId>) -> Vec<(T::AccountId, u32)> {
         let mut rel_indexes: BTreeMap<T::AccountId, u32> = BTreeMap::new(); // used to calculate index in edge.records
         let guarantors_with_index = guarantors.iter()
@@ -1350,7 +1347,7 @@ impl<T: Trait> Module<T> {
         guarantors_with_index
     }
 
-    /// Insert new or update old stake limit
+    /// Calculate the total votes from g_stash to v_stash according to `GuaranteeRel`
     fn calculate_total(
         g_stash: &T::AccountId,
         v_stash: &T::AccountId

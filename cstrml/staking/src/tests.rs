@@ -3752,8 +3752,20 @@ fn cut_guarantee_should_work() {
             RewardDestination::Controller
         ));
 
+        assert_noop!(
+            Staking::cut_guarantee(Origin::signed(2), (2, 250)),
+            DispatchError::Module {
+                index: 0,
+                error: 4,
+                message: Some("InvalidTarget"),
+            }
+        );
 
-
+        // guarantor's info guarantors should ✅
+        assert_eq!(
+            Staking::guarantors(&1),
+            None
+        );
         assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
         assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
         assert_ok!(Staking::guarantee(Origin::signed(2), (7, 250)));

@@ -592,7 +592,7 @@ decl_error! {
         AlreadyBonded,
         /// Controller is already paired.
         AlreadyPaired,
-        /// Targets cannot be empty.
+        /// Target is invalid.
         InvalidTarget,
         /// Duplicate index.
         DuplicateIndex,

@@ -3423,7 +3423,7 @@ fn guarantee_order_should_work() {
             assert_eq!(Staking::guarantee_rel(7, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
 
 
-            assert_ok!(Staking::cancel_guarantee(Origin::signed(2), (5, 1000)));
+            assert_ok!(Staking::cut_guarantee(Origin::signed(2), (5, 1000)));
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
@@ -3527,7 +3527,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
                 }
             );
 
-            assert_ok!(Staking::cancel_guarantee(Origin::signed(2), (11, 250)));
+            assert_ok!(Staking::cut_guarantee(Origin::signed(2), (11, 250)));
             assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), Some(&(250 as Balance)));
             assert_eq!(
                 Staking::validators(&11),
@@ -3704,7 +3704,7 @@ fn new_era_with_stake_limit_should_work() {
 }
 
 #[test]
-fn cancel_guarantee_should_work() {
+fn cut_guarantee_should_work() {
     ExtBuilder::default()
     .guarantee(false)
     .build()
@@ -3801,7 +3801,7 @@ fn cancel_guarantee_should_work() {
             }
         );
 
-        assert_ok!(Staking::cancel_guarantee(Origin::signed(2), (5, 1000)));
+        assert_ok!(Staking::cut_guarantee(Origin::signed(2), (5, 1000)));
         assert_eq!(
             Staking::validators(&5),
             Validations{
@@ -3810,7 +3810,7 @@ fn cancel_guarantee_should_work() {
             }
         );
 
-        assert_ok!(Staking::cancel_guarantee(Origin::signed(4), (5, 1000)));
+        assert_ok!(Staking::cut_guarantee(Origin::signed(4), (5, 1000)));
 
         assert_eq!(
             Staking::validators(&5),
@@ -3820,9 +3820,9 @@ fn cancel_guarantee_should_work() {
             }
         );
 
-        assert_ok!(Staking::cancel_guarantee(Origin::signed(2), (7, 1000))); // only 500 is valid
+        assert_ok!(Staking::cut_guarantee(Origin::signed(2), (7, 1000))); // only 500 is valid
         assert_noop!(
-            Staking::cancel_guarantee(Origin::signed(2), (7, 1000)),
+            Staking::cut_guarantee(Origin::signed(2), (7, 1000)),
             DispatchError::Module {
                 index: 0,
                 error: 4,

@@ -1189,12 +1189,8 @@ impl<T: Trait> Module<T> {
             for target in nominations.targets {
                 <GuaranteeRel<T>>::remove(&g_stash, &target);
                 let mut validations = Self::validators(&target);
-                let mut new_guarantors = vec![];
-                for value in validations.guarantors {
-                    if &value != g_stash { // chill all guarantors in Validations.guarantors
-                        new_guarantors.push(value.clone());
-                    }
-                }
+                let mut new_guarantors = validations.guarantors;
+                new_guarantors.retain(|value| value != g_stash);
                 validations.guarantors = new_guarantors;
                 <Validators<T>>::insert(&target, validations);
             }

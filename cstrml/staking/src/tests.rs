@@ -3699,7 +3699,40 @@ fn new_era_with_stake_limit_should_work() {
                     unlocking: vec![] // in time. no lock for such scenario.
                 })
             );
-            
+            start_era_with_new_workloads(6, false, 1, 200000000);
+            start_era_with_new_workloads(7, false, 1, 200000000);
+            start_era_with_new_workloads(8, false, 1, 200000000);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 2500);
+            // 3 would be removed from validators due to stake limite
+            assert_eq!(
+                Staking::validators(&11),
+                Validations{
+                    guarantee_fee: Perbill::one(),
+                    guarantors: vec![1]
+                }
+            );
+            assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), Some(&(1500 as Balance)));
+            assert_eq!(
+                Staking::stakers(11),
+                Exposure {
+                    total: 2500,
+                    own: 1000,
+                    others: vec![IndividualExposure {
+                        who: 1,
+                        value: 1500
+                    }]
+                }
+            );
+            assert_eq!(
+                Staking::ledger(&4),
+                Some(StakingLedger {
+                    stash: 3,
+                    total: 2000,
+                    active: 2000,
+                    valid: 0,
+                    unlocking: vec![] // in time. no lock for such scenario.
+                })
+            );
         });
 }
 

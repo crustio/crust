@@ -6,6 +6,7 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, ensure,
+    weights::SimpleDispatchInfo,
     dispatch::DispatchResult,
     storage::IterableStorageMap
 };
@@ -30,11 +31,11 @@ mod tests;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Identity<T> {
+pub struct Identity<AccountId> {
     pub pub_key: PubKey,
-    pub account_id: T,
+    pub account_id: AccountId,
     pub validator_pub_key: PubKey,
-    pub validator_account_id: T,
+    pub validator_account_id: AccountId,
     pub sig: TeeSignature,
 }
 
@@ -109,7 +110,7 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        #[weight = frame_support::weights::SimpleDispatchInfo::default()]
+        #[weight = SimpleDispatchInfo::default()]
         pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -156,7 +157,7 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = frame_support::weights::SimpleDispatchInfo::default()]
+        #[weight = SimpleDispatchInfo::default()]
         fn report_works(origin, work_report: WorkReport) -> DispatchResult {
             let who = ensure_signed(origin)?;
 

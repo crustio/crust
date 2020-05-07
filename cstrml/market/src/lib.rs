@@ -4,8 +4,11 @@
 #![feature(option_result_contains)]
 
 use codec::{Decode, Encode};
-use frame_support::{decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure};
-use sp_std::str;
+use frame_support::{
+    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
+    weights::SimpleDispatchInfo
+};
+use sp_std::{str, vec::Vec, convert::TryInto};
 use system::ensure_signed;
 use sp_runtime::{traits::StaticLookup};
 use tee;
@@ -14,7 +17,10 @@ use tee;
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{MerkleRoot, Balance, BlockNumber};
+use primitives::{
+    MerkleRoot, Balance, BlockNumber, Hash,
+    constants::time::MINUTES
+};
 
 #[cfg(test)]
 mod mock;
@@ -24,24 +30,26 @@ mod tests;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct StorageOrder<T> {
-    pub file_indetifier: MerkleRoot,
+pub struct StorageOrder<AccountId> {
+    pub file_identifier: MerkleRoot,
     pub file_size: u64,
-    pub expired_duration: BlockNumber,
+    pub created_at: BlockNumber,
     pub expired_on: BlockNumber,
-    pub destination: T
+    pub provider: AccountId,
+    pub client: AccountId,
 }
 
 
 /// An event handler for sending storage order
 pub trait OnOrderStorage<AccountId> {
-    fn storage_fee_transfer(transactor: &AccountId, dest: &AccountId, value: Balance) -> u64;
+    fn pay_order(transactor: &AccountId, dest: &AccountId, value: Balance) -> Hash;
 }
 
 impl<AId> OnOrderStorage<AId> for () {
-    fn storage_fee_transfer(_: &AId, _: &AId, _: Balance) -> u64 {
+    fn pay_order(_: &AId, _: &AId, _: Balance) -> Hash {
         // transfer the fee and return order id
-        0
+        // TODO: using random to generate non-duplicated order id
+        Hash::default()
     }
 }
 
@@ -55,9 +63,25 @@ pub trait Trait: system::Trait + tee::Trait {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Market {
-        // Cannot use MerkleRoot as the key. cannot open the apps
+        /// A mapping from storage provider to order id
+        pub Providers get(fn providers):
+        map hasher(twox_64_concat) T::AccountId => Option<Vec<Hash>>;
+
+        /// A mapping from clients to order id
+        pub Clients get(fn clients):
+        map hasher(twox_64_concat) T::AccountId => Option<Vec<Hash>>;
+
+        /// Order details iterated by order id
         pub StorageOrders get(fn storage_orders):
-        map hasher(blake2_128_concat) (T::AccountId, u64) => Option<StorageOrder<T::AccountId>>;
+        map hasher(twox_64_concat) Hash => Option<StorageOrder<T::AccountId>>;
+    }
+}
+
+decl_error! {
+    /// Error for the market module.
+    pub enum Error for Module<T: Trait> {
+        /// Duplicate order id.
+		DuplicateOrderId,
     }
 }
 
@@ -69,36 +93,47 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
+        type Error = Error<T>;
+
         /// TODO: organize these parameters into a struct.
-        #[weight = frame_support::weights::SimpleDispatchInfo::default()]
-        fn store_storage_order(
+        #[weight = SimpleDispatchInfo::default()]
+        fn add_storage_order(
             origin,
             dest: <T::Lookup as StaticLookup>::Source,
-            #[compact] value: Balance, // Keep it now and refactor it later
-            file_indetifier: MerkleRoot,
+            #[compact] value: Balance,
+            file_identifier: MerkleRoot,
             file_size: u64,
-            expired_duration: BlockNumber,
             expired_on: BlockNumber
         ) -> DispatchResult
             {
                 let who = ensure_signed(origin)?;
-                let dest = T::Lookup::lookup(dest)?;
+                let provider = T::Lookup::lookup(dest)?;
+                let created_at = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
+
+                // 1. Expired should be greater than created
+                ensure!(created_at + 30 * MINUTES < expired_on, "order should keep at least 30 minutes");
+
+                // 2. Construct storage order
                 let storage_order = StorageOrder::<T::AccountId> {
-                    file_indetifier,
+                    file_identifier,
                     file_size,
-                    expired_duration,
+                    created_at,
                     expired_on,
-                    destination: dest.clone()
+                    provider: provider.clone(),
+                    client: who.clone()
                 };
 
-                // 1. Do check and should do something
-                ensure!(Self::check_storage_order(&storage_order).is_ok(), "Storage Order is invalid!");
+                // 3. Do check and should do something
+                ensure!(Self::check_storage_order(&storage_order).is_ok(), "storage order is invalid!");
 
-                // 2. Cut fee and (maybe) add storage order
-                Self::maybe_insert_sorder(&who, &dest, value, &storage_order);
-                
-                // 3. Emit storage order event
-                Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
+                // 4. Pay the order and (maybe) add storage order
+                if Self::maybe_insert_sorder(&who, &provider, value, &storage_order) {
+                    // a. emit storage order event
+                    Self::deposit_event(RawEvent::ReportStorageOrders(who, storage_order));
+                } else {
+                    // b. emit error
+                    Err(Error::<T>::DuplicateOrderId)?
+                }
 
                 Ok(())
             }
@@ -106,22 +141,41 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // private function can be built in here
+    // IMMUTABLE PRIVATE
     fn check_storage_order(so: &StorageOrder<T::AccountId>) -> DispatchResult {
         ensure!(
-            &<tee::Module<T>>::get_work_report(&so.destination).is_some(),
+            <tee::Module<T>>::get_work_report(&so.provider).is_some(),
             "Cannot find work report!"
         );
         ensure!(
-            &<tee::Module<T>>::get_work_report(&so.destination).unwrap().empty_workload >= &so.file_size,
+            <tee::Module<T>>::get_work_report(&so.provider).unwrap().empty_workload >= so.file_size,
             "Empty work load is not enough!"
         );
         Ok(())
     }
+
+    // MUTABLE PRIVATE
     // sorder is equal to storage order
-    fn maybe_insert_sorder(source: &T::AccountId, dest: &T::AccountId, value: Balance, so: &StorageOrder<T::AccountId>) {
-        let fee_id = T::OnOrderStorage::storage_fee_transfer(&source, &dest, value);
-        <StorageOrders<T>>::insert((&source, &fee_id), &so);
+    fn maybe_insert_sorder(client: &T::AccountId,
+                           provider: &T::AccountId,
+                           value: Balance,
+                           so: &StorageOrder<T::AccountId>) -> bool {
+        let order_id = T::OnOrderStorage::pay_order(&client, &provider, value);
+
+        // This should be false, cause we don't allow duplicated `order_id`
+        if <StorageOrders<T>>::contains_key(&order_id) {
+            false
+        } else {
+            let mut client_orders = Self::clients(client).unwrap_or_default();
+            let mut provider_orders = Self::providers(provider).unwrap_or_default();
+            client_orders.push(order_id.clone());
+            provider_orders.push(order_id.clone());
+
+            <Clients<T>>::insert(client, client_orders);
+            <Providers<T>>::insert(provider, provider_orders);
+            <StorageOrders<T>>::insert(order_id, so);
+            true
+        }
     }
 }
 

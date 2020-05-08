@@ -554,10 +554,10 @@ decl_storage! {
                         )
                     },
                     StakerStatus::Guarantor(votes) => {
-                        for (target, votes) in votes {
+                        for (target, vote) in votes {
                             <Module<T>>::guarantee(
                                 T::Origin::from(Some(controller.clone()).into()),
-                                (T::Lookup::unlookup(target.clone()), votes.clone()),
+                                (T::Lookup::unlookup(target.clone()), vote.clone()),
                             ).ok();
                         }
                         Ok(())

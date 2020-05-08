@@ -86,6 +86,7 @@ fn basic_setup_works() {
                 (
                     21,
                     Validations {
+                        total: 250,
                         guarantee_fee: Perbill::one(),
                         guarantors: vec![101]
                     }
@@ -93,6 +94,7 @@ fn basic_setup_works() {
                 (
                     11,
                     Validations {
+                        total: 250,
                         guarantee_fee: Perbill::one(),
                         guarantors: vec![101]
                     }
@@ -1311,6 +1313,7 @@ fn validator_payment_prefs_work() {
         <Validators<Test>>::insert(
             &11,
             Validations {
+                total: 0,
                 guarantee_fee: Perbill::from_percent(50),
                 guarantors: vec![],
             },
@@ -3400,6 +3403,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
+                    total: 3000,
                     guarantee_fee: Default::default(),
                     guarantors: vec![1, 7, 1, 1, 3, 1]
                 }
@@ -3410,6 +3414,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
+                    total: 3500,
                     guarantee_fee: Default::default(),
                     guarantors: vec![1, 7, 1, 1, 3, 1, 1]
                 }
@@ -3427,6 +3432,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
+                    total: 2500,
                     guarantee_fee: Default::default(),
                     guarantors: vec![1, 7, 1, 3]
                 }
@@ -3444,6 +3450,7 @@ fn guarantee_order_should_work() {
             assert_eq!(
                 Staking::validators(&5),
                 Validations{
+                    total: 3000,
                     guarantee_fee: Default::default(),
                     guarantors: vec![1, 7, 1, 3, 1]
                 }
@@ -3522,6 +3529,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
+                    total: 1500,
                     guarantee_fee: Perbill::one(),
                     guarantors: vec![1, 1, 3]
                 }
@@ -3532,6 +3540,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
+                    total: 1250,
                     guarantee_fee: Perbill::one(),
                     guarantors: vec![1, 3]
                 }
@@ -3544,6 +3553,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
+                    total: 2000,
                     guarantee_fee: Perbill::one(),
                     guarantors: vec![1, 3, 1]
                 }
@@ -3555,6 +3565,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
+                    total: 1500,
                     guarantee_fee: Perbill::one(),
                     guarantors: vec![1, 3, 1]
                 }
@@ -3662,6 +3673,7 @@ fn new_era_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
+                    total: 4000,
                     guarantee_fee: Perbill::one(),
                     guarantors: vec![1, 3]
                 }
@@ -3673,6 +3685,7 @@ fn new_era_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
+                    total: 1500,
                     guarantee_fee: Perbill::one(),
                     guarantors: vec![1]
                 }
@@ -3707,6 +3720,7 @@ fn new_era_with_stake_limit_should_work() {
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
+                    total: 1500,
                     guarantee_fee: Perbill::one(),
                     guarantors: vec![1]
                 }
@@ -3831,6 +3845,7 @@ fn cut_guarantee_should_work() {
         assert_eq!(
             Staking::validators(&5),
             Validations{
+                total: 1750,
                 guarantee_fee: Default::default(),
                 guarantors: vec![1, 1, 3, 1]
             }
@@ -3841,6 +3856,7 @@ fn cut_guarantee_should_work() {
         assert_eq!(
             Staking::validators(&5),
             Validations{
+                total: 2250,
                 guarantee_fee: Default::default(),
                 guarantors: vec![1, 1, 3, 1, 1]
             }
@@ -3850,6 +3866,7 @@ fn cut_guarantee_should_work() {
         assert_eq!(
             Staking::validators(&5),
             Validations{
+                total: 1250,
                 guarantee_fee: Default::default(),
                 guarantors: vec![1, 3]
             }
@@ -3860,6 +3877,7 @@ fn cut_guarantee_should_work() {
         assert_eq!(
             Staking::validators(&5),
             Validations{
+                total: 250,
                 guarantee_fee: Default::default(),
                 guarantors: vec![1]
             }
@@ -3877,6 +3895,7 @@ fn cut_guarantee_should_work() {
         assert_eq!(
             Staking::validators(&7),
             Validations{
+                total: 0,
                 guarantee_fee: Default::default(),
                 guarantors: vec![]
             }
@@ -3895,6 +3914,7 @@ fn cut_guarantee_should_work() {
         assert_eq!(
             Staking::validators(&5),
             Validations{
+                total: 750,
                 guarantee_fee: Default::default(),
                 guarantors: vec![1, 1]
             }

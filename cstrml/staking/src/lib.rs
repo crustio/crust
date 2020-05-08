@@ -107,7 +107,9 @@ impl Default for RewardDestination {
 
 /// Preference of what happens regarding validation.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
-pub struct Validations<AccountId> {
+pub struct Validations<AccountId, Balance: HasCompact + Zero> {
+    /// The total votes of Validations.
+    pub total: Balance, 
     /// Reward that validator takes up-front; only the rest is split between themselves and
     /// guarantors.
     #[codec(compact)]
@@ -118,9 +120,10 @@ pub struct Validations<AccountId> {
     pub guarantors: Vec<AccountId>,
 }
 
-impl<AccountId> Default for Validations<AccountId> {
+impl<AccountId, Balance: HasCompact + Zero> Default for Validations<AccountId, Balance> {
     fn default() -> Self {
         Validations {
+            total: Zero::zero(),
             // The default guarantee fee is 100%
             guarantee_fee: Perbill::one(),
             guarantors: vec![],
@@ -133,7 +136,7 @@ impl<AccountId> Default for Validations<AccountId> {
 pub struct Nominations<AccountId, Balance: HasCompact> {
     /// The targets of nomination.
     pub targets: Vec<AccountId>,
-    /// The targets of nomination.
+    /// The total votes of nomination.
     pub total: Balance,
     /// The era the nominations were submitted.
     pub submitted_in: EraIndex,
@@ -431,7 +434,7 @@ decl_storage! {
         /// The map from {(wannabe) validator}/{candidate} stash key to the validation
         /// relationship of that validator.
         pub Validators get(fn validators):
-            map hasher(twox_64_concat) T::AccountId => Validations<T::AccountId>;
+            map hasher(twox_64_concat) T::AccountId => Validations<T::AccountId, BalanceOf<T>>;
 
         /// The map from guarantor stash key to the set of stash keys of all
         /// validators to guarantee.
@@ -845,6 +848,7 @@ decl_module! {
             }
 
             let mut validations = Validations {
+                total: Zero::zero(),
                 guarantee_fee: prefs,
                 guarantors: vec![]
             };
@@ -1255,6 +1259,7 @@ impl<T: Trait> Module<T> {
             }
             // Update Validators
             let new_validations = Validations {
+                total: validations.total - removed_votes,
                 guarantee_fee: validations.guarantee_fee,
                 guarantors: new_guarantors,
             };
@@ -1293,21 +1298,12 @@ impl<T: Trait> Module<T> {
         let guarantors_with_indexes = Self::calculate_relative_index(&new_guarantors);
 
         // Sum all current edge weight
-        let v_total_stakes = guarantors_with_indexes.iter().fold(v_own_stakes, |total, (g, index)| {
-            let w = Self::guarantee_rel(&g, &v_stash).get(&index).unwrap().clone();
-            w + total
-        });
+        let v_total_stakes = v_own_stakes + validations.total;
         let v_limit = Self::stake_limit(&v_stash).unwrap_or_default();
 
         // Insert new node and new edge
         if v_total_stakes < v_limit {
             new_guarantors.push(g_stash.clone());
-            // a. New validator
-            let new_validations = Validations {
-                guarantee_fee: validations.guarantee_fee,
-                guarantors: new_guarantors,
-            };
-            <Validators<T>>::insert(v_stash, new_validations);
 
             // c. New record. Maybe new edge.
             let mut new_records: BTreeMap<u32, BalanceOf<T>> = BTreeMap::new();
@@ -1318,6 +1314,13 @@ impl<T: Trait> Module<T> {
             let real_extra_votes = (v_limit - v_total_stakes).min(g_votes);
             new_records.insert(rel_index, real_extra_votes.clone());
             <GuaranteeRel<T>>::insert(&g_stash, &v_stash, new_records);
+            // a. New validator
+            let new_validations = Validations {
+                total: validations.total + real_extra_votes.clone(),
+                guarantee_fee: validations.guarantee_fee,
+                guarantors: new_guarantors,
+            };
+            <Validators<T>>::insert(v_stash, new_validations);
             return (true, real_extra_votes);
         }
 
@@ -1636,7 +1639,7 @@ impl<T: Trait> Module<T> {
         <tee::Module<T>>::update_identities();
         Self::clear_stakers();
 
-        let validators: Vec<(T::AccountId, Validations<T::AccountId>)> =
+        let validators: Vec<(T::AccountId, Validations<T::AccountId, BalanceOf<T>>)> =
             <Validators<T>>::iter().collect();
         let validator_count = validators.len();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
@@ -1665,6 +1668,7 @@ impl<T: Trait> Module<T> {
             let v_own_stakes = v_ledger.active.min(v_limit_stakes);
             let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             let mut v_guarantors_votes = 0;
+            let mut v_total_votes = 0;
             let mut new_guarantors: Vec<T::AccountId> = vec![];
 
             // TODO: move a separated function
@@ -1698,6 +1702,7 @@ impl<T: Trait> Module<T> {
             }
             // 2. Update Validators
             let new_validations = Validations {
+                total: to_balance(v_guarantors_votes),
                 guarantee_fee: validations.guarantee_fee,
                 guarantors: new_guarantors,
             };

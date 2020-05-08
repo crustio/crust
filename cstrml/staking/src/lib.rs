@@ -1718,10 +1718,7 @@ impl<T: Trait> Module<T> {
                 let v_total_votes =
                     (v_own_votes + v_guarantors_votes).min(u64::max_value() as u128);
 
-                let mut set_of_guarantors = BTreeSet::new();
-                for guarantor in Self::validators(v_stash).guarantors {
-                    set_of_guarantors.insert(guarantor.clone());
-                }
+                let set_of_guarantors: BTreeSet<T::AccountId> = Self::validators(v_stash).guarantors.drain(..).collect();
 
                 for guarantor in set_of_guarantors {
                     others.push(IndividualExposure {

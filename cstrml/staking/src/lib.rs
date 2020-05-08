@@ -1666,14 +1666,34 @@ impl<T: Trait> Module<T> {
                     // b. update remains and guarantors votes
                     remains -= g_real_votes;
                     v_guarantors_votes += g_real_votes;
-                    // c. UPDATE EDGE: (maybe) update GuaranteeRel
-                    records.insert(index.clone(), g_vote_stakes);
-                    <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
+                    
+                    // c. UPDATE EDGE: (maybe) update GuaranteeRel and Nominations.total
+                    if g_real_votes < votes {
+                        if let Some(mut nominations) = Self::guarantors(&guarantor) {	
+                            nominations.total -= to_balance(votes - g_real_votes);
+                            <Guarantors<T>>::insert(&guarantor, nominations);
+                        }
+                        records.insert(index.clone(), g_vote_stakes);
+                        <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
+                    }
 
                 // There has no credit for later guarantors
                 } else {
                     records.remove(&(index.clone() as u32));
-                    <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
+                    let is_empty = records.len() == 0;
+                    if is_empty {
+                        <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
+                    } else {
+                        <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
+                    }
+                    // Update Nominations
+                    if let Some(mut nominations) = Self::guarantors(&guarantor) {	
+                        nominations.total -= to_balance(votes);
+                        if is_empty {
+                            nominations.targets.remove_item(v_stash);	
+                        }
+                        <Guarantors<T>>::insert(&guarantor, nominations);	
+                    }
                 }
             }
             // 2. Update Validators
@@ -1735,8 +1755,8 @@ impl<T: Trait> Module<T> {
         <Guarantors<T>>::iter().for_each(|(g_stash, nominations)| {
             let Nominations {
                 submitted_in: _,
-                total: _,
-                targets,
+                total,
+                targets: _,
                 suppressed: _,
             } = nominations;
 
@@ -1752,16 +1772,9 @@ impl<T: Trait> Module<T> {
             let g_controller = Self::bonded(&g_stash).unwrap();
             let mut g_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&g_controller).unwrap();
-            let mut g_valid_stake_votes = Zero::zero();
-
-            // 2. Sum up all valid votes
-            for v_stash in targets {
-                g_valid_stake_votes += Self::guarantee_rel(&g_stash, &v_stash).iter()
-                .fold(Zero::zero(), |acc, (_, value)| acc + value.clone());
-            }
 
             // 3. Update guarantor's ledger
-            g_ledger.valid = g_valid_stake_votes;
+            g_ledger.valid = total;
             Self::update_ledger(&g_controller, &g_ledger);
         });
 

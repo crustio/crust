@@ -1653,7 +1653,7 @@ impl<T: Trait> Module<T> {
             // 1. Update GuaranteeRel
             for (guarantor, index) in guarantors_with_indexes {
                 let mut records = Self::guarantee_rel(&guarantor, &v_stash);
-                let votes = to_votes(records.get(&(index.clone() as u32)).unwrap().clone());
+                let votes = to_votes(records.get(&index).unwrap().clone());
 
                 // There still has credit for guarantors
                 // we should using `FILO` rule to calculate others
@@ -1673,13 +1673,13 @@ impl<T: Trait> Module<T> {
                             nominations.total -= to_balance(votes - g_real_votes);
                             <Guarantors<T>>::insert(&guarantor, nominations);
                         }
-                        records.insert(index.clone(), g_vote_stakes);
+                        records.insert(index, g_vote_stakes);
                         <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
                     }
 
                 // There has no credit for later guarantors
                 } else {
-                    records.remove(&(index.clone() as u32));
+                    records.remove(&index);
                     let is_empty = records.len() == 0;
                     if is_empty {
                         <GuaranteeRel<T>>::remove(&guarantor, &v_stash);

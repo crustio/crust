@@ -952,7 +952,8 @@ decl_module! {
                 // g_stash has voted to v_stash before
                 ensure!(<GuaranteeRel<T>>::contains_key(&g_stash, &v_stash), Error::<T>::InvalidTarget);
                 // total votes from one g_stash to one v_stash
-                let individual_total = Self::calculate_total(&g_stash, &v_stash);
+                let individual_total = Self::guarantee_rel(&g_stash, &v_stash).iter()
+                .fold(Zero::zero(), |acc, (_, value)| acc + value.clone());
                 let g_votes = votes.min(individual_total);
 
                 let (removed, removed_votes) =
@@ -1285,7 +1286,6 @@ impl<T: Trait> Module<T> {
         let mut new_guarantors = validations.guarantors;
 
         let v_own_stakes = Self::slashable_balance_of(v_stash);
-        let guarantors_with_indexes = Self::calculate_relative_index(&new_guarantors);
 
         // Sum all current edge weight
         let v_total_stakes = v_own_stakes + validations.total;
@@ -1334,19 +1334,6 @@ impl<T: Trait> Module<T> {
         })
         .collect::<Vec<(T::AccountId, u32)>>();
         guarantors_with_index
-    }
-
-    /// Calculate the total votes from g_stash to v_stash according to `GuaranteeRel`
-    fn calculate_total(
-        g_stash: &T::AccountId,
-        v_stash: &T::AccountId
-    ) -> BalanceOf<T> {
-        let records = Self::guarantee_rel(&g_stash, &v_stash);
-        let mut total: BalanceOf<T> = Zero::zero();
-        for (_, value) in records.iter() {
-            total += *value;
-        }
-        total
     }
 
     /// Insert new or update old stake limit
@@ -1658,7 +1645,6 @@ impl<T: Trait> Module<T> {
             let v_own_stakes = v_ledger.active.min(v_limit_stakes);
             let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             let mut v_guarantors_votes = 0;
-            let mut v_total_votes = 0;
             let mut new_guarantors: Vec<T::AccountId> = vec![];
 
             // TODO: move a separated function
@@ -1720,7 +1706,9 @@ impl<T: Trait> Module<T> {
                 for guarantor in set_of_guarantors {
                     others.push(IndividualExposure {
                         who: guarantor.clone(),
-                        value: Self::calculate_total(&guarantor, &v_stash),
+                        value: Self::guarantee_rel(&guarantor, &v_stash)
+                        .iter()
+                        .fold(Zero::zero(), |acc, (_, value)| acc + value.clone()),
                     });
                 }
 
@@ -1768,7 +1756,8 @@ impl<T: Trait> Module<T> {
 
             // 2. Sum up all valid votes
             for v_stash in targets {
-                g_valid_stake_votes += Self::calculate_total(&g_stash, &v_stash);
+                g_valid_stake_votes += Self::guarantee_rel(&g_stash, &v_stash).iter()
+                .fold(Zero::zero(), |acc, (_, value)| acc + value.clone());
             }
 
             // 3. Update guarantor's ledger

@@ -825,7 +825,7 @@ fn guarantors_also_get_slashed() {
                 Staking::guarantee(Origin::signed(2), (20, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 4,
+                    error: 6,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -834,7 +834,7 @@ fn guarantors_also_get_slashed() {
                 Staking::guarantee(Origin::signed(2), (10, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 4,
+                    error: 6,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -1892,7 +1892,7 @@ fn switching_roles() {
                 Staking::guarantee(Origin::signed(4), (1, 250)), // 1 is not validator
                 DispatchError::Module {
                     index: 0,
-                    error: 4,
+                    error: 6,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -1972,7 +1972,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (1, 50)), // 1 is not validtor
                 DispatchError::Module {
                     index: 0,
-                    error: 4,
+                    error: 6,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -1980,7 +1980,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (2, 50)), // 2 cannot gurantee itself
                 DispatchError::Module {
                     index: 0,
-                    error: 4,
+                    error: 6,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -1988,7 +1988,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (15, 50)), // 15 doesn't exist
                 DispatchError::Module {
                     index: 0,
-                    error: 4,
+                    error: 6,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -3803,7 +3803,7 @@ fn cut_guarantee_should_work() {
             Staking::cut_guarantee(Origin::signed(2), (2, 250)),
             DispatchError::Module {
                 index: 0,
-                error: 4,
+                error: 6,
                 message: Some("InvalidTarget"),
             }
         );
@@ -3888,7 +3888,7 @@ fn cut_guarantee_should_work() {
             Staking::cut_guarantee(Origin::signed(2), (7, 1000)),
             DispatchError::Module {
                 index: 0,
-                error: 4,
+                error: 6,
                 message: Some("InvalidTarget"),
             }
         );

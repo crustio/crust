@@ -595,14 +595,16 @@ decl_error! {
         AlreadyBonded,
         /// Controller is already paired.
         AlreadyPaired,
-        /// Target is invalid.
-        InvalidTarget,
         /// Duplicate index.
         DuplicateIndex,
         /// Slash record index out of bounds.
         InvalidSlashIndex,
+        /// Target is invalid.
+        InvalidTarget,
         /// Can not bond with value less than minimum balance.
         InsufficientValue,
+        /// Left votes of a guarantor is not sufficient.
+        InsufficientVotes,
         /// Can not schedule more unlock chunks.
         NoMoreChunks,
         /// Can not bond with more than limit
@@ -875,7 +877,7 @@ decl_module! {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let g_stash = &ledger.stash;
-            let mut remain_stake = ledger.active;
+            let remain_stake = ledger.active;
 
             let mut new_targets: Vec<T::AccountId> = vec![];
             let mut new_total: BalanceOf<T> = Zero::zero();
@@ -887,26 +889,26 @@ decl_module! {
             let (target, votes) = target;  
             // 1. Inserting a new edge
             if let Ok(v_stash) = T::Lookup::lookup(target) {
-                // Judge if v_stash is old targets
-                if remain_stake != Zero::zero() {
-                    let g_votes = votes.min(remain_stake - new_total);
+                // v_stash is not validator
+                ensure!(<Validators<T>>::contains_key(&v_stash), Error::<T>::InvalidTarget);
+                // you want to vote your self
+                ensure!(g_stash != &v_stash, Error::<T>::InvalidTarget);
+                // still have active votes to vote
+                ensure!(remain_stake > new_total, Error::<T>::InsufficientVotes);
+                let g_votes = votes.min(remain_stake - new_total);
 
-                    let (upserted, real_votes) =
-                    Self::increase_guarantee_votes(&v_stash, &g_stash, g_votes);
+                let (upserted, real_votes) =
+                Self::increase_guarantee_votes(&v_stash, &g_stash, g_votes);
 
-                    if upserted {
-                        // Update remain_stake
-                        if remain_stake <= real_votes { remain_stake = Zero::zero(); }
-                        else { remain_stake -= real_votes; }
-                        // Update the total votes of a nomination
-                        new_total += real_votes;
-                        if !new_targets.contains(&v_stash) {
-                            new_targets.push(v_stash.clone());
-                        }
+                ensure!(upserted, Error::<T>::ExceedLimit);
+                if upserted {
+                    // Update the total votes of a nomination
+                    new_total += real_votes;
+                    if !new_targets.contains(&v_stash) {
+                        new_targets.push(v_stash.clone());
                     }
                 }
             }
-            ensure!(&remain_stake != &ledger.total, Error::<T>::InvalidTarget);
             let nominations = Nominations {
                 targets: new_targets,
                 total: new_total,
@@ -943,21 +945,23 @@ decl_module! {
             }
             let (target, votes) = target;
             if let Ok(v_stash) = T::Lookup::lookup(target) {
-                // Judge if guarantor has guranteed.
+                // v_stash is not validator
+                ensure!(<Validators<T>>::contains_key(&v_stash), Error::<T>::InvalidTarget);
+                // you want to vote your self
+                ensure!(g_stash != &v_stash, Error::<T>::InvalidTarget);
+                // g_stash has voted to v_stash before
+                ensure!(<GuaranteeRel<T>>::contains_key(&g_stash, &v_stash), Error::<T>::InvalidTarget);
                 // total votes from one g_stash to one v_stash
                 let individual_total = Self::calculate_total(&g_stash, &v_stash);
                 let g_votes = votes.min(individual_total);
 
-                let (upserted, removed, removed_votes) =
+                let (removed, removed_votes) =
                 Self::decrease_guarantee_votes(&v_stash, &g_stash, g_votes);
 
-                ensure!(upserted.clone(), Error::<T>::InvalidTarget);
                 new_total -= removed_votes;
-                if upserted {
+                if removed{
                     // Update targets
-                    if removed {
-                        new_targets.remove_item(&v_stash);
-                    }
+                    new_targets.remove_item(&v_stash);
                 }
             }
 
@@ -1217,57 +1221,48 @@ impl<T: Trait> Module<T> {
         v_stash: &T::AccountId,
         g_stash: &T::AccountId,
         mut g_votes: BalanceOf<T>,
-    ) -> (bool, bool, BalanceOf<T>) {
-        if !<Validators<T>>::contains_key(v_stash) || g_stash == v_stash {
-            // v_stash is not validator or you want to vote your self
-            // you vote NOTHING 🙂
-            return (false, false, Zero::zero());
-        }
+    ) -> (bool, BalanceOf<T>) {
         let validations = Self::validators(v_stash);
         let mut new_guarantors = validations.guarantors;
         let mut removed_votes = Zero::zero();
-
-        if <GuaranteeRel<T>>::contains_key(&g_stash, &v_stash) {
-            // 1. Existed edge        
-            let mut records = Self::guarantee_rel(&g_stash, &v_stash);
-            let mut g_index: usize = new_guarantors.len() - 1;
-            let mut r_index: u32 = records.len() as u32 - 1;
-            // 2. Travese from the end of the guarantors
-            while g_votes > Zero::zero() {
-                while &new_guarantors[g_index] != g_stash { // found matching guarantor
-                    g_index = g_index.saturating_sub(1);
-                }
-                let mut votes = records.get(&r_index).unwrap().clone();
-                let real_votes = g_votes.min(votes);
-                g_votes -= real_votes;
-                votes -= real_votes;
-                removed_votes += real_votes;
-                if votes > Zero::zero() {
-                    records.insert(r_index.clone(), real_votes); // upsert real votes
-                } else {
-                    records.remove(&r_index);
-                    new_guarantors.remove(g_index.clone());
-                }
+        // 1. Existed edge        
+        let mut records = Self::guarantee_rel(&g_stash, &v_stash);
+        let mut g_index: usize = new_guarantors.len() - 1;
+        let mut r_index: u32 = records.len() as u32 - 1;
+        // 2. Travese from the end of the guarantors
+        while g_votes > Zero::zero() {
+            while &new_guarantors[g_index] != g_stash { // found matching guarantor
                 g_index = g_index.saturating_sub(1);
-                r_index = r_index.saturating_sub(1);
             }
-            // Update GuaranteeRel
-            if records.len() > 0 {
-                <GuaranteeRel<T>>::insert(&g_stash, &v_stash, records);
+            let mut votes = records.get(&r_index).unwrap().clone();
+            let real_votes = g_votes.min(votes);
+            g_votes -= real_votes;
+            votes -= real_votes;
+            removed_votes += real_votes;
+            if votes > Zero::zero() {
+                records.insert(r_index.clone(), real_votes); // upsert real votes
             } else {
-                <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
+                records.remove(&r_index);
+                new_guarantors.remove(g_index.clone());
             }
-            // Update Validators
-            let new_validations = Validations {
-                total: validations.total - removed_votes,
-                guarantee_fee: validations.guarantee_fee,
-                guarantors: new_guarantors,
-            };
-            <Validators<T>>::insert(v_stash, new_validations);
-            let removed = !<GuaranteeRel<T>>::contains_key(&g_stash, &v_stash);
-            return (true, removed, removed_votes);  
+            g_index = g_index.saturating_sub(1);
+            r_index = r_index.saturating_sub(1);
         }
-        return (false, false, Zero::zero());              
+        // Update GuaranteeRel
+        if records.len() > 0 {
+            <GuaranteeRel<T>>::insert(&g_stash, &v_stash, records);
+        } else {
+            <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
+        }
+        // Update Validators
+        let new_validations = Validations {
+            total: validations.total - removed_votes,
+            guarantee_fee: validations.guarantee_fee,
+            guarantors: new_guarantors,
+        };
+        <Validators<T>>::insert(v_stash, new_validations);
+        let removed = !<GuaranteeRel<T>>::contains_key(&g_stash, &v_stash);
+        return (removed, removed_votes);           
     }
 
 
@@ -1286,11 +1281,6 @@ impl<T: Trait> Module<T> {
         g_stash: &T::AccountId,
         g_votes: BalanceOf<T>,
     ) -> (bool, BalanceOf<T>) {
-        if !<Validators<T>>::contains_key(v_stash) || g_stash == v_stash {
-            // v_stash is not validator or you want to vote your self
-            // you vote NOTHING 🙂
-            return (false, Zero::zero());
-        }
         let validations = Self::validators(v_stash);
         let mut new_guarantors = validations.guarantors;
 

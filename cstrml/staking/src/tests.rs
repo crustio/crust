@@ -4162,6 +4162,9 @@ fn cut_guarantee_should_work() {
             })
         );
         assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(2 as u32)), Some(&(250 as Balance)));
 
         assert_eq!(
             Staking::validators(&5),
@@ -4182,27 +4185,40 @@ fn cut_guarantee_should_work() {
                 guarantors: vec![1, 1, 3, 1, 1]
             }
         );
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(3 as u32)), Some(&(500 as Balance)));
 
-        assert_ok!(Staking::cut_guarantee(Origin::signed(2), (5, 1000)));
+        assert_ok!(Staking::cut_guarantee(Origin::signed(2), (5, 600)));
         assert_eq!(
             Staking::validators(&5),
             Validations{
-                total: 1250,
+                total: 1650,
                 guarantee_fee: Default::default(),
-                guarantors: vec![1, 3]
+                guarantors: vec![1, 1, 3, 1]
             }
         );
+
+        assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), Some(&(1000 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(2 as u32)), Some(&(150 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(3 as u32)), None);
 
         assert_ok!(Staking::cut_guarantee(Origin::signed(4), (5, 1000)));
 
         assert_eq!(
             Staking::validators(&5),
             Validations{
-                total: 250,
+                total: 650,
                 guarantee_fee: Default::default(),
-                guarantors: vec![1]
+                guarantors: vec![1, 1, 1]
             }
         );
+
+        assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), None);
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(2 as u32)), Some(&(150 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(3 as u32)), None);
 
         assert_ok!(Staking::cut_guarantee(Origin::signed(2), (7, 1000))); // only 500 is valid
         assert_noop!(
@@ -4225,7 +4241,7 @@ fn cut_guarantee_should_work() {
             Staking::guarantors(&1),
             Some(Nominations {
                 targets: vec![5],
-                total: 250,
+                total: 650,
                 submitted_in: 0,
                 suppressed: false
             })
@@ -4235,16 +4251,16 @@ fn cut_guarantee_should_work() {
         assert_eq!(
             Staking::validators(&5),
             Validations{
-                total: 750,
+                total: 1150,
                 guarantee_fee: Default::default(),
-                guarantors: vec![1, 1]
+                guarantors: vec![1, 1, 1, 1]
             }
         );
         assert_eq!(
             Staking::guarantors(&1),
             Some(Nominations {
                 targets: vec![5],
-                total: 750,
+                total: 1150,
                 submitted_in: 0,
                 suppressed: false
             })

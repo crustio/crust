@@ -1225,32 +1225,33 @@ impl<T: Trait> Module<T> {
         let mut removed_votes = Zero::zero();
 
         // 1. Existed edge        
-        let mut records = Self::guarantee_rel(&g_stash, &v_stash);
+        let records = Self::guarantee_rel(&g_stash, &v_stash);
         // 2. Travese from the end of the guarantors
-        for (idx, edge_votes) in records.clone().iter_mut().rev() {
+        for (idx, edge_votes) in records.iter().rev() {
             if g_votes == Zero::zero() { break }
             // Update votes
             let real_votes = g_votes.min(*edge_votes);
             g_votes -= real_votes;
-            *edge_votes -= real_votes;
             removed_votes += real_votes;
 
             // Still have votes at this index
-            if *edge_votes > Zero::zero() {
+            if *edge_votes > real_votes {
                 // Just change `guarantee_rel`(use mutate) and `g_votes` should be zero
-                records.insert(*idx, *edge_votes); // upsert real votes
+                <GuaranteeRel<T>>::mutate(&g_stash, &v_stash, |records| {
+                    records.insert(*idx, *edge_votes - real_votes); // upsert real votes
+                });
             } else {
                 // Remove edge(`guarantee_rel` and `new_guarantors`)
-                records.remove(idx);
+                <GuaranteeRel<T>>::mutate(&g_stash, &v_stash, |records| {
+                    records.remove(idx);
+                });
                 let index = new_guarantors.iter().rposition(|x| x == g_stash).unwrap();
                 new_guarantors.remove(index);
             }
         }
 
         // Update GuaranteeRel
-        if records.len() > 0 {
-            <GuaranteeRel<T>>::insert(&g_stash, &v_stash, records);
-        } else {
+        if Self::guarantee_rel(&g_stash, &v_stash).len() == 0 {
             <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
         }
 

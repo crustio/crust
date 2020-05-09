@@ -4214,7 +4214,7 @@ fn cut_guarantee_should_work() {
             }
         );
 
-        assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), None);
+        assert_eq!(Staking::guarantee_rel(3, 5).len(), 0);
         assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
         assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
         assert_eq!(Staking::guarantee_rel(1, 5).get(&(2 as u32)), Some(&(150 as Balance)));

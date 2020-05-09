@@ -1676,14 +1676,15 @@ impl<T: Trait> Module<T> {
 
                 // There has no credit for later guarantors
                 } else {
-                    let mut records = Self::guarantee_rel(&guarantor, &v_stash);
-                    records.remove(&index);
-                    let is_empty = records.len() == 0; // used to remove GuaranteeRel and targets in Nominations
-                    // Remove GuaranteeRel or update it
+                    // Update GuaranteeRel
+                    <GuaranteeRel<T>>::mutate(&guarantor, &v_stash, |records| {
+                        records.remove(&index);
+                    });
+
+                    let is_empty = Self::guarantee_rel(&guarantor, &v_stash).len() == 0; // used to remove GuaranteeRel and targets in Nominations
+                    // Remove it
                     if is_empty {
                         <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
-                    } else {
-                        <GuaranteeRel<T>>::insert(&guarantor, &v_stash, records);
                     }
                     // Update Nominations
                     <Guarantors<T>>::mutate(&guarantor, |nominations| {

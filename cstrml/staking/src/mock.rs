@@ -520,7 +520,7 @@ pub fn bond_validator(acc: u64, val: u64) {
     assert_ok!(Staking::validate(Origin::signed(acc), Perbill::default()));
 }
 
-pub fn bond_guarantor(acc: u64, val: u64, target: Vec<(u64, u64)>) {
+pub fn bond_guarantor(acc: u64, val: u64, targets: Vec<(u64, u64)>) {
     // a = controller
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
@@ -530,7 +530,9 @@ pub fn bond_guarantor(acc: u64, val: u64, target: Vec<(u64, u64)>) {
         val,
         RewardDestination::Controller
     ));
-    assert_ok!(Staking::guarantee(Origin::signed(acc), target));
+    for target in targets {
+        assert_ok!(Staking::guarantee(Origin::signed(acc), target));
+    }
 }
 
 pub fn advance_session() {

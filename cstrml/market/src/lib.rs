@@ -123,7 +123,7 @@ decl_module! {
                     client: who.clone()
                 };
 
-                // 3. Do check and should do something
+                // 3. Do check
                 ensure!(Self::check_storage_order(&storage_order).is_ok(), "storage order is invalid!");
 
                 // 4. Pay the order and (maybe) add storage order

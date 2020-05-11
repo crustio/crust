@@ -45,9 +45,8 @@ pub struct WorkReport {
     pub pub_key: PubKey,
     pub block_number: u64,
     pub block_hash: Vec<u8>,
-    pub empty_root: MerkleRoot,
-    pub empty_workload: u64,
-    pub meaningful_workload: u64,
+    pub reserve: u64,
+    pub files: Vec<(MerkleRoot, u64)>,
     pub sig: TeeSignature,
 }
 

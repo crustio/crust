@@ -1576,6 +1576,7 @@ impl<T: Trait> Module<T> {
             .unwrap();
 
         // Milliseconds per year for the Julian year (365.25 days).
+        // TODO: add era duration to calculate each era's rewards
         const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
         // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
         let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;

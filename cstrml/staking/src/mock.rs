@@ -185,8 +185,8 @@ impl pallet_timestamp::Trait for Test {
     type MinimumPeriod = MinimumPeriod;
 }
 pub struct TestStaking;
-impl tee::OnReportWorks<AccountId> for TestStaking {
-    fn on_report_works(controller: &AccountId, _own_workload: u128, _total_workload: u128) {
+impl tee::Works<AccountId> for TestStaking {
+    fn report_works(controller: &AccountId, _own_workload: u128, _total_workload: u128) {
         // Disable work report in mock test
         Staking::update_stake_limit(controller,
             OWN_WORKLOAD.with(|v| *v.borrow()),
@@ -195,7 +195,7 @@ impl tee::OnReportWorks<AccountId> for TestStaking {
 }
 impl tee::Trait for Test {
     type Event = ();
-    type OnReportWorks = TestStaking;
+    type Works = TestStaking;
 }
 
 parameter_types! {
@@ -216,6 +216,7 @@ impl Trait for Test {
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
+    type TeeInterface = Self;
 }
 
 pub struct ExtBuilder {

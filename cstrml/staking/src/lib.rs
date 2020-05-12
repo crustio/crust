@@ -344,7 +344,17 @@ impl<T: Trait> SessionInterface<<T as frame_system::Trait>::AccountId> for T whe
     }
 }
 
-pub trait Trait: frame_system::Trait + tee::Trait {
+pub trait TeeInterface: frame_system::Trait {
+    fn update_identities();
+}
+
+impl<T: Trait> TeeInterface for T where T: tee::Trait {
+    fn update_identities() {
+        <tee::Module<T>>::update_identities();
+    }
+}
+
+pub trait Trait: frame_system::Trait {
     /// The staking balance.
     type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
@@ -386,6 +396,9 @@ pub trait Trait: frame_system::Trait + tee::Trait {
 
     /// Interface for interacting with a session module.
     type SessionInterface: self::SessionInterface<Self::AccountId>;
+
+    /// Interface for interacting with a tee module
+    type TeeInterface: self::TeeInterface;
 }
 
 /// Mode of era-forcing.
@@ -1607,7 +1620,7 @@ impl<T: Trait> Module<T> {
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> Option<Vec<T::AccountId>> {
         // Update all tee identities work report and clear stakers
-        <tee::Module<T>>::update_identities();
+        T::TeeInterface::update_identities();
         Self::clear_stakers();
 
         let validators: Vec<(T::AccountId, Validations<T::AccountId, BalanceOf<T>>)> =
@@ -1952,8 +1965,8 @@ impl<T: Trait> historical::SessionManager<T::AccountId, Exposure<T::AccountId, B
     }
 }
 
-impl<T: Trait> tee::OnReportWorks<T::AccountId> for Module<T> {
-    fn on_report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
+impl<T: Trait> tee::Works<T::AccountId> for Module<T> {
+    fn report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
         Self::update_stake_limit(controller, own_workload, total_workload);
     }
 }

@@ -109,6 +109,7 @@ impl Default for RewardDestination {
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Validations<AccountId, Balance: HasCompact + Zero> {
     /// The total votes of Validations.
+    #[codec(compact)]
     pub total: Balance, 
     /// Reward that validator takes up-front; only the rest is split between themselves and
     /// guarantors.
@@ -137,6 +138,7 @@ pub struct Nominations<AccountId, Balance: HasCompact> {
     /// The targets of nomination.
     pub targets: Vec<AccountId>,
     /// The total votes of nomination.
+    #[codec(compact)]
     pub total: Balance,
     /// The era the nominations were submitted.
     pub submitted_in: EraIndex,

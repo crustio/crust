@@ -52,12 +52,12 @@ pub struct WorkReport {
 }
 
 /// An event handler for reporting works
-pub trait OnReportWorks<AccountId> {
-    fn on_report_works(controller: &AccountId, own_workload: u128, total_workload: u128);
+pub trait Works<AccountId> {
+    fn report_works(controller: &AccountId, own_workload: u128, total_workload: u128);
 }
 
-impl<AId> OnReportWorks<AId> for () {
-    fn on_report_works(_: &AId, _: u128, _: u128) {}
+impl<AId> Works<AId> for () {
+    fn report_works(_: &AId, _: u128, _: u128) {}
 }
 
 /// The module's configuration trait.
@@ -66,7 +66,7 @@ pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
     /// The handler for reporting works
-    type OnReportWorks: OnReportWorks<Self::AccountId>;
+    type Works: Works<Self::AccountId>;
 }
 
 decl_storage! {
@@ -217,7 +217,7 @@ impl<T: Trait> Module<T> {
 
         // 4. Update stake limit
         for (controller, own_workload) in workload_map {
-            T::OnReportWorks::on_report_works(&controller, own_workload, total_workload);
+            T::Works::report_works(&controller, own_workload, total_workload);
         }
     }
 
@@ -255,7 +255,7 @@ impl<T: Trait> Module<T> {
         EmptyWorkload::put(e_total_workload);
 
         // 4. Call `on_report_works` handler
-        T::OnReportWorks::on_report_works(
+        T::Works::report_works(
             &who,
             m_workload + e_workload,
             m_total_workload + e_total_workload,

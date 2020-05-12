@@ -55,7 +55,7 @@ impl system::Trait for Test {
 
 impl Trait for Test {
     type Event = ();
-    type OnReportWorks = ();
+    type Works = ();
 }
 
 pub type Tee = Module<Test>;

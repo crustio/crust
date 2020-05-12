@@ -29,7 +29,7 @@ fn test_for_storage_order_should_work() {
         assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
             file_identifier,
             file_size: 16,
-            created_at: 50,
+            created_on: 50,
             expired_on: 360,
             provider: 100,
             client: 0

@@ -53,12 +53,12 @@ impl system::Trait for Test {
 
 impl tee::Trait for Test {
     type Event = ();
-    type OnReportWorks = ();
+    type Works = ();
 }
 
 impl Trait for Test {
     type Event = ();
-    type OnOrderStorage = ();
+    type Payment = ();
 }
 
 pub type Market = Module<Test>;

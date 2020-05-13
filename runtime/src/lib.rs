@@ -296,6 +296,7 @@ impl staking::Trait for Runtime {
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
+    type TeeInterface = Self;
 }
 
 parameter_types! {
@@ -335,13 +336,15 @@ impl transaction_payment::Trait for Runtime {
 
 impl tee::Trait for Runtime {
     type Event = Event;
-    type OnReportWorks = Staking;
+    type Works = Staking;
+    type MarketInterface = ();
 }
 
 impl market::Trait for Runtime {
     type Event = Event;
     // TODO: Bonding with balance module
-    type OnOrderStorage = ();
+    type Payment = ();
+    type OrderInspector = Tee;
 }
 
 construct_runtime! {

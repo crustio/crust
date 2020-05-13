@@ -27,6 +27,7 @@ sp-runtime-interface = { default-features = false, version = '2.0.0-alpha.6' }
 sp-std = { default-features = false, version = '2.0.0-alpha.6' }
 
 # crust runtime modules
+market = { package = 'cstrml-market', path = '../market', default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
@@ -45,5 +46,6 @@ std = [
     'sp-std/std',
     'system/std',
     'sp-runtime-interface/std',
+    'market/std',
     'primitives/std'
 ]

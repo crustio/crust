@@ -1,8 +1,11 @@
 use crate::mock::{new_test_ext, run_to_block, Origin, Market};
-use frame_support::assert_ok;
+use frame_support::{
+    assert_noop, assert_ok,
+    dispatch::DispatchError,
+};
 use hex;
 use sp_core::H256;
-use crate::StorageOrder;
+use crate::{StorageOrder, Provision};
 
 #[test]
 fn test_for_storage_order_should_work() {
@@ -13,26 +16,32 @@ fn test_for_storage_order_should_work() {
         let source = 0;
         let file_identifier =
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let destination = 100;
-        let file_size = 16; // should less than destination
-        let expired_on = 360; // file should store at least 30 minutes
+        let provider = 100;
+        let file_size = 16; // should less than provider
+        let duration = 360; // file should store at least 30 minutes
         let fee = 10;
+        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
-        assert_ok!(Market::add_storage_order(
-            Origin::signed(source.clone()), destination, fee,
-            file_identifier.clone(), file_size, expired_on
+        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), provider, fee,
+            file_identifier.clone(), file_size, duration
         ));
 
         let order_id = H256::default();
-        assert_eq!(Market::providers(100).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::providers(100).unwrap(), vec![order_id.clone()]);
+        assert_eq!(Market::providers(100).unwrap(), Provision {
+            address,
+            files: vec![file_identifier.clone()]
+        });
+        assert_eq!(Market::clients(0).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
             file_identifier,
             file_size: 16,
-            created_at: 50,
-            expired_on: 360,
+            created_on: 50,
+            expired_on: 410,
             provider: 100,
-            client: 0
+            client: 0,
+            order_status: Default::default()
         });
     });
 }
@@ -47,15 +56,24 @@ fn test_for_storage_order_should_fail_due_to_file_size() {
         let source = 0;
         let file_identifier =
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let destination = 100;
-        let file_size = 200; // should less than destination
-        let expired_on = 60;
+        let provider = 100;
+        let file_size = 200; // should less than provider
+        let duration = 360;
         let fee = 10;
+        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
-        assert!(Market::add_storage_order(
-            Origin::signed(source.clone()), destination, fee,
-            file_identifier, file_size, expired_on
-        ).is_err());
+        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
+        assert_noop!(
+            Market::place_storage_order(
+                Origin::signed(source.clone()), provider, fee,
+                file_identifier, file_size, duration
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 1,
+                message: Some("NoWorkload"),
+            }
+        );
     });
 }
 
@@ -68,15 +86,24 @@ fn test_for_storage_order_should_fail_due_to_wrong_expired() {
         let source = 0;
         let file_identifier =
             hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let destination = 100;
-        let file_size = 60; // should less than destination
-        let expired_on = 20;
+        let provider = 100;
+        let file_size = 60; // should less than provider
+        let duration = 20;
         let fee = 10;
+        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
-        assert!(Market::add_storage_order(
-            Origin::signed(source.clone()), destination, fee,
-            file_identifier, file_size, expired_on
-        ).is_err());
+        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
+        assert_noop!(
+            Market::place_storage_order(
+                Origin::signed(source.clone()), provider, fee,
+                file_identifier, file_size, duration
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 3,
+                message: Some("DurationTooShort"),
+            }
+        );
     });
 }
 
@@ -86,17 +113,44 @@ fn test_for_storage_order_should_fail_due_to_exist_of_wr() {
         // generate 50 blocks first
         run_to_block(50);
 
+        let provider = 400; // Invalid provider. No work report
+        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
+
+        assert_noop!(
+            Market::register(Origin::signed(provider), address.clone()),
+            DispatchError::Module {
+                index: 0,
+                error: 1,
+                message: Some("NoWorkload"),
+            }
+        );
+    });
+}
+
+#[test]
+fn test_for_storage_order_should_fail_due_to_provider_not_register() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
         let source = 0;
-        let file_indetifier = 
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let destination = 400; // Invalid destination. No work report
-        let file_size = 20;
-        let expired_on = 20;
+        let file_identifier =
+            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let provider = 100;
+        let file_size = 80; // should less than provider
+        let duration = 360;
         let fee = 10;
 
-        assert!(Market::add_storage_order(
-            Origin::signed(source.clone()), destination, fee,
-            file_indetifier, file_size, expired_on
-        ).is_err());
+        assert_noop!(
+            Market::place_storage_order(
+                Origin::signed(source.clone()), provider, fee,
+                file_identifier, file_size, duration
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 2,
+                message: Some("NotProvider"),
+            }
+        );
     });
 }

@@ -337,13 +337,14 @@ impl transaction_payment::Trait for Runtime {
 impl tee::Trait for Runtime {
     type Event = Event;
     type Works = Staking;
+    type MarketInterface = Self;
 }
 
 impl market::Trait for Runtime {
     type Event = Event;
     // TODO: Bonding with balance module
     type Payment = Self;
-    type OrderInspector = Self;
+    type OrderInspector = Tee;
 }
 
 construct_runtime! {

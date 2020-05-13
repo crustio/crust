@@ -8,7 +8,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
     weights::SimpleDispatchInfo
 };
-use sp_std::{str, vec::Vec, convert::TryInto};
+use sp_std::{prelude::*, convert::TryInto};
 use system::ensure_signed;
 use sp_runtime::{traits::StaticLookup};
 

@@ -93,7 +93,7 @@ impl Get<EraIndex> for SlashDeferDuration {
 }
 
 impl_outer_origin! {
-    pub enum Origin for Test  where system = frame_system {}
+    pub enum Origin for Test where system = frame_system {}
 }
 
 /// Author of block is always 11
@@ -193,9 +193,11 @@ impl tee::Works<AccountId> for TestStaking {
             TOTAL_WORKLOAD.with(|v| *v.borrow()));
     }
 }
+
 impl tee::Trait for Test {
     type Event = ();
     type Works = TestStaking;
+    type MarketInterface = ();
 }
 
 parameter_types! {

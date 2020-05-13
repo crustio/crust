@@ -60,6 +60,30 @@ impl<AId> Works<AId> for () {
     fn report_works(_: &AId, _: u128, _: u128) {}
 }
 
+/// Implement market's order inspector, bonding with work report
+/// and return if the order is legality
+impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
+    fn check_works(provider: &T::AccountId, file_size: u64) -> bool {
+        if let Some(wr) = Self::work_reports(provider) {
+              wr.empty_workload > file_size
+        } else {
+            false
+        }
+    }
+}
+
+/// Means for interacting with a specialized version of the `market` trait.
+///
+/// This is needed because `Tee`
+/// 1. updates the `Providers` of the `market::Trait`
+/// 2. use `Providers` to judge work report
+// TODO: restrict this with market trait
+pub trait MarketInterface<AccountId> {
+}
+
+impl<AId> MarketInterface<AId> for () {
+}
+
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     /// The overarching event type.
@@ -67,6 +91,9 @@ pub trait Trait: system::Trait {
 
     /// The handler for reporting works
     type Works: Works<Self::AccountId>;
+
+    /// Interface for interacting with a market module
+    type MarketInterface: self::MarketInterface<Self::AccountId>;
 }
 
 decl_storage! {
@@ -219,10 +246,6 @@ impl<T: Trait> Module<T> {
         for (controller, own_workload) in workload_map {
             T::Works::report_works(&controller, own_workload, total_workload);
         }
-    }
-
-    pub fn get_work_report(who: &T::AccountId) -> Option<WorkReport> {
-        <WorkReports<T>>::get(who)
     }
 
     // PRIVATE MUTABLES

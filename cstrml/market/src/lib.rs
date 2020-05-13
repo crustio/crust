@@ -11,7 +11,6 @@ use frame_support::{
 use sp_std::{str, vec::Vec, convert::TryInto};
 use system::ensure_signed;
 use sp_runtime::{traits::StaticLookup};
-use tee;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -40,7 +39,9 @@ pub struct StorageOrder<AccountId> {
     pub order_status: OrderStatus
 }
 
-enum OrderStatus {
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub enum OrderStatus {
     Success,
     Failed,
     Pending
@@ -53,10 +54,11 @@ impl Default for OrderStatus {
 }
 
 /// Preference of what happens regarding validation.
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Provision {
     /// Vendor's address
-    pub total: Address,
+    pub address: Address,
 
     /// The total orders who already be taken by myself.
     pub files: Vec<MerkleRoot>,
@@ -134,7 +136,7 @@ decl_module! {
 
         /// Register to be a provider, you should provide your Karst's address{ip, port}
         #[weight = SimpleDispatchInfo::default()]
-        fn register(origin, address: Address) {
+        fn register(origin, address: Address) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Make sure you have works
@@ -160,14 +162,14 @@ decl_module! {
             #[compact] value: Balance,
             file_identifier: MerkleRoot,
             file_size: u64,
-            duration: u64
+            duration: u32
         ) -> DispatchResult
             {
                 let who = ensure_signed(origin)?;
                 let provider = T::Lookup::lookup(dest)?;
 
                 // 1. Expired should be greater than created
-                ensure!(duration > REPORT_SLOT, Error::<T>::DurationTooShort);
+                ensure!(duration > REPORT_SLOT.try_into().unwrap(), Error::<T>::DurationTooShort);
 
                 // 2. Check if provider is registered
                 ensure!(<Providers<T>>::contains_key(&provider), Error::<T>::NotProvider);
@@ -218,13 +220,22 @@ impl<T: Trait> Module<T> {
             <StorageOrders<T>>::insert(order_id, so);
 
             // 2. Add `order_id` to client orders
-            <Clients<T>>::mutate(client, |client_orders| {
-                client_orders.push(order_id.clone())
+            <Clients<T>>::mutate(client, |maybe_client_orders| {
+                if let Some(mut client_order) = maybe_client_orders.clone() {
+                    client_order.push(order_id.clone());
+                    *maybe_client_orders = Some(client_order)
+                } else {
+                    *maybe_client_orders = Some(vec![order_id.clone()])
+                }
             });
 
             // 3. Add `file_identifier` to provider's files
-            <Providers<T>>::mutate(provider, |provision| {
-                provision.files.push(so.file_identifier.clone());
+            <Providers<T>>::mutate(provider, |maybe_provision| {
+                // `provision` cannot be None
+                if let Some(mut provision) = maybe_provision.clone() {
+                    provision.files.push(so.file_identifier.clone());
+                    *maybe_provision = Some(provision)
+                }
             });
             true
         }
@@ -237,6 +248,6 @@ decl_event!(
         AccountId = <T as system::Trait>::AccountId,
     {
         StorageOrderSuccess(AccountId, StorageOrder<AccountId>),
-        RegisterSuccess(AccountId);
+        RegisterSuccess(AccountId),
     }
 );

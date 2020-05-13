@@ -827,6 +827,7 @@ name = "cstrml-tee"
 version = "0.3.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-market",
  "frame-support",
  "frame-system",
  "hex",

@@ -25,7 +25,6 @@ sp-std = { default-features = false, version = '2.0.0-alpha.6' }
 
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
-tee = { package = "cstrml-tee", path = "../tee", default-features = false }
 
 [features]
 default = ['std']
@@ -39,8 +38,8 @@ std = [
     'sp-std/std',
     'system/std',
     'primitives/std',
-    'tee/std'
 ]
 
 [dev-dependencies]
 hex = '0.4.2'
+tee = { package = 'cstrml-tee', path = '../tee' }

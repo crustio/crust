@@ -59,7 +59,7 @@ pub struct Provision {
     pub total: Address,
 
     /// The total orders who already be taken by myself.
-    pub files: Vec<Hash>,
+    pub files: Vec<MerkleRoot>,
 }
 
 /// An event handler for paying market order
@@ -76,14 +76,15 @@ impl<AId> Payment<AId> for () {
     }
 }
 
+/// A trait for checking order's legality
 /// This wanyi is an outer inspector to judge if s/r order can be accepted 😵
 pub trait OrderInspector<AccountId> {
     // check if the provider can take storage order
-    fn check_storage(provider: &AccountId, file_size: u64) -> bool;
+    fn check_works(provider: &AccountId, file_size: u64) -> bool;
 }
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait + tee::Trait {
+pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
     type Payment: Payment<Self::AccountId>;
@@ -137,7 +138,7 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Make sure you have works
-            ensure!(T::OrderInspector::check_storage(&who, 0), Error::<T>::NoWorkload);
+            ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
 
             // 2. Insert provision
             <Providers<T>>::insert(who.clone(), Provision {
@@ -172,7 +173,7 @@ decl_module! {
                 ensure!(<Providers<T>>::contains_key(&provider), Error::<T>::NotProvider);
 
                 // 3. Check provider has capacity to store file
-                ensure!(T::OrderInspector::check_storage(&provider, file_size), Error::<T>::NoWorkload);
+                ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
 
                 // 4. Construct storage order
                 let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
@@ -213,14 +214,18 @@ impl<T: Trait> Module<T> {
         if <StorageOrders<T>>::contains_key(&order_id) {
             false
         } else {
-            let mut client_orders = Self::clients(client).unwrap_or_default();
-            let mut provider_orders = Self::providers(provider).unwrap_or_default();
-            client_orders.push(order_id.clone());
-            provider_orders.push(order_id.clone());
-
-            <Clients<T>>::insert(client, client_orders);
-            <Providers<T>>::insert(provider, provider_orders);
+            // 1. Add new storage order
             <StorageOrders<T>>::insert(order_id, so);
+
+            // 2. Add `order_id` to client orders
+            <Clients<T>>::mutate(client, |client_orders| {
+                client_orders.push(order_id.clone())
+            });
+
+            // 3. Add `file_identifier` to provider's files
+            <Providers<T>>::mutate(provider, |provision| {
+                provision.files.push(so.file_identifier.clone());
+            });
             true
         }
     }

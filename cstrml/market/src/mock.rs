@@ -51,18 +51,34 @@ impl system::Trait for Test {
     type OnKilledAccount = ();
 }
 
+pub struct TestOrderInspector;
+
+impl OrderInspector<AccountId> for TestOrderInspector {
+    // file size should smaller than provider's num
+    fn check_works(provider: &AccountId, file_size: u64) -> bool {
+        if let Some(wr) = Tee::work_reports(provider) {
+            wr.empty_workload > file_size
+        } else {
+            false
+        }
+    }
+}
+
 impl tee::Trait for Test {
     type Event = ();
-    type OnReportWorks = ();
+    type Works = ();
+    type MarketInterface = ();
 }
 
 impl Trait for Test {
     type Event = ();
-    type OnOrderStorage = ();
+    type Payment = ();
+    type OrderInspector = TestOrderInspector;
 }
 
 pub type Market = Module<Test>;
 pub type System = system::Module<Test>;
+pub type Tee = tee::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.

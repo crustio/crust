@@ -51,12 +51,36 @@ pub struct WorkReport {
 }
 
 /// An event handler for reporting works
-pub trait OnReportWorks<AccountId> {
-    fn on_report_works(controller: &AccountId, own_workload: u128, total_workload: u128);
+pub trait Works<AccountId> {
+    fn report_works(controller: &AccountId, own_workload: u128, total_workload: u128);
 }
 
-impl<AId> OnReportWorks<AId> for () {
-    fn on_report_works(_: &AId, _: u128, _: u128) {}
+impl<AId> Works<AId> for () {
+    fn report_works(_: &AId, _: u128, _: u128) {}
+}
+
+/// Implement market's order inspector, bonding with work report
+/// and return if the order is legality
+impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
+    fn check_works(provider: &T::AccountId, file_size: u64) -> bool {
+        if let Some(wr) = Self::work_reports(provider) {
+              wr.empty_workload > file_size
+        } else {
+            false
+        }
+    }
+}
+
+/// Means for interacting with a specialized version of the `market` trait.
+///
+/// This is needed because `Tee`
+/// 1. updates the `Providers` of the `market::Trait`
+/// 2. use `Providers` to judge work report
+// TODO: restrict this with market trait
+pub trait MarketInterface<AccountId> {
+}
+
+impl<AId> MarketInterface<AId> for () {
 }
 
 /// The module's configuration trait.
@@ -65,7 +89,10 @@ pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
     /// The handler for reporting works
-    type OnReportWorks: OnReportWorks<Self::AccountId>;
+    type Works: Works<Self::AccountId>;
+
+    /// Interface for interacting with a market module
+    type MarketInterface: self::MarketInterface<Self::AccountId>;
 }
 
 decl_storage! {
@@ -216,12 +243,8 @@ impl<T: Trait> Module<T> {
 
         // 4. Update stake limit
         for (controller, own_workload) in workload_map {
-            T::OnReportWorks::on_report_works(&controller, own_workload, total_workload);
+            T::Works::report_works(&controller, own_workload, total_workload);
         }
-    }
-
-    pub fn get_work_report(who: &T::AccountId) -> Option<WorkReport> {
-        <WorkReports<T>>::get(who)
     }
 
     // PRIVATE MUTABLES
@@ -254,7 +277,7 @@ impl<T: Trait> Module<T> {
         EmptyWorkload::put(e_total_workload);
 
         // 4. Call `on_report_works` handler
-        T::OnReportWorks::on_report_works(
+        T::Works::report_works(
             &who,
             m_workload + e_workload,
             m_total_workload + e_total_workload,

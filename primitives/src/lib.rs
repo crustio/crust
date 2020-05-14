@@ -49,3 +49,6 @@ pub type MerkleRoot = Vec<u8>;
 
 /// Report index, always be a multiple of era number
 pub type ReportSlot = u64;
+
+/// Market vendor's address info
+pub type Address = Vec<u8>;

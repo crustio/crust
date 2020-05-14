@@ -53,10 +53,16 @@ impl system::Trait for Test {
     type OnKilledAccount = ();
 }
 
+impl market::Trait for Test {
+    type Event = ();
+    type Payment = ();
+    type OrderInspector = Tee;
+}
+
 impl Trait for Test {
     type Event = ();
     type Works = ();
-    type MarketInterface = ();
+    type MarketInterface = Self;
 }
 
 pub type Tee = Module<Test>;

@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot};
+use market::Provision;
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -78,9 +79,22 @@ impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
 /// 2. use `Providers` to judge work report
 // TODO: restrict this with market trait
 pub trait MarketInterface<AccountId> {
+    /// Provision{files} will be used for tee module.
+    fn providers(account_id: &AccountId) -> Option<Provision>;
 }
 
 impl<AId> MarketInterface<AId> for () {
+    fn providers(_: &AId) -> Option<Provision> {
+        None
+    }
+}
+
+impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for T where
+    T: market::Trait
+{
+    fn providers(account_id: &<T as system::Trait>::AccountId) -> Option<Provision> {
+        <market::Module<T>>::providers(account_id)
+    }
 }
 
 /// The module's configuration trait.
@@ -88,10 +102,10 @@ pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
-    /// The handler for reporting works
+    /// The handler for reporting works.
     type Works: Works<Self::AccountId>;
 
-    /// Interface for interacting with a market module
+    /// Interface for interacting with a market module.
     type MarketInterface: self::MarketInterface<Self::AccountId>;
 }
 
@@ -227,6 +241,7 @@ impl<T: Trait> Module<T> {
         let mut total_meaningful_workload = 0;
         let mut total_empty_workload = 0;
 
+        // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
             let (e_workload, m_workload) = Self::update_and_get_workload(&controller, current_rs);
             total_meaningful_workload += m_workload;
@@ -267,6 +282,8 @@ impl<T: Trait> Module<T> {
         <WorkReports<T>>::insert(who, wr);
         <ReportedInSlot<T>>::insert(who, rs, true);
 
+        // TODO: add active order check here to return the real meaning_workload
+
         // 3. Upsert workload
         let m_workload = wr.meaningful_workload as u128;
         let e_workload = wr.empty_workload as u128;
@@ -292,6 +309,9 @@ impl<T: Trait> Module<T> {
         // 1. Judge if this controller reported works in this current era
         if let Some(wr) = Self::work_reports(controller) {
             if Self::reported_in_slot(controller, current_rs) {
+                // TODO: add market storage order passive check here
+                // this will update the order info in market
+                // and return the real meaningful workload
                 (wr.empty_workload as u128, wr.meaningful_workload as u128)
             } else {
                 // Remove work report when wr IS outdated

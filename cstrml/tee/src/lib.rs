@@ -46,7 +46,8 @@ pub struct WorkReport {
     pub pub_key: PubKey,
     pub block_number: u64,
     pub block_hash: Vec<u8>,
-    pub reserve: u64,
+    pub used: u64,
+    pub reserved: u64,
     pub files: Vec<(MerkleRoot, u64)>,
     pub sig: TeeSignature,
 }
@@ -65,7 +66,7 @@ impl<AId> Works<AId> for () {
 impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
     fn check_works(provider: &T::AccountId, file_size: u64) -> bool {
         if let Some(wr) = Self::work_reports(provider) {
-              wr.empty_workload > file_size
+              wr.reserve > file_size
         } else {
             false
         }
@@ -132,13 +133,13 @@ decl_storage! {
         }): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) ReportSlot
         => bool = false;
 
-        /// The meaningful workload, used for calculating stake limit in the end of era
+        /// The used workload, used for calculating stake limit in the end of era
         /// default is 0
-        pub MeaningfulWorkload get(fn meaningful_workload): u128 = 0;
+        pub Used get(fn used): u128 = 0;
 
-        /// The empty workload, used for calculating stake limit in the end of era
+        /// The reserved workload, used for calculating stake limit in the end of era
         /// default is 0
-        pub EmptyWorkload get(fn empty_workload): u128 = 0;
+        pub Reserved get(fn reserved): u128 = 0;
     }
 }
 
@@ -223,11 +224,15 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     // PUBLIC MUTABLES
-    /// This function is for updating all identities' work report, mainly aimed to check if it is outdated
-    /// and it should be called in the start of era.
+    /// This function is for updating all identities, in details:
+    /// 1. call `update_and_get_workload` for every identity, which will return (reserved, used)
+    /// this also (maybe) remove the `outdated` work report
+    /// 2. re-calculate `Used` and `Reserved`
+    /// 3. update `CurrentReportSlot`
+    /// 4. call `Works::report_works` interface for every identity
     ///
-    /// TC = O(n)
-    /// DB try is 2n+1
+    /// TC = O(2n)
+    /// DB try is 2n+5+Works_DB_try
     pub fn update_identities() {
         // Ideally, reported_rs should be current_rs + 1
         let reported_rs = Self::get_reported_slot();
@@ -238,34 +243,40 @@ impl<T: Trait> Module<T> {
         }
 
         // 2. Update id's work rzeport, get id's workload and total workload
-        let mut total_meaningful_workload = 0;
-        let mut total_empty_workload = 0;
+        let mut total_used = 0;
+        let mut total_reserved = 0;
 
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
-            let (e_workload, m_workload) = Self::update_and_get_workload(&controller, current_rs);
-            total_meaningful_workload += m_workload;
-            total_empty_workload += e_workload;
-            (controller.clone(), m_workload + e_workload)
+            let (reserved, used) = Self::update_and_get_workload(&controller, current_rs);
+            total_used += used;
+            total_reserved += reserved;
+            (controller.clone(), used + reserved)
         }).collect();
 
-        MeaningfulWorkload::put(total_meaningful_workload);
-        EmptyWorkload::put(total_empty_workload);
-        let total_workload = total_meaningful_workload + total_empty_workload;
+        Used::put(total_used);
+        Reserved::put(total_reserved);
+        let total_workload = total_used + total_reserved;
 
         // 3. Update current report slot
         CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
         // 4. Update stake limit
         for (controller, own_workload) in workload_map {
+            // TODO: passive market order test in here, check and (maybe) update the order's status(success -> failed)
             T::Works::report_works(&controller, own_workload, total_workload);
         }
     }
 
     // PRIVATE MUTABLES
+    /// This function will (maybe) update or insert a work report, in details:
+    /// 1. calculate used from reported files
+    /// 2. set `ReportedInSlot` to true
+    /// 3. update `Used` and `Reserved`
+    /// 4. call `Works::report_works` interface
     fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport) -> bool {
-        let mut old_m_workload: u128 = 0;
-        let mut old_e_workload: u128 = 0;
+        let mut old_used: u128 = 0;
+        let mut old_reserved: u128 = 0;
         let rs = Self::get_reported_slot();
 
         // 1. Judge if wr exists
@@ -273,48 +284,51 @@ impl<T: Trait> Module<T> {
             if &old_wr == wr {
                 return false;
             } else {
-                old_m_workload = old_wr.meaningful_workload as u128;
-                old_e_workload = old_wr.empty_workload as u128;
+                old_used = old_wr.used as u128;
+                old_reserved = old_wr.reserved as u128;
             }
         }
 
-        // 2. Upsert work report and mark reported this (report)slot
-        <WorkReports<T>>::insert(who, wr);
+        // 2. Calculate used space
+        let mut updated_wr = wr.clone();
+        updated_wr.used = wr.files.iter().fold(0, |used, (_, f_size)| {
+            // TODO: add active check from market to tee files here, (maybe) set order (pending -> success)
+            used + *f_size
+        });
+
+        // 3. Upsert work report and mark who has reported in this (report)slot
+        <WorkReports<T>>::insert(who, &updated_wr);
         <ReportedInSlot<T>>::insert(who, rs, true);
 
-        // TODO: add active order check here to return the real meaning_workload
+        // 4. Update workload
+        let used = updated_wr.used as u128;
+        let reserved = updated_wr.reserved as u128;
+        let total_used = Self::used() - old_used + used;
+        let total_reserved = Self::reserved() - old_reserved + reserved;
 
-        // 3. Upsert workload
-        let m_workload = wr.meaningful_workload as u128;
-        let e_workload = wr.empty_workload as u128;
-        let m_total_workload = Self::meaningful_workload() - old_m_workload + m_workload;
-        let e_total_workload = Self::empty_workload() - old_e_workload + e_workload;
+        Used::put(total_used);
+        Reserved::put(total_reserved);
 
-        MeaningfulWorkload::put(m_total_workload);
-        EmptyWorkload::put(e_total_workload);
-
-        // 4. Call `on_report_works` handler
+        // 5. Call `on_report_works` handler
         T::Works::report_works(
             &who,
-            m_workload + e_workload,
-            m_total_workload + e_total_workload,
+            used + reserved,
+            total_used + total_reserved,
         );
         true
     }
 
     /// Get updated workload by controller account,
     /// this function should only be called in the new era
-    /// otherwise, it will be an void in this recursive loop
+    /// otherwise, it will be an void in this recursive loop,
+    /// return the (reserved, used) storage of this controller
     fn update_and_get_workload(controller: &T::AccountId, current_rs: u64) -> (u128, u128) {
         // 1. Judge if this controller reported works in this current era
         if let Some(wr) = Self::work_reports(controller) {
             if Self::reported_in_slot(controller, current_rs) {
-                // TODO: add market storage order passive check here
-                // this will update the order info in market
-                // and return the real meaningful workload
-                (wr.empty_workload as u128, wr.meaningful_workload as u128)
+                (wr.reserved as u128, wr.used as u128)
             } else {
-                // Remove work report when wr IS outdated
+                // Remove work report when it is outdated
                 if wr.block_number < current_rs {
                     <WorkReports<T>>::remove(controller);
                 }
@@ -379,9 +393,8 @@ impl<T: Trait> Module<T> {
             &wr.pub_key,
             wr.block_number,
             &wr.block_hash,
-            &wr.empty_root,
-            wr.empty_workload,
-            wr.meaningful_workload,
+            &wr.reserved,
+            &wr.files,
             &wr.sig,
         )
     }

@@ -13,13 +13,13 @@ use sp_runtime::{
 pub type AccountId = u64;
 
 impl_outer_origin! {
-    pub enum Origin for Test {}
+    pub enum Origin for Test where system = system {}
 }
 
 // For testing the module, we construct most of a mock runtime. This means
 // first constructing a configuration type (`Test`) which `impl`s each of the
 // configuration traits of modules we want to use.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Test;
 
 parameter_types! {

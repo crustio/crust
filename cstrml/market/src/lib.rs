@@ -8,7 +8,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
     weights::SimpleDispatchInfo
 };
-use sp_std::{prelude::*, convert::TryInto};
+use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
 use sp_runtime::{traits::StaticLookup};
 
@@ -60,8 +60,8 @@ pub struct Provision {
     /// Vendor's address
     pub address: Address,
 
-    /// The total orders who already be taken by myself.
-    pub files: Vec<MerkleRoot>,
+    /// Mapping from `file_id` to `order_id`, this mapping only add when user place the order
+    pub file_map: BTreeMap<MerkleRoot, Hash>,
 }
 
 /// An event handler for paying market order
@@ -145,7 +145,7 @@ decl_module! {
             // 2. Insert provision
             <Providers<T>>::insert(who.clone(), Provision {
                 address,
-                files: vec![]
+                file_map: BTreeMap::new()
             });
 
             // 3. Emit success
@@ -229,11 +229,11 @@ impl<T: Trait> Module<T> {
                 }
             });
 
-            // 3. Add `file_identifier` to provider's files
+            // 3. Add `file_identifier` -> `order_id` to provider's file_map
             <Providers<T>>::mutate(provider, |maybe_provision| {
                 // `provision` cannot be None
                 if let Some(mut provision) = maybe_provision.clone() {
-                    provision.files.push(so.file_identifier.clone());
+                    provision.file_map.insert(so.file_identifier.clone(), order_id.clone());
                     *maybe_provision = Some(provision)
                 }
             });

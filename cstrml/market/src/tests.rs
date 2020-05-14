@@ -31,7 +31,7 @@ fn test_for_storage_order_should_work() {
         let order_id = H256::default();
         assert_eq!(Market::providers(100).unwrap(), Provision {
             address,
-            files: vec![file_identifier.clone()]
+            file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()
         });
         assert_eq!(Market::clients(0).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {

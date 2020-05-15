@@ -66,7 +66,7 @@ impl<AId> Works<AId> for () {
 impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
     fn check_works(provider: &T::AccountId, file_size: u64) -> bool {
         if let Some(wr) = Self::work_reports(provider) {
-              wr.reserve > file_size
+              wr.reserved > file_size
         } else {
             false
         }
@@ -393,7 +393,7 @@ impl<T: Trait> Module<T> {
             &wr.pub_key,
             wr.block_number,
             &wr.block_hash,
-            &wr.reserved,
+            wr.reserved,
             &wr.files,
             &wr.sig,
         )

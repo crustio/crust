@@ -57,7 +57,7 @@ impl OrderInspector<AccountId> for TestOrderInspector {
     // file size should smaller than provider's num
     fn check_works(provider: &AccountId, file_size: u64) -> bool {
         if let Some(wr) = Tee::work_reports(provider) {
-            wr.empty_workload > file_size
+            wr.reserved > file_size
         } else {
             false
         }
@@ -98,9 +98,9 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
                         pub_key: vec![],
                         block_number: 0,
                         block_hash: vec![],
-                        empty_root: vec![],
-                        empty_workload: *id,
-                        meaningful_workload: 0,
+                        files: vec![],
+                        used: 0,
+                        reserved: *id,
                         sig: vec![],
                     },
                 )

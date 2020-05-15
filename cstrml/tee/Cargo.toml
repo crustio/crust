@@ -14,6 +14,7 @@ serde = { optional = true, version = '1.0.106' }
 serde_json = "1.0.51"
 signatory = "0.18.0"
 signatory-ring = "0.18.0"
+hex = '0.4.2'
 
 # substrate frame dependencies
 frame-support = { default-features = false, version = '2.0.0-alpha.6' }
@@ -32,7 +33,6 @@ primitives = { package = 'cst-primitives', path = '../../primitives', default-fe
 
 [dev-dependencies]
 keyring = { package = "sp-keyring", version = '2.0.0-alpha.6' }
-hex = '0.4.2'
 
 [features]
 default = ['std']

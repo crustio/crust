@@ -412,10 +412,10 @@ impl ExtBuilder {
                         pub_key: vec![],
                         block_number: 0,
                         block_hash: vec![],
-                        empty_root: vec![],
-                        empty_workload: 20000000000000,
-                        meaningful_workload: 0,
+                        used: 0,
+                        reserved: 20000000000000,
                         sig: vec![],
+                        files: vec![]
                     },
                 )
             })

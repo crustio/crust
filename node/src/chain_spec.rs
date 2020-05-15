@@ -206,10 +206,10 @@ fn testnet_genesis(
                             pub_key: vec![],
                             block_number: 0,
                             block_hash: vec![],
-                            empty_root: vec![],
-                            empty_workload: WORKLOAD,
-                            meaningful_workload: 0,
+                            files: vec![],
+                            reserved: WORKLOAD,
                             sig: vec![],
+                            used: 0
                         },
                     )
                 })

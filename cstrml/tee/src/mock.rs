@@ -75,20 +75,28 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .build_storage::<Test>()
         .unwrap();
 
-    // stash-controller accounts
-    let accounts = [Sr25519Keyring::Alice.to_account_id()];
+    // initial authorities: [Alice, Bob]
+    let accounts = [
+        (
+            Sr25519Keyring::Alice.to_account_id(),
+            hex::decode("0fb42b36f26b69b7bbd3f60b2e377e66a4dacf0284877731bb59ca2cc9ce2759390dfb4b7023986e238d74df027f0f7f34b51f4b0dbf60e5f0ac90812d977499").unwrap()
+        ),
+        (
+            Sr25519Keyring::Bob.to_account_id(),
+            hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap()
+        )
+    ];
 
-    let pk = hex::decode("0fb42b36f26b69b7bbd3f60b2e377e66a4dacf0284877731bb59ca2cc9ce2759390dfb4b7023986e238d74df027f0f7f34b51f4b0dbf60e5f0ac90812d977499").unwrap();
     let tee_identities = accounts
         .iter()
-        .map(|x| {
+        .map(|(id, pk)| {
             (
-                x.clone(),
+                id.clone(),
                 Identity {
                     pub_key: pk.clone(),
-                    account_id: x.clone(),
+                    account_id: id.clone(),
                     validator_pub_key: pk.clone(),
-                    validator_account_id: x.clone(),
+                    validator_account_id: id.clone(),
                     sig: vec![],
                 },
             )
@@ -96,7 +104,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .collect();
     let work_reports = accounts
         .iter()
-        .map(|x| (x.clone(), Default::default()))
+        .map(|(x, _)| (x.clone(), Default::default()))
         .collect();
 
     GenesisConfig::<Test> {
@@ -112,11 +120,13 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
 /// Run until a particular block.
 pub fn run_to_block(n: u64) {
+    let fake_bh = H256::from_slice(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap().as_slice());
     while System::block_number() < n {
+        <system::BlockHash<Test>>::insert(System::block_number(), fake_bh.clone());
         if System::block_number() > 1 {
             System::on_finalize(System::block_number());
         }
-        System::set_block_number(System::block_number() + 1);
         System::on_initialize(System::block_number());
+        System::set_block_number(System::block_number() + 1);
     }
 }

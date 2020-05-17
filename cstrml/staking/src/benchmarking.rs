@@ -20,14 +20,13 @@ use super::*;
 
 use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
 
-use sp_runtime::traits::{Dispatchable, One};
+use sp_runtime::traits::One;
 use sp_io::hashing::blake2_256;
 
 use frame_system::RawOrigin;
 use frame_benchmarking::{benchmarks, account};
 
 use crate::Module as Staking;
-use frame_system::Module as System;
 
 const SEED: u32 = 0;
 const ACCOUNT_BALANCE_RATIO: u32 = 10000;
@@ -50,8 +49,8 @@ pub fn create_stash_controller<T: Trait>(n: u32) -> Result<(T::AccountId, T::Acc
 	return Ok((stash, controller))
 }
 
-// This function generates v validators and n nominators who are randomly nominating up to MAX_NOMINATIONS.
-pub fn create_validators_with_nominators_for_era<T: Trait>(v: u32, n: u32, m: u32) -> Result<(T::AccountId, <T::Lookup as StaticLookup>::Source), &'static str> {
+// This function generates v validators and n guarantor who are randomly nominating up to MAX_NOMINATIONS.
+pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u32) -> Result<(T::AccountId, <T::Lookup as StaticLookup>::Source), &'static str> {
 	let mut validators: Vec<<T::Lookup as StaticLookup>::Source> = Vec::with_capacity(v as usize);
 	let mut rng = ChaChaRng::from_seed(SEED.using_encoded(blake2_256));
 
@@ -70,7 +69,7 @@ pub fn create_validators_with_nominators_for_era<T: Trait>(v: u32, n: u32, m: u3
 		validators.push(stash_lookup.clone());
 	}
 
-	// Create n nominators
+	// Create n guarantor
 	let (_n_stash, n_controller) = create_stash_controller::<T>(u32::max_value())?;
 
 	// Have them randomly validate
@@ -99,7 +98,7 @@ pub fn create_validators_with_nominators_for_era<T: Trait>(v: u32, n: u32, m: u3
 	Ok((saved_n_controller, saved_v_lookup))
 }
 
-// This function generates one validator and one nominator
+// This function generates one validator and one guarantor
 pub fn create_one_validator_with_one_nominator<T: Trait>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
 	let (v_stash, v_controller) = create_stash_controller::<T>(n)?;
 	Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
@@ -125,6 +124,7 @@ benchmarks! {
 		let amount = T::Currency::minimum_balance() * 10.into();
 	}: _(RawOrigin::Signed(stash), controller_lookup, amount, reward_destination)
 
+
 	bond_extra {
 		let u in ...;
 		let (stash, controller) = create_stash_controller::<T>(u)?;
@@ -133,6 +133,7 @@ benchmarks! {
 		let max_additional = T::Currency::minimum_balance() * 10.into();
 	}: _(RawOrigin::Signed(stash), max_additional)
 
+
 	validate {
 		let u in ...;
 		let (stash, controller) = create_stash_controller::<T>(u)?;
@@ -140,15 +141,16 @@ benchmarks! {
 		Staking::<T>::upsert_stake_limit(&stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
 	}: _(RawOrigin::Signed(controller), prefs)
 
-	// // Worst case scenario, MAX_NOMINATIONS
+
 	guarantee {
 		let v = 10;
 		let n = 10;
 		let m = 2;
 		let u in ...;
 		MinimumValidatorCount::put(0);
-		let (g_controller, v_lookup) = create_validators_with_nominators_for_era::<T>(v, n, m)?;
+		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(v, n, m)?;
 	}: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
+
 
 	cut_guarantee {
 		let v = 10;
@@ -156,17 +158,18 @@ benchmarks! {
 		let m = 2;
 		let u in ...;
 		MinimumValidatorCount::put(0);
-		let (g_controller, v_lookup) = create_validators_with_nominators_for_era::<T>(v, n, m)?;
+		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(v, n, m)?;
 		Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
 		(v_lookup.clone(), T::Currency::minimum_balance().into()));
 	}: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
+
 
 	new_era {
 		let v in 1 .. 10;
 		let n in 1 .. 10;
 		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		create_validators_with_nominators_for_era::<T>(v, n, m)?;
+		create_validators_with_guarantors_for_era::<T>(v, n, m)?;
 		let session_index = SessionIndex::one();
 	}: {
 		let validators = Staking::<T>::new_era(session_index).ok_or("`new_era` failed")?;
@@ -179,18 +182,19 @@ benchmarks! {
 		let n in 1 .. 10;
 		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		create_validators_with_nominators_for_era::<T>(v, n, m)?;
+		create_validators_with_guarantors_for_era::<T>(v, n, m)?;
 		let session_index = SessionIndex::one();
 	}: {
 		Staking::<T>::update_rel_and_nominations_and_ledger();
 	}
+
 
 	select_validators {
 		let v in 1 .. 10;
 		let n in 1 .. 10;
 		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		create_validators_with_nominators_for_era::<T>(v, n, m)?;
+		create_validators_with_guarantors_for_era::<T>(v, n, m)?;
 		let session_index = SessionIndex::one();
 	}: {
 		Staking::<T>::select_validators();
@@ -203,59 +207,21 @@ mod tests {
 	use crate::mock::{ExtBuilder, Test, Balances, Staking, Origin};
 	use frame_support::assert_ok;
 
-	// #[test]
-	// fn create_validators_with_nominators_for_era_works() {
-	// 	ExtBuilder::default().has_stakers(false).build().execute_with(|| {
-	// 		let v = 10;
-	// 		let n = 100;
+	#[test]
+	fn create_validators_with_guarantors_for_era_works() {
+		ExtBuilder::default().has_stakers(false).build().execute_with(|| {
+			let v = 10;
+			let n = 100;
 
-	// 		create_validators_with_nominators_for_era::<Test>(v,n).unwrap();
+			create_validators_with_guarantors_for_era::<Test>(v,n).unwrap();
 
-	// 		let count_validators = Validators::<Test>::iter().count();
-	// 		let count_nominators = Nominators::<Test>::iter().count();
+			let count_validators = Validators::<Test>::iter().count();
+			let count_guarantor = guarantor::<Test>::iter().count();
 
-	// 		assert_eq!(count_validators, v as usize);
-	// 		assert_eq!(count_nominators, n as usize);
-	// 	});
-	// }
-
-	// #[test]
-	// fn create_validator_with_nominators_works() {
-	// 	ExtBuilder::default().has_stakers(false).build().execute_with(|| {
-	// 		let n = 10;
-
-	// 		let validator_stash = create_validator_with_nominators::<Test>(
-	// 			n,
-	// 			MAX_NOMINATIONS as u32,
-	// 		).unwrap();
-
-	// 		let current_era = CurrentEra::get().unwrap();
-
-	// 		let original_free_balance = Balances::free_balance(&validator_stash);
-	// 		assert_ok!(Staking::payout_stakers(Origin::signed(1337), validator_stash, current_era));
-	// 		let new_free_balance = Balances::free_balance(&validator_stash);
-
-	// 		assert!(original_free_balance < new_free_balance);
-	// 	});
-	// }
-
-	// #[test]
-	// fn test_payout_all() {
-	// 	ExtBuilder::default().has_stakers(false).build().execute_with(|| {
-	// 		let v = 10;
-	// 		let n = 100;
-
-	// 		let selected_benchmark = SelectedBenchmark::payout_all;
-	// 		let c = vec![(frame_benchmarking::BenchmarkParameter::v, v), (frame_benchmarking::BenchmarkParameter::n, n)];
-	// 		let closure_to_benchmark =
-	// 			<SelectedBenchmark as frame_benchmarking::BenchmarkingSetup<Test>>::instance(
-	// 				&selected_benchmark,
-	// 				&c
-	// 			).unwrap();
-
-	// 		assert_ok!(closure_to_benchmark());
-	// 	});
-	// }
+			assert_eq!(count_validators, v as usize);
+			assert_eq!(count_guarantor, n as usize);
+		});
+	}
 
 	#[test]
 	fn test_benchmarks() {

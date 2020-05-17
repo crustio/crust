@@ -204,22 +204,24 @@ benchmarks! {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::mock::{ExtBuilder, Test, Balances, Staking, Origin};
+	use crate::mock::{ExtBuilder, Test};
 	use frame_support::assert_ok;
 
 	#[test]
 	fn create_validators_with_guarantors_for_era_works() {
-		ExtBuilder::default().has_stakers(false).build().execute_with(|| {
+		ExtBuilder::default().build().execute_with(|| {
 			let v = 10;
 			let n = 100;
+			let m = 10;
 
-			create_validators_with_guarantors_for_era::<Test>(v,n).unwrap();
+			create_validators_with_guarantors_for_era::<Test>(v,n,m).unwrap();
 
 			let count_validators = Validators::<Test>::iter().count();
-			let count_guarantor = guarantor::<Test>::iter().count();
+			let count_guarantor = Guarantors::<Test>::iter().count();
 
-			assert_eq!(count_validators, v as usize);
-			assert_eq!(count_guarantor, n as usize);
+			// 3 extra validators and 1 extra guarantor in mock Test
+			assert_eq!(count_validators, (v + 3) as usize);
+			assert_eq!(count_guarantor, (n + 1) as usize);
 		});
 	}
 

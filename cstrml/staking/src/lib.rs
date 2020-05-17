@@ -9,6 +9,8 @@ mod slashing;
 mod tests;
 
 pub mod inflation;
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
 
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
@@ -1505,6 +1507,9 @@ impl<T: Trait> Module<T> {
         });
 
         // Reassign all stakers.
+        T::TeeInterface::update_identities();
+        Self::clear_stakers();
+        Self::update_rel_and_nominations_and_ledger();
         let maybe_new_validators = Self::select_validators();
         Self::apply_unapplied_slashes(current_era);
 
@@ -1614,30 +1619,9 @@ impl<T: Trait> Module<T> {
         })
     }
 
-    /// Select a new validator set from the assembled stakers and their role preferences.
-    ///
-    /// Returns the new `TotalStakes` value and a set of newly selected _stash_ IDs.
-    ///
-    /// Assumes storage is coherent with the declaration.
-    fn select_validators() -> Option<Vec<T::AccountId>> {
-        // Update all tee identities work report and clear stakers
-        T::TeeInterface::update_identities();
-        Self::clear_stakers();
-
+    fn update_rel_and_nominations_and_ledger() {
         let validators: Vec<(T::AccountId, Validations<T::AccountId, BalanceOf<T>>)> =
             <Validators<T>>::iter().collect();
-        let validator_count = validators.len();
-        let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
-
-        if validator_count < minimum_validator_count {
-            // There were not enough validators for even our minimal level of functionality.
-            // This is bad.
-            // We should probably disable all functionality except for block production
-            // and let the chain keep producing blocks until we can decide on a sufficiently
-            // substantial set.
-            // TODO: [Substrate]substrate#2494
-            return None;
-        }
 
         let to_votes =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
@@ -1789,13 +1773,36 @@ impl<T: Trait> Module<T> {
             g_ledger.valid = total;
             Self::update_ledger(&g_controller, &g_ledger);
         });
+    }
 
+    /// Select a new validator set from the assembled stakers and their role preferences.
+    ///
+    /// Returns the new `TotalStakes` value and a set of newly selected _stash_ IDs.
+    ///
+    /// Assumes storage is coherent with the declaration.
+    fn select_validators() -> Option<Vec<T::AccountId>> {
         // III. TopDown Election Algorithm
         // Select new validators by top-down their `valid` stakes
         // - time complex is O(2n)
         // - DB try is n
         // 1. Populate elections and figure out the minimum stake behind a slot.
+        let validators: Vec<(T::AccountId, Validations<T::AccountId, BalanceOf<T>>)> =
+        <Validators<T>>::iter().collect();
         let mut total_stakes: BalanceOf<T> = Zero::zero();
+        let validator_count = validators.len();
+        let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
+        if validator_count < minimum_validator_count {
+            // There were not enough validators for even our minimal level of functionality.
+            // This is bad.
+            // We should probably disable all functionality except for block production
+            // and let the chain keep producing blocks until we can decide on a sufficiently
+            // substantial set.
+            // TODO: [Substrate]substrate#2494
+            return None;
+        }
+        let to_votes =
+            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
+        let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
         let mut validators_stakes = <Stakers<T>>::iter()
             .map(|(stash, exposure)| {
                 if let Some(maybe_total_stakes) = total_stakes.checked_add(&exposure.total) {

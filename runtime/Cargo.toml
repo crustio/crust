@@ -25,6 +25,7 @@ balances = { default-features = false, package = 'pallet-balances', version = '2
 collective = { default-features = false, package = 'pallet-collective', version = '2.0.0-alpha.6' }
 frame-executive = { default-features = false, version = '2.0.0-alpha.6' }
 frame-support = { default-features = false, version = "2.0.0-alpha.6" }
+frame-benchmarking = { version = "2.0.0-alpha.6", default-features = false, optional = true }
 finality-tracker = { default-features = false, package = 'pallet-finality-tracker', version = '2.0.0-alpha.6' }
 grandpa = { default-features = false, package = 'pallet-grandpa', version = '2.0.0-alpha.6' }
 indices = { package = "pallet-indices", version = '2.0.0-alpha.6', default-features = false }
@@ -99,4 +100,7 @@ std = [
     'staking/std',
     'market/std',
     'primitives/std'
+]
+runtime-benchmarks = [
+	"frame-benchmarking",
 ]

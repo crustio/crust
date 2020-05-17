@@ -18,6 +18,8 @@ frame-support = { version = '2.0.0-alpha.6', default-features = false }
 frame-system = { version = '2.0.0-alpha.6', default-features = false }
 pallet-session = { version = '2.0.0-alpha.6', features = ["historical"], default-features = false }
 pallet-authorship = { version = '2.0.0-alpha.6', default-features = false }
+frame-benchmarking = { version = '2.0.0-alpha.6', default-features = false, optional = true }
+rand_chacha = { version = "0.2", default-features = false, optional = true }
 
 # substrate primitives
 sp-keyring = { optional = true, version = '2.0.0-alpha.6' }
@@ -59,4 +61,8 @@ std = [
 	"frame-system/std",
 	"pallet-authorship/std",
 	"tee/std"
+]
+runtime-benchmarks = [
+	"rand_chacha",
+	"frame-benchmarking",
 ]

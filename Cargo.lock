@@ -687,6 +687,7 @@ dependencies = [
  "cst-primitives",
  "cstrml-staking",
  "cstrml-tee",
+ "frame-benchmarking-cli",
  "futures 0.3.4",
  "log",
  "sc-authority-discovery",
@@ -720,6 +721,7 @@ dependencies = [
  "cstrml-market",
  "cstrml-staking",
  "cstrml-tee",
+ "frame-benchmarking",
  "frame-executive",
  "frame-support",
  "frame-system",
@@ -802,6 +804,7 @@ version = "0.3.0"
 dependencies = [
  "cst-primitives",
  "cstrml-tee",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-authorship",
@@ -810,6 +813,7 @@ dependencies = [
  "pallet-staking-reward-curve",
  "pallet-timestamp",
  "parity-scale-codec",
+ "rand_chacha 0.2.2",
  "safe-mix",
  "serde",
  "sp-core",
@@ -1160,6 +1164,26 @@ dependencies = [
  "sp-runtime",
  "sp-runtime-interface",
  "sp-std",
+]
+
+[[package]]
+name = "frame-benchmarking-cli"
+version = "2.0.0-alpha.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5f090d8d8fd52e3518a17ca78b4e8e9248d0b46d5625e79e9378ac2913de80f"
+dependencies = [
+ "frame-benchmarking",
+ "parity-scale-codec",
+ "sc-cli",
+ "sc-client",
+ "sc-client-db",
+ "sc-executor",
+ "sc-service",
+ "sp-core",
+ "sp-externalities",
+ "sp-runtime",
+ "sp-state-machine",
+ "structopt",
 ]
 
 [[package]]

@@ -1619,6 +1619,7 @@ impl<T: Trait> Module<T> {
         })
     }
 
+    /// Update GuaranteeRel, Guarantors, Validators and Ledgers according to stake limit
     fn update_rel_and_nominations_and_ledger() {
         let validators: Vec<(T::AccountId, Validations<T::AccountId, BalanceOf<T>>)> =
             <Validators<T>>::iter().collect();
@@ -1781,7 +1782,7 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> Option<Vec<T::AccountId>> {
-        // III. TopDown Election Algorithm
+        // TopDown Election Algorithm
         // Select new validators by top-down their `valid` stakes
         // - time complex is O(2n)
         // - DB try is n

@@ -160,7 +160,7 @@ benchmarks! {
 		MinimumValidatorCount::put(0);
 		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(v, n, m)?;
 		Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
-		(v_lookup.clone(), T::Currency::minimum_balance().into()));
+		(v_lookup.clone(), T::Currency::minimum_balance().into()))?;
 	}: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
 
 

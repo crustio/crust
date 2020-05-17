@@ -6,7 +6,7 @@
 use crate::chain_spec;
 use crate::cli::{Cli, Subcommand};
 use crate::service;
-use sc_cli::{CliConfiguration, SubstrateCli};
+use sc_cli::SubstrateCli;
 use crust_runtime::opaque::Block;
 
 impl SubstrateCli for Cli {

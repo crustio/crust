@@ -204,6 +204,13 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
+    // MUTABLE PUBLIC
+    pub fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<T::AccountId>) {
+        if !Self::storage_orders(order_id).contains(so) {
+            <StorageOrders<T>>::insert(order_id, so);
+        }
+    }
+
     // MUTABLE PRIVATE
     // sorder is equal to storage order
     fn maybe_insert_sorder(client: &T::AccountId,

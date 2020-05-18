@@ -514,7 +514,7 @@ impl_runtime_apis! {
 		}
     }
 
-    #[cfg(any(feature = "runtime-benchmarks", test))]
+	#[cfg(any(feature = "runtime-benchmarks", test))]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn dispatch_benchmark(
 			pallet: Vec<u8>,

@@ -29,7 +29,7 @@ use frame_benchmarking::{benchmarks, account};
 use crate::Module as Staking;
 
 const SEED: u32 = 0;
-const ACCOUNT_BALANCE_RATIO: u32 = 10000;
+const ACCOUNT_BALANCE_RATIO: u32 = 10000000;
 const STAKE_LIMIT_RATIO: u32 = 100000000;
 
 fn create_funded_user<T: Trait>(string: &'static str, n: u32) -> T::AccountId {
@@ -56,14 +56,14 @@ pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u3
 
 	// Create v validators
 	let (v_stash, v_controller) = create_stash_controller::<T>(0)?;
-	Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
+	Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into() * STAKE_LIMIT_RATIO.into());
 	Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Perbill::default())?;
 	let stash_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(v_stash.clone());
 	validators.push(stash_lookup.clone());
 	let saved_v_lookup = stash_lookup;
 	for i in 1 .. v {
 		let (v_stash, v_controller) = create_stash_controller::<T>(i)?;
-		Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
+		Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into() * STAKE_LIMIT_RATIO.into());
 		Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Perbill::default())?;
 		let stash_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(v_stash.clone());
 		validators.push(stash_lookup.clone());
@@ -143,46 +143,43 @@ benchmarks! {
 
 
 	guarantee {
-		let v = 10;
-		let n = 10;
-		let m = 2;
-		let u in ...;
+		let v in 1 .. 2;
+		let n in 1 .. 3;
+		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(v, n, m)?;
+		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
 	}: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
 
 
 	cut_guarantee {
-		let v = 10;
-		let n = 10;
-		let m = 2;
-		let u in ...;
+		let v in 1 .. 2;
+		let n in 1 .. 3;
+		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(v, n, m)?;
+		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
 		Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
 		(v_lookup.clone(), T::Currency::minimum_balance().into()))?;
 	}: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
 
 
 	new_era {
-		let v in 1 .. 10;
-		let n in 1 .. 10;
+		let v in 1 .. 2;
+		let n in 1 .. 3;
 		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		create_validators_with_guarantors_for_era::<T>(v, n, m)?;
+		create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
 		let session_index = SessionIndex::one();
 	}: {
 		let validators = Staking::<T>::new_era(session_index).ok_or("`new_era` failed")?;
-		assert!(validators.len() == v as usize);
 	}
 
 
 	update_rel_and_nominations_and_ledger {
-		let v in 1 .. 10;
-		let n in 1 .. 10;
+		let v in 1 .. 2;
+		let n in 1 .. 3;
 		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		create_validators_with_guarantors_for_era::<T>(v, n, m)?;
+		create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
 		let session_index = SessionIndex::one();
 	}: {
 		Staking::<T>::update_rel_and_nominations_and_ledger();
@@ -190,11 +187,11 @@ benchmarks! {
 
 
 	select_validators {
-		let v in 1 .. 10;
-		let n in 1 .. 10;
+		let v in 1 .. 2;
+		let n in 1 .. 3;
 		let m in 1 .. 2;
 		MinimumValidatorCount::put(0);
-		create_validators_with_guarantors_for_era::<T>(v, n, m)?;
+		create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
 		let session_index = SessionIndex::one();
 	}: {
 		Staking::<T>::select_validators();

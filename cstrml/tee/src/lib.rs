@@ -308,13 +308,20 @@ impl<T: Trait> Module<T> {
 
         Used::put(total_used);
         Reserved::put(total_reserved);
+        let total_workload = total_used + total_reserved;
 
-        // 5. Call `on_report_works` handler
-        T::Works::report_works(
-            &who,
-            used + reserved,
-            total_used + total_reserved,
-        );
+        // 5. Work report for every identity
+        let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
+            let (reserved, used) = Self::update_and_get_workload(&controller, rs);
+            (controller.clone(), used + reserved)
+        }).collect();
+
+        for (controller, own_workload) in workload_map {
+            T::Works::report_works(&controller, own_workload, total_workload);
+        }
+
+        // 6. Work report for upserted one
+        T::Works::report_works(&who, used + reserved, total_workload);
         true
     }
 

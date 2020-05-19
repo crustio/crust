@@ -50,7 +50,7 @@ fn get_valid_work_report() -> WorkReport {
     }
 }
 
-fn add_valid_sorder() {
+fn add_pending_sorder() {
     let account: AccountId = Sr25519Keyring::Bob.to_account_id();
     let files: Vec<Vec<u8>> = [
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(),
@@ -58,8 +58,17 @@ fn add_valid_sorder() {
     ].to_vec();
 
     for (idx, file) in files.iter().enumerate() {
-        upsert_sorder_to_provider(&account, file, idx as u8);
+        upsert_sorder_to_provider(&account, file, idx as u8, OrderStatus::Pending);
     }
+}
+
+fn add_success_sorder() {
+    let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+    let file: MerkleRoot =
+        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b661").unwrap();
+
+    upsert_sorder_to_provider(&account, &file, 99, OrderStatus::Success);
+
 }
 
 #[test]
@@ -198,7 +207,7 @@ fn test_for_report_works_success() {
         // generate 303 blocks first
         run_to_block(303);
         // prepare sorder
-        add_valid_sorder();
+        add_pending_sorder();
 
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
 
@@ -213,7 +222,8 @@ fn test_for_report_works_success() {
         // Check workloads after work report
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 402868224);
-        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().order_status, OrderStatus::Success);
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().order_status,
+                   OrderStatus::Success);
     });
 }
 
@@ -342,6 +352,29 @@ fn test_for_work_report_sig_check_failed() {
         };
 
         assert!(Tee::report_works(Origin::signed(account), works).is_err());
+    });
+}
+
+#[test]
+fn test_for_wr_check_failed_order() {
+    new_test_ext().execute_with(|| {
+        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+        add_success_sorder();
+        // generate 303 blocks first
+        run_to_block(303);
+
+        // report works should ok
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            get_valid_work_report()
+        ));
+
+        // check work report and workload, current_report_slot updating should work
+        Tee::update_identities();
+        // Check this 99 order should be failed
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap_or_default().order_status,
+                   OrderStatus::Failed);
+
     });
 }
 

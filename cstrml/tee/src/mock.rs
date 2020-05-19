@@ -135,7 +135,7 @@ pub fn run_to_block(n: u64) {
     }
 }
 
-pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8) {
+pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os: OrderStatus) {
     let mut file_map = Market::providers(who).unwrap_or_default().file_map;
     let sorder_id: Hash = Hash::repeat_byte(rd);
     let sorder = StorageOrder {
@@ -145,7 +145,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8) {
         expired_on: 0,
         provider: who.clone(),
         client: who.clone(),
-        order_status: Default::default()
+        order_status: os
     };
     file_map.insert(f_id.clone(), sorder_id.clone());
     let provision = Provision {

@@ -262,15 +262,37 @@ impl<T: Trait> Module<T> {
             return;
         }
 
-        // 2. Update id's work rzeport, get id's workload and total workload
+        // 2. Update id's work report, get id's workload and total workload
         let mut total_used = 0;
         let mut total_reserved = 0;
 
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
-            let (reserved, used) = Self::update_and_get_workload(&controller, current_rs);
+            // a. calculate this controller's order file map
+            let mut order_files: Vec<(MerkleRoot, Hash)> = vec![];
+            if let Some(provision) = T::MarketInterface::providers(&controller) {
+                order_files = provision.file_map.values()
+                    .filter_map(|order_id| {
+                        // Get order status(should exist) and (maybe) change the status
+                        let sorder =
+                            T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
+                        if sorder.order_status == OrderStatus::Success {
+                            Some((sorder.file_identifier, order_id.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+            }
+
+            // b. calculate controller's own reserved and used space
+            let (reserved, used) = Self::update_and_get_workload(&controller, &order_files, current_rs);
+
+            // c. add to total
             total_used += used;
             total_reserved += reserved;
+
+            // d. return my own to construct workload map
             (controller.clone(), used + reserved)
         }).collect();
 
@@ -283,7 +305,6 @@ impl<T: Trait> Module<T> {
 
         // 4. Update stake limit
         for (controller, own_workload) in workload_map {
-            // TODO: passive market order test in here, check and (maybe) update the order's status(success -> failed)
             T::Works::report_works(&controller, own_workload, total_workload);
         }
     }
@@ -314,25 +335,26 @@ impl<T: Trait> Module<T> {
         let file_map = T::MarketInterface::providers(who).unwrap_or_default().file_map;
         updated_wr.used = wr.files.iter().fold(0, |used, (f_id, f_size)| {
             if let Some(order_id) = file_map.get(f_id) {
-                // Get order status and (maybe) change the status
-                if let Some(mut sorder) = T::MarketInterface::maybe_get_sorder(order_id) {
-                    // TODO: we should specially handle `Failed` status
-                    if sorder.order_status != OrderStatus::Success {
-                        // 1. Change order status to `Success`
-                        sorder.order_status = OrderStatus::Success;
+                // Get order status(should exist) and (maybe) change the status
+                let mut sorder =
+                    T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
 
-                        // 2. Reset `expired_on` for new order
-                        if sorder.order_status == OrderStatus::Pending {
-                            let current_block_numeric = Self::get_current_block_number();
-                            // go panic if `current_block_numeric` > `created_on`
-                            sorder.expired_on += current_block_numeric - sorder.created_on;
-                        }
+                // TODO: we should specially handle `Failed` status
+                if sorder.order_status != OrderStatus::Success {
+                    // 1. Change order status to `Success`
+                    sorder.order_status = OrderStatus::Success;
 
-                        // 3. (Maybe) set sorder
-                        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
+                    // 2. Reset `expired_on` for new order
+                    if sorder.order_status == OrderStatus::Pending {
+                        let current_block_numeric = Self::get_current_block_number();
+                        // go panic if `current_block_numeric` > `created_on`
+                        sorder.expired_on += current_block_numeric - sorder.created_on;
                     }
-                    return used + *f_size
+
+                    // 3. (Maybe) set sorder
+                    T::MarketInterface::maybe_set_sorder(order_id, &sorder);
                 }
+                return used + *f_size
             }
             used
         });
@@ -361,12 +383,30 @@ impl<T: Trait> Module<T> {
 
     /// Get updated workload by controller account,
     /// this function should only be called in the new era
-    /// otherwise, it will be an void in this recursive loop,
-    /// return the (reserved, used) storage of this controller
-    fn update_and_get_workload(controller: &T::AccountId, current_rs: u64) -> (u128, u128) {
-        // 1. Judge if this controller reported works in this current era
+    /// otherwise, it will be an void in this recursive loop, it mainly includes:
+    /// 1. passive check according to market order, it (maybe) update `used` and `order_status`;
+    /// 2. (maybe) remove outdated work report
+    /// 3. return the (reserved, used) storage of this controller account
+    fn update_and_get_workload(controller: &T::AccountId, order_map: &Vec<(MerkleRoot, Hash)>, current_rs: u64) -> (u128, u128) {
+        // Judge if this controller reported works in this current era
         if let Some(wr) = Self::work_reports(controller) {
             if Self::reported_in_slot(controller, current_rs) {
+                // 1. Get all work report files
+                let wr_files: Vec<MerkleRoot> = wr.files.iter().map(|(f_id, _)| f_id.clone()).collect();
+
+                // 2. Check every order files are stored by controller
+                for (f_id, order_id) in order_map {
+                    if !wr_files.contains(f_id) {
+                        // 3. Set status to failed
+                        let mut sorder =
+                            T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
+                        sorder.order_status = OrderStatus::Failed;
+                        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
+                        // TODO: add market slashing here
+                    }
+                }
+
+                // 3. Return reserved and used
                 (wr.reserved as u128, wr.used as u128)
             } else {
                 // Remove work report when it is outdated

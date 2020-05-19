@@ -18,8 +18,8 @@ use system::ensure_signed;
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot};
-use market::Provision;
+use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot, Hash, BlockNumber};
+use market::{StorageOrder, Provision, OrderStatus};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -82,11 +82,23 @@ impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
 pub trait MarketInterface<AccountId> {
     /// Provision{files} will be used for tee module.
     fn providers(account_id: &AccountId) -> Option<Provision>;
+    /// Get storage order
+    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId>>;
+    /// (Maybe) set storage order's status
+    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId>);
 }
 
 impl<AId> MarketInterface<AId> for () {
     fn providers(_: &AId) -> Option<Provision> {
         None
+    }
+
+    fn maybe_get_sorder(_: &Hash) -> Option<StorageOrder<AId>> {
+        None
+    }
+
+    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId>) {
+
     }
 }
 
@@ -95,6 +107,14 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for T where
 {
     fn providers(account_id: &<T as system::Trait>::AccountId) -> Option<Provision> {
         <market::Module<T>>::providers(account_id)
+    }
+
+    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<<T as system::Trait>::AccountId>> {
+        <market::Module<T>>::storage_orders(order_id)
+    }
+
+    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<<T as system::Trait>::AccountId>) {
+        <market::Module<T>>::maybe_set_sorder(order_id, so);
     }
 }
 
@@ -291,9 +311,30 @@ impl<T: Trait> Module<T> {
 
         // 2. Calculate used space
         let mut updated_wr = wr.clone();
-        updated_wr.used = wr.files.iter().fold(0, |used, (_, f_size)| {
-            // TODO: add active check from market to tee files here, (maybe) set order (pending -> success)
-            used + *f_size
+        let file_map = T::MarketInterface::providers(who).unwrap_or_default().file_map;
+        updated_wr.used = wr.files.iter().fold(0, |used, (f_id, f_size)| {
+            if let Some(order_id) = file_map.get(f_id) {
+                // Get order status and (maybe) change the status
+                if let Some(mut sorder) = T::MarketInterface::maybe_get_sorder(order_id) {
+                    // TODO: we should specially handle `Failed` status
+                    if sorder.order_status != OrderStatus::Success {
+                        // 1. Change order status to `Success`
+                        sorder.order_status = OrderStatus::Success;
+
+                        // 2. Reset `expired_on` for new order
+                        if sorder.order_status == OrderStatus::Pending {
+                            let current_block_numeric = Self::get_current_block_number();
+                            // go panic if `current_block_numeric` > `created_on`
+                            sorder.expired_on += current_block_numeric - sorder.created_on;
+                        }
+
+                        // 3. (Maybe) set sorder
+                        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
+                    }
+                    return used + *f_size
+                }
+            }
+            used
         });
 
         // 3. Upsert work report and mark who has reported in this (report)slot
@@ -399,9 +440,13 @@ impl<T: Trait> Module<T> {
         )
     }
 
-    fn get_reported_slot() -> u64 {
+    fn get_current_block_number() -> BlockNumber {
         let current_block_number = <system::Module<T>>::block_number();
-        let current_block_numeric = TryInto::<u64>::try_into(current_block_number).ok().unwrap();
+        TryInto::<u32>::try_into(current_block_number).ok().unwrap()
+    }
+
+    fn get_reported_slot() -> u64 {
+        let current_block_numeric = Self::get_current_block_number() as u64;
         let current_report_index = current_block_numeric / REPORT_SLOT;
         current_report_index * REPORT_SLOT
     }

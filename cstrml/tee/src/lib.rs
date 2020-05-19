@@ -10,8 +10,7 @@ use frame_support::{
     dispatch::DispatchResult,
     storage::IterableStorageMap
 };
-use sp_std::convert::TryInto;
-use sp_std::{str, vec::Vec};
+use sp_std::{str, convert::TryInto, prelude::*};
 use system::ensure_signed;
 
 #[cfg(feature = "std")]

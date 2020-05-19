@@ -4,8 +4,8 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use sp_core::H256;
 use crate::{StorageOrder, Provision};
+use sp_core::H256;
 
 #[test]
 fn test_for_storage_order_should_work() {

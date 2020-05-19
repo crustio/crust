@@ -6,7 +6,8 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
-    weights::SimpleDispatchInfo
+    weights::SimpleDispatchInfo,
+    traits::Randomness
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
@@ -17,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use primitives::{
-    Address, MerkleRoot, Balance, BlockNumber, Hash,
+    Address, MerkleRoot, Balance, BlockNumber,
     constants::tee::REPORT_SLOT
 };
 
@@ -56,7 +57,7 @@ impl Default for OrderStatus {
 /// Preference of what happens regarding validation.
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Provision {
+pub struct Provision<Hash> {
     /// Vendor's address
     pub address: Address,
 
@@ -65,16 +66,27 @@ pub struct Provision {
 }
 
 /// An event handler for paying market order
-pub trait Payment<AccountId> {
+pub trait Payment<AccountId, Hash> {
     // Pay the storage order, return an UNIQUE `transaction id`🙏🏻
-    fn pay_sorder(transactor: &AccountId, dest: &AccountId, value: Balance) -> Hash;
+    fn pay_sorder(client: &AccountId, provider: &AccountId, value: Balance) -> Hash;
 }
 
-impl<AId> Payment<AId> for () {
-    fn pay_sorder(_: &AId, _: &AId, _: Balance) -> Hash {
-        // transfer the fee and return order id
-        // TODO: using random to generate non-duplicated order id
-        Hash::default()
+impl<T: Trait> Payment<<T as system::Trait>::AccountId,
+    <T as system::Trait>::Hash> for Module<T>
+{
+    fn pay_sorder(client: &<T as system::Trait>::AccountId,
+                  provider: &<T as system::Trait>::AccountId,
+                  _: u128) -> T::Hash {
+        let bn = <system::Module<T>>::block_number();
+        let bh: T::Hash = <system::Module<T>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &client.encode()[..],
+            &provider.encode()[..],
+        ].concat();
+
+        // it can cover most cases, for the "real" random
+        T::Randomness::random(seed.as_slice())
     }
 }
 
@@ -89,7 +101,14 @@ pub trait OrderInspector<AccountId> {
 pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-    type Payment: Payment<Self::AccountId>;
+
+    /// Something that provides randomness in the runtime.
+    type Randomness: Randomness<Self::Hash>;
+
+    /// Connector with balance module
+    type Payment: Payment<Self::AccountId, Self::Hash>;
+
+    /// Connector with tee module
     type OrderInspector: OrderInspector<Self::AccountId>;
 }
 
@@ -98,15 +117,15 @@ decl_storage! {
     trait Store for Module<T: Trait> as Market {
         /// A mapping from storage provider to order id
         pub Providers get(fn providers):
-        map hasher(twox_64_concat) T::AccountId => Option<Provision>;
+        map hasher(twox_64_concat) T::AccountId => Option<Provision<T::Hash>>;
 
         /// A mapping from clients to order id
         pub Clients get(fn clients):
-        map hasher(twox_64_concat) T::AccountId => Option<Vec<Hash>>;
+        map hasher(twox_64_concat) T::AccountId => Option<Vec<T::Hash>>;
 
         /// Order details iterated by order id
         pub StorageOrders get(fn storage_orders):
-        map hasher(twox_64_concat) Hash => Option<StorageOrder<T::AccountId>>;
+        map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId>>;
     }
 }
 
@@ -205,7 +224,7 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     // MUTABLE PUBLIC
-    pub fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<T::AccountId>) {
+    pub fn maybe_set_sorder(order_id: &T::Hash, so: &StorageOrder<T::AccountId>) {
         if !Self::storage_orders(order_id).contains(so) {
             <StorageOrders<T>>::insert(order_id, so);
         }

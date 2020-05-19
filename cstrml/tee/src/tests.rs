@@ -5,6 +5,7 @@ use frame_support::assert_ok;
 use hex;
 use keyring::Sr25519Keyring;
 use sp_core::crypto::{AccountId32, Ss58Codec};
+use primitives::Hash;
 
 type AccountId = AccountId32;
 

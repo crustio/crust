@@ -97,7 +97,7 @@ impl<AId> MarketInterface<AId> for () {
         None
     }
 
-    fn maybe_set_sorder(_: &Hash, so: &StorageOrder<AId>) {
+    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId>) {
 
     }
 }
@@ -109,11 +109,11 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for T where
         <market::Module<T>>::providers(account_id)
     }
 
-    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId>> {
+    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<<T as system::Trait>::AccountId>> {
         <market::Module<T>>::storage_orders(order_id)
     }
 
-    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountIUd>) {
+    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<<T as system::Trait>::AccountId>) {
         <market::Module<T>>::maybe_set_sorder(order_id, so);
     }
 }

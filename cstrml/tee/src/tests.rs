@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::mock::{new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider};
+use crate::mock::{new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider, Market};
 use frame_support::assert_ok;
 use hex;
 use keyring::Sr25519Keyring;
@@ -213,6 +213,7 @@ fn test_for_report_works_success() {
         // Check workloads after work report
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 402868224);
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().order_status, OrderStatus::Success);
     });
 }
 

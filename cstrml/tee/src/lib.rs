@@ -17,7 +17,7 @@ use system::ensure_signed;
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot, Hash, BlockNumber};
+use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot, BlockNumber};
 use market::{StorageOrder, Provision, OrderStatus};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
@@ -78,17 +78,17 @@ impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
 /// 1. updates the `Providers` of the `market::Trait`
 /// 2. use `Providers` to judge work report
 // TODO: restrict this with market trait
-pub trait MarketInterface<AccountId> {
+pub trait MarketInterface<AccountId, Hash> {
     /// Provision{files} will be used for tee module.
-    fn providers(account_id: &AccountId) -> Option<Provision>;
+    fn providers(account_id: &AccountId) -> Option<Provision<Hash>>;
     /// Get storage order
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId>>;
     /// (Maybe) set storage order's status
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId>);
 }
 
-impl<AId> MarketInterface<AId> for () {
-    fn providers(_: &AId) -> Option<Provision> {
+impl<AId, Hash> MarketInterface<AId, Hash> for () {
+    fn providers(_: &AId) -> Option<Provision<Hash>> {
         None
     }
 
@@ -101,18 +101,22 @@ impl<AId> MarketInterface<AId> for () {
     }
 }
 
-impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for T where
+impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
+    <T as system::Trait>::Hash> for T where
     T: market::Trait
 {
-    fn providers(account_id: &<T as system::Trait>::AccountId) -> Option<Provision> {
+    fn providers(account_id: &<T as system::Trait>::AccountId)
+        -> Option<Provision<<T as system::Trait>::Hash>> {
         <market::Module<T>>::providers(account_id)
     }
 
-    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<<T as system::Trait>::AccountId>> {
+    fn maybe_get_sorder(order_id: &<T as system::Trait>::Hash)
+        -> Option<StorageOrder<<T as system::Trait>::AccountId>> {
         <market::Module<T>>::storage_orders(order_id)
     }
 
-    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<<T as system::Trait>::AccountId>) {
+    fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
+                        so: &StorageOrder<<T as system::Trait>::AccountId>) {
         <market::Module<T>>::maybe_set_sorder(order_id, so);
     }
 }
@@ -126,7 +130,7 @@ pub trait Trait: system::Trait {
     type Works: Works<Self::AccountId>;
 
     /// Interface for interacting with a market module.
-    type MarketInterface: self::MarketInterface<Self::AccountId>;
+    type MarketInterface: self::MarketInterface<Self::AccountId, Self::Hash>;
 }
 
 decl_storage! {
@@ -268,7 +272,7 @@ impl<T: Trait> Module<T> {
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
             // a. calculate this controller's order file map
-            let mut order_files: Vec<(MerkleRoot, Hash)> = vec![];
+            let mut order_files: Vec<(MerkleRoot, T::Hash)> = vec![];
             if let Some(provision) = T::MarketInterface::providers(&controller) {
                 order_files = provision.file_map.values()
                     .filter_map(|order_id| {
@@ -386,7 +390,7 @@ impl<T: Trait> Module<T> {
     /// 1. passive check according to market order, it (maybe) update `used` and `order_status`;
     /// 2. (maybe) remove outdated work report
     /// 3. return the (reserved, used) storage of this controller account
-    fn update_and_get_workload(controller: &T::AccountId, order_map: &Vec<(MerkleRoot, Hash)>, current_rs: u64) -> (u128, u128) {
+    fn update_and_get_workload(controller: &T::AccountId, order_map: &Vec<(MerkleRoot, T::Hash)>, current_rs: u64) -> (u128, u128) {
         // Judge if this controller reported works in this current era
         if let Some(wr) = Self::work_reports(controller) {
             if Self::reported_in_slot(controller, current_rs) {

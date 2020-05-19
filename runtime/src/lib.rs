@@ -342,8 +342,9 @@ impl tee::Trait for Runtime {
 
 impl market::Trait for Runtime {
     type Event = Event;
-    // TODO: Bonding with balance module
-    type Payment = ();
+    type Randomness = RandomnessCollectiveFlip;
+    // TODO: Bonding with balance module(now we impl inside Market)
+    type Payment = Market;
     type OrderInspector = Tee;
 }
 

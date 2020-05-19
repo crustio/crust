@@ -12,7 +12,7 @@ use sp_runtime::{
     Perbill,
 };
 use market::{Provision, StorageOrder};
-use primitives::MerkleRoot;
+use primitives::{MerkleRoot, Hash};
 
 type AccountId = AccountId32;
 
@@ -57,7 +57,8 @@ impl system::Trait for Test {
 
 impl market::Trait for Test {
     type Event = ();
-    type Payment = ();
+    type Randomness = ();
+    type Payment = Market;
     type OrderInspector = Tee;
 }
 

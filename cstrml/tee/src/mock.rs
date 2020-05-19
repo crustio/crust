@@ -150,7 +150,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
     };
     file_map.insert(f_id.clone(), sorder_id.clone());
     let provision = Provision {
-        address: vec![],
+        address_info: vec![],
         file_map
     };
     <market::Providers<Test>>::insert(who, provision);

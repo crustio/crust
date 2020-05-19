@@ -1,5 +1,3 @@
-//! The Substrate Node runtime. This can be compiled with `#[no_std]`, ready for Wasm.
-
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 
@@ -18,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use primitives::{
-    Address, MerkleRoot, Balance, BlockNumber,
+    AddressInfo, MerkleRoot, Balance, BlockNumber,
     constants::tee::REPORT_SLOT
 };
 
@@ -58,8 +56,8 @@ impl Default for OrderStatus {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Provision<Hash> {
-    /// Vendor's address
-    pub address: Address,
+    /// Provider's address
+    pub address_info: AddressInfo,
 
     /// Mapping from `file_id` to `order_id`, this mapping only add when user place the order
     pub file_map: BTreeMap<MerkleRoot, Hash>,
@@ -143,19 +141,17 @@ decl_error! {
     }
 }
 
-// The module's dispatchable functions.
 decl_module! {
-    /// The module declaration.
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        type Error = Error<T>;
+
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        type Error = Error<T>;
-
-        /// Register to be a provider, you should provide your Karst's address{ip, port}
+        /// Register to be a provider, you should provide your storage layer's address info
         #[weight = SimpleDispatchInfo::default()]
-        fn register(origin, address: Address) -> DispatchResult {
+        fn register(origin, address_info: AddressInfo) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Make sure you have works
@@ -163,7 +159,7 @@ decl_module! {
 
             // 2. Insert provision
             <Providers<T>>::insert(who.clone(), Provision {
-                address,
+                address_info,
                 file_map: BTreeMap::new()
             });
 
@@ -173,11 +169,11 @@ decl_module! {
             Ok(())
         }
 
-        /// TODO: organize these parameters into a struct.
+        /// Place a storage order, make sure
         #[weight = SimpleDispatchInfo::default()]
         fn place_storage_order(
             origin,
-            dest: <T::Lookup as StaticLookup>::Source,
+            provider: <T::Lookup as StaticLookup>::Source,
             #[compact] value: Balance,
             file_identifier: MerkleRoot,
             file_size: u64,
@@ -185,7 +181,7 @@ decl_module! {
         ) -> DispatchResult
             {
                 let who = ensure_signed(origin)?;
-                let provider = T::Lookup::lookup(dest)?;
+                let provider = T::Lookup::lookup(provider)?;
 
                 // 1. Expired should be greater than created
                 ensure!(duration > REPORT_SLOT.try_into().unwrap(), Error::<T>::DurationTooShort);

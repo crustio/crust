@@ -1,5 +1,3 @@
-//! The Substrate Node runtime. This can be compiled with `#[no_std]`, ready for Wasm.
-
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 
@@ -166,9 +164,7 @@ decl_storage! {
     }
 }
 
-// The module's dispatchable functions.
 decl_module! {
-    /// The module declaration.
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
         // Initializing events
         // this is needed only if you are using events in your module

@@ -39,7 +39,7 @@ sp-inherents = '2.0.0-alpha.6'
 sp-io = '2.0.0-alpha.6'
 sp-runtime = '2.0.0-alpha.6'
 grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-alpha.6' }
-frame-benchmarking-cli = { version = "2.0.0-alpha.6" }
+frame-benchmarking-cli = { version = "2.0.0-alpha.6", optional = true }
 
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.3.0' }
@@ -49,3 +49,8 @@ primitives = { package = 'cst-primitives', path = '../primitives', version = '0.
 
 [build-dependencies]
 build-script-utils = { version = "2.0.0-alpha.6", package = "substrate-build-script-utils" }
+
+[features]
+runtime-benchmarks = [
+	"frame-benchmarking-cli",
+]

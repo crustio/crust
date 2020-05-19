@@ -7,6 +7,7 @@ use crate::chain_spec;
 use crate::cli::{Cli, Subcommand};
 use crate::service;
 use sc_cli::SubstrateCli;
+#[cfg(any(feature = "runtime-benchmarks", test))]
 use crust_runtime::opaque::Block;
 
 impl SubstrateCli for Cli {
@@ -40,15 +41,10 @@ pub fn run() -> sc_cli::Result<()> {
 	let cli = Cli::from_args();
 
 	match &cli.subcommand {
+		#[cfg(any(feature = "runtime-benchmarks", test))]
 		Some(Subcommand::Benchmark(cmd)) => {
-			if cfg!(feature = "runtime-benchmarks") {
-				let runner = cli.create_runner(cmd)?;
-				runner.sync_run(|config| cmd.run::<Block, service::Executor>(config))
-			} else {
-				println!("Benchmarking wasn't enabled when building the node. \
-				You can enable it with `--features runtime-benchmarks`.");
-				Ok(())
-			}
+			let runner = cli.create_runner(cmd)?;
+			runner.sync_run(|config| cmd.run::<Block, service::Executor>(config))
 		}
 		Some(Subcommand::Base(cmd)) => {
 			let runner = cli.create_runner(cmd)?;

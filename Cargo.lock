@@ -736,6 +736,7 @@ dependencies = [
  "pallet-indices",
  "pallet-randomness-collective-flip",
  "pallet-session",
+ "pallet-session-benchmarking",
  "pallet-staking-reward-curve",
  "pallet-timestamp",
  "pallet-transaction-payment",
@@ -3188,6 +3189,43 @@ dependencies = [
  "sp-staking",
  "sp-std",
  "sp-trie",
+]
+
+[[package]]
+name = "pallet-session-benchmarking"
+version = "2.0.0-alpha.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1eee8e29fbfec3330c3ab13b2747ec0d38857966c18443109c0d79a8820f862c"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-session",
+ "pallet-staking",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-staking"
+version = "2.0.0-alpha.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "906357a6a462a4dffed56d0b3ddc88f1114fec6c8c0b4e39f9f0b7f95527b214"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-authorship",
+ "pallet-session",
+ "parity-scale-codec",
+ "rand_chacha 0.2.2",
+ "sp-application-crypto",
+ "sp-io",
+ "sp-phragmen",
+ "sp-runtime",
+ "sp-staking",
+ "sp-std",
+ "static_assertions",
 ]
 
 [[package]]

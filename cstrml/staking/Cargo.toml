@@ -34,6 +34,8 @@ tee = { package = "cstrml-tee", path = "../tee", default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
+frame-benchmarking = '2.0.0-alpha.6'
+rand_chacha = "0.2"
 sp-core = '2.0.0-alpha.6'
 pallet-balances = '2.0.0-alpha.6'
 pallet-timestamp = '2.0.0-alpha.6'

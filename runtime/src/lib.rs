@@ -524,7 +524,7 @@ impl_runtime_apis! {
             steps: Vec<u32>,
             repeat: u32,
         ) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-            use frame_benchmarking::{Benchmarking, BenchmarkBatch, add_benchmark};
+            use frame_benchmarking::{BenchmarkBatch, add_benchmark};
             // Trying to add benchmarks directly to the Session Pallet caused cyclic dependency issues.
             // To get around that, we separated the Session benchmarks into its own crate, which is why
             // we need these two lines below.

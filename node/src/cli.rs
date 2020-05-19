@@ -18,5 +18,6 @@ pub enum Subcommand {
     Base(sc_cli::Subcommand),
     /// The custom benchmark subcommmand benchmarking runtime pallets.
     #[structopt(name = "benchmark", about = "Benchmark runtime pallets.")]
+    #[cfg(any(feature = "runtime-benchmarks", test))]
     Benchmark(frame_benchmarking_cli::BenchmarkCmd),
 }

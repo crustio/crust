@@ -73,8 +73,7 @@ pub trait Payment<AccountId> {
 impl<AId> Payment<AId> for () {
     fn pay_sorder(_: &AId, _: &AId, _: Balance) -> Hash {
         // transfer the fee and return order id
-        // TODO: using random to generate non-duplicated order id
-        Hash::default()
+        Hash::random()
     }
 }
 

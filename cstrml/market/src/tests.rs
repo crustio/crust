@@ -4,7 +4,6 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use sp_core::H256;
 use crate::{StorageOrder, Provision};
 
 #[test]
@@ -28,7 +27,9 @@ fn test_for_storage_order_should_work() {
             file_identifier.clone(), file_size, duration
         ));
 
-        let order_id = H256::default();
+        // get this random order id
+        let fm = Market::providers(100).unwrap().file_map;
+        let order_id = fm.get(&file_identifier).unwrap();
         assert_eq!(Market::providers(100).unwrap(), Provision {
             address,
             file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()

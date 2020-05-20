@@ -717,6 +717,7 @@ name = "crust-runtime"
 version = "0.3.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-market",
  "cstrml-staking",
  "cstrml-tee",
@@ -726,7 +727,6 @@ dependencies = [
  "pallet-authority-discovery",
  "pallet-authorship",
  "pallet-babe",
- "pallet-balances",
  "pallet-collective",
  "pallet-finality-tracker",
  "pallet-grandpa",
@@ -774,6 +774,22 @@ dependencies = [
  "parity-scale-codec",
  "serde",
  "sp-core",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-balances"
+version = "0.3.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-transaction-payment",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
  "sp-runtime",
  "sp-std",
 ]

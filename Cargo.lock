@@ -817,11 +817,11 @@ name = "cstrml-staking"
 version = "0.3.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-tee",
  "frame-support",
  "frame-system",
  "pallet-authorship",
- "pallet-balances",
  "pallet-session",
  "pallet-staking-reward-curve",
  "pallet-timestamp",
@@ -3042,22 +3042,6 @@ dependencies = [
  "sp-staking",
  "sp-std",
  "sp-timestamp",
-]
-
-[[package]]
-name = "pallet-balances"
-version = "2.0.0-alpha.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ef08001886d3747220630337f7afbb8f1d7cbfacaa3a8a13317e1cb3e8e366"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "serde",
- "sp-io",
- "sp-runtime",
- "sp-std",
 ]
 
 [[package]]

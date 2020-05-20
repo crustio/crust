@@ -33,7 +33,7 @@ primitives = { package = 'cst-primitives', path = '../../primitives', default-fe
 
 [dev-dependencies]
 sp-core = '2.0.0-alpha.6'
-pallet-balances = '2.0.0-alpha.6'
+balances = { package = 'cstrml-balances', path = '../balances', default-features = false }
 pallet-timestamp = '2.0.0-alpha.6'
 pallet-staking-reward-curve = '2.0.0-alpha.6'
 

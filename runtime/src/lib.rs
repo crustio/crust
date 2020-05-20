@@ -47,8 +47,6 @@ pub use timestamp::Call as TimestampCall;
 /// Crust primitives
 use primitives::{constants::{time::*, currency::*}, *};
 
-use market;
-
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;
 

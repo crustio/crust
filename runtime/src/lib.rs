@@ -47,8 +47,6 @@ pub use timestamp::Call as TimestampCall;
 /// Crust primitives
 use primitives::{constants::{time::*, currency::*}, *};
 
-use market;
-
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;
 
@@ -342,8 +340,9 @@ impl tee::Trait for Runtime {
 
 impl market::Trait for Runtime {
     type Event = Event;
-    // TODO: Bonding with balance module
-    type Payment = ();
+    type Randomness = RandomnessCollectiveFlip;
+    // TODO: Bonding with balance module(now we impl inside Market)
+    type Payment = Market;
     type OrderInspector = Tee;
 }
 

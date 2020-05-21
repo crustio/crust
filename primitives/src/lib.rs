@@ -51,4 +51,4 @@ pub type MerkleRoot = Vec<u8>;
 pub type ReportSlot = u64;
 
 /// Market vendor's address info
-pub type Address = Vec<u8>;
+pub type AddressInfo = Vec<u8>;

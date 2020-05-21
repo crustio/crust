@@ -1,0 +1,40 @@
+[package]
+name = "cstrml-balances"
+version = "0.3.0"
+authors = ["Crustio"]
+edition = "2018"
+license = "GPL-3.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
+description = "FRAME pallet to manage balances"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+serde = { version = "1.0.101", optional = true }
+codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
+sp-std = { version = '2.0.0-alpha.6', default-features = false }
+sp-io ={ version = '2.0.0-alpha.6', default-features = false }
+sp-runtime = { version = '2.0.0-alpha.6', default-features = false }
+frame-benchmarking = { version = "2.0.0-alpha.6", default-features = false, optional = true }
+frame-support = { version = "2.0.0-alpha.6", default-features = false }
+frame-system = { version = "2.0.0-alpha.6", default-features = false }
+
+[dev-dependencies]
+sp-core = '2.0.0-alpha.6'
+pallet-transaction-payment = "2.0.0-alpha.6"
+
+[features]
+default = ["std"]
+std = [
+	"serde",
+	"codec/std",
+	"sp-std/std",
+	"sp-io/std",
+	"sp-runtime/std",
+	"frame-benchmarking/std",
+	"frame-support/std",
+	"frame-system/std",
+]
+runtime-benchmarks = ["frame-benchmarking"]

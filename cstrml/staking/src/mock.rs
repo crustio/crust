@@ -17,7 +17,7 @@ use sp_staking::{
     SessionIndex,
 };
 use std::{cell::RefCell, collections::HashSet};
-use pallet_balances::AccountData;
+use balances::AccountData;
 
 /// The AccountId alias in this test module.
 pub type AccountId = u64;
@@ -141,7 +141,7 @@ parameter_types! {
     pub const TransferFee: Balance = 0;
     pub const CreationFee: Balance = 0;
 }
-impl pallet_balances::Trait for Test {
+impl balances::Trait for Test {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = ();
@@ -206,7 +206,7 @@ parameter_types! {
     pub const MaxNominatorRewardedPerValidator: u32 = 64;
 }
 impl Trait for Test {
-    type Currency = pallet_balances::Module<Self>;
+    type Currency = balances::Module<Self>;
     type Time = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
@@ -316,7 +316,7 @@ impl ExtBuilder {
             .map(|x| ((x + 1) * 10 + 1) as u64)
             .collect::<Vec<_>>();
 
-        let _ = pallet_balances::GenesisConfig::<Test> {
+        let _ = balances::GenesisConfig::<Test> {
             balances: vec![
                 (1, 10 * balance_factor),
                 (2, 20 * balance_factor),
@@ -441,7 +441,7 @@ impl ExtBuilder {
 }
 
 pub type System = frame_system::Module<Test>;
-pub type Balances = pallet_balances::Module<Test>;
+pub type Balances = balances::Module<Test>;
 pub type Session = pallet_session::Module<Test>;
 pub type Timestamp = pallet_timestamp::Module<Test>;
 pub type Staking = Module<Test>;

@@ -372,7 +372,7 @@ impl<T: Trait> Module<T> {
         Reserved::put(total_reserved);
         let total_workload = total_used + total_reserved;
 
-        // 5. Work report for every identity
+        // 5. Update work report for every identity
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
             // a. calculate this controller's order file map
             let mut order_files: Vec<(MerkleRoot, T::Hash)> = vec![];

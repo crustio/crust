@@ -1,10 +1,11 @@
 use super::*;
 
-use crate::mock::{new_test_ext, run_to_block, Origin, Tee};
+use crate::mock::{new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider, Market};
 use frame_support::assert_ok;
 use hex;
 use keyring::Sr25519Keyring;
 use sp_core::crypto::{AccountId32, Ss58Codec};
+use primitives::Hash;
 
 type AccountId = AccountId32;
 
@@ -48,6 +49,27 @@ fn get_valid_work_report() -> WorkReport {
         sig,
         files
     }
+}
+
+fn add_pending_sorder() {
+    let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+    let files: Vec<Vec<u8>> = [
+        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(),
+        hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()
+    ].to_vec();
+
+    for (idx, file) in files.iter().enumerate() {
+        upsert_sorder_to_provider(&account, file, idx as u8, OrderStatus::Pending);
+    }
+}
+
+fn add_success_sorder() {
+    let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+    let file: MerkleRoot =
+        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b661").unwrap();
+
+    upsert_sorder_to_provider(&account, &file, 99, OrderStatus::Success);
+
 }
 
 #[test]
@@ -183,8 +205,10 @@ fn test_for_identity_failed_by_duplicate_pk() {
 #[test]
 fn test_for_report_works_success() {
     new_test_ext().execute_with(|| {
-        // generate 53 blocks first
+        // generate 303 blocks first
         run_to_block(303);
+        // prepare sorder
+        add_pending_sorder();
 
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
 
@@ -199,6 +223,30 @@ fn test_for_report_works_success() {
         // Check workloads after work report
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 402868224);
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().order_status,
+                   OrderStatus::Success);
+    });
+}
+
+#[test]
+fn test_for_report_works_success_without_sorder() {
+    new_test_ext().execute_with(|| {
+        // generate 303 blocks first
+        run_to_block(303);
+
+        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+
+        // Check workloads
+        assert_eq!(Tee::reserved(), 0);
+
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            get_valid_work_report()
+        ));
+
+        // Check workloads after work report
+        assert_eq!(Tee::reserved(), 4294967296);
+        assert_eq!(Tee::used(), 0);
     });
 }
 
@@ -309,11 +357,33 @@ fn test_for_work_report_sig_check_failed() {
 }
 
 #[test]
+fn test_for_wr_check_failed_order() {
+    new_test_ext().execute_with(|| {
+        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+        add_success_sorder();
+        // generate 303 blocks first
+        run_to_block(303);
+
+        // report works should ok
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            get_valid_work_report()
+        ));
+
+        // check work report and workload, current_report_slot updating should work
+        Tee::update_identities();
+        // Check this 99 order should be failed
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap_or_default().order_status,
+                   OrderStatus::Failed);
+
+    });
+}
+
+#[test]
 fn test_for_outdated_work_reports() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let mut final_wr = get_valid_work_report();
-        final_wr.used = 402868224;
+        let wr = get_valid_work_report(); // let used be 0, we don't check it here
         // generate 303 blocks first
         run_to_block(303);
 
@@ -324,7 +394,7 @@ fn test_for_outdated_work_reports() {
         ));
         assert_eq!(
             Tee::work_reports(&account),
-            Some(final_wr.clone())
+            Some(wr.clone())
         );
 
         // check work report and workload, current_report_slot updating should work
@@ -333,13 +403,13 @@ fn test_for_outdated_work_reports() {
         assert_eq!(Tee::current_report_slot(), 300);
         // Check workloads
         assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 402868224);
+        assert_eq!(Tee::used(), 0);
 
         // generate 401 blocks, wr still valid
         run_to_block(401);
         assert_eq!(
             Tee::work_reports(&account),
-            Some(final_wr.clone())
+            Some(wr.clone())
         );
         assert!(Tee::reported_in_slot(&account, 300));
 
@@ -350,13 +420,13 @@ fn test_for_outdated_work_reports() {
         assert_eq!(Tee::current_report_slot(), 600);
         assert_eq!(
             Tee::work_reports(&account),
-            Some(final_wr.clone())
+            Some(wr.clone())
         );
         assert!(!Tee::reported_in_slot(&account, 600));
 
         // Check workloads
         assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 402868224);
+        assert_eq!(Tee::used(), 0);
 
         run_to_block(903);
         assert_eq!(Tee::current_report_slot(), 600);
@@ -374,8 +444,7 @@ fn test_for_outdated_work_reports() {
 fn test_abnormal_era() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let mut final_wr = get_valid_work_report();
-        final_wr.used = 402868224;
+        let wr = get_valid_work_report(); // let used be 0, we don't check it here
 
         // If new era happens in 101, next work is not reported
         run_to_block(101);
@@ -422,10 +491,10 @@ fn test_abnormal_era() {
             Origin::signed(account.clone()),
             get_valid_work_report()
         ));
-        assert_eq!(Tee::work_reports(&account), Some(final_wr));
+        assert_eq!(Tee::work_reports(&account), Some(wr));
         // total workload should keep same, cause we only updated in a new era
         assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 402868224);
+        assert_eq!(Tee::used(), 0);
         assert!(Tee::reported_in_slot(&account, 300));
     })
 }

@@ -4,8 +4,8 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use sp_core::H256;
 use crate::{StorageOrder, Provision};
+use sp_core::H256;
 
 #[test]
 fn test_for_storage_order_should_work() {
@@ -20,9 +20,9 @@ fn test_for_storage_order_should_work() {
         let file_size = 16; // should less than provider
         let duration = 360; // file should store at least 30 minutes
         let fee = 10;
-        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
-        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), provider, fee,
             file_identifier.clone(), file_size, duration
@@ -30,7 +30,7 @@ fn test_for_storage_order_should_work() {
 
         let order_id = H256::default();
         assert_eq!(Market::providers(100).unwrap(), Provision {
-            address,
+            address_info,
             file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()
         });
         assert_eq!(Market::clients(0).unwrap(), vec![order_id.clone()]);

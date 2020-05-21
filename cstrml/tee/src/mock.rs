@@ -11,6 +11,8 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
+use market::{Provision, StorageOrder};
+use primitives::{MerkleRoot, Hash};
 
 type AccountId = AccountId32;
 
@@ -55,7 +57,8 @@ impl system::Trait for Test {
 
 impl market::Trait for Test {
     type Event = ();
-    type Payment = ();
+    type Randomness = ();
+    type Payment = Market;
     type OrderInspector = Tee;
 }
 
@@ -67,6 +70,7 @@ impl Trait for Test {
 
 pub type Tee = Module<Test>;
 pub type System = system::Module<Test>;
+pub type Market = market::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
@@ -120,6 +124,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
 /// Run until a particular block.
 pub fn run_to_block(n: u64) {
+    // This block hash is for the valid work report
     let fake_bh = H256::from_slice(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap().as_slice());
     while System::block_number() < n {
         <system::BlockHash<Test>>::insert(System::block_number(), fake_bh.clone());
@@ -129,4 +134,25 @@ pub fn run_to_block(n: u64) {
         System::on_initialize(System::block_number());
         System::set_block_number(System::block_number() + 1);
     }
+}
+
+pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os: OrderStatus) {
+    let mut file_map = Market::providers(who).unwrap_or_default().file_map;
+    let sorder_id: Hash = Hash::repeat_byte(rd);
+    let sorder = StorageOrder {
+        file_identifier: f_id.clone(),
+        file_size: 0,
+        created_on: 0,
+        expired_on: 0,
+        provider: who.clone(),
+        client: who.clone(),
+        order_status: os
+    };
+    file_map.insert(f_id.clone(), sorder_id.clone());
+    let provision = Provision {
+        address_info: vec![],
+        file_map
+    };
+    <market::Providers<Test>>::insert(who, provision);
+    <market::StorageOrders<Test>>::insert(sorder_id, sorder);
 }

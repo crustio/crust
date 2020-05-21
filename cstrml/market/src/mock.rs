@@ -72,7 +72,8 @@ impl tee::Trait for Test {
 
 impl Trait for Test {
     type Event = ();
-    type Payment = ();
+    type Randomness = ();
+    type Payment = Market;
     type OrderInspector = TestOrderInspector;
 }
 

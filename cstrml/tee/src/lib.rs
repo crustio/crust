@@ -376,7 +376,7 @@ impl<T: Trait> Module<T> {
         for (controller, wr) in <WorkReports<T>>::iter() {
             T::Works::report_works(
                 &controller,
-                (&wr.used + &wr.reserved) as u128,
+                (wr.used + wr.reserved) as u128,
                 total_workload
             );
         }

@@ -38,6 +38,7 @@ fn test_for_storage_order_should_work() {
             file_identifier,
             file_size: 16,
             created_on: 50,
+            effected_on: 50,
             expired_on: 410,
             provider: 100,
             client: 0,

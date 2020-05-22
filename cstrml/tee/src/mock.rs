@@ -143,6 +143,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
         file_identifier: f_id.clone(),
         file_size: 0,
         created_on: 0,
+        effected_on: 0,
         expired_on: 0,
         provider: who.clone(),
         client: who.clone(),

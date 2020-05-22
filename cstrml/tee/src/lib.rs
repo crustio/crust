@@ -291,7 +291,7 @@ impl<T: Trait> Module<T> {
 
                 // TODO: we should specially handle `Failed` status
                 if sorder.order_status != OrderStatus::Success {
-                    // 1. Reset `expired_on` for new order
+                    // 1. Reset `expired_on` and `effected_on` for new order
                     if sorder.order_status == OrderStatus::Pending {
                         let current_block_numeric = Self::get_current_block_number();
                         // go panic if `current_block_numeric` > `created_on`

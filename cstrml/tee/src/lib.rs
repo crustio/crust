@@ -370,13 +370,16 @@ impl<T: Trait> Module<T> {
 
         Used::put(total_used);
         Reserved::put(total_reserved);
+        let total_workload = total_used + total_reserved;
 
-        // 5. Call `on_report_works` handler
-        T::Works::report_works(
-            &who,
-            used + reserved,
-            total_used + total_reserved,
-        );
+        // 5. Update work report for every identity
+        for (controller, wr) in <WorkReports<T>>::iter() {
+            T::Works::report_works(
+                &controller,
+                (wr.used + wr.reserved) as u128,
+                total_workload
+            );
+        }
         true
     }
 

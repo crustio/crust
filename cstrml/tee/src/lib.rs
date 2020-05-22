@@ -373,35 +373,13 @@ impl<T: Trait> Module<T> {
         let total_workload = total_used + total_reserved;
 
         // 5. Update work report for every identity
-        let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
-            // a. calculate this controller's order file map
-            let mut order_files: Vec<(MerkleRoot, T::Hash)> = vec![];
-            if let Some(provision) = T::MarketInterface::providers(&controller) {
-                order_files = provision.file_map.values()
-                    .filter_map(|order_id| {
-                        // Get order status(should exist) and (maybe) change the status
-                        let sorder =
-                            T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
-                        if sorder.order_status == OrderStatus::Success {
-                            Some((sorder.file_identifier, order_id.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-            }
-            // b. calculate controller's own reserved and used space
-            let (reserved, used) = Self::update_and_get_workload(&controller, &order_files, rs);
-            // c. return my own to construct workload map
-            (controller.clone(), used + reserved)
-        }).collect();
-
-        for (controller, own_workload) in workload_map {
-            T::Works::report_works(&controller, own_workload, total_workload);
+        for (controller, wr) in <WorkReports<T>>::iter() {
+            T::Works::report_works(
+                &controller,
+                (&wr.used + &wr.reserved) as u128,
+                total_workload
+            );
         }
-
-        // 6. Work report for upserted one
-        T::Works::report_works(&who, used + reserved, total_workload);
         true
     }
 

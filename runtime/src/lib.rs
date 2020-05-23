@@ -335,7 +335,7 @@ impl transaction_payment::Trait for Runtime {
 impl tee::Trait for Runtime {
     type Event = Event;
     type Works = Staking;
-    type MarketInterface = Self;
+    type MarketInterface = Market;
 }
 
 impl market::Trait for Runtime {

@@ -65,7 +65,7 @@ impl market::Trait for Test {
 impl Trait for Test {
     type Event = ();
     type Works = ();
-    type MarketInterface = Self;
+    type MarketInterface = Market;
 }
 
 pub type Tee = Module<Test>;

@@ -95,6 +95,55 @@ pub trait OrderInspector<AccountId> {
     fn check_works(provider: &AccountId, file_size: u64) -> bool;
 }
 
+/// Means for interacting with a specialized version of the `market` trait.
+///
+/// This is needed because `Tee`
+/// 1. updates the `Providers` of the `market::Trait`
+/// 2. use `Providers` to judge work report
+// TODO: restrict this with market trait
+pub trait MarketInterface<AccountId, Hash> {
+    /// Provision{files} will be used for tee module.
+    fn providers(account_id: &AccountId) -> Option<Provision<Hash>>;
+    /// Get storage order
+    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId>>;
+    /// (Maybe) set storage order's status
+    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId>);
+}
+
+
+impl<AId, Hash> MarketInterface<AId, Hash> for () {
+    fn providers(_: &AId) -> Option<Provision<Hash>> {
+        None
+    }
+
+    fn maybe_get_sorder(_: &Hash) -> Option<StorageOrder<AId>> {
+        None
+    }
+
+    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId>) {
+
+    }
+}
+
+impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
+    <T as system::Trait>::Hash> for Module<T>
+{
+    fn providers(account_id: &<T as system::Trait>::AccountId)
+        -> Option<Provision<<T as system::Trait>::Hash>> {
+        Self::providers(account_id)
+    }
+
+    fn maybe_get_sorder(order_id: &<T as system::Trait>::Hash)
+        -> Option<StorageOrder<<T as system::Trait>::AccountId>> {
+        Self::storage_orders(order_id)
+    }
+
+    fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
+                        so: &StorageOrder<<T as system::Trait>::AccountId>) {
+        Self::maybe_set_sorder(order_id, so);
+    }
+}
+
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     /// The overarching event type.

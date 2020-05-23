@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot, BlockNumber};
-use market::{StorageOrder, Provision, OrderStatus};
+use market::{OrderStatus, MarketInterface, OrderInspector};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -60,62 +60,13 @@ impl<AId> Works<AId> for () {
 
 /// Implement market's order inspector, bonding with work report
 /// and return if the order is legality
-impl<T: Trait> market::OrderInspector<T::AccountId> for Module<T> {
+impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
     fn check_works(provider: &T::AccountId, file_size: u64) -> bool {
         if let Some(wr) = Self::work_reports(provider) {
               wr.reserved > file_size
         } else {
             false
         }
-    }
-}
-
-/// Means for interacting with a specialized version of the `market` trait.
-///
-/// This is needed because `Tee`
-/// 1. updates the `Providers` of the `market::Trait`
-/// 2. use `Providers` to judge work report
-// TODO: restrict this with market trait
-pub trait MarketInterface<AccountId, Hash> {
-    /// Provision{files} will be used for tee module.
-    fn providers(account_id: &AccountId) -> Option<Provision<Hash>>;
-    /// Get storage order
-    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId>>;
-    /// (Maybe) set storage order's status
-    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId>);
-}
-
-impl<AId, Hash> MarketInterface<AId, Hash> for () {
-    fn providers(_: &AId) -> Option<Provision<Hash>> {
-        None
-    }
-
-    fn maybe_get_sorder(_: &Hash) -> Option<StorageOrder<AId>> {
-        None
-    }
-
-    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId>) {
-
-    }
-}
-
-impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
-    <T as system::Trait>::Hash> for T where
-    T: market::Trait
-{
-    fn providers(account_id: &<T as system::Trait>::AccountId)
-        -> Option<Provision<<T as system::Trait>::Hash>> {
-        <market::Module<T>>::providers(account_id)
-    }
-
-    fn maybe_get_sorder(order_id: &<T as system::Trait>::Hash)
-        -> Option<StorageOrder<<T as system::Trait>::AccountId>> {
-        <market::Module<T>>::storage_orders(order_id)
-    }
-
-    fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
-                        so: &StorageOrder<<T as system::Trait>::AccountId>) {
-        <market::Module<T>>::maybe_set_sorder(order_id, so);
     }
 }
 
@@ -128,7 +79,7 @@ pub trait Trait: system::Trait {
     type Works: Works<Self::AccountId>;
 
     /// Interface for interacting with a market module.
-    type MarketInterface: self::MarketInterface<Self::AccountId, Self::Hash>;
+    type MarketInterface: MarketInterface<Self::AccountId, Self::Hash>;
 }
 
 decl_storage! {

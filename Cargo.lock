@@ -719,6 +719,7 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-market",
+ "cstrml-payment",
  "cstrml-staking",
  "cstrml-tee",
  "frame-executive",
@@ -733,6 +734,7 @@ dependencies = [
  "pallet-im-online",
  "pallet-indices",
  "pallet-randomness-collective-flip",
+ "pallet-scheduler",
  "pallet-session",
  "pallet-staking-reward-curve",
  "pallet-timestamp",
@@ -799,10 +801,32 @@ name = "cstrml-market"
 version = "0.3.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-tee",
  "frame-support",
  "frame-system",
  "hex",
+ "parity-scale-codec",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-payment"
+version = "0.3.0"
+dependencies = [
+ "cst-primitives",
+ "cstrml-balances",
+ "cstrml-market",
+ "cstrml-tee",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "pallet-scheduler",
  "parity-scale-codec",
  "serde",
  "serde_json",
@@ -843,6 +867,7 @@ name = "cstrml-tee"
 version = "0.3.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-market",
  "frame-support",
  "frame-system",
@@ -3143,6 +3168,22 @@ dependencies = [
  "frame-system",
  "parity-scale-codec",
  "safe-mix",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-scheduler"
+version = "2.0.0-alpha.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48517a4251d550e19ee32f8f9e80ca6c561b859c5da064f59f143ce8bdb6311"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-io",
  "sp-runtime",
  "sp-std",
 ]

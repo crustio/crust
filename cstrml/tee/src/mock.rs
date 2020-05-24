@@ -2,7 +2,7 @@ use crate::*;
 
 use frame_support::{
     impl_outer_origin, parameter_types, weights::Weight,
-    traits::{ OnInitialize, OnFinalize }
+    traits::{ OnInitialize, OnFinalize, Get}
 };
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
@@ -13,12 +13,27 @@ use sp_runtime::{
 };
 use market::{Provision, StorageOrder};
 use primitives::{MerkleRoot, Hash};
+use balances::AccountData;
+use std::{cell::RefCell};
 
 type AccountId = AccountId32;
+pub type Balance = u64;
 
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
 }
+
+thread_local! {
+    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
+}
+
+pub struct ExistentialDeposit;
+impl Get<u64> for ExistentialDeposit {
+    fn get() -> u64 {
+        EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
+    }
+}
+
 
 // For testing the module, we construct most of a mock runtime. This means
 // first constructing a configuration type (`Test`) which `impl`s each of the
@@ -50,13 +65,22 @@ impl system::Trait for Test {
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
     type ModuleToIndex = ();
-    type AccountData = ();
+    type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
 }
 
+impl balances::Trait for Test {
+    type Balance = Balance;
+    type DustRemoval = ();
+    type Event = ();
+    type ExistentialDeposit = ExistentialDeposit;
+    type AccountStore = system::Module<Test>;
+}
+
 impl market::Trait for Test {
     type Event = ();
+    type Currency = balances::Module<Self>;
     type Randomness = ();
     type Payment = Market;
     type OrderInspector = Tee;

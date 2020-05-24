@@ -43,3 +43,4 @@ std = [
 [dev-dependencies]
 hex = '0.4.2'
 tee = { package = 'cstrml-tee', path = '../tee' }
+balances = { package = 'cstrml-balances', path = '../balances' }

@@ -1,7 +1,7 @@
 use super::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types, weights::Weight,
+    impl_outer_origin, parameter_types, impl_outer_dispatch, weights::Weight,
     traits::{OnFinalize, OnInitialize, Get}
 };
 use sp_core::H256;
@@ -17,6 +17,13 @@ pub type Balance = u64;
 
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
+}
+
+impl_outer_dispatch! {
+	pub enum Call for Test where origin: Origin {
+        balances::Balances,
+        payment::Payment,
+	}
 }
 
 // For testing the module, we construct most of a mock runtime. This means
@@ -67,7 +74,7 @@ impl system::Trait for Test {
 
 pub struct TestOrderInspector;
 
-impl OrderInspector<AccountId> for TestOrderInspector {
+impl market::OrderInspector<AccountId> for TestOrderInspector {
     // file size should smaller than provider's num
     fn check_works(provider: &AccountId, file_size: u64) -> bool {
         if let Some(wr) = Tee::work_reports(provider) {
@@ -76,6 +83,18 @@ impl OrderInspector<AccountId> for TestOrderInspector {
             false
         }
     }
+}
+
+
+parameter_types! {
+	pub const MaximumWeight: u32 = 1000000;
+}
+
+impl scheduler::Trait for Test {
+	type Event = ();
+	type Origin = Origin;
+	type Call = Call;
+	type MaximumWeight = MaximumWeight;
 }
 
 impl balances::Trait for Test {
@@ -92,17 +111,30 @@ impl tee::Trait for Test {
     type MarketInterface = ();
 }
 
-impl Trait for Test {
+impl market::Trait for Test {
     type Event = ();
-    type Currency = balances::Module<Self>;
+    type Currency = Balances;
     type Randomness = ();
-    type Payment = Market;
+    type Payment = Payment;
     type OrderInspector = TestOrderInspector;
 }
 
-pub type Market = Module<Test>;
+impl Trait for Test {
+    type Proposal = Call;
+    type Currency = Balances;
+    type Event = ();
+    type Randomness = ();
+    // TODO: Bonding with balance module(now we impl inside Market)
+    type MarketInterface = Market;
+    type Scheduler = Scheduler;
+}
+
+pub type Market = market::Module<Test>;
 pub type System = system::Module<Test>;
 pub type Tee = tee::Module<Test>;
+pub type Scheduler = scheduler::Module<Test>;
+pub type Payment = Module<Test>;
+pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.

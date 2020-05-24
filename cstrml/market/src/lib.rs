@@ -5,7 +5,7 @@ use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
     weights::SimpleDispatchInfo,
-    traits::Randomness
+    traits::{Randomness, Currency, LockableCurrency}
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use primitives::{
-    AddressInfo, MerkleRoot, Balance, BlockNumber,
+    AddressInfo, MerkleRoot, BlockNumber,
     constants::tee::REPORT_SLOT
 };
 
@@ -64,18 +64,21 @@ pub struct Provision<Hash> {
     pub file_map: BTreeMap<MerkleRoot, Hash>,
 }
 
+pub type BalanceOf<T> =
+    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
+
 /// An event handler for paying market order
-pub trait Payment<AccountId, Hash> {
+pub trait Payment<AccountId, Hash, Balance> {
     // Pay the storage order, return an UNIQUE `transaction id`🙏🏻
     fn pay_sorder(client: &AccountId, provider: &AccountId, value: Balance) -> Hash;
 }
 
 impl<T: Trait> Payment<<T as system::Trait>::AccountId,
-    <T as system::Trait>::Hash> for Module<T>
+    <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
 {
     fn pay_sorder(client: &<T as system::Trait>::AccountId,
                   provider: &<T as system::Trait>::AccountId,
-                  _: u128) -> T::Hash {
+                  _: BalanceOf<T>) -> T::Hash {
         let bn = <system::Module<T>>::block_number();
         let bh: T::Hash = <system::Module<T>>::block_hash(bn);
         let seed = [
@@ -147,6 +150,9 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
 
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
+    /// The payment balance.
+    type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
@@ -154,7 +160,7 @@ pub trait Trait: system::Trait {
     type Randomness: Randomness<Self::Hash>;
 
     /// Connector with balance module
-    type Payment: Payment<Self::AccountId, Self::Hash>;
+    type Payment: Payment<Self::AccountId, Self::Hash, BalanceOf<Self>>;
 
     /// Connector with tee module
     type OrderInspector: OrderInspector<Self::AccountId>;
@@ -201,7 +207,7 @@ decl_module! {
 
         /// Register to be a provider, you should provide your storage layer's address info
         #[weight = SimpleDispatchInfo::default()]
-        fn register(origin, address_info: AddressInfo) -> DispatchResult {
+        pub fn register(origin, address_info: AddressInfo) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Make sure you have works
@@ -221,10 +227,10 @@ decl_module! {
 
         /// Place a storage order, make sure
         #[weight = SimpleDispatchInfo::default()]
-        fn place_storage_order(
+        pub fn place_storage_order(
             origin,
             provider: <T::Lookup as StaticLookup>::Source,
-            #[compact] value: Balance,
+            #[compact] value: BalanceOf<T>,
             file_identifier: MerkleRoot,
             file_size: u64,
             duration: u32
@@ -281,7 +287,7 @@ impl<T: Trait> Module<T> {
     // sorder is equal to storage order
     fn maybe_insert_sorder(client: &T::AccountId,
                            provider: &T::AccountId,
-                           value: Balance,
+                           value: BalanceOf<T>,
                            so: &StorageOrder<T::AccountId>) -> bool {
         let order_id = T::Payment::pay_sorder(&client, &provider, value);
 

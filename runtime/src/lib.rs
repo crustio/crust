@@ -193,6 +193,17 @@ impl im_online::Trait for Runtime {
     type UnsignedPriority = StakingUnsignedPriority;
 }
 
+parameter_types! {
+	pub const MaximumWeight: Weight = 2_000_000;
+}
+
+impl scheduler::Trait for Runtime {
+    type Event = Event;
+    type Call = Call;
+    type Origin = Origin;
+    type MaximumWeight = MaximumWeight;
+}
+
 impl grandpa::Trait for Runtime {
     type Event = Event;
 }
@@ -339,11 +350,22 @@ impl tee::Trait for Runtime {
 }
 
 impl market::Trait for Runtime {
+    type Currency = Balances;
     type Event = Event;
     type Randomness = RandomnessCollectiveFlip;
     // TODO: Bonding with balance module(now we impl inside Market)
-    type Payment = Market;
+    type Payment = Payment;
     type OrderInspector = Tee;
+}
+
+impl payment::Trait for Runtime {
+    type Proposal = Call;
+    type Currency = Balances;
+    type Event = Event;
+    type Randomness = RandomnessCollectiveFlip;
+    // TODO: Bonding with balance module(now we impl inside Market)
+    type MarketInterface = Market;
+    type Scheduler = Scheduler;
 }
 
 construct_runtime! {
@@ -373,10 +395,12 @@ construct_runtime! {
         Grandpa: grandpa::{Module, Call, Storage, Config, Event},
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: authority_discovery::{Module, Call, Config},
+        Scheduler: scheduler::{Module, Call, Storage, Event<T>},
 
         // Crust modules
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
         Market: market::{Module, Call, Storage, Event<T>},
+        Payment: payment::{Module, Call, Storage, Event<T>},
     }
 }
 

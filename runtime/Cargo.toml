@@ -34,6 +34,7 @@ session = { default-features = false, package = 'pallet-session', version = '2.0
 pallet-staking-reward-curve = { default-features = false, version = '2.0.0-alpha.6' }
 timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-alpha.6' }
 transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-alpha.6' }
+scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-alpha.6' }
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-alpha.6' }
@@ -57,6 +58,7 @@ tee = { package = 'cstrml-tee', path = '../cstrml/tee', default-features = false
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
 market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
 balances = { package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
+payment = { package = 'cstrml-payment', path = '../cstrml/payment', default-features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
 
 [features]
@@ -94,9 +96,11 @@ std = [
     'system/std',
     'timestamp/std',
     'transaction-payment/std',
+    'scheduler/std',
     'sp-runtime-interface/std',
     'tee/std',
     'staking/std',
     'market/std',
+    'payment/std',
     'primitives/std'
 ]

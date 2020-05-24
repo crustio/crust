@@ -62,8 +62,8 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
 
         let result = T::Scheduler::schedule_named(
             sorder_id,
-            when,
-            None,
+            when + when,
+            Some((when, 5)),
             63,
             Call::payment_by_instalments(
                 client.clone(),
@@ -136,8 +136,8 @@ decl_module! {
             value: BalanceOf<T>,
             order_id: T::Hash
         ) -> DispatchResult {
-			ensure_root(origin)?;
-            Self::do_payment_by_instalments(&client, &provider, value, &order_id);
+			ensure_root(origin.clone())?;
+            Self::do_payment_by_instalments(origin, &client, &provider, value, &order_id);
             Self::deposit_event(RawEvent::PaymentSuccess(client));
             Ok(())
 		}
@@ -147,13 +147,19 @@ decl_module! {
 impl<T: Trait> Module<T> {
 
     fn do_payment_by_instalments(
+        origin: T::Origin,
         client: &<T as system::Trait>::AccountId,
         provider: &<T as system::Trait>::AccountId,
         value: BalanceOf<T>,
         order_id: &T::Hash
     ) -> DispatchResult {
-        let sorder =
+        let mut sorder =
         T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
+        let current_block_number = <system::Module<T>>::block_number();
+        let current_block_numeric = TryInto::<u32>::try_into(current_block_number).ok().unwrap();
+        // go panic if `current_block_numeric` > `created_on`
+        sorder.created_on = current_block_numeric;
+        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
         Ok(())
     }
 }

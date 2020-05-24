@@ -35,9 +35,90 @@ fn test_for_storage_order_should_work() {
         });
         assert_eq!(Market::clients(0).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
-            file_identifier,
+            file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+
+        run_to_block(101);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 100,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+        run_to_block(149);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 100,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+        run_to_block(150);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 150,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+        run_to_block(200);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 200,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+        run_to_block(250);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 250,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+        run_to_block(300);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 300,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+        run_to_block(350);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 300,
+            expired_on: 410,
+            provider: 100,
+            client: 0,
+            order_status: Default::default()
+        });
+        run_to_block(400);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 300,
             expired_on: 410,
             provider: 100,
             client: 0,

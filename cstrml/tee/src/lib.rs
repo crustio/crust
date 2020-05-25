@@ -291,15 +291,16 @@ impl<T: Trait> Module<T> {
 
                 // TODO: we should specially handle `Failed` status
                 if sorder.order_status != OrderStatus::Success {
-                    // 1. Change order status to `Success`
-                    sorder.order_status = OrderStatus::Success;
-
-                    // 2. Reset `expired_on` for new order
+                    // 1. Reset `expired_on` and `completed_on` for new order
                     if sorder.order_status == OrderStatus::Pending {
                         let current_block_numeric = Self::get_current_block_number();
                         // go panic if `current_block_numeric` > `created_on`
                         sorder.expired_on += current_block_numeric - sorder.created_on;
+                        sorder.completed_on = current_block_numeric;
                     }
+
+                    // 2. Change order status to `Success`
+                    sorder.order_status = OrderStatus::Success;
 
                     // 3. (Maybe) set sorder
                     T::MarketInterface::maybe_set_sorder(order_id, &sorder);

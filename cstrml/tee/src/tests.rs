@@ -210,6 +210,8 @@ fn test_for_report_works_success() {
         // prepare sorder
         add_pending_sorder();
 
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 0);
+
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
 
         // Check workloads
@@ -225,6 +227,7 @@ fn test_for_report_works_success() {
         assert_eq!(Tee::used(), 402868224);
         assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().order_status,
                    OrderStatus::Success);
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 303);
     });
 }
 

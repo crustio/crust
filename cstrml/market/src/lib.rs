@@ -32,6 +32,7 @@ pub struct StorageOrder<AccountId> {
     pub file_identifier: MerkleRoot,
     pub file_size: u64,
     pub created_on: BlockNumber,
+    pub completed_on: BlockNumber,
     pub expired_on: BlockNumber,
     pub provider: AccountId,
     pub client: AccountId,
@@ -247,6 +248,7 @@ decl_module! {
                     file_identifier,
                     file_size,
                     created_on,
+                    completed_on: created_on,
                     expired_on: created_on + duration, // this will changed, when `order_status` become `Success`
                     provider: provider.clone(),
                     client: who.clone(),

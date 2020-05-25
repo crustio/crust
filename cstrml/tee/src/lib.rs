@@ -303,6 +303,7 @@ impl<T: Trait> Module<T> {
                     sorder.order_status = OrderStatus::Success;
 
                     // 3. (Maybe) set sorder
+                    // TODO: we should specially handle `Failed` status
                     T::MarketInterface::maybe_set_sorder(order_id, &sorder);
                 }
                 return used + *f_size

@@ -60,23 +60,21 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         return sorder_id;
     }
 
-    fn start_delayed_pay(
-        sorder_id: &T::Hash,
-        value: BalanceOf<T>) {
+    fn start_delayed_pay(sorder_id: &T::Hash) {
             let sorder = T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
             let interal =  TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
+            let times = (sorder.expired_on - sorder.completed_on)/MINUTES + 1;
+            let value = Self::payments(sorder_id).unwrap_or_default().total;
+            let piece_value: BalanceOf<T> = BalanceOf::<T>::from(TryInto::<u32>::try_into(value).ok().unwrap()/times);
             let result = T::Scheduler::schedule_named(
                 sorder_id,
                 <system::Module<T>>::block_number(),
-                Some(
-                    (interal,
-                    (sorder.expired_on - sorder.completed_on)/MINUTES + 1)
-                    ),
+                Some((interal, times)),
                 63,
                 Call::payment_by_instalments(
                     sorder.client.clone(),
                     sorder.provider.clone(),
-                    value,
+                    piece_value,
                     sorder_id.clone()
                 ).into(),
             );
@@ -159,6 +157,25 @@ decl_module! {
     }
 }
 
+pub trait BalanceInterface<Origin, AccountId, Balance>: system::Trait {
+    /// Disable a given validator by stash ID.
+    ///
+    /// Returns `true` if new era should be forced at the end of this session.
+    /// This allows preventing a situation where there is too many validators
+    /// disabled and block production stalls.
+    fn transfer(origin: Origin, client: &AccountId, provider: &AccountId, value: Balance);
+}
+
+impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, BalanceOf<T>> for T where T: balances::Trait {
+    fn transfer(
+        origin: T::Origin,
+        client: &<T as system::Trait>::AccountId,
+        provider: &<T as system::Trait>::AccountId,
+        value: BalanceOf<T>) {
+        <balances::Module<T>>::force_transfer(origin, client, provider, value);
+    }
+}
+
 impl<T: Trait> Module<T> {
 
     fn do_payment_by_instalments(
@@ -168,13 +185,6 @@ impl<T: Trait> Module<T> {
         value: BalanceOf<T>,
         order_id: &T::Hash
     ) -> DispatchResult {
-        let mut sorder =
-        T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
-        let current_block_number = <system::Module<T>>::block_number();
-        let current_block_numeric = TryInto::<u32>::try_into(current_block_number).ok().unwrap();
-        // go panic if `current_block_numeric` > `created_on`
-        sorder.created_on = current_block_numeric;
-        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
         Ok(())
     }
 

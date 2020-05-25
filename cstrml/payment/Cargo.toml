@@ -26,6 +26,7 @@ sp-std = { default-features = false, version = '2.0.0-alpha.6' }
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 market = { package = 'cstrml-market', path = '../market', default-features = false }
+balances = { package = 'cstrml-balances', path = '../balances', default-features = false }
 
 [features]
 default = ['std']
@@ -39,7 +40,8 @@ std = [
     'sp-std/std',
     'system/std',
     'primitives/std',
-    'market/std'
+    'market/std',
+    'balances/std'
 ]
 
 [dev-dependencies]

@@ -73,7 +73,7 @@ pub trait Payment<AccountId, Hash, Balance> {
     fn pay_sorder(client: &AccountId, provider: &AccountId, value: Balance) -> Hash;
 
     // Start delayed pay
-    fn start_delayed_pay(sorder_id: &Hash, value: Balance);
+    fn start_delayed_pay(sorder_id: &Hash);
 }
 
 impl<T: Trait> Payment<<T as system::Trait>::AccountId,
@@ -94,10 +94,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         T::Randomness::random(seed.as_slice())
     }
 
-    fn start_delayed_pay(
-        _: &T::Hash,
-        _: BalanceOf<T>) {
-        }
+    fn start_delayed_pay(_: &T::Hash) { }
 }
 
 /// A trait for checking order's legality
@@ -159,6 +156,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
                         so: &StorageOrder<<T as system::Trait>::AccountId>) {
         Self::maybe_set_sorder(order_id, so);
+        Self::start_delayed_pay(order_id);
     }
 
     fn clients(account_id: &<T as system::Trait>::AccountId)

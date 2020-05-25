@@ -71,6 +71,9 @@ pub type BalanceOf<T> =
 pub trait Payment<AccountId, Hash, Balance> {
     // Pay the storage order, return an UNIQUE `transaction id`🙏🏻
     fn pay_sorder(client: &AccountId, provider: &AccountId, value: Balance) -> Hash;
+
+    // Start delayed pay
+    fn start_delayed_pay(sorder_id: &Hash, value: Balance);
 }
 
 impl<T: Trait> Payment<<T as system::Trait>::AccountId,
@@ -90,6 +93,11 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         // it can cover most cases, for the "real" random
         T::Randomness::random(seed.as_slice())
     }
+
+    fn start_delayed_pay(
+        _: &T::Hash,
+        _: BalanceOf<T>) {
+        }
 }
 
 /// A trait for checking order's legality
@@ -112,6 +120,8 @@ pub trait MarketInterface<AccountId, Hash> {
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId>>;
     /// (Maybe) set storage order's status
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId>);
+    /// Vec{order_id} will be used for payment module.
+    fn clients(account_id: &AccountId) -> Option<Vec<Hash>>;
 }
 
 
@@ -126,6 +136,10 @@ impl<AId, Hash> MarketInterface<AId, Hash> for () {
 
     fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId>) {
 
+    }
+
+    fn clients(_: &AId) -> Option<Vec<Hash>> {
+        None
     }
 }
 
@@ -146,6 +160,12 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
                         so: &StorageOrder<<T as system::Trait>::AccountId>) {
         Self::maybe_set_sorder(order_id, so);
     }
+
+    fn clients(account_id: &<T as system::Trait>::AccountId)
+        -> Option<Vec<<T as system::Trait>::Hash>> {
+        Self::clients(account_id)
+    }
+    
 }
 
 /// The module's configuration trait.

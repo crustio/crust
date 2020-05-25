@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure, Parameter,
     weights::SimpleDispatchInfo,
@@ -13,14 +13,14 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto};
 use system::{ensure_signed, ensure_root};
-use sp_runtime::{traits::{StaticLookup, Dispatchable}};
+use sp_runtime::{traits::{StaticLookup, Dispatchable, Zero}};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use primitives::{
-    Balance, BlockNumber,
+    Balance, BlockNumber, constants::time::MINUTES
 };
 
 use market::{OrderStatus, MarketInterface, Payment};
@@ -52,29 +52,44 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
 
         // it can cover most cases, for the "real" random
         let sorder_id = T::Randomness::random(seed.as_slice());
-        let when = <system::Module<T>>::block_number();
-        T::Currency::set_lock(
-            PAYMENT_ID,
-            &client,
-            value,
-            WithdrawReasons::all(),
-        );
-
-        let result = T::Scheduler::schedule_named(
-            sorder_id,
-            when + when,
-            Some((when, 5)),
-            63,
-            Call::payment_by_instalments(
-                client.clone(),
-                provider.clone(),
-                value,
-                sorder_id.clone()
-            ).into(),
-        );
-        <Payments<T>>::insert(sorder_id, value);
+        Self::add_new_payments_lock(client, value.clone());
+        <Payments<T>>::insert(sorder_id, PaymentLedger{
+            total: value,
+            already_paid: Zero::zero()
+        });
         return sorder_id;
     }
+
+    fn start_delayed_pay(
+        sorder_id: &T::Hash,
+        value: BalanceOf<T>) {
+            let sorder = T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
+            let interal =  TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
+            let result = T::Scheduler::schedule_named(
+                sorder_id,
+                <system::Module<T>>::block_number(),
+                Some(
+                    (interal,
+                    (sorder.expired_on - sorder.completed_on)/MINUTES + 1)
+                    ),
+                63,
+                Call::payment_by_instalments(
+                    sorder.client.clone(),
+                    sorder.provider.clone(),
+                    value,
+                    sorder_id.clone()
+                ).into(),
+            );
+        }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct PaymentLedger<Balance: HasCompact + Zero> {
+    #[codec(compact)]
+    pub total: Balance,
+    #[codec(compact)]
+    pub already_paid: Balance
 }
 
 /// The module's configuration trait.
@@ -101,7 +116,7 @@ decl_storage! {
     trait Store for Module<T: Trait> as Market {
         /// A mapping from storage provider to order id
         pub Payments get(fn payments):
-        map hasher(twox_64_concat) T::Hash => BalanceOf<T>;
+        map hasher(twox_64_concat) T::Hash => Option<PaymentLedger<BalanceOf<T>>>;
     }
 }
 
@@ -161,6 +176,28 @@ impl<T: Trait> Module<T> {
         sorder.created_on = current_block_numeric;
         T::MarketInterface::maybe_set_sorder(order_id, &sorder);
         Ok(())
+    }
+
+    fn add_new_payments_lock(
+        client: &<T as system::Trait>::AccountId,
+        value: BalanceOf<T>
+    ) {
+        let current_lock = Self::total_lock(client);
+        T::Currency::set_lock(
+            PAYMENT_ID,
+            &client,
+            value + current_lock,
+            WithdrawReasons::all(),
+        );
+    }
+
+    fn total_lock(client: &<T as system::Trait>::AccountId) -> BalanceOf<T> {
+        T::MarketInterface::clients(client).unwrap_or_default().iter().fold(
+            Zero::zero(), |acc, &order_id| {
+                let payment_ledger = Self::payments(order_id).unwrap_or_default();
+                acc + payment_ledger.total - payment_ledger.already_paid
+            }
+        )
     }
 }
 

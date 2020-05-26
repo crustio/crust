@@ -46,6 +46,7 @@ std = [
 
 [dev-dependencies]
 hex = '0.4.2'
+keyring = { package = "sp-keyring", version = '2.0.0-alpha.6' }
 tee = { package = 'cstrml-tee', path = '../tee' }
 balances = { package = 'cstrml-balances', path = '../balances' }
 scheduler = { package = 'pallet-scheduler', version = '2.0.0-alpha.6' }

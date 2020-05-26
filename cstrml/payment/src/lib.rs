@@ -13,7 +13,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto};
 use system::{ensure_signed, ensure_root};
-use sp_runtime::{traits::{StaticLookup, Dispatchable, Zero}};
+use sp_runtime::{traits::{StaticLookup, Dispatchable, Zero, Convert}};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -62,14 +62,14 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
 
     fn start_delayed_pay(sorder_id: &T::Hash) {
             let sorder = T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
-            let interal =  TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
+            let interval =  TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
             let times = (sorder.expired_on - sorder.completed_on)/MINUTES + 1;
             let value = Self::payments(sorder_id).unwrap_or_default().total;
             let piece_value: BalanceOf<T> = BalanceOf::<T>::from(TryInto::<u32>::try_into(value).ok().unwrap()/times);
             let result = T::Scheduler::schedule_named(
                 sorder_id,
-                <system::Module<T>>::block_number(),
-                Some((interal, times)),
+                <system::Module<T>>::block_number() + interval, // must have a delay
+                Some((interval, times)),
                 63,
                 Call::payment_by_instalments(
                     sorder.client.clone(),
@@ -106,7 +106,12 @@ pub trait Trait: system::Trait {
     type MarketInterface: MarketInterface<Self::AccountId, Self::Hash>;
 
     /// The Scheduler.
-	type Scheduler: ScheduleNamed<Self::BlockNumber, Self::Proposal>;
+    type Scheduler: ScheduleNamed<Self::BlockNumber, Self::Proposal>;
+    
+    /// Used to transfer
+    type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u128, BalanceOf<Self>>;
+
+    type BalanceInterface: self::BalanceInterface<Self::Origin, Self::AccountId, BalanceOf<Self>>;
 }
 
 // This module's storage items.
@@ -172,7 +177,13 @@ impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, Bala
         client: &<T as system::Trait>::AccountId,
         provider: &<T as system::Trait>::AccountId,
         value: BalanceOf<T>) {
-        <balances::Module<T>>::force_transfer(origin, client, provider, value);
+            let to_balance = |b: BalanceOf<T>| T::Balance::from(<T::CurrencyToBalance as Convert<BalanceOf<T>, u64>>::convert(b) as u32);
+            <balances::Module<T>>::force_transfer(
+                origin,
+                T::Lookup::unlookup(client.clone()),
+                T::Lookup::unlookup(provider.clone()),
+                to_balance(value)
+            );
     }
 }
 
@@ -185,6 +196,19 @@ impl<T: Trait> Module<T> {
         value: BalanceOf<T>,
         order_id: &T::Hash
     ) -> DispatchResult {
+        let current_lock = Self::total_lock(client);
+        T::Currency::set_lock(
+            PAYMENT_ID,
+            &client,
+            current_lock - value,
+            WithdrawReasons::all(),
+        );
+        T::BalanceInterface::transfer(origin.clone(), client, provider, value);
+        <Payments<T>>::mutate(&order_id, |payment_ledger| {
+            if let Some(p) = payment_ledger {
+                p.already_paid += value;
+            }
+        });
         Ok(())
     }
 

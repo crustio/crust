@@ -169,7 +169,7 @@ decl_module! {
         }
 
         #[weight = SimpleDispatchInfo::default()]
-        fn report_works(origin, work_report: WorkReport) -> DispatchResult {
+        pub fn report_works(origin, work_report: WorkReport) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified

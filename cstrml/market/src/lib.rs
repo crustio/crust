@@ -156,7 +156,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
                         so: &StorageOrder<<T as system::Trait>::AccountId>) {
         Self::maybe_set_sorder(order_id, so);
-        Self::start_delayed_pay(order_id);
+        T::Payment::start_delayed_pay(order_id);
     }
 
     fn clients(account_id: &<T as system::Trait>::AccountId)

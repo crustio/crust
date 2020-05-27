@@ -90,7 +90,7 @@ pub struct TestOrderInspector;
 
 impl market::OrderInspector<AccountId> for TestOrderInspector {
     // file size should smaller than provider's num
-    fn check_works(provider: &AccountId, file_size: u64) -> bool {
+    fn check_works(_provider: &AccountId, _file_size: u64) -> bool {
         true
     }
 }

@@ -5,7 +5,7 @@ use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
     weights::SimpleDispatchInfo,
-    traits::{Randomness, Currency, LockableCurrency}
+    traits::{Randomness, Currency, ReservableCurrency}
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
@@ -169,7 +169,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     /// The payment balance.
-    type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+    type Currency: ReservableCurrency<Self::AccountId>;
 
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -211,7 +211,9 @@ decl_error! {
 		/// Not provider
 		NotProvider,
 		/// File duration is too short
-		DurationTooShort
+        DurationTooShort,
+        /// Don't have enough currency
+        InsufficientCurrecy
     }
 }
 
@@ -265,6 +267,9 @@ decl_module! {
 
                 // 3. Check provider has capacity to store file
                 ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
+
+                // 4. Check client has enough currency to pay
+                ensure!(T::Currency::can_reserve(&who, value.clone()), Error::<T>::InsufficientCurrecy);
 
                 // 4. Construct storage order
                 let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();

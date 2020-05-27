@@ -125,14 +125,6 @@ decl_storage! {
 decl_error! {
     /// Error for the market module.
     pub enum Error for Module<T: Trait> {
-        /// Duplicate order id.
-		DuplicateOrderId,
-		/// No workload
-		NoWorkload,
-		/// Not provider
-		NotProvider,
-		/// File duration is too short
-		DurationTooShort
     }
 }
 
@@ -190,11 +182,6 @@ decl_module! {
 }
 
 pub trait BalanceInterface<Origin, AccountId, Balance>: system::Trait {
-    /// Disable a given validator by stash ID.
-    ///
-    /// Returns `true` if new era should be forced at the end of this session.
-    /// This allows preventing a situation where there is too many validators
-    /// disabled and block production stalls.
     fn maybe_transfer(origin: Origin, client: &AccountId, provider: &AccountId, value: Balance) -> bool;
 }
 

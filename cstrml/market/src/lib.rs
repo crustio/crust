@@ -205,12 +205,12 @@ decl_error! {
     /// Error for the market module.
     pub enum Error for Module<T: Trait> {
         /// Duplicate order id.
-		DuplicateOrderId,
-		/// No workload
-		NoWorkload,
-		/// Not provider
-		NotProvider,
-		/// File duration is too short
+        DuplicateOrderId,
+        /// No workload
+        NoWorkload,
+        /// Not provider
+        NotProvider,
+        /// File duration is too short
         DurationTooShort,
         /// Don't have enough currency
         InsufficientCurrecy

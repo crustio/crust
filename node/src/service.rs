@@ -2,7 +2,7 @@
 
 use crust_runtime::{self, opaque::Block, RuntimeApi};
 use grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider, StorageAndProofProvider};
-use sc_client::LongestChain;
+use sc_consensus::LongestChain;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
 use sc_service::{error::Error as ServiceError, AbstractService, Configuration, ServiceBuilder, Role};
@@ -25,6 +25,8 @@ native_executor_instance!(
 macro_rules! new_full_start {
 	($config:expr) => {{
 		use std::sync::Arc;
+
+		// TODO: add prometheus setting?
 		let mut import_setup = None;
 		let inherent_data_providers = sp_inherents::InherentDataProviders::new();
 
@@ -32,9 +34,9 @@ macro_rules! new_full_start {
 			crust_runtime::opaque::Block, crust_runtime::RuntimeApi, crate::service::Executor
 		>($config)?
 			.with_select_chain(|_config, backend| {
-				Ok(sc_client::LongestChain::new(backend.clone()))
+				Ok(sc_consensus::LongestChain::new(backend.clone()))
 			})?
-			.with_transaction_pool(|config, client, _fetcher| {
+			.with_transaction_pool(|config, client, _fetcher, prometheus_registry| {
 				let pool_api = sc_transaction_pool::FullChainApi::new(client.clone());
 				Ok(sc_transaction_pool::BasicPool::new(config, std::sync::Arc::new(pool_api)))
 			})?

@@ -18,45 +18,45 @@ codec = { default-features = false, features = ['derive'], package = 'parity-sca
 serde = { features = ['derive'], optional = true, version = '1.0.106' }
 
 # substrate frame dependencies
-authorship = { default-features = false, package = 'pallet-authorship', version = '2.0.0-alpha.6' }
-authority-discovery = { default-features = false, package = 'pallet-authority-discovery', version = '2.0.0-alpha.6' }
-babe = { default-features = false, package = 'pallet-babe', version = '2.0.0-alpha.6' }
-collective = { default-features = false, package = 'pallet-collective', version = '2.0.0-alpha.6' }
-frame-executive = { default-features = false, version = '2.0.0-alpha.6' }
-frame-support = { default-features = false, version = "2.0.0-alpha.6" }
-finality-tracker = { default-features = false, package = 'pallet-finality-tracker', version = '2.0.0-alpha.6' }
-grandpa = { default-features = false, package = 'pallet-grandpa', version = '2.0.0-alpha.6' }
-indices = { package = "pallet-indices", version = '2.0.0-alpha.6', default-features = false }
-im-online = { default-features = false, package = 'pallet-im-online', version = '2.0.0-alpha.6' }
-randomness-collective-flip = { default-features = false, package = 'pallet-randomness-collective-flip', version = '2.0.0-alpha.6' }
-system = { default-features = false, package = 'frame-system', version = '2.0.0-alpha.6' }
-session = { default-features = false, package = 'pallet-session', version = '2.0.0-alpha.6' }
-pallet-staking-reward-curve = { default-features = false, version = '2.0.0-alpha.6' }
-timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-alpha.6' }
-transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-alpha.6' }
+authorship = { default-features = false, package = 'pallet-authorship', version = '2.0.0-rc2' }
+authority-discovery = { default-features = false, package = 'pallet-authority-discovery', version = '2.0.0-rc2' }
+babe = { default-features = false, package = 'pallet-babe', version = '2.0.0-rc2' }
+balances = { default-features = false, package = 'pallet-balances', version = '2.0.0-rc2' }
+collective = { default-features = false, package = 'pallet-collective', version = '2.0.0-rc2' }
+frame-executive = { default-features = false, version = '2.0.0-rc2' }
+frame-support = { default-features = false, version = "2.0.0-rc2" }
+finality-tracker = { default-features = false, package = 'pallet-finality-tracker', version = '2.0.0-rc2' }
+grandpa = { default-features = false, package = 'pallet-grandpa', version = '2.0.0-rc2' }
+indices = { package = "pallet-indices", version = '2.0.0-rc2', default-features = false }
+im-online = { default-features = false, package = 'pallet-im-online', version = '2.0.0-rc2' }
+randomness-collective-flip = { default-features = false, package = 'pallet-randomness-collective-flip', version = '2.0.0-rc2' }
+system = { default-features = false, package = 'frame-system', version = '2.0.0-rc2' }
+session = { default-features = false, package = 'pallet-session', version = '2.0.0-rc2' }
+pallet-staking-reward-curve = { default-features = false, version = '2.0.0-rc2' }
+timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-rc2' }
+transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-rc2' }
 
 # substrate primitives
-authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-alpha.6' }
-babe-primitives = { default-features = false, package = 'sp-consensus-babe', version = '0.8.0-alpha.6' }
-sp-api = { default-features = false, version = '2.0.0-alpha.6' }
-sp-block-builder = { default-features = false, version = '2.0.0-alpha.6' }
-sp-core = { default-features = false, version = '2.0.0-alpha.6' }
-sp-inherents = { default-features = false, version = '2.0.0-alpha.6' }
-sp-io = { default-features = false, version = '2.0.0-alpha.6' }
-sp-offchain = { default-features = false, version = '2.0.0-alpha.6' }
-sp-runtime = { default-features = false, version = '2.0.0-alpha.6' }
-sp-session = { default-features = false, version = '2.0.0-alpha.6' }
-sp-staking = { default-features = false, version = '2.0.0-alpha.6' }
-sp-std = { default-features = false, version = '2.0.0-alpha.6' }
-sp-transaction-pool = { default-features = false, version = '2.0.0-alpha.6' }
-sp-version = { default-features = false, version = '2.0.0-alpha.6' }
-sp-runtime-interface = { default-features = false, version = '2.0.0-alpha.6' }
+authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc2' }
+babe-primitives = { default-features = false, package = 'sp-consensus-babe', version = '0.8.0-rc2' }
+sp-api = { default-features = false, version = '2.0.0-rc2' }
+sp-block-builder = { default-features = false, version = '2.0.0-rc2' }
+sp-core = { default-features = false, version = '2.0.0-rc2' }
+sp-inherents = { default-features = false, version = '2.0.0-rc2' }
+sp-io = { default-features = false, version = '2.0.0-rc2' }
+sp-offchain = { default-features = false, version = '2.0.0-rc2' }
+sp-runtime = { default-features = false, version = '2.0.0-rc2' }
+sp-session = { default-features = false, version = '2.0.0-rc2' }
+sp-staking = { default-features = false, version = '2.0.0-rc2' }
+sp-std = { default-features = false, version = '2.0.0-rc2' }
+sp-transaction-pool = { default-features = false, version = '2.0.0-rc2' }
+sp-version = { default-features = false, version = '2.0.0-rc2' }
+sp-runtime-interface = { default-features = false, version = '2.0.0-rc2' }
 
 # crust runtime modules
 tee = { package = 'cstrml-tee', path = '../cstrml/tee', default-features = false }
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
 market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
-balances = { package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
 
 [features]

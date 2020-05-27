@@ -10,16 +10,16 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use sp_core::OpaqueMetadata;
 use sp_runtime::traits::{
-    BlakeTwo256, Block as BlockT, Convert, ConvertInto, OpaqueKeys, SaturatedConversion,
-    IdentityLookup
+    BlakeTwo256, Block as BlockT, Convert, OpaqueKeys, SaturatedConversion,
+    IdentityLookup, Saturating
 };
 use sp_runtime::{
-    create_runtime_str, generic, impl_opaque_keys, ApplyExtrinsicResult, Perbill,
+    create_runtime_str, generic, impl_opaque_keys, ApplyExtrinsicResult, Perbill, KeyTypeId,
     transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority}
 };
 use sp_std::prelude::*;
 
-use grandpa::{fg_primitives, AuthorityList as GrandpaAuthorityList};
+use grandpa::{AuthorityId as GrandpaId, fg_primitives, AuthorityList as GrandpaAuthorityList};
 use sp_api::impl_runtime_apis;
 use sp_staking::SessionIndex;
 
@@ -32,14 +32,16 @@ pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 pub use balances::Call as BalancesCall;
 pub use frame_support::{
     construct_runtime, parameter_types,
-    traits::{Currency, Randomness},
-    weights::Weight,
+    traits::{Currency, KeyOwnerProofSystem, Randomness},
+    weights::{
+        Weight, IdentityFee,
+        constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
+    },
     StorageValue,
 };
 pub use im_online::sr25519::AuthorityId as ImOnlineId;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-use system::offchain::TransactionSubmitter;
 use session::{historical as session_historical};
 
 pub use timestamp::Call as TimestampCall;
@@ -84,6 +86,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_version: 1,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
+    transaction_version: 1
 };
 
 /// The version infromation used to identify this runtime when compiled natively.
@@ -96,11 +99,13 @@ pub fn native_version() -> NativeVersion {
 }
 
 parameter_types! {
-	pub const BlockHashCount: BlockNumber = 250;
-	pub const MaximumBlockWeight: Weight = 1_000_000_000;
+	pub const BlockHashCount: BlockNumber = 2400;
+	pub const MaximumBlockWeight: Weight = 2 * WEIGHT_PER_SECOND;
 	pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
 	pub const MaximumBlockLength: u32 = 5 * 1024 * 1024;
 	pub const Version: RuntimeVersion = VERSION;
+	pub const MaximumExtrinsicWeight: Weight = AvailableBlockRatio::get()
+		.saturating_sub(Perbill::from_percent(10)) * MaximumBlockWeight::get();
 }
 
 impl system::Trait for Runtime {
@@ -128,6 +133,18 @@ impl system::Trait for Runtime {
     type BlockHashCount = BlockHashCount;
     /// Maximum weight of each block.
     type MaximumBlockWeight = MaximumBlockWeight;
+    /// The weight of database operations that the runtime can invoke.
+    type DbWeight = RocksDbWeight;
+    /// The weight of the overhead invoked on the block import process, independent of the
+    /// extrinsics included in that block.
+    type BlockExecutionWeight = BlockExecutionWeight;
+    /// The base weight of any extrinsic processed by the runtime, independent of the
+    /// logic of that extrinsic. (Signature verification, nonce increment, fee, etc...)
+    type ExtrinsicBaseWeight = ExtrinsicBaseWeight;
+    /// The maximum weight that a single extrinsic of `Normal` dispatch class can have,
+    /// idependent of the logic of that extrinsics. (Roughly max block weight - average on
+    /// initialize cost).
+    type MaximumExtrinsicWeight = MaximumExtrinsicWeight;
     /// Maximum size of all encoded transactions (in bytes) that are allowed in one block.
     type MaximumBlockLength = MaximumBlockLength;
     /// Portion of the block weight that is available to all normal transactions.
@@ -172,7 +189,12 @@ impl indices::Trait for Runtime {
 
 impl authority_discovery::Trait for Runtime {}
 
-type SubmitTransaction = TransactionSubmitter<ImOnlineId, Runtime, UncheckedExtrinsic>;
+impl<C> system::offchain::SendTransactionTypes<C> for Runtime where
+    Call: From<C>,
+{
+    type Extrinsic = UncheckedExtrinsic;
+    type OverarchingCall = Call;
+}
 
 parameter_types! {
     pub const SessionDuration: BlockNumber = EPOCH_DURATION_IN_BLOCKS as _;
@@ -186,15 +208,26 @@ parameter_types! {
 impl im_online::Trait for Runtime {
     type AuthorityId = ImOnlineId;
     type Event = Event;
-    type Call = Call;
-    type SubmitTransaction = SubmitTransaction;
     type SessionDuration = SessionDuration;
     type ReportUnresponsiveness = ();
-    type UnsignedPriority = StakingUnsignedPriority;
+    type UnsignedPriority = ImOnlineUnsignedPriority;
 }
 
 impl grandpa::Trait for Runtime {
     type Event = Event;
+    type Call = Call;
+
+    type KeyOwnerProof =
+    <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
+
+    type KeyOwnerIdentification = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+        KeyTypeId,
+        GrandpaId,
+    )>>::IdentificationTuple;
+
+    type KeyOwnerProofSystem = ();
+
+    type HandleEquivocation = ();
 }
 
 parameter_types! {
@@ -326,9 +359,9 @@ parameter_types! {
 impl transaction_payment::Trait for Runtime {
     type Currency = balances::Module<Runtime>;
     type OnTransactionPayment = ();
-    type TransactionBaseFee = TransactionBaseFee;
     type TransactionByteFee = TransactionByteFee;
-    type WeightToFee = ConvertInto;
+    type WeightToFee = IdentityFee<Balance>;
+    // TODO: add `TargetedFeeAdjustment` mechanism
     type FeeMultiplierUpdate = ();
 }
 
@@ -392,7 +425,8 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 pub type BlockId = generic::BlockId<Block>;
 /// The SignedExtension to the basic transaction logic.
 pub type SignedExtra = (
-    system::CheckVersion<Runtime>,
+    system::CheckSpecVersion<Runtime>,
+    system::CheckTxVersion<Runtime>,
     system::CheckGenesis<Runtime>,
     system::CheckEra<Runtime>,
     system::CheckNonce<Runtime>,
@@ -468,19 +502,19 @@ impl_runtime_apis! {
 	}
 
     impl babe_primitives::BabeApi<Block> for Runtime {
-        fn configuration() -> babe_primitives::BabeConfiguration {
+        fn configuration() -> babe_primitives::BabeGenesisConfiguration {
             // The choice of `c` parameter (where `1 - c` represents the
             // probability of a slot being empty), is done in accordance to the
             // slot duration and expected target block time, for safely
             // resisting network delays of maximum two seconds.
             // <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
-            babe_primitives::BabeConfiguration {
+            babe_primitives::BabeGenesisConfiguration {
                 slot_duration: Babe::slot_duration(),
-                epoch_length: EpochDuration::get(),
-                c: PRIMARY_PROBABILITY,
-                genesis_authorities: Babe::authorities(),
-                randomness: Babe::randomness(),
-                secondary_slots: true,
+				epoch_length: EpochDuration::get(),
+				c: PRIMARY_PROBABILITY,
+				genesis_authorities: Babe::authorities(),
+				randomness: Babe::randomness(),
+				allowed_slots: babe_primitives::AllowedSlots::PrimaryAndSecondaryPlainSlots
             }
         }
         fn current_epoch_start() -> babe_primitives::SlotNumber {
@@ -492,6 +526,32 @@ impl_runtime_apis! {
         fn grandpa_authorities() -> GrandpaAuthorityList {
             Grandpa::grandpa_authorities()
         }
+
+        fn submit_report_equivocation_extrinsic(
+			equivocation_proof: fg_primitives::EquivocationProof<
+				<Block as BlockT>::Hash,
+				sp_runtime::traits::NumberFor<Block>,
+			>,
+			key_owner_proof: fg_primitives::OpaqueKeyOwnershipProof,
+		) -> Option<()> {
+			let key_owner_proof = key_owner_proof.decode()?;
+
+			Grandpa::submit_report_equivocation_extrinsic(
+				equivocation_proof,
+				key_owner_proof,
+			)
+		}
+
+		fn generate_key_ownership_proof(
+			_set_id: fg_primitives::SetId,
+			authority_id: fg_primitives::AuthorityId,
+		) -> Option<fg_primitives::OpaqueKeyOwnershipProof> {
+			use codec::Encode;
+
+			Historical::prove((fg_primitives::KEY_TYPE, authority_id))
+				.map(|p| p.encode())
+				.map(fg_primitives::OpaqueKeyOwnershipProof::new)
+		}
     }
 
     impl authority_discovery_primitives::AuthorityDiscoveryApi<Block> for Runtime {

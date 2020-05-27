@@ -17,22 +17,22 @@ signatory-ring = "0.18.0"
 hex = '0.4.2'
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = '2.0.0-alpha.6' }
-system = { package = 'frame-system', default-features = false, version = '2.0.0-alpha.6' }
+frame-support = { default-features = false, version = '2.0.0-rc2' }
+system = { package = 'frame-system', default-features = false, version = '2.0.0-rc2' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-alpha.6' }
-sp-io = { default-features = false, version = '2.0.0-alpha.6' }
-sp-runtime = { default-features = false, version = '2.0.0-alpha.6' }
-sp-runtime-interface = { default-features = false, version = '2.0.0-alpha.6' }
-sp-std = { default-features = false, version = '2.0.0-alpha.6' }
+sp-core = { default-features = false, version = '2.0.0-rc2' }
+sp-io = { default-features = false, version = '2.0.0-rc2' }
+sp-runtime = { default-features = false, version = '2.0.0-rc2' }
+sp-runtime-interface = { default-features = false, version = '2.0.0-rc2' }
+sp-std = { default-features = false, version = '2.0.0-rc2' }
 
 # crust runtime modules
 market = { package = 'cstrml-market', path = '../market', default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-keyring = { package = "sp-keyring", version = '2.0.0-alpha.6' }
+keyring = { package = "sp-keyring", version = '2.0.0-rc2' }
 
 [features]
 default = ['std']

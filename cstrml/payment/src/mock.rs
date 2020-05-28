@@ -42,6 +42,18 @@ impl Convert<u128, u64> for CurrencyToVoteHandler {
     }
 }
 
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 {
+        x
+    }
+}
+
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
+    }
+}
+
 // For testing the module, we construct most of a mock runtime. This means
 // first constructing a configuration type (`Test`) which `impl`s each of the
 // configuration traits of modules we want to use.

@@ -322,6 +322,12 @@ impl Convert<u128, u64> for CurrencyToVoteHandler {
     }
 }
 
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
+    }
+}
+
 impl staking::Trait for Runtime {
     type Currency = Balances;
     type Time = Timestamp;

@@ -10,7 +10,7 @@ use frame_support::{
         Currency, ReservableCurrency
     }
 };
-use sp_std::{prelude::*, convert::TryInto};
+use sp_std::{prelude::*, convert::{TryInto}};
 use system::{ensure_root};
 use sp_runtime::{traits::{StaticLookup, Dispatchable, Zero, Convert}};
 
@@ -59,24 +59,24 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
     }
 
     fn start_delayed_pay(sorder_id: &T::Hash) {
-            let sorder = T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
-            let interval =  TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
-            let times = (sorder.expired_on - sorder.completed_on)/MINUTES + 1;
-            let total = Self::payments(sorder_id).unwrap_or_default().total;
-            let piece_value: BalanceOf<T> = BalanceOf::<T>::from(TryInto::<u32>::try_into(total).ok().unwrap()/times + 1);
-            let _ = T::Scheduler::schedule_named(
-                sorder_id.encode(),
-                <system::Module<T>>::block_number() + interval, // must have a delay
-                Some((interval, times)),
-                63,
-                Call::payment_by_instalments(
-                    sorder.client.clone(),
-                    sorder.provider.clone(),
-                    piece_value,
-                    sorder_id.clone()
-                ).into(),
-            );
-        }
+        let sorder = T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
+        let interval =  TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
+        let times = (sorder.expired_on - sorder.completed_on)/MINUTES + 1;
+        let total = Self::payments(sorder_id).unwrap_or_default().total;
+        let piece_value: BalanceOf<T> = <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(total)/times as u128 + 1);
+        let _ = T::Scheduler::schedule_named(
+            sorder_id.encode(),
+            <system::Module<T>>::block_number() + interval, // must have a delay
+            Some((interval, times)),
+            63,
+            Call::payment_by_instalments(
+                sorder.client.clone(),
+                sorder.provider.clone(),
+                piece_value,
+                sorder_id.clone()
+            ).into(),
+        );
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -107,7 +107,7 @@ pub trait Trait: system::Trait {
     type Scheduler: ScheduleNamed<Self::BlockNumber, Self::Proposal>;
     
     /// Used to transfer
-    type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u128, BalanceOf<Self>>;
+    type CurrencyToBalance: Convert<BalanceOf<Self>, u128> + Convert<u128, BalanceOf<Self>>;
 
     type BalanceInterface: self::BalanceInterface<Self::Origin, Self::AccountId, BalanceOf<Self>>;
 }
@@ -185,12 +185,13 @@ pub trait BalanceInterface<Origin, AccountId, Balance>: system::Trait {
 }
 
 impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, BalanceOf<T>> for T where T: balances::Trait {
+
     fn maybe_transfer(
         origin: T::Origin,
         client: &<T as system::Trait>::AccountId,
         provider: &<T as system::Trait>::AccountId,
         value: BalanceOf<T>) -> bool {
-            let to_balance = |b: BalanceOf<T>| T::Balance::from(<T::CurrencyToBalance as Convert<BalanceOf<T>, u64>>::convert(b) as u32);
+            let to_balance = |b: BalanceOf<T>| TryInto::<T::Balance>::try_into(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(b)).ok().unwrap();
             <balances::Module<T>>::force_transfer(
                 origin,
                 T::Lookup::unlookup(client.clone()),

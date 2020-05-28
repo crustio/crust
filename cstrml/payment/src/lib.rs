@@ -52,7 +52,8 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         if T::Currency::reserve(&client, value).is_ok() {
             <Payments<T>>::insert(sorder_id, PaymentLedger{
                 total: value,
-                already_paid: Zero::zero()
+                already_paid: Zero::zero(),
+                already_unreserved: Zero::zero()
             });
         }
         return sorder_id;
@@ -85,7 +86,9 @@ pub struct PaymentLedger<Balance: HasCompact + Zero> {
     #[codec(compact)]
     pub total: Balance,
     #[codec(compact)]
-    pub already_paid: Balance
+    pub already_paid: Balance,
+    #[codec(compact)]
+    pub already_unreserved: Balance,
 }
 
 /// The module's configuration trait.
@@ -154,6 +157,11 @@ decl_module! {
                 T::Currency::unreserve(
                     &client,
                     real_value);
+                <Payments<T>>::mutate(&order_id, |payment_ledger| {
+                    if let Some(p) = payment_ledger {
+                        p.already_unreserved += real_value;
+                    }
+                });
                 // Check the order status
                 if let Some(sorder) = T::MarketInterface::maybe_get_sorder(&order_id) {
                     match sorder.order_status {
@@ -207,7 +215,7 @@ impl<T: Trait> Module<T> {
         T::MarketInterface::clients(client).unwrap_or_default().iter().fold(
             Zero::zero(), |acc, &order_id| {
                 let payment_ledger = Self::payments(order_id).unwrap_or_default();
-                acc + payment_ledger.total - payment_ledger.already_paid
+                acc + payment_ledger.total - payment_ledger.already_unreserved
             }
         )
     }

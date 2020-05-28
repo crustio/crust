@@ -1,5 +1,6 @@
 use super::*;
 use crate::mock::*;
+use crate::mock::Payment as CstrmlPayment;
 use frame_support::{
     assert_noop, assert_ok,
     dispatch::DispatchError,
@@ -75,12 +76,12 @@ fn test_for_storage_order_and_payment_should_work() {
         });
         assert_eq!(Balances::free_balance(source.clone()), 10);
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
-        assert_eq!(crate::mock::Payment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
             already_paid: 0
         });
         run_to_block(303);
-        assert_eq!(crate::mock::Payment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
             already_paid: 0
         });
@@ -94,15 +95,16 @@ fn test_for_storage_order_and_payment_should_work() {
         ));
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(Balances::free_balance(provider.clone()), 0);
-        assert_eq!(crate::mock::Payment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
             already_paid: 0
         });
         for i in 1..30 {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
+            assert_eq!(Balances::free_balance(source.clone()), 10);
             assert_eq!(Balances::free_balance(provider.clone()), i * 2);
-            assert_eq!(crate::mock::Payment::payments(order_id).unwrap(), PaymentLedger {
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 already_paid: i * 2
             });
@@ -141,4 +143,110 @@ fn test_for_storage_order_and_payment_should_fail() {
         );
 
     });
+}
+
+#[test]
+fn test_for_storage_order_and_payment_should_suspend() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source: AccountId = Sr25519Keyring::Alice.to_account_id();
+        let file_identifier =
+        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let provider: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let file_size = 16; // should less than provider
+        let duration = 360; // file should store at least 30 minutes
+        let fee = 60;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 70);
+        assert_eq!(Balances::free_balance(source.clone()), 70);
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), provider.clone(), fee,
+            file_identifier.clone(), file_size, duration
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Market::providers(provider.clone()).unwrap(), Provision {
+            address_info,
+            file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()
+        });
+        assert_eq!(Market::clients(source.clone()).unwrap(), vec![order_id.clone()]);
+        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 50,
+            completed_on: 50,
+            expired_on: 410,
+            provider: provider.clone(),
+            client: source.clone(),
+            order_status: Default::default()
+        });
+        assert_eq!(Balances::free_balance(source.clone()), 10);
+        assert_eq!(Balances::reserved_balance(source.clone()), 60);
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+            total: 60,
+            already_paid: 0
+        });
+        run_to_block(303);
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+            total: 60,
+            already_paid: 0
+        });
+
+        // Check workloads
+        assert_eq!(Tee::reserved(), 0);
+
+        assert_ok!(Tee::report_works(
+            Origin::signed(provider.clone()),
+            get_valid_work_report()
+        ));
+        assert_eq!(Balances::reserved_balance(source.clone()), 60);
+        assert_eq!(Balances::free_balance(provider.clone()), 0);
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+            total: 60,
+            already_paid: 0
+        });
+        for i in 1..11 {
+            run_to_block(303 + i * 10);
+            assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
+            assert_eq!(Balances::free_balance(source.clone()), 10);
+            assert_eq!(Balances::free_balance(provider.clone()), i * 2);
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+                total: 60,
+                already_paid: i * 2
+            });
+        }
+        <market::StorageOrders<Test>>::mutate(&order_id, |sorder| {
+            if let Some(order) = sorder {
+                order.order_status = OrderStatus::Pending;
+            }
+        });
+        for i in 11..21 {
+            run_to_block(303 + i * 10);
+            assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
+            assert_eq!(Balances::free_balance(source.clone()), 10 + (i - 10) * 2 );
+            assert_eq!(Balances::free_balance(provider.clone()), 20);
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+                total: 60,
+                already_paid: 20
+            });
+        }
+        <market::StorageOrders<Test>>::mutate(&order_id, |sorder| {
+            if let Some(order) = sorder {
+                order.order_status = OrderStatus::Success;
+            }
+        });
+        for i in 21..30 {
+            run_to_block(303 + i * 10);
+            assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
+            assert_eq!(Balances::free_balance(source.clone()), 30 );
+            assert_eq!(Balances::free_balance(provider.clone()), 20 + (i - 20) * 2);
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+                total: 60,
+                already_paid: 20 + (i - 20) * 2
+            });
+        }
+});
 }

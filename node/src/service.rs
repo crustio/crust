@@ -1,7 +1,10 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 use crust_runtime::{self, opaque::Block, RuntimeApi};
-use grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider, StorageAndProofProvider};
+use grandpa::{
+    self,
+    FinalityProofProvider as GrandpaFinalityProofProvider, StorageAndProofProvider, SharedVoterState
+};
 use sc_consensus::LongestChain;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
@@ -38,9 +41,17 @@ macro_rules! new_full_start {
 			})?
 			.with_transaction_pool(|config, client, _fetcher, prometheus_registry| {
 				let pool_api = sc_transaction_pool::FullChainApi::new(client.clone());
-				Ok(sc_transaction_pool::BasicPool::new(config, std::sync::Arc::new(pool_api)))
+				let pool = sc_transaction_pool::BasicPool::new(config, std::sync::Arc::new(pool_api), prometheus_registry);
+				Ok(pool)
 			})?
-			.with_import_queue(|_config, client, mut select_chain, _transaction_pool| {
+			.with_import_queue(|
+			    _config,
+			    client,
+			    mut select_chain,
+			    _,
+			    spawn_task_handle,
+			    registry
+            | {
 				let select_chain = select_chain.take()
 					.ok_or_else(|| sc_service::Error::SelectChainRequired)?;
 
@@ -62,6 +73,8 @@ macro_rules! new_full_start {
 					None,
 					client,
 					inherent_data_providers.clone(),
+					spawn_task_handle,
+					registry
 				)?;
 
 				import_setup = Some((babe_block_import, grandpa_link, babe_link));
@@ -98,11 +111,12 @@ pub fn new_full(config: Configuration)
     let (block_import, grandpa_link, babe_link) = import_setup.take()
         .expect("Link Half and Block Import are present for Full Services or setup failed before. qed");
 
-    if let Role::Authority { sentry_nodes } = &role {
+    if role.is_authority() {
         let proposer =
             sc_basic_authorship::ProposerFactory::new(
                 service.client(),
-                service.transaction_pool()
+                service.transaction_pool(),
+                service.prometheus_registry().as_ref()
             );
 
         let client = service.client();
@@ -134,6 +148,19 @@ pub fn new_full(config: Configuration)
         // Authority discovery: this module runs to promise authorities' connection
         // TODO: [Substrate]refine sentry mode using updated substrate code
         if matches!(role, Role::Authority{..} | Role::Sentry{..}) {
+            let (sentries, authority_discovery_role) = match role {
+                Role::Authority { ref sentry_nodes } => (
+                    sentry_nodes.clone(),
+                    authority_discovery::Role::Authority (
+                        service.keystore(),
+                    ),
+                ),
+                Role::Sentry {..} => (
+                    vec![],
+                    authority_discovery::Role::Sentry,
+                ),
+                _ => unreachable!("Due to outer matches! constraint; qed."),
+            };
             let network = service.network();
             let network_event_stream = network.event_stream("authority-discovery");
             let dht_event_stream = network_event_stream.filter_map(|e| async move {
@@ -145,9 +172,9 @@ pub fn new_full(config: Configuration)
             let authority_discovery = authority_discovery::AuthorityDiscovery::new(
                 service.client(),
                 network,
-                sentry_nodes.clone(),
-                service.keystore(),
+                sentries,
                 dht_event_stream,
+                authority_discovery_role,
                 service.prometheus_registry(),
             );
             service.spawn_task("authority-discovery", authority_discovery);
@@ -164,7 +191,7 @@ pub fn new_full(config: Configuration)
 
     let grandpa_config = grandpa::Config {
         // FIXME: [Substrate]substrate/issues#1578 make this available through chainspec
-        gossip_duration: Duration::from_millis(333),
+        gossip_duration: Duration::from_millis(1000),
         justification_period: 512,
         name: Some(name),
         observer_enabled: false,
@@ -191,7 +218,8 @@ pub fn new_full(config: Configuration)
             inherent_data_providers: inherent_data_providers.clone(),
             telemetry_on_connect: Some(service.telemetry_on_connect_stream()),
             voting_rule: grandpa::VotingRulesBuilder::default().build(),
-            prometheus_registry: service.prometheus_registry()
+            prometheus_registry: service.prometheus_registry(),
+            shared_voter_state: SharedVoterState::empty()
         };
 
         // the GRANDPA voter task is considered infallible, i.e.
@@ -221,17 +249,31 @@ pub fn new_light(config: Configuration)
         .with_select_chain(|_config, backend| {
             Ok(LongestChain::new(backend.clone()))
         })?
-        .with_transaction_pool(|config, client, fetcher| {
+        .with_transaction_pool(|
+            config,
+            client,
+            fetcher,
+            prometheus_registry
+        | {
             let fetcher = fetcher
                 .ok_or_else(|| "Trying to start light transaction pool without active fetcher")?;
 
             let pool_api = sc_transaction_pool::LightChainApi::new(client.clone(), fetcher.clone());
             let pool = sc_transaction_pool::BasicPool::with_revalidation_type(
-                config, Arc::new(pool_api), sc_transaction_pool::RevalidationType::Light,
+                config, Arc::new(pool_api), prometheus_registry, sc_transaction_pool::RevalidationType::Light,
             );
             Ok(pool)
         })?
-        .with_import_queue_and_fprb(|_config, client, backend, fetcher, _select_chain, _tx_pool| {
+        .with_import_queue_and_fprb(|
+            _config,
+            client,
+            backend,
+            fetcher,
+            _select_chain,
+            _tx_pool,
+            spawn_task_handle,
+            prometheus_registry
+        | {
             let fetch_checker = fetcher
                 .map(|fetcher| fetcher.checker().clone())
                 .ok_or_else(|| "Trying to start light import queue without active fetch checker")?;
@@ -260,6 +302,8 @@ pub fn new_light(config: Configuration)
                 Some(Box::new(finality_proof_import)),
                 client,
                 inherent_data_providers.clone(),
+                spawn_task_handle,
+                prometheus_registry,
             )?;
 
             Ok((import_queue, finality_proof_request_builder))

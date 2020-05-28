@@ -4,7 +4,6 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
-    weights::SimpleDispatchInfo,
     traits::{Randomness, Currency, ReservableCurrency}
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
@@ -226,7 +225,7 @@ decl_module! {
         fn deposit_event() = default;
 
         /// Register to be a provider, you should provide your storage layer's address info
-        #[weight = SimpleDispatchInfo::default()]
+        #[weight = 1_000_000]
         pub fn register(origin, address_info: AddressInfo) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -246,7 +245,7 @@ decl_module! {
         }
 
         /// Place a storage order, make sure
-        #[weight = SimpleDispatchInfo::default()]
+        #[weight = 1_000_000]
         pub fn place_storage_order(
             origin,
             provider: <T::Lookup as StaticLookup>::Source,

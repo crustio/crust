@@ -1,8 +1,9 @@
 use crate::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types, weights::Weight,
-    traits::{ OnInitialize, OnFinalize, Get}
+    impl_outer_origin, parameter_types,
+    weights::{Weight, constants::RocksDbWeight},
+    traits::{ OnInitialize, OnFinalize, Get }
 };
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
@@ -61,6 +62,10 @@ impl system::Trait for Test {
     type Event = ();
     type BlockHashCount = BlockHashCount;
     type MaximumBlockWeight = MaximumBlockWeight;
+    type DbWeight = RocksDbWeight;
+    type BlockExecutionWeight = ();
+    type ExtrinsicBaseWeight = ();
+    type MaximumExtrinsicWeight = MaximumBlockWeight;
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();

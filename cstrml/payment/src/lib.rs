@@ -4,7 +4,6 @@
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, Parameter,
-    weights::SimpleDispatchInfo,
     traits::
     {
         Randomness, schedule::Named as ScheduleNamed,
@@ -66,7 +65,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
             let total = Self::payments(sorder_id).unwrap_or_default().total;
             let piece_value: BalanceOf<T> = BalanceOf::<T>::from(TryInto::<u32>::try_into(total).ok().unwrap()/times + 1);
             let _ = T::Scheduler::schedule_named(
-                sorder_id,
+                sorder_id.encode(),
                 <system::Module<T>>::block_number() + interval, // must have a delay
                 Some((interval, times)),
                 63,
@@ -137,7 +136,7 @@ decl_module! {
         fn deposit_event() = default;
 
         /// Enact a proposal from a referendum. For now we just make the weight be the maximum.
-		#[weight = SimpleDispatchInfo::MaxNormal]
+		#[weight = 1_000_000]
         fn payment_by_instalments(
             origin,
             client: <T as system::Trait>::AccountId,

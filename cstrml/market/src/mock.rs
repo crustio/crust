@@ -1,7 +1,8 @@
 use super::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types, weights::Weight,
+    impl_outer_origin, parameter_types,
+    weights::{Weight, constants::RocksDbWeight},
     traits::{OnFinalize, OnInitialize, Get}
 };
 use sp_core::H256;
@@ -12,6 +13,7 @@ use sp_runtime::{
 };
 use std::{cell::RefCell};
 use balances::AccountData;
+
 pub type AccountId = u64;
 pub type Balance = u64;
 
@@ -56,6 +58,10 @@ impl system::Trait for Test {
     type Event = ();
     type BlockHashCount = BlockHashCount;
     type MaximumBlockWeight = MaximumBlockWeight;
+    type DbWeight = RocksDbWeight;
+    type BlockExecutionWeight = ();
+    type ExtrinsicBaseWeight = ();
+    type MaximumExtrinsicWeight = MaximumBlockWeight;
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
@@ -94,7 +100,7 @@ impl tee::Trait for Test {
 
 impl Trait for Test {
     type Event = ();
-    type Currency = balances::Module<Self>;
+    type Currency = Balances;
     type Randomness = ();
     type Payment = Market;
     type OrderInspector = TestOrderInspector;
@@ -103,6 +109,7 @@ impl Trait for Test {
 pub type Market = Module<Test>;
 pub type System = system::Module<Test>;
 pub type Tee = tee::Module<Test>;
+pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.

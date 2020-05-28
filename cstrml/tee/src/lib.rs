@@ -4,7 +4,6 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, ensure,
-    weights::SimpleDispatchInfo,
     dispatch::DispatchResult,
     storage::IterableStorageMap
 };
@@ -121,7 +120,7 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        #[weight = SimpleDispatchInfo::default()]
+        #[weight = 1_000_000]
         pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -168,7 +167,7 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = SimpleDispatchInfo::default()]
+        #[weight = 1_000_000]
         pub fn report_works(origin, work_report: WorkReport) -> DispatchResult {
             let who = ensure_signed(origin)?;
 

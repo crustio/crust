@@ -1,7 +1,8 @@
 use super::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types, impl_outer_dispatch, weights::Weight,
+    impl_outer_origin, parameter_types, impl_outer_dispatch,
+    weights::{Weight, constants::RocksDbWeight},
     traits::{OnFinalize, OnInitialize, Get}
 };
 use sp_runtime::{
@@ -25,6 +26,7 @@ impl_outer_dispatch! {
 	pub enum Call for Test where origin: Origin {
         balances::Balances,
         payment::Payment,
+        system::System,
 	}
 }
 
@@ -77,6 +79,10 @@ impl system::Trait for Test {
     type Event = ();
     type BlockHashCount = BlockHashCount;
     type MaximumBlockWeight = MaximumBlockWeight;
+    type DbWeight = RocksDbWeight;
+    type BlockExecutionWeight = ();
+    type ExtrinsicBaseWeight = ();
+    type MaximumExtrinsicWeight = MaximumBlockWeight;
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();

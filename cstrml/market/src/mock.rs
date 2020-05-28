@@ -1,7 +1,8 @@
 use super::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types, weights::Weight,
+    impl_outer_origin, parameter_types,
+    weights::{Weight, constants::RocksDbWeight},
     traits::{OnFinalize, OnInitialize}
 };
 use sp_core::H256;
@@ -10,6 +11,8 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
+use frame_support::weights::RuntimeDbWeight;
+
 pub type AccountId = u64;
 
 impl_outer_origin! {
@@ -42,6 +45,10 @@ impl system::Trait for Test {
     type Event = ();
     type BlockHashCount = BlockHashCount;
     type MaximumBlockWeight = MaximumBlockWeight;
+    type DbWeight = RocksDbWeight;
+    type BlockExecutionWeight = ();
+    type ExtrinsicBaseWeight = ();
+    type MaximumExtrinsicWeight = MaximumBlockWeight;
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();

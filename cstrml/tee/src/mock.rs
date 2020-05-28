@@ -1,7 +1,8 @@
 use crate::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types, weights::Weight,
+    impl_outer_origin, parameter_types,
+    weights::{Weight, constants::RocksDbWeight},
     traits::{ OnInitialize, OnFinalize }
 };
 use keyring::Sr25519Keyring;
@@ -46,6 +47,10 @@ impl system::Trait for Test {
     type Event = ();
     type BlockHashCount = BlockHashCount;
     type MaximumBlockWeight = MaximumBlockWeight;
+    type DbWeight = RocksDbWeight;
+    type BlockExecutionWeight = ();
+    type ExtrinsicBaseWeight = ();
+    type MaximumExtrinsicWeight = MaximumBlockWeight;
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();

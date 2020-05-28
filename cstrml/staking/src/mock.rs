@@ -5,7 +5,7 @@ use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     StorageValue, IterableStorageMap,
     traits::{Currency, Get, FindAuthor, OnInitialize},
-    weights::Weight,
+    weights::{Weight, constants::RocksDbWeight},
 };
 use sp_core::{crypto::key_types, H256};
 use sp_io;
@@ -129,6 +129,10 @@ impl frame_system::Trait for Test {
     type Event = ();
     type BlockHashCount = BlockHashCount;
     type MaximumBlockWeight = MaximumBlockWeight;
+    type DbWeight = RocksDbWeight;
+    type BlockExecutionWeight = ();
+    type ExtrinsicBaseWeight = ();
+    type MaximumExtrinsicWeight = MaximumBlockWeight;
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();

@@ -14,6 +14,7 @@ use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_module, decl_event, decl_storage, ensure, decl_error,
     storage::IterableStorageMap,
+    dispatch::DispatchResult,
     weights::Weight,
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
@@ -628,6 +629,8 @@ decl_error! {
         NoWorkloads,
         /// Attempting to target a stash that still has funds.
 		FundedTarget,
+		/// Incorrect number of slashing spans provided.
+		IncorrectSlashingSpans,
     }
 }
 
@@ -818,7 +821,7 @@ decl_module! {
         /// - Writes are limited to the `origin` account key.
         /// # </weight>
         #[weight = 400_000_000]
-        fn withdraw_unbonded(origin) {
+        fn withdraw_unbonded(origin, num_slashing_spans: u32) {
             let controller = ensure_signed(origin)?;
 			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 			let stash = ledger.stash.clone();
@@ -830,7 +833,7 @@ decl_module! {
 				// This account must have called `unbond()` with some value that caused the active
 				// portion to fall below existential deposit + will have no more unlocking chunks
 				// left. We can now safely remove all staking-related information.
-				Self::kill_stash(&stash);
+				Self::kill_stash(&stash, num_slashing_spans)?;
 				// remove the lock.
 				T::Currency::remove_lock(STAKING_ID, &stash);
 			} else {
@@ -1092,13 +1095,13 @@ decl_module! {
 
         /// Force a current staker to become completely unstaked, immediately.
         #[weight = 10_000_000]
-        fn force_unstake(origin, stash: T::AccountId) {
+        fn force_unstake(origin, stash: T::AccountId, num_slashing_spans: u32) {
             ensure_root(origin)?;
 
             // remove the lock.
             T::Currency::remove_lock(STAKING_ID, &stash);
             // remove all staking-related information.
-            Self::kill_stash(&stash);
+            Self::kill_stash(&stash, num_slashing_spans)?;
         }
 
         /// Force there to be a new era at the end of sessions indefinitely.
@@ -1163,9 +1166,9 @@ decl_module! {
 		/// - Writes Each: SpanSlash * S
 		/// # </weight>
 		#[weight = 1_000_000]
-		fn reap_stash(_origin, stash: T::AccountId) {
+		fn reap_stash(_origin, stash: T::AccountId, num_slashing_spans: u32) {
 			ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
-			Self::kill_stash(&stash);
+			Self::kill_stash(&stash, num_slashing_spans)?;
 			T::Currency::remove_lock(STAKING_ID, &stash);
 		}
     }
@@ -1862,15 +1865,21 @@ impl<T: Trait> Module<T> {
     /// This is called :
     /// - Immediately when an account's balance falls below existential deposit.
     /// - after a `withdraw_unbond()` call that frees all of a stash's bonded balance.
-    fn kill_stash(stash: &T::AccountId) {
-        if let Some(controller) = <Bonded<T>>::take(stash) {
-            <Ledger<T>>::remove(&controller);
-        }
-        <Payee<T>>::remove(stash);
-        Self::chill_validator(stash);
-        Self::chill_guarantor(stash);
+    fn kill_stash(stash: &T::AccountId, num_slashing_spans: u32) -> DispatchResult {
+        let controller = Bonded::<T>::get(stash).ok_or(Error::<T>::NotStash)?;
 
-        slashing::clear_stash_metadata::<T>(stash);
+        slashing::clear_stash_metadata::<T>(stash, num_slashing_spans)?;
+
+        Bonded::<T>::remove(stash);
+        <Ledger<T>>::remove(&controller);
+
+        <Payee<T>>::remove(stash);
+        <Validators<T>>::remove(stash);
+        <Guarantors<T>>::remove(stash);
+
+        system::Module::<T>::dec_ref(stash);
+
+        Ok(())
     }
 
     /// This function will update the controller's stake limit

@@ -118,6 +118,8 @@ pub trait MarketInterface<AccountId, Hash> {
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId>);
     /// Vec{order_id} will be used for payment module.
     fn clients(account_id: &AccountId) -> Option<Vec<Hash>>;
+    /// Called when file is tranferred successfully.
+    fn on_file_transfer_success(order_id: &Hash, so: &StorageOrder<AccountId>);
 }
 
 
@@ -137,6 +139,10 @@ impl<AId, Hash> MarketInterface<AId, Hash> for () {
     fn clients(_: &AId) -> Option<Vec<Hash>> {
         None
     }
+
+    fn on_file_transfer_success(_: &Hash, _: &StorageOrder<AId>) {
+
+    }
 }
 
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
@@ -155,12 +161,18 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
                         so: &StorageOrder<<T as system::Trait>::AccountId>) {
         Self::maybe_set_sorder(order_id, so);
-        T::Payment::start_delayed_pay(order_id);
     }
 
     fn clients(account_id: &<T as system::Trait>::AccountId)
         -> Option<Vec<<T as system::Trait>::Hash>> {
         Self::clients(account_id)
+    }
+
+    fn on_file_transfer_success(
+        order_id: &<T as system::Trait>::Hash,
+        so: &StorageOrder<<T as system::Trait>::AccountId>) {
+        Self::maybe_set_sorder(order_id, so);
+        T::Payment::start_delayed_pay(order_id);
     }
     
 }

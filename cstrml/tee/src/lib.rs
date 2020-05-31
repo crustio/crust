@@ -301,9 +301,9 @@ impl<T: Trait> Module<T> {
                     // 2. Change order status to `Success`
                     sorder.order_status = OrderStatus::Success;
 
-                    // 3. (Maybe) set sorder
+                    // 3. (Maybe) set sorder and start delay pay
                     // TODO: we should specially handle `Failed` status
-                    T::MarketInterface::maybe_set_sorder(order_id, &sorder);
+                    T::MarketInterface::on_file_transfer_success(order_id, &sorder);
                 }
                 return used + *f_size
             }

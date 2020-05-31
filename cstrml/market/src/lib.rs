@@ -75,27 +75,6 @@ pub trait Payment<AccountId, Hash, Balance> {
     fn start_delayed_pay(sorder_id: &Hash);
 }
 
-impl<T: Trait> Payment<<T as system::Trait>::AccountId,
-    <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
-{
-    fn pay_sorder(client: &<T as system::Trait>::AccountId,
-                  provider: &<T as system::Trait>::AccountId,
-                  _: BalanceOf<T>) -> T::Hash {
-        let bn = <system::Module<T>>::block_number();
-        let bh: T::Hash = <system::Module<T>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &client.encode()[..],
-            &provider.encode()[..],
-        ].concat();
-
-        // it can cover most cases, for the "real" random
-        T::Randomness::random(seed.as_slice())
-    }
-
-    fn start_delayed_pay(_: &T::Hash) { }
-}
-
 /// A trait for checking order's legality
 /// This wanyi is an outer inspector to judge if s/r order can be accepted 😵
 pub trait OrderInspector<AccountId> {
@@ -119,9 +98,8 @@ pub trait MarketInterface<AccountId, Hash> {
     /// Vec{order_id} will be used for payment module.
     fn clients(account_id: &AccountId) -> Option<Vec<Hash>>;
     /// Called when file is tranferred successfully.
-    fn on_file_transfer_success(order_id: &Hash, so: &StorageOrder<AccountId>);
+    fn on_sorder_success(order_id: &Hash, so: &StorageOrder<AccountId>);
 }
-
 
 impl<AId, Hash> MarketInterface<AId, Hash> for () {
     fn providers(_: &AId) -> Option<Provision<Hash>> {
@@ -140,7 +118,7 @@ impl<AId, Hash> MarketInterface<AId, Hash> for () {
         None
     }
 
-    fn on_file_transfer_success(_: &Hash, _: &StorageOrder<AId>) {
+    fn on_sorder_success(_: &Hash, _: &StorageOrder<AId>) {
 
     }
 }
@@ -168,7 +146,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
         Self::clients(account_id)
     }
 
-    fn on_file_transfer_success(
+    fn on_sorder_success(
         order_id: &<T as system::Trait>::Hash,
         so: &StorageOrder<<T as system::Trait>::AccountId>) {
         Self::maybe_set_sorder(order_id, so);

@@ -303,7 +303,7 @@ impl<T: Trait> Module<T> {
 
                     // 3. (Maybe) set sorder and start delay pay
                     // TODO: we should specially handle `Failed` status
-                    T::MarketInterface::on_file_transfer_success(order_id, &sorder);
+                    T::MarketInterface::on_sorder_success(order_id, &sorder);
                 }
                 return used + *f_size
             }

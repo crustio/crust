@@ -3,7 +3,7 @@ use crate::*;
 use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{ OnInitialize, OnFinalize, Get }
+    traits::{ OnInitialize, OnFinalize, Get, Randomness }
 };
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
@@ -83,11 +83,33 @@ impl balances::Trait for Test {
     type AccountStore = system::Module<Test>;
 }
 
+impl market::Payment<<Test as system::Trait>::AccountId,
+    <Test as system::Trait>::Hash, market::BalanceOf<Test>> for Tee
+{
+    fn pay_sorder(client: &<Test as system::Trait>::AccountId,
+        provider: &<Test as system::Trait>::AccountId,
+                  _: market::BalanceOf<Test>) -> <Test as system::Trait>::Hash {
+        let bn = <system::Module<Test>>::block_number();
+        let bh: <Test as system::Trait>::Hash = <system::Module<Test>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &client.encode()[..],
+            &provider.encode()[..],
+        ].concat();
+
+        // it can cover most cases, for the "real" random
+        <Test as market::Trait>::Randomness::random(seed.as_slice())
+    }
+
+    fn start_delayed_pay(_: &<Test as system::Trait>::Hash) { }
+}
+
+
 impl market::Trait for Test {
     type Event = ();
     type Currency = balances::Module<Self>;
     type Randomness = ();
-    type Payment = Market;
+    type Payment = Tee;
     type OrderInspector = Tee;
 }
 

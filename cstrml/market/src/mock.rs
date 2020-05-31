@@ -98,6 +98,27 @@ impl tee::Trait for Test {
     type MarketInterface = ();
 }
 
+impl Payment<<Test as system::Trait>::AccountId,
+    <Test as system::Trait>::Hash, BalanceOf<Test>> for Market
+{
+    fn pay_sorder(client: &<Test as system::Trait>::AccountId,
+        provider: &<Test as system::Trait>::AccountId,
+                  _: BalanceOf<Test>) -> <Test as system::Trait>::Hash {
+        let bn = <system::Module<Test>>::block_number();
+        let bh: <Test as system::Trait>::Hash = <system::Module<Test>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &client.encode()[..],
+            &provider.encode()[..],
+        ].concat();
+
+        // it can cover most cases, for the "real" random
+        <Test as Trait>::Randomness::random(seed.as_slice())
+    }
+
+    fn start_delayed_pay(_: &<Test as system::Trait>::Hash) { }
+}
+
 impl Trait for Test {
     type Event = ();
     type Currency = Balances;

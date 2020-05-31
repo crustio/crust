@@ -6,7 +6,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, Parameter,
     traits::
     {
-        Randomness, schedule::Named as ScheduleNamed,
+        Randomness, schedule::Named as ScheduleNamed, schedule::HARD_DEADLINE,
         Currency, ReservableCurrency
     }
 };
@@ -52,8 +52,8 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         if T::Currency::reserve(&client, value).is_ok() {
             <Payments<T>>::insert(sorder_id, PaymentLedger{
                 total: value,
-                already_paid: Zero::zero(),
-                already_unreserved: Zero::zero()
+                paid: Zero::zero(),
+                unreserved: Zero::zero()
             });
         }
         return sorder_id;
@@ -61,19 +61,19 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
 
     fn start_delayed_pay(sorder_id: &T::Hash) {
         let sorder = T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
-        let interval =  TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
+        let interval = TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
         let times = (sorder.expired_on - sorder.completed_on)/MINUTES + 1;
         let total = Self::payments(sorder_id).unwrap_or_default().total;
-        let piece_value: BalanceOf<T> = <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(total)/times as u128 + 1);
+        let slot: BalanceOf<T> = <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(total)/times as u128 + 1);
         let _ = T::Scheduler::schedule_named(
             sorder_id.encode(),
             <system::Module<T>>::block_number() + interval, // must have a delay
             Some((interval, times)),
-            63,
-            Call::payment_by_instalments(
+            HARD_DEADLINE,
+            Call::slot_pay(
                 sorder.client.clone(),
                 sorder.provider.clone(),
-                piece_value,
+                slot,
                 sorder_id.clone()
             ).into(),
         );
@@ -86,9 +86,9 @@ pub struct PaymentLedger<Balance: HasCompact + Zero> {
     #[codec(compact)]
     pub total: Balance,
     #[codec(compact)]
-    pub already_paid: Balance,
+    pub paid: Balance,
     #[codec(compact)]
-    pub already_unreserved: Balance,
+    pub unreserved: Balance,
 }
 
 /// The module's configuration trait.
@@ -139,8 +139,8 @@ decl_module! {
         fn deposit_event() = default;
 
         /// Enact a proposal from a referendum. For now we just make the weight be the maximum.
-		#[weight = 1_000_000]
-        fn payment_by_instalments(
+        #[weight = 1_000_000]
+        fn slot_pay(
             origin,
             client: <T as system::Trait>::AccountId,
             provider: <T as system::Trait>::AccountId,
@@ -150,16 +150,19 @@ decl_module! {
             ensure_root(origin.clone())?;
             // 0. check left currency
             let payment_ledger = Self::payments(order_id).unwrap_or_default();
-            let real_value = value.min(payment_ledger.total - payment_ledger.already_paid);
+            let real_value = value.min(payment_ledger.total - payment_ledger.paid);
 
             if !Zero::is_zero(&real_value) {
                 // 1. unreserve one piece currency
                 T::Currency::unreserve(
                     &client,
                     real_value);
+                // unreserved value would be added anyway.
+                // If the status of storage order is not success,
+                // the CRU would be just unreserved(transferred) to original client.
                 <Payments<T>>::mutate(&order_id, |payment_ledger| {
                     if let Some(p) = payment_ledger {
-                        p.already_unreserved += real_value;
+                        p.unreserved += real_value;
                     }
                 });
                 // Check the order status
@@ -171,20 +174,19 @@ decl_module! {
                                 // 4. update payments
                                 <Payments<T>>::mutate(&order_id, |payment_ledger| {
                                     if let Some(p) = payment_ledger {
-                                        p.already_paid += real_value;
+                                        p.paid += real_value;
                                     }
                                 });
                                 Self::deposit_event(RawEvent::PaymentSuccess(client));
                             }
 
                         },
-                        // TODO: Deal with failure status
                         _ => {}
                     }
                 }
             }
             Ok(())
-		}
+        }
     }
 }
 
@@ -206,18 +208,6 @@ impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, Bala
                 T::Lookup::unlookup(provider.clone()),
                 to_balance(value)
             ).is_ok()
-    }
-}
-
-impl<T: Trait> Module<T> {
-    // Unused function right now
-    fn total_reserved(client: &<T as system::Trait>::AccountId) -> BalanceOf<T> {
-        T::MarketInterface::clients(client).unwrap_or_default().iter().fold(
-            Zero::zero(), |acc, &order_id| {
-                let payment_ledger = Self::payments(order_id).unwrap_or_default();
-                acc + payment_ledger.total - payment_ledger.already_unreserved
-            }
-        )
     }
 }
 

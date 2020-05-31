@@ -78,14 +78,14 @@ fn test_for_storage_order_and_payment_should_work() {
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
-            already_paid: 0,
-            already_unreserved: 0
+            paid: 0,
+            unreserved: 0
         });
         run_to_block(303);
         assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
-            already_paid: 0,
-            already_unreserved: 0
+            paid: 0,
+            unreserved: 0
         });
 
         // Check workloads
@@ -99,8 +99,8 @@ fn test_for_storage_order_and_payment_should_work() {
         assert_eq!(Balances::free_balance(provider.clone()), 0);
         assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
-            already_paid: 0,
-            already_unreserved: 0
+            paid: 0,
+            unreserved: 0
         });
         for i in 1..30 {
             run_to_block(303 + i * 10);
@@ -109,8 +109,8 @@ fn test_for_storage_order_and_payment_should_work() {
             assert_eq!(Balances::free_balance(provider.clone()), i * 2);
             assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
                 total: 60,
-                already_paid: i * 2,
-                already_unreserved: i * 2,
+                paid: i * 2,
+                unreserved: i * 2,
             });
         }
     });
@@ -191,14 +191,14 @@ fn test_for_storage_order_and_payment_should_suspend() {
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
-            already_paid: 0,
-            already_unreserved: 0
+            paid: 0,
+            unreserved: 0
         });
         run_to_block(303);
         assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
-            already_paid: 0,
-            already_unreserved: 0
+            paid: 0,
+            unreserved: 0
         });
 
         // Check workloads
@@ -212,8 +212,8 @@ fn test_for_storage_order_and_payment_should_suspend() {
         assert_eq!(Balances::free_balance(provider.clone()), 0);
         assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
             total: 60,
-            already_paid: 0,
-            already_unreserved: 0
+            paid: 0,
+            unreserved: 0
         });
         for i in 1..11 {
             run_to_block(303 + i * 10);
@@ -222,8 +222,8 @@ fn test_for_storage_order_and_payment_should_suspend() {
             assert_eq!(Balances::free_balance(provider.clone()), i * 2);
             assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
                 total: 60,
-                already_paid: i * 2,
-                already_unreserved: i * 2
+                paid: i * 2,
+                unreserved: i * 2
             });
         }
         <market::StorageOrders<Test>>::mutate(&order_id, |sorder| {
@@ -238,8 +238,8 @@ fn test_for_storage_order_and_payment_should_suspend() {
             assert_eq!(Balances::free_balance(provider.clone()), 20);
             assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
                 total: 60,
-                already_paid: 20,
-                already_unreserved: i * 2
+                paid: 20,
+                unreserved: i * 2
                 
             });
         }
@@ -255,8 +255,8 @@ fn test_for_storage_order_and_payment_should_suspend() {
             assert_eq!(Balances::free_balance(provider.clone()), 20 + (i - 20) * 2);
             assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
                 total: 60,
-                already_paid: 20 + (i - 20) * 2,
-                already_unreserved: i * 2
+                paid: 20 + (i - 20) * 2,
+                unreserved: i * 2
             });
         }
 });

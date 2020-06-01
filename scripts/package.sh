@@ -12,8 +12,8 @@ else
     mkdir crust/bin
     
     # create and fillin VERSION file
-    touch crust/bin/VERSION
-    echo $version >> crust/bin/VERSION
+    touch crust/VERSION
+    echo $version >> crust/VERSION
 
     # copy crust
     cp target/release/crust crust/bin/

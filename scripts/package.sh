@@ -19,5 +19,8 @@ else
     cp target/release/crust crust/bin/
 
     # package
-    tar -cvf crust.tar crust 
+    tar -cvf crust.tar crust
+
+    # delete crust folder
+    rm -Rf crust/
 fi

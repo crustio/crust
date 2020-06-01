@@ -33,6 +33,7 @@ primitives = { package = 'cst-primitives', path = '../../primitives', default-fe
 
 [dev-dependencies]
 keyring = { package = "sp-keyring", version = '2.0.0-rc2' }
+balances = { package = 'pallet-balances', version = '2.0.0-rc2' }
 
 [features]
 default = ['std']

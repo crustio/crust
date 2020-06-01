@@ -1,28 +1,64 @@
-use crate::*;
+use super::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types,
+    impl_outer_origin, parameter_types, impl_outer_dispatch,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{ OnInitialize, OnFinalize, Get, Randomness }
+    traits::{OnFinalize, OnInitialize, Get}
 };
-use keyring::Sr25519Keyring;
-use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
+    traits::{BlakeTwo256, IdentityLookup, SaturatedConversion},
     Perbill,
 };
-use market::{Provision, StorageOrder};
-use primitives::{MerkleRoot, Hash};
-use balances::AccountData;
 use std::{cell::RefCell};
-
-type AccountId = AccountId32;
+use balances::AccountData;
 pub type Balance = u64;
+
+use keyring::Sr25519Keyring;
+use sp_core::{crypto::AccountId32, H256};
+pub type AccountId = AccountId32;
 
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
 }
+
+impl_outer_dispatch! {
+	pub enum Call for Test where origin: Origin {
+        balances::Balances,
+        payment::Payment,
+        system::System,
+	}
+}
+
+pub struct CurrencyToVoteHandler;
+impl Convert<u64, u64> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u64 {
+        x
+    }
+}
+impl Convert<u128, u64> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u64 {
+        x.saturated_into()
+    }
+}
+
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 {
+        x
+    }
+}
+
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
+    }
+}
+
+// For testing the module, we construct most of a mock runtime. This means
+// first constructing a configuration type (`Test`) which `impl`s each of the
+// configuration traits of modules we want to use.
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct Test;
 
 thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
@@ -34,13 +70,6 @@ impl Get<u64> for ExistentialDeposit {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
     }
 }
-
-
-// For testing the module, we construct most of a mock runtime. This means
-// first constructing a configuration type (`Test`) which `impl`s each of the
-// configuration traits of modules we want to use.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Test;
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
@@ -75,60 +104,74 @@ impl system::Trait for Test {
     type OnKilledAccount = ();
 }
 
+pub struct TestOrderInspector;
+
+impl market::OrderInspector<AccountId> for TestOrderInspector {
+    // file size should smaller than provider's num
+    fn check_works(_provider: &AccountId, _file_size: u64) -> bool {
+        true
+    }
+}
+
+
+parameter_types! {
+	pub const MaximumWeight: u32 = 1000000;
+}
+
+impl scheduler::Trait for Test {
+	type Event = ();
+	type Origin = Origin;
+	type Call = Call;
+	type MaximumWeight = MaximumWeight;
+}
+
 impl balances::Trait for Test {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = ();
     type ExistentialDeposit = ExistentialDeposit;
-    type AccountStore = system::Module<Test>;
+    type AccountStore = System;
 }
 
-impl market::Payment<<Test as system::Trait>::AccountId,
-    <Test as system::Trait>::Hash, market::BalanceOf<Test>> for Tee
-{
-    fn pay_sorder(client: &<Test as system::Trait>::AccountId,
-        provider: &<Test as system::Trait>::AccountId,
-                  _: market::BalanceOf<Test>) -> <Test as system::Trait>::Hash {
-        let bn = <system::Module<Test>>::block_number();
-        let bh: <Test as system::Trait>::Hash = <system::Module<Test>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &client.encode()[..],
-            &provider.encode()[..],
-        ].concat();
-
-        // it can cover most cases, for the "real" random
-        <Test as market::Trait>::Randomness::random(seed.as_slice())
-    }
-
-    fn start_delayed_pay(_: &<Test as system::Trait>::Hash) { }
-}
-
-
-impl market::Trait for Test {
-    type Event = ();
-    type Currency = balances::Module<Self>;
-    type Randomness = ();
-    type Payment = Tee;
-    type OrderInspector = Tee;
-}
-
-impl Trait for Test {
+impl tee::Trait for Test {
     type Event = ();
     type Works = ();
     type MarketInterface = Market;
 }
 
-pub type Tee = Module<Test>;
-pub type System = system::Module<Test>;
+impl market::Trait for Test {
+    type Event = ();
+    type Currency = Balances;
+    type Randomness = ();
+    type Payment = Payment;
+    type OrderInspector = TestOrderInspector;
+}
+
+impl Trait for Test {
+    type Proposal = Call;
+    type Currency = Balances;
+    type Event = ();
+    type Randomness = ();
+    // TODO: Bonding with balance module(now we impl inside Market)
+    type MarketInterface = Market;
+    type Scheduler = Scheduler;
+    type CurrencyToBalance = CurrencyToVoteHandler;
+    type BalanceInterface = Self;
+}
+
 pub type Market = market::Module<Test>;
+pub type System = system::Module<Test>;
+pub type Tee = tee::Module<Test>;
+pub type Scheduler = scheduler::Module<Test>;
+pub type Payment = Module<Test>;
+pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = system::GenesisConfig::default()
-        .build_storage::<Test>()
-        .unwrap();
+    .build_storage::<Test>()
+    .unwrap();
 
     // initial authorities: [Alice, Bob]
     let accounts = [
@@ -147,7 +190,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .map(|(id, pk)| {
             (
                 id.clone(),
-                Identity {
+                tee::Identity {
                     pub_key: pk.clone(),
                     account_id: id.clone(),
                     validator_pub_key: pk.clone(),
@@ -162,49 +205,28 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .map(|(x, _)| (x.clone(), Default::default()))
         .collect();
 
-    GenesisConfig::<Test> {
+    let _ = tee::GenesisConfig::<Test> {
         current_report_slot: 0,
         tee_identities,
-        work_reports,
+        work_reports
     }
-    .assimilate_storage(&mut t)
-    .unwrap();
+    .assimilate_storage(&mut t);
 
     t.into()
 }
 
 /// Run until a particular block.
+// TODO: make it into util?
 pub fn run_to_block(n: u64) {
-    // This block hash is for the valid work report
     let fake_bh = H256::from_slice(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap().as_slice());
     while System::block_number() < n {
         <system::BlockHash<Test>>::insert(System::block_number(), fake_bh.clone());
         if System::block_number() > 1 {
             System::on_finalize(System::block_number());
+            Scheduler::on_finalize(System::block_number());
         }
-        System::on_initialize(System::block_number());
         System::set_block_number(System::block_number() + 1);
+        System::on_initialize(System::block_number());
+        Scheduler::on_initialize(System::block_number());
     }
-}
-
-pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os: OrderStatus) {
-    let mut file_map = Market::providers(who).unwrap_or_default().file_map;
-    let sorder_id: Hash = Hash::repeat_byte(rd);
-    let sorder = StorageOrder {
-        file_identifier: f_id.clone(),
-        file_size: 0,
-        created_on: 0,
-        completed_on: 0,
-        expired_on: 0,
-        provider: who.clone(),
-        client: who.clone(),
-        order_status: os
-    };
-    file_map.insert(f_id.clone(), sorder_id.clone());
-    let provision = Provision {
-        address_info: vec![],
-        file_map
-    };
-    <market::Providers<Test>>::insert(who, provision);
-    <market::StorageOrders<Test>>::insert(sorder_id, sorder);
 }

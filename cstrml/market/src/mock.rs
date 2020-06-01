@@ -3,7 +3,7 @@ use super::*;
 use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{OnFinalize, OnInitialize}
+    traits::{OnFinalize, OnInitialize, Get}
 };
 use sp_core::H256;
 use sp_runtime::{
@@ -11,9 +11,11 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-use frame_support::weights::RuntimeDbWeight;
+use std::{cell::RefCell};
+use balances::AccountData;
 
 pub type AccountId = u64;
+pub type Balance = u64;
 
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
@@ -24,6 +26,17 @@ impl_outer_origin! {
 // configuration traits of modules we want to use.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Test;
+
+thread_local! {
+    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
+}
+
+pub struct ExistentialDeposit;
+impl Get<u64> for ExistentialDeposit {
+    fn get() -> u64 {
+        EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
+    }
+}
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
@@ -53,7 +66,7 @@ impl system::Trait for Test {
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
     type ModuleToIndex = ();
-    type AccountData = ();
+    type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
 }
@@ -71,14 +84,44 @@ impl OrderInspector<AccountId> for TestOrderInspector {
     }
 }
 
+impl balances::Trait for Test {
+    type Balance = Balance;
+    type DustRemoval = ();
+    type Event = ();
+    type ExistentialDeposit = ExistentialDeposit;
+    type AccountStore = System;
+}
+
 impl tee::Trait for Test {
     type Event = ();
     type Works = ();
     type MarketInterface = ();
 }
 
+impl Payment<<Test as system::Trait>::AccountId,
+    <Test as system::Trait>::Hash, BalanceOf<Test>> for Market
+{
+    fn pay_sorder(client: &<Test as system::Trait>::AccountId,
+        provider: &<Test as system::Trait>::AccountId,
+                  _: BalanceOf<Test>) -> <Test as system::Trait>::Hash {
+        let bn = <system::Module<Test>>::block_number();
+        let bh: <Test as system::Trait>::Hash = <system::Module<Test>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &client.encode()[..],
+            &provider.encode()[..],
+        ].concat();
+
+        // it can cover most cases, for the "real" random
+        <Test as Trait>::Randomness::random(seed.as_slice())
+    }
+
+    fn start_delayed_pay(_: &<Test as system::Trait>::Hash) { }
+}
+
 impl Trait for Test {
     type Event = ();
+    type Currency = Balances;
     type Randomness = ();
     type Payment = Market;
     type OrderInspector = TestOrderInspector;
@@ -87,6 +130,7 @@ impl Trait for Test {
 pub type Market = Module<Test>;
 pub type System = system::Module<Test>;
 pub type Tee = tee::Module<Test>;
+pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.

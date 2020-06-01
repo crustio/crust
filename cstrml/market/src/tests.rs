@@ -1,4 +1,5 @@
-use crate::mock::{new_test_ext, run_to_block, Origin, Market};
+use super::*;
+use crate::mock::*;
 use frame_support::{
     assert_noop, assert_ok,
     dispatch::DispatchError,
@@ -21,7 +22,7 @@ fn test_for_storage_order_should_work() {
         let duration = 360; // file should store at least 30 minutes
         let fee = 10;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-
+        let _ = Balances::make_free_balance_be(&source, 80);
         assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), provider, fee,

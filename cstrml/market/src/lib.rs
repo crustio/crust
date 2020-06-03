@@ -11,7 +11,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
-use sp_runtime::{traits::{StaticLookup, Zero}};
+use sp_runtime::{traits::StaticLookup};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -234,11 +234,11 @@ decl_module! {
                 Err(Error::<T>::InsufficientValue)?
             }
             // 3. Ensure provider has enough currency.
-            ensure!(value > T::Currency::free_balance(&who), Error::<T>::InsufficientCurrecy);
+            ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 4. Ensure value is larger than used.
             if let Some(pledge_ledger) = Self::pledge_ledgers(&who) {
-                ensure!(value > pledge_ledger.unused, Error::<T>::InsufficientPledge);
+                ensure!(value >= pledge_ledger.total - pledge_ledger.unused, Error::<T>::InsufficientPledge);
             }
 
             // 5 Upsert ledger
@@ -246,14 +246,16 @@ decl_module! {
                 Some(_) => {
                     <PledgeLedgers<T>>::mutate(&who, |pledge_ledger| {
                         if let Some(pl) = pledge_ledger {
+                            pl.unused = value.clone() + pl.unused - pl.total;
                             pl.total = value.clone();
+                            
                         }
-                    })
+                    });
                 },
                 None => {
                     let pledge_ledger = PledgeLedger {
                         total: value.clone(),
-                        unused: Zero::zero()
+                        unused: value.clone(),
                     };
                     <PledgeLedgers<T>>::insert(&who, pledge_ledger);
                 }
@@ -327,6 +329,12 @@ decl_module! {
             // 4. Check client has enough currency to pay
             ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
+            // 5. Check if provider pledged
+            ensure!(<PledgeLedgers<T>>::contains_key(&provider), Error::<T>::InsufficientPledge);
+
+            // 6. Check provider has unused pledge
+            ensure!(amount <= Self::pledge_ledgers(&provider).unwrap().unused, Error::<T>::InsufficientPledge);
+
             // 5. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
             let storage_order = StorageOrder::<T::AccountId, BalanceOf<T>> {
@@ -343,6 +351,12 @@ decl_module! {
 
             // 6. Pay the order and (maybe) add storage order
             if Self::maybe_insert_sorder(&who, &provider, &storage_order) {
+                // 9. update ledger
+                <PledgeLedgers<T>>::mutate(&provider, |pledge_ledger| {
+                    if let Some(pl) = pledge_ledger {
+                        pl.unused -= amount;
+                    }
+                });
                 // a. emit storage order success event
                 Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
             } else {

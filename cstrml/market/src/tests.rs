@@ -167,3 +167,37 @@ fn test_for_storage_order_should_fail_due_to_provider_not_register() {
         );
     });
 }
+
+#[test]
+fn test_for_pledge_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let provider = 100;
+        let file_size = 16; // should less than provider
+        let duration = 360; // file should store at least 30 minutes
+        let fee = 10;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 200);
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
+        assert_ok!(Market::pledge(Origin::signed(provider), 180));
+        assert_eq!(Market::pledge_ledgers(provider).unwrap(), PledgeLedger {
+            total: 180,
+            unused: 0
+        });
+        assert_ok!(Market::pledge(Origin::signed(provider), 160));
+        assert_eq!(Market::pledge_ledgers(provider).unwrap(), PledgeLedger {
+            total: 160,
+            unused: 0
+        });
+        assert_ok!(Market::pledge(Origin::signed(provider), 150));
+        assert_eq!(Market::pledge_ledgers(provider).unwrap(), PledgeLedger {
+            total: 150,
+            unused: 0
+        });
+    });
+}

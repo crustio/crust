@@ -4,11 +4,14 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
-    traits::{Randomness, Currency, ReservableCurrency}
+    traits::{
+        Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
+        WithdrawReasons
+    }
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
-use sp_runtime::{traits::StaticLookup};
+use sp_runtime::{traits::{StaticLookup, Zero}};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -24,6 +27,8 @@ mod mock;
 
 #[cfg(test)]
 mod tests;
+
+const MARKET_ID: LockIdentifier = *b"market  ";
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -45,6 +50,15 @@ pub enum OrderStatus {
     Success,
     Failed,
     Pending
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct PledgeLedger<Balance> {
+    // total balance of pledge
+    pub total: Balance,
+    // unused balance of pledge
+    pub unused: Balance
 }
 
 impl Default for OrderStatus {
@@ -143,7 +157,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     /// The payment balance.
-    type Currency: ReservableCurrency<Self::AccountId>;
+    type Currency: ReservableCurrency<Self::AccountId> + LockableCurrency<Self::AccountId>;
 
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -172,6 +186,10 @@ decl_storage! {
         /// Order details iterated by order id
         pub StorageOrders get(fn storage_orders):
         map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
+
+        /// Pledge details iterated by provider id
+        pub PledgeLedgers get(fn pledge_ledgers):
+        map hasher(twox_64_concat) T::AccountId => Option<PledgeLedger<BalanceOf<T>>>;
     }
 }
 
@@ -187,7 +205,11 @@ decl_error! {
         /// File duration is too short
         DurationTooShort,
         /// Don't have enough currency
-        InsufficientCurrency
+        InsufficientCurrency,
+        /// Don't have enough pledge
+        InsufficientPledge,
+        /// Can not bond with value less than minimum balance.
+        InsufficientValue,
     }
 }
 
@@ -198,6 +220,59 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
+
+        /// Pledge amount of currency to accept market order.
+        #[weight = 1_000_000]
+        pub fn pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Check if provider is registered.
+            ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
+
+            // 2. Reject a pledge which is considered to be _dust_.
+            if value < T::Currency::minimum_balance() {
+                Err(Error::<T>::InsufficientValue)?
+            }
+            // 3. Ensure provider has enough currency.
+            ensure!(value > T::Currency::free_balance(&who), Error::<T>::InsufficientCurrecy);
+
+            // 4. Ensure value is larger than used.
+            if let Some(pledge_ledger) = Self::pledge_ledgers(&who) {
+                ensure!(value > pledge_ledger.unused, Error::<T>::InsufficientPledge);
+            }
+
+            // 5 Upsert ledger
+            match Self::pledge_ledgers(&who) {
+                Some(_) => {
+                    <PledgeLedgers<T>>::mutate(&who, |pledge_ledger| {
+                        if let Some(pl) = pledge_ledger {
+                            pl.total = value.clone();
+                        }
+                    })
+                },
+                None => {
+                    let pledge_ledger = PledgeLedger {
+                        total: value.clone(),
+                        unused: Zero::zero()
+                    };
+                    <PledgeLedgers<T>>::insert(&who, pledge_ledger);
+                }
+            }
+
+            // 6. set lock
+            T::Currency::set_lock(
+                MARKET_ID,
+                &who,
+                value,
+                WithdrawReasons::all(),
+            );
+
+            // 7. Emit success
+            Self::deposit_event(RawEvent::PledgeSuccess(who));
+
+            Ok(())
+        }
+
 
         /// Register to be a provider, you should provide your storage layer's address info
         #[weight = 1_000_000]
@@ -372,5 +447,6 @@ decl_event!(
     {
         StorageOrderSuccess(AccountId, StorageOrder<AccountId, Balance>),
         RegisterSuccess(AccountId),
+        PledgeSuccess(AccountId),
     }
 );

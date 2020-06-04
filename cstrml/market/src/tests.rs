@@ -45,7 +45,7 @@ fn test_for_storage_order_should_work() {
             provider,
             client,
             amount: fee,
-            status: Default::default()
+            status: OrderStatus::Pending
         });
     });
 }

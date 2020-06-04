@@ -47,28 +47,24 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         false
     }
 
-    // Ideally, this function only be called under an `EXISTED` and `SUCCESS` storage order
+    // Ideally, this function only be called under an `EXISTED` storage order
     // TODO: We should return whether `Scheduler` successful
     fn pay_sorder(sorder_id: &T::Hash) {
         // 1. Storage order should exist
         if let Some(so) = T::MarketInterface::maybe_get_sorder(sorder_id) {
-            // 2. Order status should be successful
-            if so.status != OrderStatus::Success {
-                return
-            }
             if let Some(ledger) = Self::payments(sorder_id) {
-                // 3. Calculate duration
+                // 2. Calculate duration
                 let minute = TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
                 let duration = (so.expired_on - so.completed_on) / MINUTES + 1;
 
-                // 4. Calculate slot payment amount
+                // 3. Calculate slot payment amount
                 let total_amount = ledger.total;
                 let slot_amount: BalanceOf<T> =
                     <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::
                     convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::
                     convert(total_amount) / duration as u128 + 1);
 
-                // 5. Arrange a scheduler
+                // 4. Arrange a scheduler
                 // TODO: What if returning an error?
                 let _ = T::Scheduler::schedule_named(
                     sorder_id.encode(),
@@ -168,7 +164,7 @@ decl_module! {
             let real_amount = amount.min(ledger.total - ledger.paid);
 
             // 4. Ensure amount > 0
-            ensure!(Zero::is_zero(&real_amount), Error::<T>::NoMoreAmount);
+            ensure!(!Zero::is_zero(&real_amount), Error::<T>::NoMoreAmount);
 
             // 5. Get storage order
             let sorder = T::MarketInterface::maybe_get_sorder(&sorder_id).unwrap_or_default();

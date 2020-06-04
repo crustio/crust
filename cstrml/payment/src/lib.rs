@@ -148,15 +148,16 @@ decl_module! {
             order_id: T::Hash
         ) -> DispatchResult {
             ensure_root(origin.clone())?;
-            // 0. check left currency
+            // 0. Check left currency
             let payment_ledger = Self::payments(order_id).unwrap_or_default();
             let real_value = value.min(payment_ledger.total - payment_ledger.paid);
 
             if !Zero::is_zero(&real_value) {
-                // 1. unreserve one piece currency
+                // 1. Unreserved one slot currency
                 T::Currency::unreserve(
                     &client,
                     real_value);
+
                 // unreserved value would be added anyway.
                 // If the status of storage order is not success,
                 // the CRU would be just unreserved(transferred) to original client.
@@ -165,7 +166,7 @@ decl_module! {
                         p.unreserved += real_value;
                     }
                 });
-                // Check the order status
+                // 2. Check the order status
                 if let Some(sorder) = T::MarketInterface::maybe_get_sorder(&order_id) {
                     match sorder.order_status {
                         OrderStatus::Success => {
@@ -195,7 +196,6 @@ pub trait BalanceInterface<Origin, AccountId, Balance>: system::Trait {
 }
 
 impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, BalanceOf<T>> for T where T: balances::Trait {
-
     fn maybe_transfer(
         origin: T::Origin,
         client: &<T as system::Trait>::AccountId,

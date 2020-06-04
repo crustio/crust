@@ -3,7 +3,7 @@ use crate::*;
 use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{ OnInitialize, OnFinalize, Get, Randomness }
+    traits::{ OnInitialize, OnFinalize, Get }
 };
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
@@ -84,36 +84,26 @@ impl balances::Trait for Test {
 }
 
 impl market::Payment<<Test as system::Trait>::AccountId,
-    <Test as system::Trait>::Hash, market::BalanceOf<Test>> for Tee
+    <Test as system::Trait>::Hash, BalanceOf<Test>> for Tee
 {
-    fn pay_sorder(client: &<Test as system::Trait>::AccountId,
-        provider: &<Test as system::Trait>::AccountId,
-                  _: market::BalanceOf<Test>) -> <Test as system::Trait>::Hash {
-        let bn = <system::Module<Test>>::block_number();
-        let bh: <Test as system::Trait>::Hash = <system::Module<Test>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &client.encode()[..],
-            &provider.encode()[..],
-        ].concat();
-
-        // it can cover most cases, for the "real" random
-        <Test as market::Trait>::Randomness::random(seed.as_slice())
+    fn reserve_sorder(_: &Hash, _: &AccountId, _: Balance) -> bool {
+        true
     }
 
-    fn start_delayed_pay(_: &<Test as system::Trait>::Hash) { }
+    fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
 }
 
 
 impl market::Trait for Test {
-    type Event = ();
     type Currency = balances::Module<Self>;
+    type Event = ();
     type Randomness = ();
     type Payment = Tee;
     type OrderInspector = Tee;
 }
 
 impl Trait for Test {
+    type Currency = balances::Module<Self>;
     type Event = ();
     type Works = ();
     type MarketInterface = Market;
@@ -198,7 +188,8 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
         expired_on: 0,
         provider: who.clone(),
         client: who.clone(),
-        order_status: os
+        amount: 0,
+        status: os
     };
     file_map.insert(f_id.clone(), sorder_id.clone());
     let provision = Provision {

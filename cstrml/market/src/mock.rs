@@ -12,6 +12,7 @@ use sp_runtime::{
     Perbill,
 };
 use std::{cell::RefCell};
+use primitives::Hash;
 use balances::AccountData;
 
 pub type AccountId = u64;
@@ -93,6 +94,7 @@ impl balances::Trait for Test {
 }
 
 impl tee::Trait for Test {
+    type Currency = Balances;
     type Event = ();
     type Works = ();
     type MarketInterface = ();
@@ -101,27 +103,16 @@ impl tee::Trait for Test {
 impl Payment<<Test as system::Trait>::AccountId,
     <Test as system::Trait>::Hash, BalanceOf<Test>> for Market
 {
-    fn pay_sorder(client: &<Test as system::Trait>::AccountId,
-        provider: &<Test as system::Trait>::AccountId,
-                  _: BalanceOf<Test>) -> <Test as system::Trait>::Hash {
-        let bn = <system::Module<Test>>::block_number();
-        let bh: <Test as system::Trait>::Hash = <system::Module<Test>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &client.encode()[..],
-            &provider.encode()[..],
-        ].concat();
-
-        // it can cover most cases, for the "real" random
-        <Test as Trait>::Randomness::random(seed.as_slice())
+    fn reserve_sorder(_: &Hash, _: &AccountId, _: Balance) -> bool {
+        true
     }
 
-    fn start_delayed_pay(_: &<Test as system::Trait>::Hash) { }
+    fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
 }
 
 impl Trait for Test {
-    type Event = ();
     type Currency = Balances;
+    type Event = ();
     type Randomness = ();
     type Payment = Market;
     type OrderInspector = TestOrderInspector;

@@ -3,10 +3,9 @@
 
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
-    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, Parameter,
-    traits::
-    {
-        Randomness, schedule::Named as ScheduleNamed, schedule::HARD_DEADLINE,
+    decl_event, decl_module, decl_storage, decl_error, ensure, dispatch::DispatchResult, Parameter,
+    traits::{
+        schedule::Named as ScheduleNamed, schedule::HARD_DEADLINE,
         Currency, ReservableCurrency
     }
 };
@@ -30,59 +29,62 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-pub type BalanceOf<T> =
+type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
 impl<T: Trait> Payment<<T as system::Trait>::AccountId,
     <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
 {
-    fn pay_sorder(client: &<T as system::Trait>::AccountId,
-                  provider: &<T as system::Trait>::AccountId,
-                  value: BalanceOf<T>) -> T::Hash {
-        let bn = <system::Module<T>>::block_number();
-        let bh: T::Hash = <system::Module<T>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &client.encode()[..],
-            &provider.encode()[..],
-        ].concat();
-
-        // it can cover most cases, for the "real" random
-        let sorder_id = T::Randomness::random(seed.as_slice());
-        if T::Currency::reserve(&client, value).is_ok() {
-            <Payments<T>>::insert(sorder_id, PaymentLedger{
-                total: value,
+    fn reserve_sorder(sorder_id: &T::Hash, client: &T::AccountId, amount: BalanceOf<T>) -> bool {
+        if T::Currency::reserve(&client, amount.clone()).is_ok() {
+            <Payments<T>>::insert(sorder_id, Ledger {
+                total: amount,
                 paid: Zero::zero(),
                 unreserved: Zero::zero()
             });
+            return true
         }
-        return sorder_id;
+        false
     }
 
-    fn start_delayed_pay(sorder_id: &T::Hash) {
-        let sorder = T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
-        let interval = TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
-        let times = (sorder.expired_on - sorder.completed_on)/MINUTES + 1;
-        let total = Self::payments(sorder_id).unwrap_or_default().total;
-        let slot: BalanceOf<T> = <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(total)/times as u128 + 1);
-        let _ = T::Scheduler::schedule_named(
-            sorder_id.encode(),
-            <system::Module<T>>::block_number() + interval, // must have a delay
-            Some((interval, times)),
-            HARD_DEADLINE,
-            Call::slot_pay(
-                sorder.client.clone(),
-                sorder.provider.clone(),
-                slot,
-                sorder_id.clone()
-            ).into(),
-        );
+    // Ideally, this function only be called under an `EXISTED` and `SUCCESS` storage order
+    // TODO: We should return whether `Scheduler` successful
+    fn pay_sorder(sorder_id: &T::Hash) {
+        // 1. Storage order should exist
+        if let Some(so) = T::MarketInterface::maybe_get_sorder(sorder_id) {
+            // 2. Order status should be successful
+            if so.status != OrderStatus::Success {
+                return
+            }
+            if let Some(ledger) = Self::payments(sorder_id) {
+                // 3. Calculate duration
+                let minute = TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
+                let duration = (so.expired_on - so.completed_on) / MINUTES + 1;
+
+                // 4. Calculate slot payment amount
+                let total_amount = ledger.total;
+                let slot_amount: BalanceOf<T> =
+                    <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::
+                    convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::
+                    convert(total_amount) / duration as u128 + 1);
+
+                // 5. Arrange a scheduler
+                // TODO: What if returning an error?
+                let _ = T::Scheduler::schedule_named(
+                    sorder_id.encode(),
+                    <system::Module<T>>::block_number() + minute, // must have a delay
+                    Some((minute, duration)),
+                    HARD_DEADLINE,
+                    Call::slot_pay(sorder_id.clone(), slot_amount).into(),
+                );
+            }
+        }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct PaymentLedger<Balance: HasCompact + Zero> {
+pub struct Ledger<Balance: HasCompact + Zero> {
     #[codec(compact)]
     pub total: Balance,
     #[codec(compact)]
@@ -94,39 +96,44 @@ pub struct PaymentLedger<Balance: HasCompact + Zero> {
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     type Proposal: Parameter + Dispatchable<Origin=Self::Origin> + From<Call<Self>>;
+
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId>;
 
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
-    /// Something that provides randomness in the runtime.
-    type Randomness: Randomness<Self::Hash>;
-
-    /// Interface for interacting with a market module.
-    type MarketInterface: MarketInterface<Self::AccountId, Self::Hash>;
-
-    /// The Scheduler.
-    type Scheduler: ScheduleNamed<Self::BlockNumber, Self::Proposal>;
-    
     /// Used to transfer
     type CurrencyToBalance: Convert<BalanceOf<Self>, u128> + Convert<u128, BalanceOf<Self>>;
 
+    /// The Scheduler.
+    type Scheduler: ScheduleNamed<Self::BlockNumber, Self::Proposal>;
+
+    /// Interface for interacting with a market module.
+    type MarketInterface: MarketInterface<Self::AccountId, Self::Hash, BalanceOf<Self>>;
+
+    /// Interface for interacting with balance module
     type BalanceInterface: self::BalanceInterface<Self::Origin, Self::AccountId, BalanceOf<Self>>;
 }
 
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Market {
-        /// A mapping from storage provider to order id
+        /// A mapping from storage order id to payment ledger info
         pub Payments get(fn payments):
-        map hasher(twox_64_concat) T::Hash => Option<PaymentLedger<BalanceOf<T>>>;
+        map hasher(twox_64_concat) T::Hash => Option<Ledger<BalanceOf<T>>>;
     }
 }
 
 decl_error! {
     /// Error for the market module.
     pub enum Error for Module<T: Trait> {
+        /// No more payment
+        NoMoreAmount,
+        /// Storage order not exist
+        NoStorageOrder,
+        /// Payment ledger not exist
+        NoPaymentInfo,
     }
 }
 
@@ -138,61 +145,76 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        /// Enact a proposal from a referendum. For now we just make the weight be the maximum.
+        /// Called by `Scheduler`(with root rights) ONLY, and for now only support `StorageOrder`.
+        /// This function will check `sorder_id` is added in `Payments` and `StorageOrders`
+        ///
+        /// <weight>
+        /// - Independent of the arguments. Moderate complexity.
+        /// - O(1).
+        /// - 8 extra DB entries.
+        /// </weight>
         #[weight = 1_000_000]
-        fn slot_pay(
-            origin,
-            client: <T as system::Trait>::AccountId,
-            provider: <T as system::Trait>::AccountId,
-            value: BalanceOf<T>,
-            order_id: T::Hash
-        ) -> DispatchResult {
+        fn slot_pay(origin, sorder_id: T::Hash, amount: BalanceOf<T>) -> DispatchResult {
             ensure_root(origin.clone())?;
-            // 0. Check left currency
-            let payment_ledger = Self::payments(order_id).unwrap_or_default();
-            let real_value = value.min(payment_ledger.total - payment_ledger.paid);
 
-            if !Zero::is_zero(&real_value) {
-                // 1. Unreserved one slot currency
-                T::Currency::unreserve(
-                    &client,
-                    real_value);
+            // 1. Ensure payment ledger existed
+            ensure!(Self::payments(&sorder_id).is_some(), Error::<T>::NoPaymentInfo);
 
-                // unreserved value would be added anyway.
-                // If the status of storage order is not success,
-                // the CRU would be just unreserved(transferred) to original client.
-                <Payments<T>>::mutate(&order_id, |payment_ledger| {
-                    if let Some(p) = payment_ledger {
-                        p.unreserved += real_value;
-                    }
-                });
-                // 2. Check the order status
-                if let Some(sorder) = T::MarketInterface::maybe_get_sorder(&order_id) {
-                    match sorder.order_status {
-                        OrderStatus::Success => {
-                            // 3. (Maybe) transfer the currency
-                            if T::BalanceInterface::maybe_transfer(origin.clone(), &client, &provider, real_value) {
-                                // 4. update payments
-                                <Payments<T>>::mutate(&order_id, |payment_ledger| {
-                                    if let Some(p) = payment_ledger {
-                                        p.paid += real_value;
-                                    }
-                                });
-                                Self::deposit_event(RawEvent::PaymentSuccess(client));
-                            }
+            // 2. Ensure storage order existed
+            ensure!(T::MarketInterface::maybe_get_sorder(&sorder_id).is_some(), Error::<T>::NoStorageOrder);
 
-                        },
-                        _ => {}
-                    }
+            // 3. Prepare payment amount
+            let ledger = Self::payments(&sorder_id).unwrap_or_default();
+            let real_amount = amount.min(ledger.total - ledger.paid);
+
+            // 4. Ensure amount > 0
+            ensure!(Zero::is_zero(&real_amount), Error::<T>::NoMoreAmount);
+
+            // 5. Get storage order
+            let sorder = T::MarketInterface::maybe_get_sorder(&sorder_id).unwrap_or_default();
+            let client = sorder.client.clone();
+            let provider = sorder.provider.clone();
+
+            // 6. [DB Write] Unreserved 1 slot amount
+            T::Currency::unreserve(
+                &client,
+                real_amount);
+
+            // 7. [DB Write] Nice move 🥳
+            // Unreserved value will be added anyway.
+            // If the status of storage order status is `Failed`,
+            // the CRUs will be just unreserved(aka, unlocked) to client-self.
+            <Payments<T>>::mutate(&sorder_id, |ledger| {
+                if let Some(p) = ledger {
+                    p.unreserved += real_amount;
                 }
+            });
+
+            // 8. Check storage order status
+            match sorder.status {
+                OrderStatus::Success => {
+                    // 9. [DB Write] (Maybe) Transfer the amount
+                    // TODO: What if this failed several time, paid will be smaller than it should be?
+                    if T::BalanceInterface::maybe_transfer(origin.clone(), &client, &provider, real_amount) {
+                        // 10. [DB Write] Update ledger
+                        <Payments<T>>::mutate(&sorder_id, |ledger| {
+                            if let Some(l) = ledger {
+                                l.paid += real_amount;
+                            }
+                        });
+                        Self::deposit_event(RawEvent::PaymentSuccess(client));
+                    }
+                },
+                _ => {}
             }
+
             Ok(())
         }
     }
 }
 
 pub trait BalanceInterface<Origin, AccountId, Balance>: system::Trait {
-    fn maybe_transfer(origin: Origin, client: &AccountId, provider: &AccountId, value: Balance) -> bool;
+    fn maybe_transfer(origin: Origin, client: &AccountId, provider: &AccountId, amount: Balance) -> bool;
 }
 
 impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, BalanceOf<T>> for T where T: balances::Trait {
@@ -200,13 +222,14 @@ impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, Bala
         origin: T::Origin,
         client: &<T as system::Trait>::AccountId,
         provider: &<T as system::Trait>::AccountId,
-        value: BalanceOf<T>) -> bool {
-            let to_balance = |b: BalanceOf<T>| TryInto::<T::Balance>::try_into(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(b)).ok().unwrap();
+        amount: BalanceOf<T>) -> bool {
+            let to_balance =
+                |b: BalanceOf<T>| TryInto::<T::Balance>::try_into(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(b)).ok().unwrap();
             <balances::Module<T>>::force_transfer(
                 origin,
                 T::Lookup::unlookup(client.clone()),
                 T::Lookup::unlookup(provider.clone()),
-                to_balance(value)
+                to_balance(amount)
             ).is_ok()
     }
 }

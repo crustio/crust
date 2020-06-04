@@ -5,7 +5,8 @@ use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, ensure,
     dispatch::DispatchResult,
-    storage::IterableStorageMap
+    storage::IterableStorageMap,
+    traits::{Currency, ReservableCurrency}
 };
 use sp_std::{str, convert::TryInto, prelude::*};
 use system::ensure_signed;
@@ -25,6 +26,9 @@ mod mock;
 
 #[cfg(test)]
 mod tests;
+
+pub type BalanceOf<T> =
+    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -71,6 +75,10 @@ impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
 
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
+    /// The payment balance.
+    /// TODO: remove this for abstracting MarketInterface into tee self
+    type Currency: ReservableCurrency<Self::AccountId>;
+
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
@@ -78,7 +86,7 @@ pub trait Trait: system::Trait {
     type Works: Works<Self::AccountId>;
 
     /// Interface for interacting with a market module.
-    type MarketInterface: MarketInterface<Self::AccountId, Self::Hash>;
+    type MarketInterface: MarketInterface<Self::AccountId, Self::Hash, BalanceOf<Self>>;
 }
 
 decl_storage! {
@@ -225,7 +233,7 @@ impl<T: Trait> Module<T> {
                         // Get order status(should exist) and (maybe) change the status
                         let sorder =
                             T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
-                        if sorder.order_status == OrderStatus::Success {
+                        if sorder.status == OrderStatus::Success {
                             Some((sorder.file_identifier, order_id.clone()))
                         } else {
                             None
@@ -289,9 +297,9 @@ impl<T: Trait> Module<T> {
                     T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
 
                 // TODO: we should specially handle `Failed` status
-                if sorder.order_status != OrderStatus::Success {
+                if sorder.status != OrderStatus::Success {
                     // 1. Reset `expired_on` and `completed_on` for new order
-                    if sorder.order_status == OrderStatus::Pending {
+                    if sorder.status == OrderStatus::Pending {
                         let current_block_numeric = Self::get_current_block_number();
                         // go panic if `current_block_numeric` > `created_on`
                         sorder.expired_on += current_block_numeric - sorder.created_on;
@@ -299,11 +307,11 @@ impl<T: Trait> Module<T> {
                     }
 
                     // 2. Change order status to `Success`
-                    sorder.order_status = OrderStatus::Success;
+                    sorder.status = OrderStatus::Success;
 
                     // 3. (Maybe) set sorder and start delay pay
                     // TODO: we should specially handle `Failed` status
-                    T::MarketInterface::on_sorder_success(order_id, &sorder);
+                    T::MarketInterface::maybe_set_sorder(order_id, &sorder);
                 }
                 return used + *f_size
             }
@@ -354,9 +362,8 @@ impl<T: Trait> Module<T> {
                         // 3. Set status to failed
                         let mut sorder =
                             T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
-                        sorder.order_status = OrderStatus::Failed;
+                        sorder.status = OrderStatus::Failed;
                         T::MarketInterface::maybe_set_sorder(order_id, &sorder);
-                        // TODO: add market slashing here
                     }
                 }
 

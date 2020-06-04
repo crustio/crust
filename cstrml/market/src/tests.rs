@@ -17,7 +17,8 @@ fn test_for_storage_order_should_work() {
         let source = 0;
         let file_identifier =
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let provider = 100;
+        let provider: u64 = 100;
+        let client: u64 = 0;
         let file_size = 16; // should less than provider
         let duration = 360; // file should store at least 30 minutes
         let fee = 10;
@@ -30,20 +31,21 @@ fn test_for_storage_order_should_work() {
         ));
 
         let order_id = H256::default();
-        assert_eq!(Market::providers(100).unwrap(), Provision {
+        assert_eq!(Market::providers(&provider).unwrap(), Provision {
             address_info,
             file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()
         });
-        assert_eq!(Market::clients(0).unwrap(), vec![order_id.clone()]);
+        assert_eq!(Market::clients(&client).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
             file_identifier,
             file_size: 16,
             created_on: 50,
             completed_on: 50,
             expired_on: 410,
-            provider: 100,
-            client: 0,
-            order_status: Default::default()
+            provider,
+            client,
+            amount: fee,
+            status: Default::default()
         });
     });
 }

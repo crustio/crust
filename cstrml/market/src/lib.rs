@@ -245,7 +245,7 @@ decl_module! {
             // 4. Check client has enough currency to pay
             ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
-            // 4. Construct storage order
+            // 5. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
             let storage_order = StorageOrder::<T::AccountId, BalanceOf<T>> {
                 file_identifier,
@@ -259,7 +259,7 @@ decl_module! {
                 status: OrderStatus::Pending
             };
 
-            // 5. Pay the order and (maybe) add storage order
+            // 6. Pay the order and (maybe) add storage order
             if Self::maybe_insert_sorder(&who, &provider, &storage_order) {
                 // a. emit storage order success event
                 Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));

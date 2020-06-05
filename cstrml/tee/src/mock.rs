@@ -191,7 +191,12 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
         amount: 0,
         status: os
     };
-    file_map.insert(f_id.clone(), sorder_id.clone());
+    if let Some(orders) = file_map.get_mut(f_id) {
+        orders.push(sorder_id.clone())
+    } else {
+        file_map.insert(f_id.clone(), vec![sorder_id.clone()]);
+    }
+
     let provision = Provision {
         address_info: vec![],
         file_map

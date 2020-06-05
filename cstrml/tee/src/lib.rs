@@ -226,20 +226,19 @@ impl<T: Trait> Module<T> {
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
             // a. calculate this controller's order file map
+            // TC = O(nm), `n` is stored files number and `m` is corresponding order ids
             let mut order_files: Vec<(MerkleRoot, T::Hash)> = vec![];
             if let Some(provision) = T::MarketInterface::providers(&controller) {
-                order_files = provision.file_map.values()
-                    .filter_map(|order_id| {
+                for (f_id, order_ids) in provision.file_map.iter() {
+                    for order_id in order_ids {
                         // Get order status(should exist) and (maybe) change the status
                         let sorder =
                             T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
                         if sorder.status == OrderStatus::Success {
-                            Some((sorder.file_identifier, order_id.clone()))
-                        } else {
-                            None
+                            order_files.push((f_id.clone(), order_id.clone()))
                         }
-                    })
-                    .collect();
+                    }
+                }
             }
 
             // b. calculate controller's own reserved and used space
@@ -291,27 +290,28 @@ impl<T: Trait> Module<T> {
         let mut updated_wr = wr.clone();
         let file_map = T::MarketInterface::providers(who).unwrap_or_default().file_map;
         updated_wr.used = wr.files.iter().fold(0, |used, (f_id, f_size)| {
-            if let Some(order_id) = file_map.get(f_id) {
-                // Get order status(should exist) and (maybe) change the status
-                let mut sorder =
-                    T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
+            if let Some(order_ids) = file_map.get(f_id) {
+                for order_id in order_ids {
+                    // Get order status(should exist) and (maybe) change the status
+                    let mut sorder =
+                        T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
 
-                // TODO: we should specially handle `Failed` status
-                if sorder.status != OrderStatus::Success {
-                    // 1. Reset `expired_on` and `completed_on` for new order
-                    if sorder.status == OrderStatus::Pending {
-                        let current_block_numeric = Self::get_current_block_number();
-                        // go panic if `current_block_numeric` > `created_on`
-                        sorder.expired_on += current_block_numeric - sorder.created_on;
-                        sorder.completed_on = current_block_numeric;
-                    }
-
-                    // 2. Change order status to `Success`
-                    sorder.status = OrderStatus::Success;
-
-                    // 3. (Maybe) set sorder and start delay pay
                     // TODO: we should specially handle `Failed` status
-                    T::MarketInterface::maybe_set_sorder(order_id, &sorder);
+                    if sorder.status != OrderStatus::Success {
+                        // 1. Reset `expired_on` and `completed_on` for new order
+                        if sorder.status == OrderStatus::Pending {
+                            let current_block_numeric = Self::get_current_block_number();
+                            // go panic if `current_block_numeric` > `created_on`
+                            sorder.expired_on += current_block_numeric - sorder.created_on;
+                            sorder.completed_on = current_block_numeric;
+                        }
+
+                        // 2. Change order status to `Success`
+                        sorder.status = OrderStatus::Success;
+
+                        // 3. Set sorder status and (Maybe) start delay pay
+                        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
+                    }
                 }
                 return used + *f_size
             }

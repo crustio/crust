@@ -24,6 +24,8 @@ fn test_for_storage_order_should_work() {
         let fee = 10;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 80);
+
+        // 1. Normal flow, aka happy pass 😃
         assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), provider, fee,
@@ -33,11 +35,11 @@ fn test_for_storage_order_should_work() {
         let order_id = H256::default();
         assert_eq!(Market::providers(&provider).unwrap(), Provision {
             address_info,
-            file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()
+            file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
         assert_eq!(Market::clients(&client).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
-            file_identifier,
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
             completed_on: 50,
@@ -47,9 +49,16 @@ fn test_for_storage_order_should_work() {
             amount: fee,
             status: OrderStatus::Pending
         });
+
+        // 2. Register after get order, address should update but others should not
+        let another_address_info = "ws://127.0.0.1:9900".as_bytes().to_vec();
+        assert_ok!(Market::register(Origin::signed(provider), another_address_info.clone()));
+        assert_eq!(Market::providers(&provider).unwrap(), Provision {
+            address_info: another_address_info.clone(),
+            file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
+        });
     });
 }
-
 
 #[test]
 fn test_for_storage_order_should_fail_due_to_file_size() {

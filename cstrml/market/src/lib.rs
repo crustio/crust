@@ -61,7 +61,7 @@ pub struct Provision<Hash> {
     pub address_info: AddressInfo,
 
     /// Mapping from `file_id` to `order_id`s, this mapping only add when user place the order
-    pub file_map: BTreeMap<MerkleRoot, Hash>,
+    pub file_map: BTreeMap<MerkleRoot, Vec<Hash>>,
 }
 
 type BalanceOf<T> =
@@ -207,11 +207,18 @@ decl_module! {
             // 1. Make sure you have works
             ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
 
-            // 2. Insert provision
-            // TODO: Allow provider change his address_info
-            <Providers<T>>::insert(who.clone(), Provision {
-                address_info,
-                file_map: BTreeMap::new()
+            // 2. Upsert provision
+            <Providers<T>>::mutate(&who, |maybe_provision| {
+                if let Some(provision) = maybe_provision {
+                    // Change provider's address info
+                    provision.address_info = address_info;
+                } else {
+                    // New provider
+                    *maybe_provision = Some(Provision {
+                        address_info,
+                        file_map: BTreeMap::new()
+                    })
+                }
             });
 
             // 3. Emit success
@@ -316,20 +323,24 @@ impl<T: Trait> Module<T> {
 
             // 2. Add `order_id` to client orders
             <Clients<T>>::mutate(client, |maybe_client_orders| {
-                if let Some(mut client_order) = maybe_client_orders.clone() {
+                if let Some(client_order) = maybe_client_orders {
                     client_order.push(order_id.clone());
-                    *maybe_client_orders = Some(client_order)
                 } else {
                     *maybe_client_orders = Some(vec![order_id.clone()])
                 }
             });
 
-            // 3. Add `file_identifier` -> `order_id` to provider's file_map
+            // 3. Add `file_identifier` -> `order_id`s to provider's file_map
             <Providers<T>>::mutate(provider, |maybe_provision| {
                 // `provision` cannot be None
-                if let Some(mut provision) = maybe_provision.clone() {
-                    provision.file_map.insert(so.file_identifier.clone(), order_id.clone());
-                    *maybe_provision = Some(provision)
+                if let Some(provision) = maybe_provision {
+                    let mut order_ids: Vec::<T::Hash> = vec![];
+                    if let Some(o_ids) = provision.file_map.get(&so.file_identifier) {
+                        order_ids = o_ids.clone();
+                    }
+
+                    order_ids.push(order_id);
+                    provision.file_map.insert(so.file_identifier.clone(), order_ids.clone());
                 }
             });
 

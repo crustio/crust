@@ -55,6 +55,7 @@ fn add_pending_sorder() {
     let account: AccountId = Sr25519Keyring::Bob.to_account_id();
     let files: Vec<Vec<u8>> = [
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(),
+        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(),
         hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()
     ].to_vec();
 
@@ -225,7 +226,11 @@ fn test_for_report_works_success() {
         // Check workloads after work report
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 402868224);
+
+        // Check same file all been confirmed
         assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status,
+                   OrderStatus::Success);
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(2)).unwrap_or_default().status,
                    OrderStatus::Success);
         assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 303);
     });

@@ -242,7 +242,7 @@ fn test_for_pledge_should_fail_due_to_insufficient_currency() {
             DispatchError::Module {
                 index: 0,
                 error: 4,
-                message: Some("InsufficientCurrecy")
+                message: Some("InsufficientCurrency")
             }
         );
     });

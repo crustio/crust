@@ -6,9 +6,8 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use market::{StorageOrder, Provision};
 use tee::WorkReport;
-use crate::PaymentLedger;
+use crate::Ledger;
 
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
@@ -42,7 +41,8 @@ fn test_for_storage_order_and_payment_should_work() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source: AccountId = Sr25519Keyring::Alice.to_account_id();
+        // Prepare test data
+        let client: AccountId = Sr25519Keyring::Alice.to_account_id();
         let file_identifier =
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let provider: AccountId = Sr25519Keyring::Bob.to_account_id();
@@ -50,39 +50,26 @@ fn test_for_storage_order_and_payment_should_work() {
         let duration = 360; // file should store at least 30 minutes
         let fee = 60;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 70);
-        assert_eq!(Balances::free_balance(source.clone()), 70);
+        let _ = Balances::make_free_balance_be(&client, 70);
+        assert_eq!(Balances::free_balance(client.clone()), 70);
+
+        // Call register and place storage order
         assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), provider.clone(), fee,
+            Origin::signed(client.clone()), provider.clone(), fee,
             file_identifier.clone(), file_size, duration
         ));
 
         let order_id = H256::default();
-        assert_eq!(Market::providers(provider.clone()).unwrap(), Provision {
-            address_info,
-            file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()
-        });
-        assert_eq!(Market::clients(source.clone()).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            completed_on: 50,
-            expired_on: 410,
-            provider: provider.clone(),
-            client: source.clone(),
-            order_status: Default::default()
-        });
-        assert_eq!(Balances::free_balance(source.clone()), 10);
-        assert_eq!(Balances::reserved_balance(source.clone()), 60);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(Balances::free_balance(client.clone()), 10);
+        assert_eq!(Balances::reserved_balance(client.clone()), 60);
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
             total: 60,
             paid: 0,
             unreserved: 0
         });
         run_to_block(303);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
             total: 60,
             paid: 0,
             unreserved: 0
@@ -95,19 +82,20 @@ fn test_for_storage_order_and_payment_should_work() {
             Origin::signed(provider.clone()),
             get_valid_work_report()
         ));
-        assert_eq!(Balances::reserved_balance(source.clone()), 60);
+        assert_eq!(Balances::reserved_balance(client.clone()), 60);
         assert_eq!(Balances::free_balance(provider.clone()), 0);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
             total: 60,
             paid: 0,
             unreserved: 0
         });
+
         for i in 1..30 {
             run_to_block(303 + i * 10);
-            assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
-            assert_eq!(Balances::free_balance(source.clone()), 10);
+            assert_eq!(Balances::reserved_balance(client.clone()), 60 - i * 2);
+            assert_eq!(Balances::free_balance(client.clone()), 10);
             assert_eq!(Balances::free_balance(provider.clone()), i * 2);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
                 total: 60,
                 paid: i * 2,
                 unreserved: i * 2,
@@ -118,7 +106,7 @@ fn test_for_storage_order_and_payment_should_work() {
 
 
 #[test]
-fn test_for_storage_order_and_payment_should_fail() {
+fn test_for_storage_order_and_payment_should_failed_by_insufficient_currency() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -133,6 +121,7 @@ fn test_for_storage_order_and_payment_should_fail() {
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 40);
         assert_eq!(Balances::free_balance(source.clone()), 40);
+
         assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
         assert_noop!(
             Market::place_storage_order(
@@ -142,7 +131,7 @@ fn test_for_storage_order_and_payment_should_fail() {
             DispatchError::Module {
                 index: 0,
                 error: 4,
-                message: Some("InsufficientCurrecy"),
+                message: Some("InsufficientCurrency"),
             }
         );
 
@@ -165,6 +154,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 70);
         assert_eq!(Balances::free_balance(source.clone()), 70);
+
         assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), provider.clone(), fee,
@@ -172,30 +162,16 @@ fn test_for_storage_order_and_payment_should_suspend() {
         ));
 
         let order_id = H256::default();
-        assert_eq!(Market::providers(provider.clone()).unwrap(), Provision {
-            address_info,
-            file_map: vec![(file_identifier.clone(), order_id.clone())].into_iter().collect()
-        });
-        assert_eq!(Market::clients(source.clone()).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            completed_on: 50,
-            expired_on: 410,
-            provider: provider.clone(),
-            client: source.clone(),
-            order_status: Default::default()
-        });
         assert_eq!(Balances::free_balance(source.clone()), 10);
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
             total: 60,
             paid: 0,
             unreserved: 0
         });
+
         run_to_block(303);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
             total: 60,
             paid: 0,
             unreserved: 0
@@ -210,25 +186,27 @@ fn test_for_storage_order_and_payment_should_suspend() {
         ));
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(Balances::free_balance(provider.clone()), 0);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
             total: 60,
             paid: 0,
             unreserved: 0
         });
+
         for i in 1..11 {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10);
             assert_eq!(Balances::free_balance(provider.clone()), i * 2);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
                 total: 60,
                 paid: i * 2,
                 unreserved: i * 2
             });
         }
+
         <market::StorageOrders<Test>>::mutate(&order_id, |sorder| {
-            if let Some(order) = sorder {
-                order.order_status = OrderStatus::Pending;
+            if let Some(so) = sorder {
+                so.status = OrderStatus::Failed;
             }
         });
         for i in 11..21 {
@@ -236,28 +214,30 @@ fn test_for_storage_order_and_payment_should_suspend() {
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10 + (i - 10) * 2 );
             assert_eq!(Balances::free_balance(provider.clone()), 20);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
                 total: 60,
                 paid: 20,
                 unreserved: i * 2
                 
             });
         }
+
         <market::StorageOrders<Test>>::mutate(&order_id, |sorder| {
-            if let Some(order) = sorder {
-                order.order_status = OrderStatus::Success;
+            if let Some(so) = sorder {
+                so.status = OrderStatus::Success;
             }
         });
+
         for i in 21..30 {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 30 );
             assert_eq!(Balances::free_balance(provider.clone()), 20 + (i - 20) * 2);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), PaymentLedger {
+            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
                 total: 60,
                 paid: 20 + (i - 20) * 2,
                 unreserved: i * 2
             });
         }
-});
+    });
 }

@@ -383,6 +383,7 @@ impl transaction_payment::Trait for Runtime {
 }
 
 impl tee::Trait for Runtime {
+    type Currency = Balances;
     type Event = Event;
     type Works = Staking;
     type MarketInterface = Market;
@@ -401,11 +402,10 @@ impl payment::Trait for Runtime {
     type Proposal = Call;
     type Currency = Balances;
     type Event = Event;
-    type Randomness = RandomnessCollectiveFlip;
+    type CurrencyToBalance = CurrencyToVoteHandler;
+    type Scheduler = Scheduler;
     // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
-    type Scheduler = Scheduler;
-    type CurrencyToBalance = CurrencyToVoteHandler;
     type BalanceInterface = Self;
 }
 

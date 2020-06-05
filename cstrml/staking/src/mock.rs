@@ -199,6 +199,7 @@ impl tee::Works<AccountId> for TestStaking {
 }
 
 impl tee::Trait for Test {
+    type Currency = Balances;
     type Event = ();
     type Works = TestStaking;
     type MarketInterface = ();

@@ -27,7 +27,7 @@ mod tests;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct StorageOrder<AccountId> {
+pub struct StorageOrder<AccountId, Balance> {
     pub file_identifier: MerkleRoot,
     pub file_size: u64,
     pub created_on: BlockNumber,
@@ -35,7 +35,8 @@ pub struct StorageOrder<AccountId> {
     pub expired_on: BlockNumber,
     pub provider: AccountId,
     pub client: AccountId,
-    pub order_status: OrderStatus
+    pub amount: Balance,
+    pub status: OrderStatus
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
@@ -59,26 +60,25 @@ pub struct Provision<Hash> {
     /// Provider's address
     pub address_info: AddressInfo,
 
-    /// Mapping from `file_id` to `order_id`, this mapping only add when user place the order
+    /// Mapping from `file_id` to `order_id`s, this mapping only add when user place the order
     pub file_map: BTreeMap<MerkleRoot, Hash>,
 }
 
-pub type BalanceOf<T> =
+type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
 /// An event handler for paying market order
 pub trait Payment<AccountId, Hash, Balance> {
-    // Pay the storage order, return an UNIQUE `transaction id`🙏🏻
-    fn pay_sorder(client: &AccountId, provider: &AccountId, value: Balance) -> Hash;
-
-    // Start delayed pay
-    fn start_delayed_pay(sorder_id: &Hash);
+    /// Reserve client's transferable balances
+    fn reserve_sorder(sorder_id: &Hash, client: &AccountId, amount: Balance) -> bool;
+    /// Start delayed payment for a reserved storage order
+    fn pay_sorder(sorder_id: &Hash);
 }
 
 /// A trait for checking order's legality
 /// This wanyi is an outer inspector to judge if s/r order can be accepted 😵
 pub trait OrderInspector<AccountId> {
-    // check if the provider can take storage order
+    /// Check if the provider can take storage order
     fn check_works(provider: &AccountId, file_size: u64) -> bool;
 }
 
@@ -87,72 +87,57 @@ pub trait OrderInspector<AccountId> {
 /// This is needed because `Tee`
 /// 1. updates the `Providers` of the `market::Trait`
 /// 2. use `Providers` to judge work report
-// TODO: restrict this with market trait
-pub trait MarketInterface<AccountId, Hash> {
+pub trait MarketInterface<AccountId, Hash, Balance> {
     /// Provision{files} will be used for tee module.
     fn providers(account_id: &AccountId) -> Option<Provision<Hash>>;
-    /// Get storage order
-    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId>>;
-    /// (Maybe) set storage order's status
-    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId>);
     /// Vec{order_id} will be used for payment module.
     fn clients(account_id: &AccountId) -> Option<Vec<Hash>>;
-    /// Called when file is tranferred successfully.
-    fn on_sorder_success(order_id: &Hash, so: &StorageOrder<AccountId>);
+    /// Get storage order
+    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
+    /// (Maybe) set storage order's status
+    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>);
 }
 
-impl<AId, Hash> MarketInterface<AId, Hash> for () {
+impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
     fn providers(_: &AId) -> Option<Provision<Hash>> {
         None
-    }
-
-    fn maybe_get_sorder(_: &Hash) -> Option<StorageOrder<AId>> {
-        None
-    }
-
-    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId>) {
-
     }
 
     fn clients(_: &AId) -> Option<Vec<Hash>> {
         None
     }
 
-    fn on_sorder_success(_: &Hash, _: &StorageOrder<AId>) {
+    fn maybe_get_sorder(_: &Hash) -> Option<StorageOrder<AId, Balance>> {
+        None
+    }
+
+    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId, Balance>) {
 
     }
 }
 
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
-    <T as system::Trait>::Hash> for Module<T>
+    <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
 {
     fn providers(account_id: &<T as system::Trait>::AccountId)
         -> Option<Provision<<T as system::Trait>::Hash>> {
         Self::providers(account_id)
     }
 
+    fn clients(account_id: &<T as system::Trait>::AccountId)
+               -> Option<Vec<<T as system::Trait>::Hash>> {
+        Self::clients(account_id)
+    }
+
     fn maybe_get_sorder(order_id: &<T as system::Trait>::Hash)
-        -> Option<StorageOrder<<T as system::Trait>::AccountId>> {
+        -> Option<StorageOrder<<T as system::Trait>::AccountId, BalanceOf<T>>> {
         Self::storage_orders(order_id)
     }
 
     fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
-                        so: &StorageOrder<<T as system::Trait>::AccountId>) {
+                        so: &StorageOrder<<T as system::Trait>::AccountId, BalanceOf<T>>) {
         Self::maybe_set_sorder(order_id, so);
     }
-
-    fn clients(account_id: &<T as system::Trait>::AccountId)
-        -> Option<Vec<<T as system::Trait>::Hash>> {
-        Self::clients(account_id)
-    }
-
-    fn on_sorder_success(
-        order_id: &<T as system::Trait>::Hash,
-        so: &StorageOrder<<T as system::Trait>::AccountId>) {
-        Self::maybe_set_sorder(order_id, so);
-        T::Payment::start_delayed_pay(order_id);
-    }
-    
 }
 
 /// The module's configuration trait.
@@ -186,15 +171,15 @@ decl_storage! {
 
         /// Order details iterated by order id
         pub StorageOrders get(fn storage_orders):
-        map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId>>;
+        map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
     }
 }
 
 decl_error! {
     /// Error for the market module.
     pub enum Error for Module<T: Trait> {
-        /// Duplicate order id.
-        DuplicateOrderId,
+        /// Failed on generating order id
+        GenerateOrderIdFailed,
         /// No workload
         NoWorkload,
         /// Not provider
@@ -202,7 +187,7 @@ decl_error! {
         /// File duration is too short
         DurationTooShort,
         /// Don't have enough currency
-        InsufficientCurrecy
+        InsufficientCurrency
     }
 }
 
@@ -223,6 +208,7 @@ decl_module! {
             ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
 
             // 2. Insert provision
+            // TODO: Allow provider change his address_info
             <Providers<T>>::insert(who.clone(), Provision {
                 address_info,
                 file_map: BTreeMap::new()
@@ -234,81 +220,99 @@ decl_module! {
             Ok(())
         }
 
-        /// Place a storage order, make sure
+        /// Place a storage order
         #[weight = 1_000_000]
         pub fn place_storage_order(
             origin,
             provider: <T::Lookup as StaticLookup>::Source,
-            #[compact] value: BalanceOf<T>,
+            #[compact] amount: BalanceOf<T>,
             file_identifier: MerkleRoot,
             file_size: u64,
             duration: u32
-        ) -> DispatchResult
-            {
-                let who = ensure_signed(origin)?;
-                let provider = T::Lookup::lookup(provider)?;
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let provider = T::Lookup::lookup(provider)?;
 
-                // 1. Expired should be greater than created
-                ensure!(duration > REPORT_SLOT.try_into().unwrap(), Error::<T>::DurationTooShort);
+            // 1. Expired should be greater than created
+            ensure!(duration > REPORT_SLOT.try_into().unwrap(), Error::<T>::DurationTooShort);
 
-                // 2. Check if provider is registered
-                ensure!(<Providers<T>>::contains_key(&provider), Error::<T>::NotProvider);
+            // 2. Check if provider is registered
+            ensure!(<Providers<T>>::contains_key(&provider), Error::<T>::NotProvider);
 
-                // 3. Check provider has capacity to store file
-                ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
+            // 3. Check provider has capacity to store file
+            ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
 
-                // 4. Check client has enough currency to pay
-                ensure!(T::Currency::can_reserve(&who, value.clone()), Error::<T>::InsufficientCurrecy);
+            // 4. Check client has enough currency to pay
+            ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
-                // 4. Construct storage order
-                let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
-                let storage_order = StorageOrder::<T::AccountId> {
-                    file_identifier,
-                    file_size,
-                    created_on,
-                    completed_on: created_on,
-                    expired_on: created_on + duration, // this will changed, when `order_status` become `Success`
-                    provider: provider.clone(),
-                    client: who.clone(),
-                    order_status: OrderStatus::Pending
-                };
+            // 5. Construct storage order
+            let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
+            let storage_order = StorageOrder::<T::AccountId, BalanceOf<T>> {
+                file_identifier,
+                file_size,
+                created_on,
+                completed_on: created_on,
+                expired_on: created_on + duration, // this will be changed, when `status` become `Success`
+                provider: provider.clone(),
+                client: who.clone(),
+                amount,
+                status: OrderStatus::Pending
+            };
 
-                // 5. Pay the order and (maybe) add storage order
-                if Self::maybe_insert_sorder(&who, &provider, value, &storage_order) {
-                    // a. emit storage order event
-                    Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
-                } else {
-                    // b. emit error
-                    Err(Error::<T>::DuplicateOrderId)?
-                }
-
-                Ok(())
+            // 6. Pay the order and (maybe) add storage order
+            if Self::maybe_insert_sorder(&who, &provider, &storage_order) {
+                // a. emit storage order success event
+                Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
+            } else {
+                // b. emit error
+                Err(Error::<T>::GenerateOrderIdFailed)?
             }
+
+            Ok(())
+        }
     }
 }
 
 impl<T: Trait> Module<T> {
     // MUTABLE PUBLIC
-    pub fn maybe_set_sorder(order_id: &T::Hash, so: &StorageOrder<T::AccountId>) {
-        if !Self::storage_orders(order_id).contains(so) {
-            <StorageOrders<T>>::insert(order_id, so);
+    pub fn maybe_set_sorder(order_id: &T::Hash, so: &StorageOrder<T::AccountId, BalanceOf<T>>) {
+        if let Some(old_sorder) = Self::storage_orders(order_id) {
+            if &old_sorder != so {
+                // 1. Order has been confirmed in the first time { Pending -> Success }
+                if old_sorder.status == OrderStatus::Pending &&
+                    so.status == OrderStatus::Success {
+                    T::Payment::pay_sorder(order_id);
+                }
+
+                // TODO: add market slashing here
+                // TODO: Record `failed_count` from `Success` to `Failed`
+                // TODO: Record `failed_duration` from `Failed` to `Success`
+
+                // 2. Update storage order
+                <StorageOrders<T>>::insert(order_id, so);
+            }
         }
     }
 
     // MUTABLE PRIVATE
-    // sorder is equal to storage order
+    // `sorder` is equal to storage order
     fn maybe_insert_sorder(client: &T::AccountId,
                            provider: &T::AccountId,
-                           value: BalanceOf<T>,
-                           so: &StorageOrder<T::AccountId>) -> bool {
-        let order_id = T::Payment::pay_sorder(&client, &provider, value);
+                           so: &StorageOrder<T::AccountId, BalanceOf<T>>) -> bool {
+        let order_id = Self::get_sorder_id(client, provider);
 
         // This should be false, cause we don't allow duplicated `order_id`
         if <StorageOrders<T>>::contains_key(&order_id) {
             false
         } else {
+            // 0. If reserve client's balance failed return error
+            // TODO: return different error type
+            if !T::Payment::reserve_sorder(&order_id, client, so.amount) {
+                return false
+            }
+
             // 1. Add new storage order
-            <StorageOrders<T>>::insert(order_id, so);
+            <StorageOrders<T>>::insert(&order_id, so);
 
             // 2. Add `order_id` to client orders
             <Clients<T>>::mutate(client, |maybe_client_orders| {
@@ -328,8 +332,24 @@ impl<T: Trait> Module<T> {
                     *maybe_provision = Some(provision)
                 }
             });
+
             true
         }
+    }
+
+    fn get_sorder_id(client: &T::AccountId, provider: &T::AccountId) -> T::Hash {
+        // 1. Construct random seed
+        // seed = [ block_hash, client_account, provider_account ]
+        let bn = <system::Module<T>>::block_number();
+        let bh: T::Hash = <system::Module<T>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &client.encode()[..],
+            &provider.encode()[..],
+        ].concat();
+
+        // 2. It can cover most cases, for the "real" random
+        T::Randomness::random(seed.as_slice())
     }
 }
 
@@ -337,8 +357,9 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as system::Trait>::AccountId,
+        Balance = BalanceOf<T>
     {
-        StorageOrderSuccess(AccountId, StorageOrder<AccountId>),
+        StorageOrderSuccess(AccountId, StorageOrder<AccountId, Balance>),
         RegisterSuccess(AccountId),
     }
 );

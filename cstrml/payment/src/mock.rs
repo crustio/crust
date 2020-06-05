@@ -134,14 +134,15 @@ impl balances::Trait for Test {
 }
 
 impl tee::Trait for Test {
+    type Currency = Balances;
     type Event = ();
     type Works = ();
     type MarketInterface = Market;
 }
 
 impl market::Trait for Test {
-    type Event = ();
     type Currency = Balances;
+    type Event = ();
     type Randomness = ();
     type Payment = Payment;
     type OrderInspector = TestOrderInspector;
@@ -151,11 +152,10 @@ impl Trait for Test {
     type Proposal = Call;
     type Currency = Balances;
     type Event = ();
-    type Randomness = ();
+    type CurrencyToBalance = CurrencyToVoteHandler;
+    type Scheduler = Scheduler;
     // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
-    type Scheduler = Scheduler;
-    type CurrencyToBalance = CurrencyToVoteHandler;
     type BalanceInterface = Self;
 }
 

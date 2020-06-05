@@ -54,7 +54,7 @@ fn test_for_storage_order_and_payment_should_work() {
         let _ = Balances::make_free_balance_be(&client, 70);
         let _ = Balances::make_free_balance_be(&provider, pledge_amount);
         assert_eq!(Balances::free_balance(client.clone()), 70);
-        
+
         // Call register and place storage order
         assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount));

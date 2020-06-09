@@ -89,7 +89,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     transaction_version: 1
 };
 
-/// The version infromation used to identify this runtime when compiled natively.
+/// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
     NativeVersion {

@@ -56,8 +56,7 @@ fn test_for_storage_order_and_payment_should_work() {
         assert_eq!(Balances::free_balance(client.clone()), 70);
 
         // Call register and place storage order
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
-        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount));
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount, address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(client.clone()), provider.clone(), fee,
             file_identifier.clone(), file_size, duration
@@ -125,7 +124,7 @@ fn test_for_storage_order_and_payment_should_failed_by_insufficient_currency() {
         let _ = Balances::make_free_balance_be(&source, 40);
         assert_eq!(Balances::free_balance(source.clone()), 40);
 
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0, address_info.clone()));
         assert_noop!(
             Market::place_storage_order(
             Origin::signed(source.clone()), provider.clone(), fee,
@@ -159,8 +158,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
         let _ = Balances::make_free_balance_be(&provider, pledge_amount);
         assert_eq!(Balances::free_balance(source.clone()), 70);
 
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
-        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount));
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount, address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), provider.clone(), fee,
             file_identifier.clone(), file_size, duration

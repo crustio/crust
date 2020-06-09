@@ -373,3 +373,25 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
         });
     });
 }
+
+#[test]
+fn test_for_pledge_should_fail_due_to_double_pledge() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let provider = 100;
+        let _ = Balances::make_free_balance_be(&provider, 80);
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 70));
+        assert_noop!(
+            Market::pledge(
+                Origin::signed(provider),
+                70
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 8,
+                message: Some("DoublePledged")
+            }
+        );
+    });
+}

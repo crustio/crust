@@ -212,6 +212,8 @@ decl_error! {
         InsufficientValue,
         /// Not Pledged before
         NotPledged,
+        /// Pledged before
+        DoublePledged,
     }
 }
 
@@ -301,17 +303,20 @@ decl_module! {
             // 2. Ensure provider has enough currency.
             ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 3. Prepare new pledge ledger
+            // 3. Check if provider has not pledged before
+            ensure!(!<PledgeLedgers<T>>::contains_key(&who), Error::<T>::DoublePledged);
+
+            // 4. Prepare new pledge ledger
             let pledge_ledger = PledgeLedger {
                 total: value,
                 used: Zero::zero()
             };
 
-            // 4 Upsert pledge ledger
+            // 5 Upsert pledge ledger
             Self::upsert_pledge_ledger(&who, &pledge_ledger);
 
-            // 5. Emit success
-            Self::deposit_event(RawEvent::RegisterSuccess(who));
+            // 6. Emit success
+            Self::deposit_event(RawEvent::PledgeSuccess(who));
 
             Ok(())
         }

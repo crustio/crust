@@ -210,6 +210,8 @@ decl_error! {
         InsufficientPledge,
         /// Can not bond with value less than minimum balance.
         InsufficientValue,
+        /// Not Pledged before
+        NotPledged,
     }
 }
 
@@ -230,21 +232,23 @@ decl_module! {
             ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
 
             // 2. Reject a pledge which is considered to be _dust_.
-            if value < T::Currency::minimum_balance() {
-                Err(Error::<T>::InsufficientValue)?
-            }
-            // 3. Ensure provider has enough currency.
+            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+
+            // 3. Check if provider has pledged before
+            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+
+            // 4. Ensure provider has enough currency.
             ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
 
             let mut pledge_ledger = Self::pledge_ledgers(&who);
-            // 4. Increase total value
+            // 5. Increase total value
             pledge_ledger.total += value;
 
-            // 5 Upsert pledge ledger
+            // 6 Upsert pledge ledger
 
             Self::upsert_pledge_ledger(&who, &pledge_ledger);
 
-            // 6. Emit success
+            // 7. Emit success
             Self::deposit_event(RawEvent::PledgeSuccess(who));
 
             Ok(())
@@ -260,22 +264,23 @@ decl_module! {
             ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
 
             // 2. Reject a pledge which is considered to be _dust_.
-            if value < T::Currency::minimum_balance() {
-                Err(Error::<T>::InsufficientValue)?
-            }
+            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 3. Ensure value is smaller than unused.
+            // 3. Check if provider has pledged before
+            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+
+            // 4. Ensure value is smaller than unused.
             let mut pledge_ledger = Self::pledge_ledgers(&who);
             ensure!(value <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
 
-            // 4. Decrease total value
+            // 5. Decrease total value
             pledge_ledger.total -= value;
 
-            // 5 Upsert pledge ledger
+            // 6 Upsert pledge ledger
 
             Self::upsert_pledge_ledger(&who, &pledge_ledger);
 
-            // 6. Emit success
+            // 7. Emit success
             Self::deposit_event(RawEvent::PledgeSuccess(who));
 
             Ok(())
@@ -286,16 +291,41 @@ decl_module! {
         #[weight = 1_000_000]
         pub fn pledge(
             origin,
-            #[compact] value: BalanceOf<T>,
-            address_info: AddressInfo
+            #[compact] value: BalanceOf<T>
         ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Reject a pledge which is considered to be _dust_.
+            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+
+            // 2. Ensure provider has enough currency.
+            ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
+
+            // 3. Prepare new pledge ledger
+            let pledge_ledger = PledgeLedger {
+                total: value,
+                used: Zero::zero()
+            };
+
+            // 4 Upsert pledge ledger
+            Self::upsert_pledge_ledger(&who, &pledge_ledger);
+
+            // 5. Emit success
+            Self::deposit_event(RawEvent::RegisterSuccess(who));
+
+            Ok(())
+        }
+
+        /// Register to be a provider, you should provide your storage layer's address info
+        #[weight = 1_000_000]
+        pub fn register(origin, address_info: AddressInfo) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Make sure you have works
             ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
 
-            // 2. Ensure provider has enough currency.
-            ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
+            // 2. Check if provider has pledged before
+            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Upsert provision
             <Providers<T>>::mutate(&who, |maybe_provision| {
@@ -303,15 +333,6 @@ decl_module! {
                     // Change provider's address info
                     provision.address_info = address_info;
                 } else {
-                    // 4. Prepare new pledge ledger
-                    let pledge_ledger = PledgeLedger {
-                        total: value,
-                        used: Zero::zero()
-                    };
-
-                    // 5 Upsert pledge ledger
-                    Self::upsert_pledge_ledger(&who, &pledge_ledger);
-
                     // New provider
                     *maybe_provision = Some(Provision {
                         address_info,
@@ -320,7 +341,7 @@ decl_module! {
                 }
             });
 
-            // 6. Emit success
+            // 4. Emit success
             Self::deposit_event(RawEvent::RegisterSuccess(who));
 
             Ok(())

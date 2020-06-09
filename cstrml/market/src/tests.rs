@@ -27,7 +27,8 @@ fn test_for_storage_order_should_work() {
 
         // 1. Normal flow, aka happy pass 😃
         let _ = Balances::make_free_balance_be(&provider, 80);
-        assert_ok!(Market::pledge(Origin::signed(provider), 60, address_info.clone()));
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), provider, fee,
             file_identifier.clone(), file_size, duration
@@ -53,7 +54,7 @@ fn test_for_storage_order_should_work() {
 
         // 2. Register after get order, address should update but others should not
         let another_address_info = "ws://127.0.0.1:9900".as_bytes().to_vec();
-        assert_ok!(Market::pledge(Origin::signed(provider), 60, another_address_info.clone()));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), another_address_info.clone()));
         assert_eq!(Market::providers(&provider).unwrap(), Provision {
             address_info: another_address_info.clone(),
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
@@ -80,7 +81,9 @@ fn test_for_storage_order_should_fail_due_to_file_size() {
         let fee = 10;
         let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
-        assert_ok!(Market::pledge(Origin::signed(provider), 0, address.clone()));
+
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0));
+        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
         assert_noop!(
             Market::place_storage_order(
                 Origin::signed(source.clone()), provider, fee,
@@ -110,7 +113,8 @@ fn test_for_storage_order_should_fail_due_to_wrong_expired() {
         let fee = 10;
         let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
-        assert_ok!(Market::pledge(Origin::signed(provider), 0, address.clone()));
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0));
+        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
         assert_noop!(
             Market::place_storage_order(
                 Origin::signed(source.clone()), provider, fee,
@@ -133,9 +137,9 @@ fn test_for_storage_order_should_fail_due_to_exist_of_wr() {
 
         let provider = 400; // Invalid provider. No work report
         let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
-
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0));
         assert_noop!(
-            Market::pledge(Origin::signed(provider), 0, address.clone()),
+            Market::register(Origin::signed(provider), address.clone()),
             DispatchError::Module {
                 index: 0,
                 error: 1,
@@ -181,7 +185,8 @@ fn test_for_pledge_should_work() {
         let provider = 100;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&provider, 200);
-        assert_ok!(Market::pledge(Origin::signed(provider), 180, address_info.clone()));
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 180));
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
         assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
             total: 180,
             used: 0
@@ -229,13 +234,11 @@ fn test_for_pledge_should_fail_due_to_insufficient_currency() {
         run_to_block(50);
 
         let provider = 100;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&provider, 100);
         assert_noop!(
             Market::pledge(
                 Origin::signed(provider),
-                200,
-                address_info.clone()
+                200
             ),
             DispatchError::Module {
                 index: 0,
@@ -262,7 +265,8 @@ fn test_for_pledge_should_fail_due_to_insufficient_pledge() {
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 80);
         let _ = Balances::make_free_balance_be(&provider, 80);
-        assert_ok!(Market::pledge(Origin::signed(provider), 70, address_info.clone()));
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 70));
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), provider, fee,
             file_identifier.clone(), file_size, duration
@@ -306,7 +310,8 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 80);
         let _ = Balances::make_free_balance_be(&provider, 80);
-        assert_ok!(Market::pledge(Origin::signed(provider), 0, address_info.clone()));
+        assert_ok!(Market::pledge(Origin::signed(provider), 0));
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
         assert_noop!(
             Market::place_storage_order(
                 Origin::signed(source.clone()), provider, fee,

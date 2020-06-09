@@ -2,7 +2,7 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-runtime'
-version = '0.3.0'
+version = '0.5.0'
 build = 'build.rs'
 license = "GPL-3.0"
 homepage = "https://crust.network"
@@ -36,6 +36,7 @@ pallet-staking-reward-curve = { default-features = false, version = '2.0.0-rc2' 
 timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-rc2' }
 transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-rc2' }
 scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc2' }
+sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc2' }
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc2' }
@@ -92,6 +93,7 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
+    'sudo/std',
     'session/std',
     'system/std',
     'timestamp/std',

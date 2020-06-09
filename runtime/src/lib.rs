@@ -219,8 +219,8 @@ parameter_types! {
 
 impl scheduler::Trait for Runtime {
     type Event = Event;
-    type Call = Call;
     type Origin = Origin;
+    type Call = Call;
     type MaximumWeight = MaximumWeight;
 }
 
@@ -382,6 +382,11 @@ impl transaction_payment::Trait for Runtime {
     type FeeMultiplierUpdate = ();
 }
 
+impl sudo::Trait for Runtime {
+    type Event = Event;
+    type Call = Call;
+}
+
 impl tee::Trait for Runtime {
     type Currency = Balances;
     type Event = Event;
@@ -442,6 +447,9 @@ construct_runtime! {
         Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
         Market: market::{Module, Call, Storage, Event<T>},
         Payment: payment::{Module, Call, Storage, Event<T>},
+
+        // Sudo. Last module. Usable initially, but removed once governance enabled.
+		Sudo: sudo::{Module, Call, Storage, Config<T>, Event<T>},
     }
 }
 

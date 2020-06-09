@@ -376,7 +376,8 @@ decl_module! {
             ensure!(<PledgeLedgers<T>>::contains_key(&provider), Error::<T>::InsufficientPledge);
 
             // 6. Check provider has unused pledge
-            ensure!(amount <= Self::pledge_ledgers(&provider).total - Self::pledge_ledgers(&provider).used, Error::<T>::InsufficientPledge);
+            let pledge_ledger = Self::pledge_ledgers(&provider);
+            ensure!(amount <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
 
             // 7. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();

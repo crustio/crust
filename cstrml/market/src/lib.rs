@@ -225,69 +225,36 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        /// Pledge extra amount of currency to accept market order.
+        /// Register to be a provider, you should provide your storage layer's address info
         #[weight = 1_000_000]
-        pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+        pub fn register(origin, address_info: AddressInfo) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Check if provider is registered.
-            ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
+            // 1. Make sure you have works
+            ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
 
-            // 2. Reject a pledge which is considered to be _dust_.
-            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
-
-            // 3. Check if provider has pledged before
+            // 2. Check if provider has pledged before
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
-            // 4. Ensure provider has enough currency.
-            ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
+            // 3. Upsert provision
+            <Providers<T>>::mutate(&who, |maybe_provision| {
+                if let Some(provision) = maybe_provision {
+                    // Change provider's address info
+                    provision.address_info = address_info;
+                } else {
+                    // New provider
+                    *maybe_provision = Some(Provision {
+                        address_info,
+                        file_map: BTreeMap::new()
+                    })
+                }
+            });
 
-            let mut pledge_ledger = Self::pledge_ledgers(&who);
-            // 5. Increase total value
-            pledge_ledger.total += value;
-
-            // 6 Upsert pledge ledger
-
-            Self::upsert_pledge_ledger(&who, &pledge_ledger);
-
-            // 7. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who));
+            // 4. Emit success
+            Self::deposit_event(RawEvent::RegisterSuccess(who));
 
             Ok(())
         }
-
-
-        /// Descrease pledge amount of currency for market order.
-        #[weight = 1_000_000]
-        pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // 1. Check if provider is registered.
-            ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
-
-            // 2. Reject a pledge which is considered to be _dust_.
-            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
-
-            // 3. Check if provider has pledged before
-            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
-
-            // 4. Ensure value is smaller than unused.
-            let mut pledge_ledger = Self::pledge_ledgers(&who);
-            ensure!(value <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
-
-            // 5. Decrease total value
-            pledge_ledger.total -= value;
-
-            // 6 Upsert pledge ledger
-
-            Self::upsert_pledge_ledger(&who, &pledge_ledger);
-
-            // 7. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who));
-
-            Ok(())
-        }
-
 
         /// Register to be a provider, you should provide your storage layer's address info
         #[weight = 1_000_000]
@@ -321,33 +288,62 @@ decl_module! {
             Ok(())
         }
 
-        /// Register to be a provider, you should provide your storage layer's address info
+        /// Pledge extra amount of currency to accept market order.
         #[weight = 1_000_000]
-        pub fn register(origin, address_info: AddressInfo) -> DispatchResult {
+        pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Make sure you have works
-            ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
+            // 1. Check if provider is registered.
+            ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
 
-            // 2. Check if provider has pledged before
+            // 2. Reject a pledge which is considered to be _dust_.
+            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+
+            // 3. Check if provider has pledged before
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
-            // 3. Upsert provision
-            <Providers<T>>::mutate(&who, |maybe_provision| {
-                if let Some(provision) = maybe_provision {
-                    // Change provider's address info
-                    provision.address_info = address_info;
-                } else {
-                    // New provider
-                    *maybe_provision = Some(Provision {
-                        address_info,
-                        file_map: BTreeMap::new()
-                    })
-                }
-            });
+            // 4. Ensure provider has enough currency.
+            ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 4. Emit success
-            Self::deposit_event(RawEvent::RegisterSuccess(who));
+            let mut pledge_ledger = Self::pledge_ledgers(&who);
+            // 5. Increase total value
+            pledge_ledger.total += value;
+
+            // 6 Upsert pledge ledger
+            Self::upsert_pledge_ledger(&who, &pledge_ledger);
+
+            // 7. Emit success
+            Self::deposit_event(RawEvent::PledgeSuccess(who));
+
+            Ok(())
+        }
+
+        /// Decrease pledge amount of currency for market order.
+        #[weight = 1_000_000]
+        pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Check if provider is registered.
+            ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
+
+            // 2. Reject a pledge which is considered to be _dust_.
+            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+
+            // 3. Check if provider has pledged before
+            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+
+            // 4. Ensure value is smaller than unused.
+            let mut pledge_ledger = Self::pledge_ledgers(&who);
+            ensure!(value <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
+
+            // 5. Decrease total value
+            pledge_ledger.total -= value;
+
+            // 6 Upsert pledge ledger
+            Self::upsert_pledge_ledger(&who, &pledge_ledger);
+
+            // 7. Emit success
+            Self::deposit_event(RawEvent::PledgeSuccess(who));
 
             Ok(())
         }
@@ -400,14 +396,14 @@ decl_module! {
 
             // 8. Pay the order and (maybe) add storage order
             if Self::maybe_insert_sorder(&who, &provider, &storage_order) {
-                // 9. update ledger
+                // a. update ledger
                 <PledgeLedgers<T>>::mutate(&provider, |pledge_ledger| {
                         pledge_ledger.used += amount;
                 });
-                // a. emit storage order success event
+                // b. emit storage order success event
                 Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
             } else {
-                // b. emit error
+                // c. emit error
                 Err(Error::<T>::GenerateOrderIdFailed)?
             }
 

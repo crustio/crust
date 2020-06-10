@@ -449,7 +449,7 @@ construct_runtime! {
         Payment: payment::{Module, Call, Storage, Event<T>},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
-		Sudo: sudo::{Module, Call, Storage, Config<T>, Event<T>},
+        Sudo: sudo::{Module, Call, Storage, Config<T>, Event<T>},
     }
 }
 

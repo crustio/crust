@@ -1248,7 +1248,7 @@ impl<T: Trait> Module<T> {
         let mut new_guarantors = Self::validators(v_stash).guarantors;
         let mut removed_votes = Zero::zero();
 
-        // Travese from the end of the records
+        // Traverse from the end of the records
         for (idx, edge_votes) in Self::guarantee_rel(&g_stash, &v_stash).iter().rev() {
             if g_votes == Zero::zero() { break }
             // Update votes

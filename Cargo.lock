@@ -669,7 +669,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "crust"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "crust-runtime",
  "cst-primitives",
@@ -702,7 +702,7 @@ dependencies = [
 
 [[package]]
 name = "crust-runtime"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "cst-primitives",
  "cstrml-market",
@@ -725,6 +725,7 @@ dependencies = [
  "pallet-scheduler",
  "pallet-session",
  "pallet-staking-reward-curve",
+ "pallet-sudo",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "parity-scale-codec",
@@ -759,7 +760,7 @@ dependencies = [
 
 [[package]]
 name = "cst-primitives"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "parity-scale-codec",
  "serde",
@@ -770,7 +771,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-market"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "cst-primitives",
  "cstrml-tee",
@@ -789,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-payment"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "cst-primitives",
  "cstrml-market",
@@ -811,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-staking"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "cst-primitives",
  "cstrml-tee",
@@ -837,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-tee"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "cst-primitives",
  "cstrml-market",
@@ -3194,6 +3195,21 @@ dependencies = [
  "proc-macro2",
  "quote 1.0.3",
  "syn 1.0.17",
+]
+
+[[package]]
+name = "pallet-sudo"
+version = "2.0.0-rc2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b13c045d6b74479e8da5cbc0446367a9bbf4e40dc60fced19d015fffc75d3ced"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

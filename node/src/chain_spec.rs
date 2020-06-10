@@ -2,7 +2,8 @@ use sp_core::{Pair, Public, sr25519};
 use crust_runtime::{
     AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
     AuthorityDiscoveryConfig, SessionConfig, SessionKeys, StakerStatus,
-    StakingConfig, IndicesConfig, SystemConfig, TeeConfig, WASM_BINARY
+    StakingConfig, IndicesConfig, SystemConfig, TeeConfig, SudoConfig,
+    WASM_BINARY
 };
 use cstrml_staking::Forcing;
 use cstrml_tee::WorkReport;
@@ -214,6 +215,9 @@ fn testnet_genesis(
                     )
                 })
                 .collect(),
+        }),
+        sudo: Some(SudoConfig {
+            key: endowed_accounts[0].clone(),
         }),
     }
 }

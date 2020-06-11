@@ -293,26 +293,23 @@ decl_module! {
         pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Check if provider is registered.
-            ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
-
-            // 2. Reject a pledge which is considered to be _dust_.
+            // 1. Reject a pledge which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 3. Check if provider has pledged before
+            // 2. Check if provider has pledged before
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
-            // 4. Ensure provider has enough currency.
+            // 3. Ensure provider has enough currency.
             ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
 
             let mut pledge_ledger = Self::pledge_ledgers(&who);
-            // 5. Increase total value
+            // 4. Increase total value
             pledge_ledger.total += value;
 
-            // 6 Upsert pledge ledger
+            // 5 Upsert pledge ledger
             Self::upsert_pledge_ledger(&who, &pledge_ledger);
 
-            // 7. Emit success
+            // 6. Emit success
             Self::deposit_event(RawEvent::PledgeSuccess(who));
 
             Ok(())
@@ -323,26 +320,23 @@ decl_module! {
         pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Check if provider is registered.
-            ensure!(<Providers<T>>::contains_key(&who), Error::<T>::NotProvider);
-
-            // 2. Reject a pledge which is considered to be _dust_.
+            // 1. Reject a pledge which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 3. Check if provider has pledged before
+            // 2. Check if provider has pledged before
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
-            // 4. Ensure value is smaller than unused.
+            // 3. Ensure value is smaller than unused.
             let mut pledge_ledger = Self::pledge_ledgers(&who);
             ensure!(value <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
 
-            // 5. Decrease total value
+            // 4. Decrease total value
             pledge_ledger.total -= value;
 
-            // 6 Upsert pledge ledger
+            // 5 Upsert pledge ledger
             Self::upsert_pledge_ledger(&who, &pledge_ledger);
 
-            // 7. Emit success
+            // 6. Emit success
             Self::deposit_event(RawEvent::PledgeSuccess(who));
 
             Ok(())

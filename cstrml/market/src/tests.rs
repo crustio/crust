@@ -205,7 +205,7 @@ fn test_for_pledge_should_work() {
 }
 
 #[test]
-fn test_for_pledge_extra_should_fail_due_to_provider_not_register() {
+fn test_for_pledge_extra_should_fail_due_to_provider_not_pledge() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -219,8 +219,8 @@ fn test_for_pledge_extra_should_fail_due_to_provider_not_register() {
             ),
             DispatchError::Module {
                 index: 0,
-                error: 2,
-                message: Some("NotProvider")
+                error: 7,
+                message: Some("NotPledged")
             }
         );
     });
@@ -393,5 +393,18 @@ fn test_for_pledge_should_fail_due_to_double_pledge() {
                 message: Some("DoublePledged")
             }
         );
+    });
+}
+
+#[test]
+fn test_for_pledge_should_work_without_register() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let provider = 100;
+        let _ = Balances::make_free_balance_be(&provider, 80);
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 70));
+        assert_ok!(Market::pledge_extra(Origin::signed(provider.clone()), 70));
+        assert_ok!(Market::cut_pledge(Origin::signed(provider.clone()), 70));
     });
 }

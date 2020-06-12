@@ -2880,9 +2880,11 @@ fn slashing_guarantors_by_span_max() {
 
 #[test]
 // TODO: this slashing test case should be changed
-/*fn slashes_are_summed_across_spans() {
+fn slashes_are_summed_across_spans() {
     ExtBuilder::default().build().execute_with(|| {
-        start_era(1);
+        start_era(1, false);
+        start_era(2, false);	
+        start_era(3, false);
 
         assert_eq!(Balances::free_balance(&21), 2000);
         assert_eq!(Staking::slashable_balance_of(&21), 1000);
@@ -2900,13 +2902,13 @@ fn slashing_guarantors_by_span_max() {
         let expected_spans = vec![
             slashing::SlashingSpan {
                 index: 1,
-                start: 2,
+                start: 4,
                 length: None,
             },
             slashing::SlashingSpan {
                 index: 0,
                 start: 0,
-                length: Some(2),
+                length: Some(4),
             },
         ];
 
@@ -2916,7 +2918,7 @@ fn slashing_guarantors_by_span_max() {
         // 21 has been force-chilled. re-signal intent to validate.
         Staking::validate(Origin::signed(20), Default::default()).unwrap();
 
-        start_era(4);
+        start_era(4, false);
 
         assert_eq!(Staking::slashable_balance_of(&21), 900);
 
@@ -2936,20 +2938,20 @@ fn slashing_guarantors_by_span_max() {
             },
             slashing::SlashingSpan {
                 index: 1,
-                start: 2,
-                length: Some(3),
+                start: 4,
+                length: Some(1),
             },
             slashing::SlashingSpan {
                 index: 0,
                 start: 0,
-                length: Some(2),
+                length: Some(4),
             },
         ];
 
         assert_eq!(get_span(21).iter().collect::<Vec<_>>(), expected_spans);
         assert_eq!(Balances::free_balance(&21), 1810);
     });
-}*/
+}
 
 #[test]
 fn deferred_slashes_are_deferred() {

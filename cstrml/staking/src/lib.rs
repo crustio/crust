@@ -4,6 +4,7 @@
 
 #[cfg(test)]
 mod mock;
+
 mod slashing;
 #[cfg(test)]
 mod tests;

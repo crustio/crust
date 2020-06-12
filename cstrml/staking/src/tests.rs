@@ -2774,11 +2774,11 @@ fn garbage_collection_on_window_pruning() {
 }
 
 #[test]
-// TODO: this slashing test case should be changed
-/*fn slashing_guarantors_by_span_max() {
+fn slashing_guarantors_by_span_max() {
     ExtBuilder::default().build().execute_with(|| {
-        start_era(1);
-        start_era(2);
+        start_era(1, false);
+        start_era(2, false);
+        start_era(3, false);
 
         assert_eq!(Balances::free_balance(&11), 1000);
         assert_eq!(Balances::free_balance(&21), 2000);
@@ -2876,7 +2876,7 @@ fn garbage_collection_on_window_pruning() {
         // only the maximum slash in a single span is taken.
         assert_eq!(Balances::free_balance(&101), 2000 - slash_2_amount);
     });
-}*/
+}
 
 #[test]
 // TODO: this slashing test case should be changed

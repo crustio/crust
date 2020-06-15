@@ -2879,7 +2879,6 @@ fn slashing_guarantors_by_span_max() {
 }
 
 #[test]
-// TODO: this slashing test case should be changed
 fn slashes_are_summed_across_spans() {
     ExtBuilder::default().build().execute_with(|| {
         start_era(1, false);

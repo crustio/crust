@@ -1205,8 +1205,18 @@ impl<T: Trait> Module<T> {
     fn chill_validator(v_stash: &T::AccountId) {
         let validations = Self::validators(v_stash);
 
-        for guarantor in validations.guarantors {
-            <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
+        for g_stash in validations.guarantors {
+
+            <Guarantors<T>>::mutate(&g_stash, |nominations| {
+                if let Some(n) = nominations {
+                    n.targets.retain(|stash| {
+                        stash != v_stash
+                    });
+                    n.total -= Self::guarantee_rel(&g_stash, &v_stash).iter()
+                    .fold(Zero::zero(), |acc, (_, value)| acc + value.clone());
+                }
+            });
+            <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
         }
 
         <Validators<T>>::remove(v_stash);

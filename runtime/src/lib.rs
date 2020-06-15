@@ -209,7 +209,7 @@ impl im_online::Trait for Runtime {
     type AuthorityId = ImOnlineId;
     type Event = Event;
     type SessionDuration = SessionDuration;
-    type ReportUnresponsiveness = ();
+    type ReportUnresponsiveness = Offences;
     type UnsignedPriority = ImOnlineUnsignedPriority;
 }
 
@@ -348,6 +348,17 @@ impl staking::Trait for Runtime {
 }
 
 parameter_types! {
+	pub const OffencesWeightSoftLimit: Weight = Perbill::from_percent(60) * MaximumBlockWeight::get();
+}
+
+impl offences::Trait for Runtime {
+	type Event = Event;
+	type IdentificationTuple = session::historical::IdentificationTuple<Self>;
+	type OnOffenceHandler = Staking;
+	type WeightSoftLimit = OffencesWeightSoftLimit;
+}
+
+parameter_types! {
     pub const ExistentialDeposit: u128 = 1 * CENTS;
 }
 
@@ -441,6 +452,7 @@ construct_runtime! {
         Grandpa: grandpa::{Module, Call, Storage, Config, Event},
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: authority_discovery::{Module, Call, Config},
+        Offences: offences::{Module, Call, Storage, Event},
         Scheduler: scheduler::{Module, Call, Storage, Event<T>},
 
         // Crust modules

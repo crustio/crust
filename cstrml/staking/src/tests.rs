@@ -2774,11 +2774,11 @@ fn garbage_collection_on_window_pruning() {
 }
 
 #[test]
-// TODO: this slashing test case should be changed
-/*fn slashing_guarantors_by_span_max() {
+fn slashing_guarantors_by_span_max() {
     ExtBuilder::default().build().execute_with(|| {
-        start_era(1);
-        start_era(2);
+        start_era(1, false);
+        start_era(2, false);
+        start_era(3, false);
 
         assert_eq!(Balances::free_balance(&11), 1000);
         assert_eq!(Balances::free_balance(&21), 2000);
@@ -2876,13 +2876,14 @@ fn garbage_collection_on_window_pruning() {
         // only the maximum slash in a single span is taken.
         assert_eq!(Balances::free_balance(&101), 2000 - slash_2_amount);
     });
-}*/
+}
 
 #[test]
-// TODO: this slashing test case should be changed
-/*fn slashes_are_summed_across_spans() {
+fn slashes_are_summed_across_spans() {
     ExtBuilder::default().build().execute_with(|| {
-        start_era(1);
+        start_era(1, false);
+        start_era(2, false);	
+        start_era(3, false);
 
         assert_eq!(Balances::free_balance(&21), 2000);
         assert_eq!(Staking::slashable_balance_of(&21), 1000);
@@ -2900,13 +2901,13 @@ fn garbage_collection_on_window_pruning() {
         let expected_spans = vec![
             slashing::SlashingSpan {
                 index: 1,
-                start: 2,
+                start: 4,
                 length: None,
             },
             slashing::SlashingSpan {
                 index: 0,
                 start: 0,
-                length: Some(2),
+                length: Some(4),
             },
         ];
 
@@ -2916,7 +2917,7 @@ fn garbage_collection_on_window_pruning() {
         // 21 has been force-chilled. re-signal intent to validate.
         Staking::validate(Origin::signed(20), Default::default()).unwrap();
 
-        start_era(4);
+        start_era(4, false);
 
         assert_eq!(Staking::slashable_balance_of(&21), 900);
 
@@ -2936,20 +2937,20 @@ fn garbage_collection_on_window_pruning() {
             },
             slashing::SlashingSpan {
                 index: 1,
-                start: 2,
-                length: Some(3),
+                start: 4,
+                length: Some(1),
             },
             slashing::SlashingSpan {
                 index: 0,
                 start: 0,
-                length: Some(2),
+                length: Some(4),
             },
         ];
 
         assert_eq!(get_span(21).iter().collect::<Vec<_>>(), expected_spans);
         assert_eq!(Balances::free_balance(&21), 1810);
     });
-}*/
+}
 
 #[test]
 fn deferred_slashes_are_deferred() {
@@ -4265,5 +4266,120 @@ fn cut_guarantee_should_work() {
                 suppressed: false
             })
         );
+    });
+}
+
+#[test]
+fn chill_stash_should_work() {
+    ExtBuilder::default()
+    .guarantee(false)
+    .build()
+    .execute_with(|| {
+
+        for i in 1..10 {
+            let _ = Balances::deposit_creating(&i, 5000);
+        }
+
+        Staking::upsert_stake_limit(&5, 5000);
+        assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 5000);
+        Staking::upsert_stake_limit(&7, 5000);
+        assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 5000);
+
+        // add a new validator candidate
+        assert_ok!(Staking::bond(
+            Origin::signed(5),
+            6,
+            1000,
+            RewardDestination::Controller
+        ));
+        assert_ok!(Staking::validate(Origin::signed(6), Perbill::default()));
+        // add a new validator candidate
+        assert_ok!(Staking::bond(
+            Origin::signed(7),
+            8,
+            2000,
+            RewardDestination::Controller
+        ));
+        assert_ok!(Staking::validate(Origin::signed(8), Perbill::default()));
+
+        // add guarantor
+        assert_ok!(Staking::bond(
+            Origin::signed(1),
+            2,
+            2000,
+            RewardDestination::Controller
+        ));
+
+        // add guarantor
+        assert_ok!(Staking::bond(
+            Origin::signed(3),
+            4,
+            2000,
+            RewardDestination::Controller
+        ));
+
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (7, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(2), (7, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(4), (5, 250)));
+        assert_ok!(Staking::guarantee(Origin::signed(4), (7, 250)));
+
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 7).get(&(0 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 7).get(&(1 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(3, 7).get(&(0 as u32)), Some(&(250 as Balance)));
+
+        assert_eq!(
+            Staking::guarantors(&1),
+            Some(Nominations {
+                targets: vec![5, 7],
+                total: 1000,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+
+        assert_eq!(
+            Staking::validators(&5),
+            Validations{
+                total: 750,
+                guarantee_fee: Default::default(),
+                guarantors: vec![1, 1, 3]
+            }
+        );
+
+        assert_ok!(Staking::chill(Origin::signed(6)));
+
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(0 as u32)), None);
+        assert_eq!(Staking::guarantee_rel(1, 5).get(&(1 as u32)), None);
+        assert_eq!(Staking::guarantee_rel(1, 7).get(&(0 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(1, 7).get(&(1 as u32)), Some(&(250 as Balance)));
+        assert_eq!(Staking::guarantee_rel(3, 5).get(&(0 as u32)), None);
+        assert_eq!(Staking::guarantee_rel(3, 7).get(&(0 as u32)), Some(&(250 as Balance)));
+
+        assert_eq!(
+            Staking::guarantors(&1),
+            Some(Nominations {
+                targets: vec![7],
+                total: 500,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+
+        assert_eq!(
+            Staking::guarantors(&3),
+            Some(Nominations {
+                targets: vec![7],
+                total: 250,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+
+        assert!(!<Validators<Test>>::contains_key(&5));
     });
 }

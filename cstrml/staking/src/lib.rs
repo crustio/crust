@@ -4,6 +4,7 @@
 
 #[cfg(test)]
 mod mock;
+
 mod slashing;
 #[cfg(test)]
 mod tests;
@@ -1204,8 +1205,18 @@ impl<T: Trait> Module<T> {
     fn chill_validator(v_stash: &T::AccountId) {
         let validations = Self::validators(v_stash);
 
-        for guarantor in validations.guarantors {
-            <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
+        for g_stash in validations.guarantors {
+
+            <Guarantors<T>>::mutate(&g_stash, |nominations| {
+                if let Some(n) = nominations {
+                    n.targets.retain(|stash| {
+                        stash != v_stash
+                    });
+                    n.total -= Self::guarantee_rel(&g_stash, &v_stash).iter()
+                    .fold(Zero::zero(), |acc, (_, value)| acc + value.clone());
+                }
+            });
+            <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
         }
 
         <Validators<T>>::remove(v_stash);
@@ -1775,19 +1786,20 @@ impl<T: Trait> Module<T> {
         // II. Traverse guarantors, update guarantor's ledger
         <Guarantors<T>>::iter().for_each(|(g_stash, nominations)| {
             let Nominations {
-                submitted_in: _,
+                submitted_in,
                 total,
-                targets: _,
+                mut targets,
                 suppressed: _,
             } = nominations;
 
-            /*// Filter out nomination targets which were guaranteed before the most recent
-            // slashing span.
-            // TODO: uncomment it when figured out the slash strategy
-            targets.retain(|target| {
-                <Self as Store>::SlashingSpans::get(&target.who)
-                    .map_or(true, |spans| submitted_in >= spans.last_start())
-            });*/
+			// Filter out nomination targets which were guaranteed before the most recent
+			// slashing span.
+			targets.retain(|stash| {
+				<Self as Store>::SlashingSpans::get(&stash).map_or(
+					true,
+					|spans| submitted_in >= spans.last_nonzero_slash(),
+				)
+			});
 
             // 1. Init all guarantor's valid stakes
             let g_controller = Self::bonded(&g_stash).unwrap();

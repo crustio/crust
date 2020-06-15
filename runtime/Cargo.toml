@@ -37,6 +37,7 @@ timestamp = { default-features = false, package = 'pallet-timestamp', version = 
 transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-rc2' }
 scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc2' }
 sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc2' }
+offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc2' }
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc2' }
@@ -99,6 +100,7 @@ std = [
     'timestamp/std',
     'transaction-payment/std',
     'scheduler/std',
+    'offences/std',
     'sp-runtime-interface/std',
     'tee/std',
     'staking/std',

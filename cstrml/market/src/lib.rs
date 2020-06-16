@@ -214,6 +214,8 @@ decl_error! {
         NotPledged,
         /// Pledged before
         DoublePledged,
+        /// Place order to himself
+        PlaceSelfOrder,
     }
 }
 
@@ -355,26 +357,29 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let provider = T::Lookup::lookup(provider)?;
 
-            // 1. Expired should be greater than created
+            // 1. Cannot place storage order to himself.
+            ensure!(who != provider, Error::<T>::PlaceSelfOrder);
+
+            // 2. Expired should be greater than created
             ensure!(duration > REPORT_SLOT.try_into().unwrap(), Error::<T>::DurationTooShort);
 
-            // 2. Check if provider is registered
+            // 3. Check if provider is registered
             ensure!(<Providers<T>>::contains_key(&provider), Error::<T>::NotProvider);
 
-            // 3. Check provider has capacity to store file
+            // 4. Check provider has capacity to store file
             ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
 
-            // 4. Check client has enough currency to pay
+            // 5. Check client has enough currency to pay
             ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
-            // 5. Check if provider pledged
+            // 6. Check if provider pledged
             ensure!(<PledgeLedgers<T>>::contains_key(&provider), Error::<T>::InsufficientPledge);
 
-            // 6. Check provider has unused pledge
+            // 7. Check provider has unused pledge
             let pledge_ledger = Self::pledge_ledgers(&provider);
             ensure!(amount <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
 
-            // 7. Construct storage order
+            // 8. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
             let storage_order = StorageOrder::<T::AccountId, BalanceOf<T>> {
                 file_identifier,
@@ -388,7 +393,7 @@ decl_module! {
                 status: OrderStatus::Pending
             };
 
-            // 8. Pay the order and (maybe) add storage order
+            // 9. Pay the order and (maybe) add storage order
             if Self::maybe_insert_sorder(&who, &provider, &storage_order) {
                 // a. update ledger
                 <PledgeLedgers<T>>::mutate(&provider, |pledge_ledger| {

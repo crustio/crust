@@ -29,6 +29,18 @@ fn test_for_storage_order_should_work() {
         let _ = Balances::make_free_balance_be(&provider, 80);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
         assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+
+        assert_noop!(
+            Market::place_storage_order(
+                Origin::signed(provider.clone()), provider.clone(), fee,
+                file_identifier.clone(), file_size, duration
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 9,
+                message: Some("PlaceSelfOrder"),
+            }
+        );
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), provider, fee,
             file_identifier.clone(), file_size, duration

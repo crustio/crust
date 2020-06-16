@@ -31,9 +31,20 @@ impl Convert<u64, u64> for CurrencyToVoteHandler {
         x
     }
 }
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 {
+        x
+    }
+}
 impl Convert<u128, u64> for CurrencyToVoteHandler {
     fn convert(x: u128) -> u64 {
         x.saturated_into()
+    }
+}
+
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
     }
 }
 
@@ -212,6 +223,7 @@ parameter_types! {
 }
 impl Trait for Test {
     type Currency = balances::Module<Self>;
+    type EnhancedBalanceInterface = Self;
     type Time = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();

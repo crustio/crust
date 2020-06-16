@@ -330,6 +330,7 @@ impl Convert<u64, u128> for CurrencyToVoteHandler {
 
 impl staking::Trait for Runtime {
     type Currency = Balances;
+    type EnhancedBalanceInterface = Self;
     type Time = Timestamp;
 
     type CurrencyToVote = CurrencyToVoteHandler;

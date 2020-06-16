@@ -33,7 +33,7 @@ use sp_staking::{
     SessionIndex,
     offence::{OnOffenceHandler, OffenceDetails, Offence, ReportOffence, OffenceError},
 };
-use sp_std::{convert::TryInto, prelude::*, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
+use sp_std::{convert::{TryInto}, prelude::*, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 
 use frame_system::{self as system, ensure_root, ensure_signed};
 #[cfg(feature = "std")]
@@ -359,6 +359,8 @@ pub trait Trait: frame_system::Trait {
     /// The staking balance.
     type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
+    type EnhancedBalanceInterface: EnhancedBalanceInterface<Self::AccountId, BalanceOf<Self>>;
+
     /// Time used for computing era duration.
     type Time: Time;
 
@@ -367,7 +369,7 @@ pub trait Trait: frame_system::Trait {
     /// TODO: [Substrate]substrate#1377
     /// The backward convert should be removed as the new Phragmen API returns ratio.
     /// The post-processing needs it but will be moved to off-chain. TODO: #2908
-    type CurrencyToVote: Convert<BalanceOf<Self>, u64> + Convert<u128, BalanceOf<Self>>;
+    type CurrencyToVote: Convert<BalanceOf<Self>, u128> + Convert<u128, BalanceOf<Self>>;
 
     /// Tokens have been minted and are unused for validator-reward.
     type RewardRemainder: OnUnbalanced<NegativeImbalanceOf<Self>>;
@@ -550,7 +552,7 @@ decl_storage! {
         build(|config: &GenesisConfig<T>| {
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
-                    T::Currency::free_balance(&stash) >= balance,
+                    T::EnhancedBalanceInterface::free_balance_for_staking_only(stash) >= balance,
                     "Stash does not have enough balance to bond."
                 );
                 let _ = <Module<T>>::bond(
@@ -694,7 +696,7 @@ decl_module! {
             <Bonded<T>>::insert(&stash, &controller);
             <Payee<T>>::insert(&stash, payee);
 
-            let stash_balance = T::Currency::free_balance(&stash);
+            let stash_balance = T::EnhancedBalanceInterface::free_balance_for_staking_only(&stash);
             let value = value.min(stash_balance);
             let item = StakingLedger {
                 stash,
@@ -727,7 +729,7 @@ decl_module! {
             let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-            let stash_balance = T::Currency::free_balance(&stash);
+            let stash_balance = T::EnhancedBalanceInterface::free_balance_for_staking_only(&stash);
 
             if let Some(mut extra) = stash_balance.checked_sub(&ledger.total) {
                 extra = extra.min(max_additional);
@@ -1543,7 +1545,7 @@ impl<T: Trait> Module<T> {
             let total_authoring_payout = Self::authoring_rewards_in_era();
             let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
             let to_num =
-                |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
+                |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u128>>::convert(b);
 
             // 1. Block authoring payout
             for (v, p) in validators.iter().zip(points.individual.into_iter()) {
@@ -1660,7 +1662,7 @@ impl<T: Trait> Module<T> {
         }
 
         let to_votes =
-            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
+            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u128>>::convert(b);
         let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
         // I. Traverse validators, get `IndividualExposure` and update guarantors
@@ -1943,6 +1945,24 @@ impl<T: Trait> Module<T> {
             Forcing::ForceAlways | Forcing::ForceNew => (),
             _ => ForceEra::put(Forcing::ForceNew),
         }
+    }
+}
+
+pub trait EnhancedBalanceInterface<AccountId, Balance>: system::Trait {
+    fn free_balance_for_staking_only(who: &AccountId) -> Balance;
+}
+
+impl<T: Trait> EnhancedBalanceInterface<<T as system::Trait>::AccountId, BalanceOf<T>> for T where T: balances::Trait
+{
+    fn free_balance_for_staking_only(who: &<T as system::Trait>::AccountId) -> BalanceOf<T>
+    {
+        let to_balanceof = |e: T::Balance| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(TryInto::<u128>::try_into(e).ok().unwrap());
+        let sum = <balances::Module<T>>::locks(who).iter().fold(Zero::zero(), |acc: <T as balances::Trait>::Balance, value| {
+            let mut one_lock = Zero::zero();
+            if value.id != STAKING_ID {one_lock = value.amount;}
+            acc + one_lock
+        });
+        T::Currency::free_balance(who).saturating_sub(to_balanceof(sum))
     }
 }
 

@@ -26,6 +26,7 @@ sp-phragmen = { version = '2.0.0-rc2', default-features = false }
 sp-io ={ version = '2.0.0-rc2', default-features = false }
 sp-runtime = { version = '2.0.0-rc2', default-features = false }
 sp-staking = { version = '2.0.0-rc2', default-features = false }
+balances = { default-features = false, package = 'pallet-balances', version = '2.0.0-rc2' }
 
 # crust runtime modules
 tee = { package = "cstrml-tee", path = "../tee", default-features = false }

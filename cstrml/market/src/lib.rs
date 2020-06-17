@@ -336,7 +336,7 @@ decl_module! {
             pledge_ledger.total -= value;
 
             // 5 Upsert pledge ledger
-            if pledge_ledger.total.is_zero() && pledge_ledger.used.is_zero() {
+            if pledge_ledger.total.is_zero() {
                 <PledgeLedgers<T>>::remove(&who);
                 // remove the lock.
                 T::Currency::remove_lock(MARKET_ID, &who);

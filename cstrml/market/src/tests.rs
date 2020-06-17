@@ -28,6 +28,10 @@ fn test_for_storage_order_should_work() {
         // 1. Normal flow, aka happy pass 😃
         let _ = Balances::make_free_balance_be(&provider, 80);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
+        assert_ok!(Market::cut_pledge(Origin::signed(provider.clone()), 60));
+        assert!(!<PledgeLedgers<Test>>::contains_key(provider.clone()));
+        assert_eq!(Balances::locks(provider.clone()).len(), 0);
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
         assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
 
         assert_noop!(

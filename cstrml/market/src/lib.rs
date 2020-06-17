@@ -336,7 +336,13 @@ decl_module! {
             pledge_ledger.total -= value;
 
             // 5 Upsert pledge ledger
-            Self::upsert_pledge_ledger(&who, &pledge_ledger);
+            if pledge_ledger.total.is_zero() {
+                <PledgeLedgers<T>>::remove(&who);
+                // remove the lock.
+                T::Currency::remove_lock(MARKET_ID, &who);
+            } else {
+                Self::upsert_pledge_ledger(&who, &pledge_ledger);
+            }
 
             // 6. Emit success
             Self::deposit_event(RawEvent::PledgeSuccess(who));

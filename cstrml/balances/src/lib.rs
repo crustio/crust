@@ -159,6 +159,8 @@ use sp_runtime::{
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 
+use primitives::traits::TransferrableCurrency;
+
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 
 pub trait Subtrait<I: Instance = DefaultInstance>: frame_system::Trait {
@@ -1287,6 +1289,17 @@ where
 		let mut locks = Self::locks(who);
 		locks.retain(|l| l.id != id);
 		Self::update_locks(who, &locks[..]);
+	}
+}
+
+impl<T: Trait<I>, I: Instance> TransferrableCurrency<T::AccountId> for Module<T, I>
+where
+	T::Balance: MaybeSerializeDeserialize + Debug
+{
+	fn transferrable_balance(who: &T::AccountId) -> Self::Balance
+	{
+		let sum = Self::locks(who).iter().fold(Zero::zero(), |acc: Self::Balance, value| {acc + value.amount});
+		Self::account(who).free.saturating_sub(sum)
 	}
 }
 

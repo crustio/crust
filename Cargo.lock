@@ -763,6 +763,7 @@ dependencies = [
 name = "cst-primitives"
 version = "0.5.0"
 dependencies = [
+ "frame-support",
  "parity-scale-codec",
  "serde",
  "sp-core",
@@ -774,6 +775,7 @@ dependencies = [
 name = "cstrml-balances"
 version = "0.5.0"
 dependencies = [
+ "cst-primitives",
  "frame-benchmarking",
  "frame-support",
  "frame-system",

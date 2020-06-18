@@ -19,7 +19,8 @@ use serde::{Deserialize, Serialize};
 // Crust runtime modules
 use primitives::{
     AddressInfo, MerkleRoot, BlockNumber,
-    constants::tee::REPORT_SLOT
+    constants::tee::REPORT_SLOT,
+    traits::TransferrableCurrency
 };
 
 #[cfg(test)]
@@ -157,7 +158,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     /// The payment balance.
-    type Currency: ReservableCurrency<Self::AccountId> + LockableCurrency<Self::AccountId>;
+    type Currency: ReservableCurrency<Self::AccountId> + TransferrableCurrency<Self::AccountId>;
 
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -270,7 +271,7 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Ensure provider has enough currency.
-            ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(value <= T::Currency::transferrable_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if provider has not pledged before
             ensure!(!<PledgeLedgers<T>>::contains_key(&who), Error::<T>::DoublePledged);
@@ -302,7 +303,7 @@ decl_module! {
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Ensure provider has enough currency.
-            ensure!(value <= T::Currency::free_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(value <= T::Currency::transferrable_balance(&who), Error::<T>::InsufficientCurrency);
 
             let mut pledge_ledger = Self::pledge_ledgers(&who);
             // 4. Increase total value

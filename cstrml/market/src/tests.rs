@@ -396,7 +396,7 @@ fn test_for_pledge_should_fail_due_to_double_pledge() {
         // generate 50 blocks first
         run_to_block(50);
         let provider = 100;
-        let _ = Balances::make_free_balance_be(&provider, 80);
+        let _ = Balances::make_free_balance_be(&provider, 200);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 70));
         assert_noop!(
             Market::pledge(
@@ -420,7 +420,18 @@ fn test_for_pledge_should_work_without_register() {
         let provider = 100;
         let _ = Balances::make_free_balance_be(&provider, 80);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 70));
-        assert_ok!(Market::pledge_extra(Origin::signed(provider.clone()), 70));
+        assert_noop!(
+            Market::pledge_extra(
+                Origin::signed(provider.clone()),
+                70
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 4,
+                message: Some("InsufficientCurrency")
+            }
+        );
+        assert_ok!(Market::pledge_extra(Origin::signed(provider.clone()), 10));
         assert_ok!(Market::cut_pledge(Origin::signed(provider.clone()), 70));
     });
 }

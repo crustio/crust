@@ -21,7 +21,6 @@ serde = { features = ['derive'], optional = true, version = '1.0.106' }
 authorship = { default-features = false, package = 'pallet-authorship', version = '2.0.0-rc2' }
 authority-discovery = { default-features = false, package = 'pallet-authority-discovery', version = '2.0.0-rc2' }
 babe = { default-features = false, package = 'pallet-babe', version = '2.0.0-rc2' }
-balances = { default-features = false, package = 'pallet-balances', version = '2.0.0-rc2' }
 collective = { default-features = false, package = 'pallet-collective', version = '2.0.0-rc2' }
 frame-executive = { default-features = false, version = '2.0.0-rc2' }
 frame-support = { default-features = false, version = "2.0.0-rc2" }
@@ -62,6 +61,7 @@ staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-feat
 market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
 payment = { package = 'cstrml-payment', path = '../cstrml/payment', default-features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
+balances = { default-features = false, package = 'cstrml-balances', path = '../cstrml/balances' }
 
 [features]
 default = ['std']

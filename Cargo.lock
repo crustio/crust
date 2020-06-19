@@ -705,6 +705,7 @@ name = "crust-runtime"
 version = "0.5.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-market",
  "cstrml-payment",
  "cstrml-staking",
@@ -715,7 +716,6 @@ dependencies = [
  "pallet-authority-discovery",
  "pallet-authorship",
  "pallet-babe",
- "pallet-balances",
  "pallet-collective",
  "pallet-finality-tracker",
  "pallet-grandpa",
@@ -763,9 +763,27 @@ dependencies = [
 name = "cst-primitives"
 version = "0.5.0"
 dependencies = [
+ "frame-support",
  "parity-scale-codec",
  "serde",
  "sp-core",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-balances"
+version = "0.5.0"
+dependencies = [
+ "cst-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-transaction-payment",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
  "sp-runtime",
  "sp-std",
 ]
@@ -775,11 +793,11 @@ name = "cstrml-market"
 version = "0.5.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-tee",
  "frame-support",
  "frame-system",
  "hex",
- "pallet-balances",
  "parity-scale-codec",
  "serde",
  "serde_json",
@@ -794,12 +812,12 @@ name = "cstrml-payment"
 version = "0.5.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-market",
  "cstrml-tee",
  "frame-support",
  "frame-system",
  "hex",
- "pallet-balances",
  "pallet-scheduler",
  "parity-scale-codec",
  "serde",
@@ -816,11 +834,11 @@ name = "cstrml-staking"
 version = "0.5.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-tee",
  "frame-support",
  "frame-system",
  "pallet-authorship",
- "pallet-balances",
  "pallet-session",
  "pallet-staking-reward-curve",
  "pallet-timestamp",
@@ -842,11 +860,11 @@ name = "cstrml-tee"
 version = "0.5.0"
 dependencies = [
  "cst-primitives",
+ "cstrml-balances",
  "cstrml-market",
  "frame-support",
  "frame-system",
  "hex",
- "pallet-balances",
  "parity-scale-codec",
  "serde",
  "serde_json",

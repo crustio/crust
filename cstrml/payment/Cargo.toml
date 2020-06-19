@@ -16,7 +16,7 @@ serde_json = "1.0.51"
 # substrate frames
 system = { package = 'frame-system', default-features = false, version = '2.0.0-rc2' }
 frame-support = { default-features = false, version = '2.0.0-rc2' }
-balances = { default-features = false, package = 'pallet-balances', version = '2.0.0-rc2' }
+
 
 # substrate primitives
 sp-core = { default-features = false, version = '2.0.0-rc2' }
@@ -27,7 +27,7 @@ sp-std = { default-features = false, version = '2.0.0-rc2' }
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 market = { package = 'cstrml-market', path = '../market', default-features = false }
-
+balances = { default-features = false, package = 'cstrml-balances', path = '../balances' }
 [features]
 default = ['std']
 std = [
@@ -48,6 +48,6 @@ std = [
 hex = '0.4.2'
 keyring = { package = "sp-keyring", version = '2.0.0-rc2' }
 tee = { package = 'cstrml-tee', path = '../tee' }
-balances = { package = 'pallet-balances', version = '2.0.0-rc2' }
+balances = { package = 'cstrml-balances', path = '../balances' }
 scheduler = { package = 'pallet-scheduler', version = '2.0.0-rc2' }
 

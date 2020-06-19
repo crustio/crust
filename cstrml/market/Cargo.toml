@@ -43,4 +43,4 @@ std = [
 [dev-dependencies]
 hex = '0.4.2'
 tee = { package = 'cstrml-tee', path = '../tee' }
-balances = { package = 'pallet-balances', version = '2.0.0-rc2' }
+balances = { package = 'cstrml-balances', path = '../balances' }

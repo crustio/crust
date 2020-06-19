@@ -1,0 +1,40 @@
+[package]
+name = "cstrml-balances"
+version = "0.5.0"
+authors = ["Crustio"]
+edition = "2018"
+license = "GPL-3.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+serde = { version = "1.0.101", optional = true }
+codec = { package = "parity-scale-codec", version = "1.3.0", default-features = false, features = ["derive"] }
+sp-std = { default-features = false, version = '2.0.0-rc2' }
+sp-runtime = { default-features = false, version = '2.0.0-rc2' }
+frame-benchmarking = { version = "2.0.0-rc2", default-features = false, optional = true }
+frame-support = { version = "2.0.0-rc2", default-features = false }
+frame-system = { version = "2.0.0-rc2", default-features = false }
+primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
+
+[dev-dependencies]
+sp-io = { version = "2.0.0-rc2" }
+sp-core = { version = "2.0.0-rc2" }
+pallet-transaction-payment = { version = "2.0.0-rc2" }
+
+[features]
+default = ["std"]
+std = [
+	"serde",
+	"codec/std",
+	"sp-std/std",
+	"sp-runtime/std",
+	"frame-benchmarking/std",
+	"frame-support/std",
+	"frame-system/std",
+	"primitives/std"
+]
+runtime-benchmarks = ["frame-benchmarking"]

@@ -25,7 +25,7 @@ use pallet_session::historical;
 use sp_runtime::{
     Perbill, RuntimeDebug,
     traits::{
-        Convert, Zero, One, StaticLookup, CheckedSub, Saturating, AtLeast32Bit,
+        Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
         CheckedAdd
     },
 };
@@ -41,7 +41,10 @@ use sp_runtime::{Deserialize, Serialize};
 
 // Crust runtime modules
 use tee;
-use primitives::constants::{currency::*, time::*};
+use primitives::{
+    constants::{currency::*, time::*},
+    traits::TransferrableCurrency
+};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
@@ -357,7 +360,7 @@ impl<T: Trait> TeeInterface for T where T: tee::Trait {
 
 pub trait Trait: frame_system::Trait {
     /// The staking balance.
-    type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+    type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
     /// Time used for computing era duration.
     type Time: Time;
@@ -550,7 +553,7 @@ decl_storage! {
         build(|config: &GenesisConfig<T>| {
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
-                    T::Currency::free_balance(&stash) >= balance,
+                    T::Currency::transfer_balance(&stash) >= balance,
                     "Stash does not have enough balance to bond."
                 );
                 let _ = <Module<T>>::bond(
@@ -694,7 +697,7 @@ decl_module! {
             <Bonded<T>>::insert(&stash, &controller);
             <Payee<T>>::insert(&stash, payee);
 
-            let stash_balance = T::Currency::free_balance(&stash);
+            let stash_balance = T::Currency::transfer_balance(&stash);
             let value = value.min(stash_balance);
             let item = StakingLedger {
                 stash,
@@ -706,7 +709,7 @@ decl_module! {
             Self::update_ledger(&controller, &item);
         }
 
-        /// Add some extra amount that have appeared in the stash `free_balance` into the balance up
+        /// Add some extra amount that have appeared in the stash `transfer_balance` into the balance up
         /// for staking.
         ///
         /// Use this if there are additional funds in your stash account that you wish to bond.
@@ -727,26 +730,23 @@ decl_module! {
             let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-            let stash_balance = T::Currency::free_balance(&stash);
-
-            if let Some(mut extra) = stash_balance.checked_sub(&ledger.total) {
-                extra = extra.min(max_additional);
-                // [LIMIT ACTIVE CHECK] 1:
-                // Candidates should judge its stake limit, this promise candidates' bonded stake
-                // won't exceed.
-                if <Validators<T>>::contains_key(&stash) {
-                    let limit = Self::stake_limit(&stash).unwrap_or_default();
-                    if ledger.active >= limit {
-                        Err(Error::<T>::NoWorkloads)?
-                    } else {
-                        extra = extra.min(limit - ledger.active);
-                    }
+            let mut extra = T::Currency::transfer_balance(&stash);
+            extra = extra.min(max_additional);
+            // [LIMIT ACTIVE CHECK] 1:
+            // Candidates should judge its stake limit, this promise candidates' bonded stake
+            // won't exceed.
+            if <Validators<T>>::contains_key(&stash) {
+                let limit = Self::stake_limit(&stash).unwrap_or_default();
+                if ledger.active >= limit {
+                    Err(Error::<T>::NoWorkloads)?
+                } else {
+                    extra = extra.min(limit - ledger.active);
                 }
-
-                ledger.total += extra;
-                ledger.active += extra;
-                Self::update_ledger(&controller, &ledger);
             }
+
+            ledger.total += extra;
+            ledger.active += extra;
+            Self::update_ledger(&controller, &ledger);
         }
 
         /// Schedule a portion of the stash to be unlocked ready for transfer out after the bond

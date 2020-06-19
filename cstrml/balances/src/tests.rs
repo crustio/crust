@@ -659,7 +659,7 @@ macro_rules! decl_tests {
 		}
 
 		#[test]
-		fn account_transfer_balance_works() {
+		fn account_transfer_balance_should_work() {
 			<$ext_builder>::default().existential_deposit(100).build().execute_with(|| {
 				assert_eq!(<TotalIssuance<$test>>::get(), 0);
 

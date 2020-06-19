@@ -657,5 +657,35 @@ macro_rules! decl_tests {
 					assert_eq!(Balances::reserved_balance(1), 0);
 				});
 		}
+
+		#[test]
+		fn account_transfer_balance_works() {
+			<$ext_builder>::default().existential_deposit(100).build().execute_with(|| {
+				assert_eq!(<TotalIssuance<$test>>::get(), 0);
+
+				// Setup two accounts with free balance above the existential threshold.
+				let _ = Balances::deposit_creating(&1, 300);
+
+				assert_eq!(Balances::transfer_balance(&1), 300);
+				Balances::set_lock(ID_1, &1, 50, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 250);
+				Balances::set_lock(ID_1, &1, 100, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 200);
+				Balances::set_lock(ID_2, &1, 50, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 150);
+				Balances::set_lock(ID_2, &1, 100, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 100);
+				// exceed the amount of freee balance.
+				Balances::set_lock(ID_2, &1, 300, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 0);
+				Balances::set_lock(ID_2, &1, 250, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 0);
+				
+				Balances::set_lock(ID_2, &1, 150, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 50);
+				Balances::remove_lock(ID_1, &1);
+				assert_eq!(Balances::transfer_balance(&1), 150);
+			});
+		}
 	}
 }

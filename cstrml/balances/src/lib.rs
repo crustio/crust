@@ -1296,10 +1296,10 @@ impl<T: Trait<I>, I: Instance> TransferrableCurrency<T::AccountId> for Module<T,
 where
 	T::Balance: MaybeSerializeDeserialize + Debug
 {
-	fn transferrable_balance(who: &T::AccountId) -> Self::Balance
+	fn transfer_balance(who: &T::AccountId) -> Self::Balance
 	{
-		let sum = Self::locks(who).iter().fold(Zero::zero(), |acc: Self::Balance, value| {acc + value.amount});
-		Self::account(who).free.saturating_sub(sum)
+		let sum_of_locks = Self::locks(who).iter().fold(Zero::zero(), |acc: Self::Balance, value| {acc + value.amount});
+		Self::account(who).free.saturating_sub(sum_of_locks)
 	}
 }
 

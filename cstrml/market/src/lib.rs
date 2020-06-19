@@ -271,7 +271,7 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Ensure provider has enough currency.
-            ensure!(value <= T::Currency::transferrable_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if provider has not pledged before
             ensure!(!<PledgeLedgers<T>>::contains_key(&who), Error::<T>::DoublePledged);
@@ -303,7 +303,7 @@ decl_module! {
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Ensure provider has enough currency.
-            ensure!(value <= T::Currency::transferrable_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             let mut pledge_ledger = Self::pledge_ledgers(&who);
             // 4. Increase total value

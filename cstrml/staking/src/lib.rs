@@ -553,7 +553,7 @@ decl_storage! {
         build(|config: &GenesisConfig<T>| {
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
-                    T::Currency::transferrable_balance(&stash) >= balance,
+                    T::Currency::transfer_balance(&stash) >= balance,
                     "Stash does not have enough balance to bond."
                 );
                 let _ = <Module<T>>::bond(
@@ -697,7 +697,7 @@ decl_module! {
             <Bonded<T>>::insert(&stash, &controller);
             <Payee<T>>::insert(&stash, payee);
 
-            let stash_balance = T::Currency::transferrable_balance(&stash);
+            let stash_balance = T::Currency::transfer_balance(&stash);
             let value = value.min(stash_balance);
             let item = StakingLedger {
                 stash,
@@ -709,7 +709,7 @@ decl_module! {
             Self::update_ledger(&controller, &item);
         }
 
-        /// Add some extra amount that have appeared in the stash `transferrable_balance` into the balance up
+        /// Add some extra amount that have appeared in the stash `transfer_balance` into the balance up
         /// for staking.
         ///
         /// Use this if there are additional funds in your stash account that you wish to bond.
@@ -730,7 +730,7 @@ decl_module! {
             let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-            let mut extra = T::Currency::transferrable_balance(&stash);
+            let mut extra = T::Currency::transfer_balance(&stash);
             extra = extra.min(max_additional);
             // [LIMIT ACTIVE CHECK] 1:
             // Candidates should judge its stake limit, this promise candidates' bonded stake

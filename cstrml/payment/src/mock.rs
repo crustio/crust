@@ -142,6 +142,10 @@ impl tee::Trait for Test {
     type MarketInterface = Market;
 }
 
+parameter_types! {
+    pub const PunishDuration: market::EraIndex = 100;
+}
+
 impl market::Trait for Test {
     type Currency = Balances;
     type CurrencyToBalance = CurrencyToVoteHandler;
@@ -151,6 +155,7 @@ impl market::Trait for Test {
     type OrderInspector = TestOrderInspector;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
+    type PunishDuration = PunishDuration;
 }
 
 impl Trait for Test {

@@ -409,6 +409,7 @@ impl<T: Trait> Module<T> {
                         sorder.status = OrderStatus::Failed;
                         T::MarketInterface::maybe_set_sorder(order_id, &sorder);
                     }
+                    T::MarketInterface::maybe_punish_provider(order_id);
                 }
 
                 // 3. Return reserved and used

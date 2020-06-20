@@ -8,6 +8,20 @@ use hex;
 use crate::{StorageOrder, Provision};
 use sp_core::H256;
 
+fn set_punishment_in_success_count(order_id: &H256, success_count: EraIndex) {
+    let mut so = Market::storage_orders(&order_id).unwrap();
+    so.status = OrderStatus::Success;
+    Market::maybe_set_sorder(&order_id, &so);
+    for _ in 0 .. success_count {
+        Market::maybe_punish_provider(&order_id);
+    }
+    so.status = OrderStatus::Failed;
+    Market::maybe_set_sorder(&order_id, &so);
+    for _ in success_count .. <mock::Test as Trait>::PunishDuration::get(){
+        Market::maybe_punish_provider(&order_id);
+    }
+}
+
 #[test]
 fn test_for_storage_order_should_work() {
     new_test_ext().execute_with(|| {
@@ -446,5 +460,136 @@ fn test_for_pledge_should_work_without_register() {
         );
         assert_ok!(Market::pledge_extra(Origin::signed(provider.clone()), 10));
         assert_ok!(Market::cut_pledge(Origin::signed(provider.clone()), 70));
+    });
+}
+
+#[test]
+fn test_for_half_punish_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let provider: u64 = 100;
+        let client: u64 = 0;
+        let file_size = 16; // should less than provider
+        let duration = 360; // file should store at least 30 minutes
+        let fee = 10;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 200);
+
+        // 1. Normal flow, aka happy pass 😃
+        let _ = Balances::make_free_balance_be(&provider, 200);
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), provider, fee,
+            file_identifier.clone(), file_size, duration
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 50,
+            completed_on: 50,
+            expired_on: 410,
+            provider,
+            client,
+            amount: fee,
+            status: OrderStatus::Pending
+        });
+
+        set_punishment_in_success_count(&order_id, 90);
+
+        assert_eq!(Balances::free_balance(&provider), 195);
+        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+            total: 55,
+            used: 5
+        });
+
+        set_punishment_in_success_count(&order_id, 90);
+
+        assert_eq!(Balances::free_balance(&provider), 190);
+        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+            total: 50,
+            used: 0
+        });
+
+        // total fee has been punished.
+        set_punishment_in_success_count(&order_id, 90);
+
+        assert_eq!(Balances::free_balance(&provider), 190);
+        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+            total: 50,
+            used: 0
+        });
+    });
+}
+
+#[test]
+fn test_for_full_punish_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let provider: u64 = 100;
+        let client: u64 = 0;
+        let file_size = 16; // should less than provider
+        let duration = 360; // file should store at least 30 minutes
+        let fee = 10;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 200);
+
+        // 1. Normal flow, aka happy pass 😃
+        let _ = Balances::make_free_balance_be(&provider, 200);
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), provider, fee,
+            file_identifier.clone(), file_size, duration
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 50,
+            completed_on: 50,
+            expired_on: 410,
+            provider,
+            client,
+            amount: fee,
+            status: OrderStatus::Pending
+        });
+
+        set_punishment_in_success_count(&order_id, 95);
+
+        assert_eq!(Balances::free_balance(&provider), 200);
+        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+            total: 60,
+            used: 10
+        });
+
+        set_punishment_in_success_count(&order_id, 89);
+
+        assert_eq!(Balances::free_balance(&provider), 190);
+        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+            total: 50,
+            used: 0
+        });
+
+        set_punishment_in_success_count(&order_id, 90);
+
+        assert_eq!(Balances::free_balance(&provider), 190);
+        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+            total: 50,
+            used: 0
+        });
     });
 }

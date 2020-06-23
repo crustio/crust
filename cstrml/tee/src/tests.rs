@@ -341,7 +341,7 @@ fn test_for_work_report_timing_check_failed_by_wrong_hash() {
         let block_hash = [1; 32].to_vec();
 
         let works = WorkReport {
-            pub_key: "pub_key_alice".as_bytes().to_vec(),
+            pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
             block_number: 50,
             block_hash,
             used: 0,
@@ -371,7 +371,7 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
         let block_hash = [0; 32].to_vec();
 
         let works = WorkReport {
-            pub_key: "pub_key_alice".as_bytes().to_vec(),
+            pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
             block_number: 50,
             block_hash,
             used: 0,
@@ -395,7 +395,7 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
 fn test_for_work_report_sig_check_failed() {
     new_test_ext().execute_with(|| {
         // generate 53 blocks first
-        run_to_block(53);
+        run_to_block(303);
 
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
         let pub_key = hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap();

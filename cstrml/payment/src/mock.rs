@@ -191,11 +191,12 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             (
                 id.clone(),
                 tee::Identity {
+                    ias_sig: vec![],
                     pub_key: pk.clone(),
                     account_id: id.clone(),
-                    validator_pub_key: pk.clone(),
-                    validator_account_id: id.clone(),
                     sig: vec![],
+                    ias_cert: vec![],
+                    isv_body: vec![]
                 },
             )
         })
@@ -207,6 +208,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     let _ = tee::GenesisConfig::<Test> {
         current_report_slot: 0,
+        code: vec![],
         tee_identities,
         work_reports
     }

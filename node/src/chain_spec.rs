@@ -194,6 +194,7 @@ fn testnet_genesis(
         }),
         tee: Some(TeeConfig {
             current_report_slot: 0,
+            code: vec![],
             tee_identities: endowed_accounts
                 .iter()
                 .map(|x| (x.clone(), Default::default()))

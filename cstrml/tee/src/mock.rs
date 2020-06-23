@@ -122,37 +122,34 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     // initial authorities: [Alice, Bob]
     let accounts = [
-        (
-            Sr25519Keyring::Alice.to_account_id(),
-            hex::decode("0fb42b36f26b69b7bbd3f60b2e377e66a4dacf0284877731bb59ca2cc9ce2759390dfb4b7023986e238d74df027f0f7f34b51f4b0dbf60e5f0ac90812d977499").unwrap()
-        ),
-        (
-            Sr25519Keyring::Bob.to_account_id(),
-            hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap()
-        )
+        Sr25519Keyring::Alice.to_account_id(),
+        Sr25519Keyring::Bob.to_account_id(),
     ];
 
     let tee_identities = accounts
         .iter()
-        .map(|(id, pk)| {
+        .map(|id| {
             (
                 id.clone(),
                 Identity {
-                    pub_key: pk.clone(),
+                    ias_sig: vec![],
+                    ias_cert: vec![],
                     account_id: id.clone(),
-                    validator_pub_key: pk.clone(),
-                    validator_account_id: id.clone(),
-                    sig: vec![],
+                    isv_body: vec![],
+                    pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
+                    sig: vec![]
                 },
             )
         })
         .collect();
     let work_reports = accounts
         .iter()
-        .map(|(x, _)| (x.clone(), Default::default()))
+        .map(|x| (x.clone(), Default::default()))
         .collect();
 
     GenesisConfig::<Test> {
+        // Test temp code
+        code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
         current_report_slot: 0,
         tee_identities,
         work_reports,

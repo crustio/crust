@@ -428,6 +428,7 @@ impl ExtBuilder {
 
         let _ = tee::GenesisConfig::<Test> {
             current_report_slot: 0,
+            code: vec![],
             tee_identities: identities
                 .iter()
                 .map(|id| (*id, Default::default()))

@@ -3,7 +3,7 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-    decl_event, decl_module, decl_storage, ensure,
+    decl_event, decl_module, decl_storage, ensure, decl_error,
     dispatch::DispatchResult,
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency}
@@ -14,8 +14,13 @@ use system::ensure_signed;
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
-// Crust runtime modules
-use primitives::{constants::tee::*, MerkleRoot, PubKey, TeeSignature, ReportSlot, BlockNumber};
+// Crust primitives and runtime modules
+use primitives::{
+    constants::tee::*,
+    MerkleRoot, PubKey, TeeSignature,
+    ReportSlot, BlockNumber, IASSig,
+    ISVBody, Cert, TeeCode
+};
 use market::{OrderStatus, MarketInterface, OrderInspector};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
@@ -33,10 +38,11 @@ pub type BalanceOf<T> =
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Identity<AccountId> {
-    pub pub_key: PubKey,
+    pub ias_sig: IASSig,
+    pub ias_cert: Cert,
     pub account_id: AccountId,
-    pub validator_pub_key: PubKey,
-    pub validator_account_id: AccountId,
+    pub isv_body: ISVBody,
+    pub pub_key: PubKey,
     pub sig: TeeSignature,
 }
 
@@ -91,6 +97,9 @@ pub trait Trait: system::Trait {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Tee {
+        /// The TEE enclave code, this should be managed by sudo/democracy
+        pub Code get(fn code) config(): TeeCode;
+
         /// The TEE identities, mapping from controller to optional identity value
         pub TeeIdentities get(fn tee_identities) config():
             map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
@@ -122,54 +131,60 @@ decl_storage! {
     }
 }
 
+decl_error! {
+    /// Error for the tee module.
+    pub enum Error for Module<T: Trait> {
+        /// Illegal applier
+        IllegalApplier,
+        /// Duplicate identity signature
+        DuplicateSig,
+        /// Identity check failed
+        IllegalTrustedChain,
+        /// Illegal reporter
+        IllegalReporter,
+        /// Invalid public key
+        InvalidPubKey,
+        /// Invalid timing
+        InvalidReportTime,
+        /// Illegal work report signature
+        IllegalWorkReportSig,
+    }
+}
+
 decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        type Error = Error<T>;
+
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
         #[weight = 1_000_000]
-        pub fn register_identity(origin, identity: Identity<T::AccountId>) -> DispatchResult {
+        pub fn register(origin, unparsed_identity: Identity<T::AccountId>) -> DispatchResult {
             let who = ensure_signed(origin)?;
-
-            // 0. Genesis validators have rights to register themselves
-            if let Some(maybe_genesis_validator) = <TeeIdentities<T>>::get(&who) {
-                if &maybe_genesis_validator.account_id == &maybe_genesis_validator.validator_account_id {
-                    // Store the tee identity
-                    <TeeIdentities<T>>::insert(&who, &identity);
-                    return Ok(());
-                }
-            }
-
-            let applier = &identity.account_id;
-            let validator = &identity.validator_account_id;
-            let applier_pk = &identity.pub_key;
-            let validator_pk = &identity.validator_pub_key;
+            let applier = &unparsed_identity.account_id;
 
             // 1. Ensure who is applier
-            ensure!(&who == applier, "Tee applier must be the extrinsic sender");
+            ensure!(&who == applier, Error::<T>::IllegalApplier);
 
-            // 2. applier cannot be validator
-            ensure!(applier != validator, "You cannot verify yourself");
-            ensure!(applier_pk != validator_pk, "You cannot verify yourself");
+            // 2. Ensure sig is unique
+            ensure!(Self::sig_is_unique(&unparsed_identity.sig), Error::<T>::DuplicateSig);
 
-            // 3. v_account_id should been validated before
-            ensure!(<TeeIdentities<T>>::contains_key(validator), "Validator needs to be validated before");
-            ensure!(&<TeeIdentities<T>>::get(validator).unwrap().pub_key == validator_pk, "Validator public key not found");
+            // 3. Ensure unparsed_identity trusted chain id legal
+            let maybe_pk = Self::check_and_get_pk(&unparsed_identity);
+            ensure!(maybe_pk.is_some(), Error::<T>::IllegalTrustedChain);
 
-            // 4. Check pub_key is unique
-            ensure!(Self::pub_key_is_unique(applier_pk), "Public key already be registered");
+            // 4. Construct a parsed identity(with public key)
+            let mut identity = unparsed_identity.clone();
+            identity.pub_key = maybe_pk.unwrap();
 
-            // 5. Verify sig
-            ensure!(Self::identity_sig_check(&identity), "Tee report signature is illegal");
-
-            // 6. applier is new add or needs to be updated
+            // 5. Applier is new add or needs to be updated
             if !Self::tee_identities(applier).contains(&identity) {
                 // Store the tee identity
                 <TeeIdentities<T>>::insert(applier, &identity);
 
-                // Emit tee identity event
-                Self::deposit_event(RawEvent::RegisterIdentity(who, identity));
+                // Emit event
+                Self::deposit_event(RawEvent::RegisterSuccess(who));
             }
 
             Ok(())
@@ -180,19 +195,19 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            ensure!(<TeeIdentities<T>>::contains_key(&who), "Reporter must be registered before");
-            ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, "Validator public key not found");
+            ensure!(<TeeIdentities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
+            ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
 
             // 2. Do timing check
-            ensure!(Self::work_report_timing_check(&work_report).is_ok(), "Work report's timing is wrong");
+            ensure!(Self::work_report_timing_check(&work_report).is_ok(), Error::<T>::InvalidReportTime);
 
             // 3. Do sig check
-            ensure!(Self::work_report_sig_check(&work_report), "Work report signature is illegal");
+            ensure!(Self::work_report_sig_check(&work_report), Error::<T>::IllegalWorkReportSig);
 
             // 4. Maybe upsert work report
             if Self::maybe_upsert_work_report(&who, &work_report) {
                 // 5. Emit workload event
-                Self::deposit_event(RawEvent::ReportWorks(who, work_report));
+                Self::deposit_event(RawEvent::WorksReportSuccess(who, work_report));
             }
             Ok(())
         }
@@ -382,14 +397,14 @@ impl<T: Trait> Module<T> {
     }
 
     // PRIVATE IMMUTABLES
-    /// This function is judging if the pub_key already be registered
+    /// This function is judging if the identity{sig} already be registered
     /// TC is O(n)
     /// DB try is O(1)
-    fn pub_key_is_unique(pk: &PubKey) -> bool {
+    fn sig_is_unique(sig: &TeeSignature) -> bool {
         let mut is_unique = true;
 
         for (_, id) in <TeeIdentities<T>>::iter() {
-            if &id.pub_key == pk {
+            if &id.sig == sig {
                 is_unique = false;
                 break
             }
@@ -398,15 +413,17 @@ impl<T: Trait> Module<T> {
         is_unique
     }
 
-    fn identity_sig_check(id: &Identity<T::AccountId>) -> bool {
-        let applier_id = id.account_id.encode();
-        let validator_id = id.validator_account_id.encode();
-        api::crypto::verify_identity_sig(
-            &id.pub_key,
-            &applier_id,
-            &id.validator_pub_key,
-            &validator_id,
+    fn check_and_get_pk(id: &Identity<T::AccountId>) -> Option<Vec<u8>> {
+        let enclave_code = Self::code();
+        let applier = id.account_id.encode();
+
+        api::crypto::verify_identity(
+            &id.ias_sig,
+            &id.ias_cert,
+            &applier,
+            &id.isv_body,
             &id.sig,
+            &enclave_code,
         )
     }
 
@@ -458,7 +475,7 @@ decl_event!(
     where
         AccountId = <T as system::Trait>::AccountId,
     {
-        RegisterIdentity(AccountId, Identity<AccountId>),
-        ReportWorks(AccountId, WorkReport),
+        RegisterSuccess(AccountId),
+        WorksReportSuccess(AccountId, WorkReport),
     }
 );

@@ -39,11 +39,24 @@ pub type Hash = sp_core::H256;
 /// Digest item type.
 pub type DigestItem = generic::DigestItem<Hash>;
 
+/// Tee certification type, begin with `-----BEGIN CERTIFICATE-----`
+/// and end with `-----END CERTIFICATE-----`
+pub type Cert = Vec<u8>;
+
+/// The IAS signature type
+pub type IASSig = Vec<u8>;
+
+/// The ISV body type, contains the enclave code and public key
+pub type ISVBody = Vec<u8>;
+
 /// Tee public key, little-endian-format, 64 bytes vec
 pub type PubKey = Vec<u8>;
 
 /// Tee signature, little-endian-format, 64 bytes vec
 pub type TeeSignature = Vec<u8>;
+
+/// Tee enclave code
+pub type TeeCode = Vec<u8>;
 
 /// Work report empty workload/storage merkle root
 pub type MerkleRoot = Vec<u8>;

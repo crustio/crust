@@ -294,7 +294,14 @@ fn test_for_report_works_failed_by_pub_key_is_not_found() {
         let mut works = get_valid_work_report();
         works.pub_key = "another_pub_key".as_bytes().to_vec();
 
-        assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        assert_noop!(
+            Tee::report_works(Origin::signed(account), works),
+            DispatchError::Module {
+                index: 0,
+                error: 4,
+                message: Some("InvalidPubKey"),
+            }
+        );
     });
 }
 
@@ -313,7 +320,14 @@ fn test_for_report_works_failed_by_reporter_is_not_registered() {
             files: vec![]
         };
 
-        assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        assert_noop!(
+            Tee::report_works(Origin::signed(account), works),
+            DispatchError::Module {
+                index: 0,
+                error: 3,
+                message: Some("IllegalReporter"),
+            }
+        );
     });
 }
 
@@ -336,7 +350,14 @@ fn test_for_work_report_timing_check_failed_by_wrong_hash() {
             files: vec![]
         };
 
-        assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        assert_noop!(
+            Tee::report_works(Origin::signed(account), works),
+            DispatchError::Module {
+                index: 0,
+                error: 5,
+                message: Some("InvalidReportTime"),
+            }
+        );
     });
 }
 
@@ -359,7 +380,14 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
             files: vec![]
         };
 
-        assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        assert_noop!(
+            Tee::report_works(Origin::signed(account), works),
+            DispatchError::Module {
+                index: 0,
+                error: 5,
+                message: Some("InvalidReportTime"),
+            }
+        );
     });
 }
 
@@ -388,7 +416,14 @@ fn test_for_work_report_sig_check_failed() {
             files
         };
 
-        assert!(Tee::report_works(Origin::signed(account), works).is_err());
+        assert_noop!(
+            Tee::report_works(Origin::signed(account), works),
+            DispatchError::Module {
+                index: 0,
+                error: 6,
+                message: Some("IllegalWorkReportSig"),
+            }
+        );
     });
 }
 

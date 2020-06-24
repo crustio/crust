@@ -1206,7 +1206,6 @@ impl<T: Trait> Module<T> {
         let validations = Self::validators(v_stash);
 
         for g_stash in validations.guarantors {
-
             <Guarantors<T>>::mutate(&g_stash, |nominations| {
                 if let Some(n) = nominations {
                     n.targets.retain(|stash| {

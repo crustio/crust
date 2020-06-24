@@ -3,13 +3,13 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-    decl_event, decl_module, decl_storage, ensure, decl_error,
+    decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::DispatchResult,
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency}
 };
 use sp_std::{str, convert::TryInto, prelude::*};
-use system::ensure_signed;
+use system::{ensure_root, ensure_signed};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -159,6 +159,25 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
+        /// Set new enclave code
+        ///
+        /// # <weight>
+        /// - O(1)
+        /// - 1 DB try
+        /// # </weight>
+        #[weight = 1_000_000]
+        pub fn set_code(origin, new_code: TeeCode) {
+            ensure_root(origin)?;
+
+            <Code>::put(new_code);
+        }
+
+        /// Register as new trusted tee node
+        ///
+        /// # <weight>
+        /// - O(n)
+        /// - 3 DB try
+        /// # </weight>
         #[weight = 1_000_000]
         pub fn register(origin, unparsed_identity: Identity<T::AccountId>) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -190,6 +209,12 @@ decl_module! {
             Ok(())
         }
 
+        /// Register as new trusted tee node
+        ///
+        /// # <weight>
+        /// - O(2n)
+        /// - 3n+8 DB try
+        /// # </weight>
         #[weight = 1_000_000]
         pub fn report_works(origin, work_report: WorkReport) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -302,6 +327,8 @@ impl<T: Trait> Module<T> {
         }
 
         // 2. Calculate used space
+        // TC = O(M*logN), N is file_map's key number, M is same file's orders number
+        // 2M DB try
         let mut updated_wr = wr.clone();
         let file_map = T::MarketInterface::providers(who).unwrap_or_default().file_map;
         updated_wr.used = wr.files.iter().fold(0, |used, (f_id, f_size)| {
@@ -348,6 +375,8 @@ impl<T: Trait> Module<T> {
         let total_workload = total_used + total_reserved;
 
         // 5. Update work report for every identity
+        // TC = O(N)
+        // N DB try
         for (controller, wr) in <WorkReports<T>>::iter() {
             T::Works::report_works(
                 &controller,

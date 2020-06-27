@@ -436,7 +436,6 @@ impl payment::Trait for Runtime {
     type Currency = Balances;
     type Event = Event;
     type CurrencyToBalance = CurrencyToVoteHandler;
-    type Scheduler = Scheduler;
     // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
 }

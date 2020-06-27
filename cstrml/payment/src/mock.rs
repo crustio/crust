@@ -156,7 +156,6 @@ impl Trait for Test {
     type Scheduler = Scheduler;
     // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
-    type BalanceInterface = Self;
 }
 
 pub type Market = market::Module<Test>;

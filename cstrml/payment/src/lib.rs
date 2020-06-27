@@ -5,13 +5,13 @@ use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure, dispatch::DispatchResult, Parameter,
     traits::{
-        schedule::Named as ScheduleNamed, schedule::HARD_DEADLINE,
+        schedule::Named as ScheduleNamed, schedule::HARD_DEADLINE, ExistenceRequirement,
         Currency, ReservableCurrency
     }
 };
 use sp_std::{prelude::*, convert::{TryInto}};
 use system::{ensure_root};
-use sp_runtime::{traits::{StaticLookup, Dispatchable, Zero, Convert}};
+use sp_runtime::{traits::{Dispatchable, Zero, Convert}};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -107,9 +107,6 @@ pub trait Trait: system::Trait {
 
     /// Interface for interacting with a market module.
     type MarketInterface: MarketInterface<Self::AccountId, Self::Hash, BalanceOf<Self>>;
-
-    /// Interface for interacting with balance module
-    type BalanceInterface: self::BalanceInterface<Self::Origin, Self::AccountId, BalanceOf<Self>>;
 }
 
 // This module's storage items.
@@ -191,7 +188,7 @@ decl_module! {
                 OrderStatus::Success => {
                     // 9. [DB Write] (Maybe) Transfer the amount
                     // TODO: What if this failed several time, paid will be smaller than it should be?
-                    if T::BalanceInterface::maybe_transfer(origin.clone(), &client, &provider, real_amount) {
+                    if T::Currency::transfer(&client, &provider, real_amount, ExistenceRequirement::AllowDeath).is_ok() {
                         // 10. [DB Write] Update ledger
                         <Payments<T>>::mutate(&sorder_id, |ledger| {
                             if let Some(l) = ledger {
@@ -206,27 +203,6 @@ decl_module! {
 
             Ok(())
         }
-    }
-}
-
-pub trait BalanceInterface<Origin, AccountId, Balance>: system::Trait {
-    fn maybe_transfer(origin: Origin, client: &AccountId, provider: &AccountId, amount: Balance) -> bool;
-}
-
-impl<T: Trait> BalanceInterface<T::Origin, <T as system::Trait>::AccountId, BalanceOf<T>> for T where T: balances::Trait {
-    fn maybe_transfer(
-        origin: T::Origin,
-        client: &<T as system::Trait>::AccountId,
-        provider: &<T as system::Trait>::AccountId,
-        amount: BalanceOf<T>) -> bool {
-            let to_balance =
-                |b: BalanceOf<T>| TryInto::<T::Balance>::try_into(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::convert(b)).ok().unwrap();
-            <balances::Module<T>>::force_transfer(
-                origin,
-                T::Lookup::unlookup(client.clone()),
-                T::Lookup::unlookup(provider.clone()),
-                to_balance(amount)
-            ).is_ok()
     }
 }
 

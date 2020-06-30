@@ -422,7 +422,6 @@ impl payment::Trait for Runtime {
     type Scheduler = Scheduler;
     // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
-    type BalanceInterface = Self;
 }
 
 construct_runtime! {

@@ -6,7 +6,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
     traits::{
         Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
-        WithdrawReasons
+        WithdrawReasons, Get
     }
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
@@ -22,6 +22,7 @@ use primitives::{
     constants::tee::REPORT_SLOT,
     traits::TransferrableCurrency
 };
+use crate::mock::Balance;
 
 #[cfg(test)]
 mod mock;
@@ -71,11 +72,13 @@ impl Default for OrderStatus {
 /// Preference of what happens regarding validation.
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Provision<Hash> {
+pub struct Provision<Hash, Balance> {
     /// Provider's address
     pub address_info: AddressInfo,
-
-    /// Mapping from `file_id` to `order_id`s, this mapping only add when user place the order
+    /// Provider's storage order's price, unit is CRUs/byte/minute
+    pub storage_price: Balance,
+    /// Mapping from `file_id` to `sorder_id`s
+    /// this mapping only be added when client place a sorder
     pub file_map: BTreeMap<MerkleRoot, Vec<Hash>>,
 }
 
@@ -104,7 +107,7 @@ pub trait OrderInspector<AccountId> {
 /// 2. use `Providers` to judge work report
 pub trait MarketInterface<AccountId, Hash, Balance> {
     /// Provision{files} will be used for tee module.
-    fn providers(account_id: &AccountId) -> Option<Provision<Hash>>;
+    fn providers(account_id: &AccountId) -> Option<Provision<Hash, Balance>>;
     /// Vec{order_id} will be used for payment module.
     fn clients(account_id: &AccountId) -> Option<Vec<Hash>>;
     /// Get storage order
@@ -114,7 +117,7 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
-    fn providers(_: &AId) -> Option<Provision<Hash>> {
+    fn providers(_: &AId) -> Option<Provision<Hash, Balance>> {
         None
     }
 
@@ -135,7 +138,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
 {
     fn providers(account_id: &<T as system::Trait>::AccountId)
-        -> Option<Provision<<T as system::Trait>::Hash>> {
+        -> Option<Provision<<T as system::Trait>::Hash, BalanceOf<T>>> {
         Self::providers(account_id)
     }
 
@@ -171,6 +174,12 @@ pub trait Trait: system::Trait {
 
     /// Connector with tee module
     type OrderInspector: OrderInspector<Self::AccountId>;
+
+    /// Minimum storage order price
+    type MinimumStoragePrice: Get<BalanceOf<T>>;
+
+    /// Minimum storage order duration
+    type MinimumSorderDuration: Get<u32>;
 }
 
 // This module's storage items.
@@ -178,7 +187,7 @@ decl_storage! {
     trait Store for Module<T: Trait> as Market {
         /// A mapping from storage provider to order id
         pub Providers get(fn providers):
-        map hasher(twox_64_concat) T::AccountId => Option<Provision<T::Hash>>;
+        map hasher(twox_64_concat) T::AccountId => Option<Provision<T::Hash, BalanceOf<T>>>;
 
         /// A mapping from clients to order id
         pub Clients get(fn clients):
@@ -217,6 +226,8 @@ decl_error! {
         DoublePledged,
         /// Place order to himself
         PlaceSelfOrder,
+        /// Storage price is too low
+        LowStoragePrice,
     }
 }
 
@@ -230,7 +241,11 @@ decl_module! {
 
         /// Register to be a provider, you should provide your storage layer's address info
         #[weight = 1_000_000]
-        pub fn register(origin, address_info: AddressInfo) -> DispatchResult {
+        pub fn register(
+            origin,
+            address_info: AddressInfo,
+            storage_price: BalanceOf<T>
+        ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Make sure you have works
@@ -239,21 +254,26 @@ decl_module! {
             // 2. Check if provider has pledged before
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
-            // 3. Upsert provision
+            // 3. Make sure the storage price
+            ensure!(storage_price >= T::MinumumStoragePrice::get(), Error::<T>::LowStoragePrice);
+
+            // 4. Upsert provision
             <Providers<T>>::mutate(&who, |maybe_provision| {
                 if let Some(provision) = maybe_provision {
-                    // Change provider's address info
+                    // Update provider
                     provision.address_info = address_info;
+                    provision.storage_price = storage_price;
                 } else {
                     // New provider
                     *maybe_provision = Some(Provision {
                         address_info,
+                        storage_price,
                         file_map: BTreeMap::new()
                     })
                 }
             });
 
-            // 4. Emit success
+            // 5. Emit success
             Self::deposit_event(RawEvent::RegisterSuccess(who));
 
             Ok(())
@@ -339,7 +359,7 @@ decl_module! {
             // 5 Upsert pledge ledger
             if pledge_ledger.total.is_zero() {
                 <PledgeLedgers<T>>::remove(&who);
-                // remove the lock.
+                // Remove the lock.
                 T::Currency::remove_lock(MARKET_ID, &who);
             } else {
                 Self::upsert_pledge_ledger(&who, &pledge_ledger);
@@ -356,7 +376,6 @@ decl_module! {
         pub fn place_storage_order(
             origin,
             provider: <T::Lookup as StaticLookup>::Source,
-            #[compact] amount: BalanceOf<T>,
             file_identifier: MerkleRoot,
             file_size: u64,
             duration: u32
@@ -368,7 +387,7 @@ decl_module! {
             ensure!(who != provider, Error::<T>::PlaceSelfOrder);
 
             // 2. Expired should be greater than created
-            ensure!(duration > REPORT_SLOT.try_into().unwrap(), Error::<T>::DurationTooShort);
+            ensure!(duration > T::MinimumSorderDuration::get(), Error::<T>::DurationTooShort);
 
             // 3. Check if provider is registered
             ensure!(<Providers<T>>::contains_key(&provider), Error::<T>::NotProvider);
@@ -376,15 +395,19 @@ decl_module! {
             // 4. Check provider has capacity to store file
             ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
 
-            // 5. Check client has enough currency to pay
-            ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
-
-            // 6. Check if provider pledged
+            // 5. Check if provider pledged and has enough unused pledge
             ensure!(<PledgeLedgers<T>>::contains_key(&provider), Error::<T>::InsufficientPledge);
 
-            // 7. Check provider has unused pledge
             let pledge_ledger = Self::pledge_ledgers(&provider);
+            let provision = Self::providers(&provider).unwrap();
+
+            // Rounded file size from `bytes` to `megabytes`
+            let rounded_file_size = file_size / 1_048_576 + 1;
+            let amount = provision.storage_price.checked_mul((rounded_file_size*duration)).unwrap_or();
             ensure!(amount <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
+
+            // 5. Check client can afford the sorder
+            ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
             // 8. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
@@ -444,7 +467,7 @@ impl<T: Trait> Module<T> {
     fn maybe_insert_sorder(client: &T::AccountId,
                            provider: &T::AccountId,
                            so: &StorageOrder<T::AccountId, BalanceOf<T>>) -> bool {
-        let order_id = Self::get_sorder_id(client, provider);
+        let order_id = Self::generate_sorder_id(client, provider);
 
         // This should be false, cause we don't allow duplicated `order_id`
         if <StorageOrders<T>>::contains_key(&order_id) {
@@ -486,21 +509,6 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn get_sorder_id(client: &T::AccountId, provider: &T::AccountId) -> T::Hash {
-        // 1. Construct random seed
-        // seed = [ block_hash, client_account, provider_account ]
-        let bn = <system::Module<T>>::block_number();
-        let bh: T::Hash = <system::Module<T>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &client.encode()[..],
-            &provider.encode()[..],
-        ].concat();
-
-        // 2. It can cover most cases, for the "real" random
-        T::Randomness::random(seed.as_slice())
-    }
-
     fn upsert_pledge_ledger(
         provider: &T::AccountId,
         pledge_ledger: &PledgeLedger<BalanceOf<T>>
@@ -514,6 +522,23 @@ impl<T: Trait> Module<T> {
         );
         // 2. Update PledgeLedger
         <PledgeLedgers<T>>::insert(&provider, pledge_ledger);
+    }
+
+    // IMMUTABLE PRIVATE
+    // Generate the storage order id by using the on-chain randomness
+    fn generate_sorder_id(client: &T::AccountId, provider: &T::AccountId) -> T::Hash {
+        // 1. Construct random seed, 👼 bless the randomness
+        // seed = [ block_hash, client_account, provider_account ]
+        let bn = <system::Module<T>>::block_number();
+        let bh: T::Hash = <system::Module<T>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &client.encode()[..],
+            &provider.encode()[..],
+        ].concat();
+
+        // 2. It can cover most cases, for the "real" random
+        T::Randomness::random(seed.as_slice())
     }
 }
 

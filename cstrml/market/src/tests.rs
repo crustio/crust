@@ -406,7 +406,7 @@ fn test_for_pledge_should_fail_due_to_double_pledge() {
             DispatchError::Module {
                 index: 0,
                 error: 8,
-                message: Some("DoublePledged")
+                message: Some("AlreadyPledged")
             }
         );
     });

@@ -220,14 +220,14 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            ensure!(<TeeIdentities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
-            ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
+            // ensure!(<TeeIdentities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
+            // ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
 
             // 2. Do timing check
-            ensure!(Self::work_report_timing_check(&work_report).is_ok(), Error::<T>::InvalidReportTime);
+            // ensure!(Self::work_report_timing_check(&work_report).is_ok(), Error::<T>::InvalidReportTime);
 
             // 3. Do sig check
-            ensure!(Self::work_report_sig_check(&work_report), Error::<T>::IllegalWorkReportSig);
+            // ensure!(Self::work_report_sig_check(&work_report), Error::<T>::IllegalWorkReportSig);
 
             // 4. Maybe upsert work report
             if Self::maybe_upsert_work_report(&who, &work_report) {

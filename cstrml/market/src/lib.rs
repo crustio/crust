@@ -11,7 +11,9 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
-use sp_runtime::{traits::{StaticLookup, Zero}};
+use sp_runtime::{
+    traits::{StaticLookup, Zero, CheckedMul, Convert}
+};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -19,10 +21,8 @@ use serde::{Deserialize, Serialize};
 // Crust runtime modules
 use primitives::{
     AddressInfo, MerkleRoot, BlockNumber,
-    constants::tee::REPORT_SLOT,
     traits::TransferrableCurrency
 };
-use crate::mock::Balance;
 
 #[cfg(test)]
 mod mock;
@@ -42,7 +42,8 @@ pub struct StorageOrder<AccountId, Balance> {
     pub expired_on: BlockNumber,
     pub provider: AccountId,
     pub client: AccountId,
-    pub amount: Balance,
+    // payment amount in each slot
+    pub slot_amount: Balance,
     pub status: OrderStatus
 }
 
@@ -163,6 +164,9 @@ pub trait Trait: system::Trait {
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId> + TransferrableCurrency<Self::AccountId>;
 
+    /// Converter from Currency<u64> to Balance.
+    type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
+
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
@@ -176,7 +180,7 @@ pub trait Trait: system::Trait {
     type OrderInspector: OrderInspector<Self::AccountId>;
 
     /// Minimum storage order price
-    type MinimumStoragePrice: Get<BalanceOf<T>>;
+    type MinimumStoragePrice: Get<BalanceOf<Self>>;
 
     /// Minimum storage order duration
     type MinimumSorderDuration: Get<u32>;
@@ -223,7 +227,7 @@ decl_error! {
         /// Not Pledged before
         NotPledged,
         /// Pledged before
-        DoublePledged,
+        AlreadyPledged,
         /// Place order to himself
         PlaceSelfOrder,
         /// Storage price is too low
@@ -255,7 +259,7 @@ decl_module! {
             ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Make sure the storage price
-            ensure!(storage_price >= T::MinumumStoragePrice::get(), Error::<T>::LowStoragePrice);
+            ensure!(storage_price >= T::MinimumStoragePrice::get(), Error::<T>::LowStoragePrice);
 
             // 4. Upsert provision
             <Providers<T>>::mutate(&who, |maybe_provision| {
@@ -294,7 +298,7 @@ decl_module! {
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if provider has not pledged before
-            ensure!(!<PledgeLedgers<T>>::contains_key(&who), Error::<T>::DoublePledged);
+            ensure!(!<PledgeLedgers<T>>::contains_key(&who), Error::<T>::AlreadyPledged);
 
             // 4. Prepare new pledge ledger
             let pledge_ledger = PledgeLedger {
@@ -401,31 +405,37 @@ decl_module! {
             let pledge_ledger = Self::pledge_ledgers(&provider);
             let provision = Self::providers(&provider).unwrap();
 
-            // Rounded file size from `bytes` to `megabytes`
-            let rounded_file_size = file_size / 1_048_576 + 1;
-            let amount = provision.storage_price.checked_mul((rounded_file_size*duration)).unwrap_or();
+            // 6. Get slot amount, unit is amount/minute
+            let slot_amount =
+                Self::get_slot_amount(&provision.storage_price, file_size)
+                .unwrap();
+
+            // 7. Calculate amount = slot_amount * duration
+            let amount = slot_amount.checked_mul(&<T::CurrencyToBalance
+                as Convert<u64, BalanceOf<T>>>::convert(duration as u64)).unwrap();
             ensure!(amount <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
 
-            // 5. Check client can afford the sorder
+            // 8. Check client can afford the sorder
             ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
-            // 8. Construct storage order
+            // 9. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
+            let expired_on = created_on + duration*10;
             let storage_order = StorageOrder::<T::AccountId, BalanceOf<T>> {
                 file_identifier,
                 file_size,
                 created_on,
                 completed_on: created_on,
-                expired_on: created_on + duration, // this will be changed, when `status` become `Success`
+                expired_on, // this will be changed, when `status` become `Success`
                 provider: provider.clone(),
                 client: who.clone(),
-                amount,
+                slot_amount,
                 status: OrderStatus::Pending
             };
 
-            // 9. Pay the order and (maybe) add storage order
-            if Self::maybe_insert_sorder(&who, &provider, &storage_order) {
-                // a. update ledger
+            // 10. Pay the order and (maybe) add storage order
+            if Self::maybe_insert_sorder(&who, &provider, amount.clone(), &storage_order) {
+                // a. update pledge ledger
                 <PledgeLedgers<T>>::mutate(&provider, |pledge_ledger| {
                         pledge_ledger.used += amount;
                 });
@@ -466,6 +476,7 @@ impl<T: Trait> Module<T> {
     // `sorder` is equal to storage order
     fn maybe_insert_sorder(client: &T::AccountId,
                            provider: &T::AccountId,
+                           amount: BalanceOf<T>,
                            so: &StorageOrder<T::AccountId, BalanceOf<T>>) -> bool {
         let order_id = Self::generate_sorder_id(client, provider);
 
@@ -475,7 +486,7 @@ impl<T: Trait> Module<T> {
         } else {
             // 0. If reserve client's balance failed return error
             // TODO: return different error type
-            if !T::Payment::reserve_sorder(&order_id, client, so.amount) {
+            if !T::Payment::reserve_sorder(&order_id, client, amount) {
                 return false
             }
 
@@ -539,6 +550,15 @@ impl<T: Trait> Module<T> {
 
         // 2. It can cover most cases, for the "real" random
         T::Randomness::random(seed.as_slice())
+    }
+
+    // Calculate slot amount
+    fn get_slot_amount(price: &BalanceOf<T>, file_size: u64) -> Option<BalanceOf<T>> {
+        // Rounded file size from `bytes` to `megabytes`
+        // Convert file_size into `Currency`
+        let rounded_file_size = <T::CurrencyToBalance
+            as Convert<u64, BalanceOf<T>>>::convert(file_size / 1_048_576 + 1);
+        price.checked_mul(&rounded_file_size)
     }
 }
 

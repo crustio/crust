@@ -52,26 +52,19 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
     fn pay_sorder(sorder_id: &T::Hash) {
         // 1. Storage order should exist
         if let Some(so) = T::MarketInterface::maybe_get_sorder(sorder_id) {
-            if let Some(ledger) = Self::payments(sorder_id) {
-                // 2. Calculate duration
+            if <Payments<T>>::contains_key(sorder_id) {
+                // 2. Calculate slots
                 let minute = TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
-                let duration = (so.expired_on - so.completed_on) / MINUTES + 1;
+                let slots = (so.expired_on - so.completed_on) / MINUTES;
 
-                // 3. Calculate slot payment amount
-                let total_amount = ledger.total;
-                let slot_amount: BalanceOf<T> =
-                    <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::
-                    convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::
-                    convert(total_amount) / duration as u128 + 1);
-
-                // 4. Arrange a scheduler
+                // 3. Arrange a scheduler
                 // TODO: What if returning an error?
                 let _ = T::Scheduler::schedule_named(
                     sorder_id.encode(),
                     <system::Module<T>>::block_number() + minute, // must have a delay
-                    Some((minute, duration)),
+                    Some((minute, slots)),
                     HARD_DEADLINE,
-                    Call::slot_pay(sorder_id.clone(), slot_amount).into(),
+                    Call::slot_pay(sorder_id.clone(), so.slot_amount).into(),
                 );
             }
         }

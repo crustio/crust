@@ -44,6 +44,8 @@ parameter_types! {
     pub const MaximumBlockWeight: Weight = 1024;
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
+    pub const MinimumStoragePrice: Balance = 1;
+    pub const MinimumSorderDuration: u32 = 1;
 }
 
 impl system::Trait for Test {
@@ -112,10 +114,13 @@ impl Payment<<Test as system::Trait>::AccountId,
 
 impl Trait for Test {
     type Currency = Balances;
+    type CurrencyToBalance = ();
     type Event = ();
     type Randomness = ();
     type Payment = Market;
     type OrderInspector = TestOrderInspector;
+    type MinimumStoragePrice = MinimumStoragePrice;
+    type MinimumSorderDuration = MinimumSorderDuration;
 }
 
 pub type Market = Module<Test>;

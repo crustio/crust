@@ -42,8 +42,8 @@ pub struct StorageOrder<AccountId, Balance> {
     pub expired_on: BlockNumber,
     pub provider: AccountId,
     pub client: AccountId,
-    // payment amount in each slot
-    pub slot_amount: Balance,
+    // Payment amount in each slot
+    pub amount: Balance,
     pub status: OrderStatus
 }
 
@@ -57,7 +57,7 @@ pub enum OrderStatus {
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct PledgeLedger<Balance> {
+pub struct Pledge<Balance> {
     // total balance of pledge
     pub total: Balance,
     // used balance of pledge
@@ -202,8 +202,8 @@ decl_storage! {
         map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
 
         /// Pledge details iterated by provider id
-        pub PledgeLedgers get(fn pledge_ledgers):
-        map hasher(twox_64_concat) T::AccountId => PledgeLedger<BalanceOf<T>>;
+        pub Pledges get(fn pledges):
+        map hasher(twox_64_concat) T::AccountId => Pledge<BalanceOf<T>>;
     }
 }
 
@@ -256,7 +256,7 @@ decl_module! {
             ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
 
             // 2. Check if provider has pledged before
-            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+            ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Make sure the storage price
             ensure!(storage_price >= T::MinimumStoragePrice::get(), Error::<T>::LowStoragePrice);
@@ -298,16 +298,16 @@ decl_module! {
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if provider has not pledged before
-            ensure!(!<PledgeLedgers<T>>::contains_key(&who), Error::<T>::AlreadyPledged);
+            ensure!(!<Pledges<T>>::contains_key(&who), Error::<T>::AlreadyPledged);
 
-            // 4. Prepare new pledge ledger
-            let pledge_ledger = PledgeLedger {
+            // 4. Prepare new pledge
+            let pledge = Pledge {
                 total: value,
                 used: Zero::zero()
             };
 
-            // 5 Upsert pledge ledger
-            Self::upsert_pledge_ledger(&who, &pledge_ledger);
+            // 5 Upsert pledge
+            Self::upsert_pledge(&who, &pledge);
 
             // 6. Emit success
             Self::deposit_event(RawEvent::PledgeSuccess(who));
@@ -324,17 +324,17 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if provider has pledged before
-            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+            ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Ensure provider has enough currency.
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
-            let mut pledge_ledger = Self::pledge_ledgers(&who);
+            let mut pledge = Self::pledges(&who);
             // 4. Increase total value
-            pledge_ledger.total += value;
+            pledge.total += value;
 
-            // 5 Upsert pledge ledger
-            Self::upsert_pledge_ledger(&who, &pledge_ledger);
+            // 5 Upsert pledge
+            Self::upsert_pledge(&who, &pledge);
 
             // 6. Emit success
             Self::deposit_event(RawEvent::PledgeSuccess(who));
@@ -351,22 +351,22 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if provider has pledged before
-            ensure!(<PledgeLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+            ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Ensure value is smaller than unused.
-            let mut pledge_ledger = Self::pledge_ledgers(&who);
-            ensure!(value <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
+            let mut pledge = Self::pledges(&who);
+            ensure!(value <= pledge.total - pledge.used, Error::<T>::InsufficientPledge);
 
             // 4. Decrease total value
-            pledge_ledger.total -= value;
+            pledge.total -= value;
 
-            // 5 Upsert pledge ledger
-            if pledge_ledger.total.is_zero() {
-                <PledgeLedgers<T>>::remove(&who);
+            // 5 Upsert pledge
+            if pledge.total.is_zero() {
+                <Pledges<T>>::remove(&who);
                 // Remove the lock.
                 T::Currency::remove_lock(MARKET_ID, &who);
             } else {
-                Self::upsert_pledge_ledger(&who, &pledge_ledger);
+                Self::upsert_pledge(&who, &pledge);
             }
 
             // 6. Emit success
@@ -400,20 +400,16 @@ decl_module! {
             ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
 
             // 5. Check if provider pledged and has enough unused pledge
-            ensure!(<PledgeLedgers<T>>::contains_key(&provider), Error::<T>::InsufficientPledge);
+            ensure!(<Pledges<T>>::contains_key(&provider), Error::<T>::InsufficientPledge);
 
-            let pledge_ledger = Self::pledge_ledgers(&provider);
+            let pledge = Self::pledges(&provider);
             let provision = Self::providers(&provider).unwrap();
 
-            // 6. Get slot amount, unit is amount/minute
-            let slot_amount =
-                Self::get_slot_amount(&provision.storage_price, file_size)
-                .unwrap();
+            // 6. Get amount
+            let amount = Self::get_sorder_amount(&provision.storage_price, file_size, duration).unwrap();
 
-            // 7. Calculate amount = slot_amount * duration
-            let amount = slot_amount.checked_mul(&<T::CurrencyToBalance
-                as Convert<u64, BalanceOf<T>>>::convert(duration as u64)).unwrap();
-            ensure!(amount <= pledge_ledger.total - pledge_ledger.used, Error::<T>::InsufficientPledge);
+            // 7. Judge if provider's pledge is enough
+            ensure!(amount <= pledge.total - pledge.used, Error::<T>::InsufficientPledge);
 
             // 8. Check client can afford the sorder
             ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
@@ -429,15 +425,15 @@ decl_module! {
                 expired_on, // this will be changed, when `status` become `Success`
                 provider: provider.clone(),
                 client: who.clone(),
-                slot_amount,
+                amount,
                 status: OrderStatus::Pending
             };
 
             // 10. Pay the order and (maybe) add storage order
             if Self::maybe_insert_sorder(&who, &provider, amount.clone(), &storage_order) {
-                // a. update pledge ledger
-                <PledgeLedgers<T>>::mutate(&provider, |pledge_ledger| {
-                        pledge_ledger.used += amount;
+                // a. update pledge
+                <Pledges<T>>::mutate(&provider, |pledge| {
+                        pledge.used += amount;
                 });
                 // b. emit storage order success event
                 Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
@@ -520,19 +516,19 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn upsert_pledge_ledger(
+    fn upsert_pledge(
         provider: &T::AccountId,
-        pledge_ledger: &PledgeLedger<BalanceOf<T>>
+        pledge: &Pledge<BalanceOf<T>>
     ) {
         // 1. Set lock
         T::Currency::set_lock(
             MARKET_ID,
             &provider,
-            pledge_ledger.total,
+            pledge.total,
             WithdrawReasons::all(),
         );
-        // 2. Update PledgeLedger
-        <PledgeLedgers<T>>::insert(&provider, pledge_ledger);
+        // 2. Update Pledge
+        <Pledges<T>>::insert(&provider, pledge);
     }
 
     // IMMUTABLE PRIVATE
@@ -552,13 +548,17 @@ impl<T: Trait> Module<T> {
         T::Randomness::random(seed.as_slice())
     }
 
-    // Calculate slot amount
-    fn get_slot_amount(price: &BalanceOf<T>, file_size: u64) -> Option<BalanceOf<T>> {
+    // Calculate storage order's amount
+    fn get_sorder_amount(price: &BalanceOf<T>, file_size: u64, duration: u32) -> Option<BalanceOf<T>> {
         // Rounded file size from `bytes` to `megabytes`
-        // Convert file_size into `Currency`
-        let rounded_file_size = <T::CurrencyToBalance
-            as Convert<u64, BalanceOf<T>>>::convert(file_size / 1_048_576 + 1);
-        price.checked_mul(&rounded_file_size)
+        let mut rounded_file_size = file_size / 1_048_576;
+        if file_size % 1_048_576 != 0 {
+            rounded_file_size += 1;
+        }
+
+        // Convert file size into `Currency`
+        price.checked_mul(&<T::CurrencyToBalance
+        as Convert<u64, BalanceOf<T>>>::convert(rounded_file_size * (duration as u64)))
     }
 }
 

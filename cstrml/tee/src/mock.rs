@@ -211,7 +211,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
     let punishment = ProviderPunishment {
         success: 0,
         failed: 0,
-        punished_value: Zero::zero()
+        value: Zero::zero()
     };
     <market::ProviderPunishments<Test>>::insert(sorder_id, punishment);
 }

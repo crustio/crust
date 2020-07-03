@@ -539,10 +539,10 @@ impl<T: Trait> Module<T> {
             real_punish_value = real_punish_value.min(so.amount - punishment.value);
             T::Currency::slash(&so.provider, real_punish_value);
             // Update ledger
-            let mut pledge_ledger = Self::pledge_ledgers(&so.provider);
-            pledge_ledger.total -= real_punish_value;
-            pledge_ledger.used -= real_punish_value;
-            Self::upsert_pledge_ledger(&so.provider, &pledge_ledger);
+            let mut pledge = Self::pledges(&so.provider);
+            pledge.total -= real_punish_value;
+            pledge.used -= real_punish_value;
+            Self::upsert_pledge(&so.provider, &pledge);
         }
         real_punish_value
     }

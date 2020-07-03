@@ -475,17 +475,20 @@ fn test_for_half_punish_should_work() {
         let provider: u64 = 100;
         let client: u64 = 0;
         let file_size = 16; // should less than provider
-        let duration = 360; // file should store at least 30 minutes
-        let fee = 10;
+        let duration = 10;
+        let fee: u64 = 1;
+        let amount: u64 = 10;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 200);
+        let _ = Balances::make_free_balance_be(&source, 60);
 
         // 1. Normal flow, aka happy pass 😃
         let _ = Balances::make_free_balance_be(&provider, 200);
+
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), provider, fee,
+            Origin::signed(source), provider,
             file_identifier.clone(), file_size, duration
         ));
 
@@ -495,17 +498,17 @@ fn test_for_half_punish_should_work() {
             file_size: 16,
             created_on: 50,
             completed_on: 50,
-            expired_on: 410,
+            expired_on: 50+10*10,
             provider,
             client,
-            amount: fee,
+            amount,
             status: OrderStatus::Pending
         });
 
         set_punishment_in_success_count(&order_id, 90);
 
         assert_eq!(Balances::free_balance(&provider), 195);
-        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+        assert_eq!(Market::pledges(&provider), Pledge {
             total: 55,
             used: 5
         });
@@ -513,7 +516,7 @@ fn test_for_half_punish_should_work() {
         set_punishment_in_success_count(&order_id, 90);
 
         assert_eq!(Balances::free_balance(&provider), 190);
-        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+        assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });
@@ -522,7 +525,7 @@ fn test_for_half_punish_should_work() {
         set_punishment_in_success_count(&order_id, 90);
 
         assert_eq!(Balances::free_balance(&provider), 190);
-        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+        assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });
@@ -541,17 +544,19 @@ fn test_for_full_punish_should_work() {
         let provider: u64 = 100;
         let client: u64 = 0;
         let file_size = 16; // should less than provider
-        let duration = 360; // file should store at least 30 minutes
-        let fee = 10;
+        let duration = 10;
+        let fee: u64 = 1;
+        let amount: u64 = 10;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 200);
+        let _ = Balances::make_free_balance_be(&source, 60);
 
         // 1. Normal flow, aka happy pass 😃
         let _ = Balances::make_free_balance_be(&provider, 200);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), provider, fee,
+            Origin::signed(source), provider,
             file_identifier.clone(), file_size, duration
         ));
 
@@ -561,17 +566,17 @@ fn test_for_full_punish_should_work() {
             file_size: 16,
             created_on: 50,
             completed_on: 50,
-            expired_on: 410,
+            expired_on: 50+10*10,
             provider,
             client,
-            amount: fee,
+            amount,
             status: OrderStatus::Pending
         });
 
         set_punishment_in_success_count(&order_id, 95);
 
         assert_eq!(Balances::free_balance(&provider), 200);
-        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+        assert_eq!(Market::pledges(&provider), Pledge {
             total: 60,
             used: 10
         });
@@ -579,7 +584,7 @@ fn test_for_full_punish_should_work() {
         set_punishment_in_success_count(&order_id, 89);
 
         assert_eq!(Balances::free_balance(&provider), 190);
-        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+        assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });
@@ -587,7 +592,7 @@ fn test_for_full_punish_should_work() {
         set_punishment_in_success_count(&order_id, 90);
 
         assert_eq!(Balances::free_balance(&provider), 190);
-        assert_eq!(Market::pledge_ledgers(&provider), PledgeLedger {
+        assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });

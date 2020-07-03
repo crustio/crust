@@ -48,7 +48,7 @@ pub use timestamp::Call as TimestampCall;
 
 /// Crust primitives
 use primitives::{
-    constants::{time::*, currency::*, tee::REPORT_SLOT},
+    constants::{time::*, currency::*},
     *
 };
 

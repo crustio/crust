@@ -116,6 +116,8 @@ impl market::OrderInspector<AccountId> for TestOrderInspector {
 
 parameter_types! {
 	pub const MaximumWeight: u32 = 1000000;
+    pub const MinimumStoragePrice: Balance = 1;
+    pub const MinimumSorderDuration: u32 = 1;
 }
 
 impl scheduler::Trait for Test {
@@ -142,10 +144,13 @@ impl tee::Trait for Test {
 
 impl market::Trait for Test {
     type Currency = Balances;
+    type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();
     type Randomness = ();
     type Payment = Payment;
     type OrderInspector = TestOrderInspector;
+    type MinimumStoragePrice = MinimumStoragePrice;
+    type MinimumSorderDuration = MinimumSorderDuration;
 }
 
 impl Trait for Test {

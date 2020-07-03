@@ -8,7 +8,7 @@ use frame_support::{
 use sp_core::H256;
 use sp_runtime::{
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
+    traits::{BlakeTwo256, IdentityLookup, SaturatedConversion},
     Perbill,
 };
 use std::{cell::RefCell};
@@ -36,6 +36,30 @@ pub struct ExistentialDeposit;
 impl Get<u64> for ExistentialDeposit {
     fn get() -> u64 {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
+    }
+}
+
+pub struct CurrencyToVoteHandler;
+impl Convert<u64, u64> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u64 {
+        x
+    }
+}
+impl Convert<u128, u64> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u64 {
+        x.saturated_into()
+    }
+}
+
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 {
+        x
+    }
+}
+
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
     }
 }
 
@@ -114,7 +138,7 @@ impl Payment<<Test as system::Trait>::AccountId,
 
 impl Trait for Test {
     type Currency = Balances;
-    type CurrencyToBalance = ();
+    type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();
     type Randomness = ();
     type Payment = Market;

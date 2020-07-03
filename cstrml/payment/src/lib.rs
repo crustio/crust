@@ -63,10 +63,9 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
                 // 2. Calculate slots
                 // TODO: Change fixed time frequency to fixed slots
                 let minute = TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
-                let duration = so.expired_on - so.completed_on;
-                let slots = duration / MINUTES;
+                let slots = (so.expired_on - so.completed_on) / MINUTES;
                 let slot_amount = so.amount.checked_div(&<T::CurrencyToBalance
-                    as Convert<u64, BalanceOf<T>>>::convert(duration as u64)).unwrap();
+                    as Convert<u64, BalanceOf<T>>>::convert(slots as u64)).unwrap();
 
                 // 3. Arrange a scheduler
                 // TODO: What if returning an error?

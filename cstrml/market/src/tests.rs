@@ -64,7 +64,7 @@ fn test_for_storage_order_should_work() {
             file_size: 16,
             created_on: 50,
             completed_on: 50,
-            expired_on: 410,
+            expired_on: 50+10*10,
             provider,
             client,
             amount,
@@ -82,7 +82,7 @@ fn test_for_storage_order_should_work() {
         });
         assert_eq!(Market::pledges(provider), Pledge {
             total: 60,
-            used: fee
+            used: amount
         });
     });
 }
@@ -390,7 +390,7 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
             file_size: 16,
             created_on: 50,
             completed_on: 50,
-            expired_on: 410,
+            expired_on: 50+60*10,
             provider: 100,
             client: 0,
             amount,

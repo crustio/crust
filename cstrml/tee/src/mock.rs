@@ -96,10 +96,13 @@ impl market::Payment<<Test as system::Trait>::AccountId,
 
 impl market::Trait for Test {
     type Currency = balances::Module<Self>;
+    type CurrencyToBalance = ();
     type Event = ();
     type Randomness = ();
     type Payment = Tee;
     type OrderInspector = Tee;
+    type MinimumStoragePrice = ();
+    type MinimumSorderDuration = ();
 }
 
 impl Trait for Test {
@@ -196,6 +199,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
 
     let provision = Provision {
         address_info: vec![],
+        storage_price: 1,
         file_map
     };
     <market::Providers<Test>>::insert(who, provision);

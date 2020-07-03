@@ -64,7 +64,7 @@ pub enum OrderStatus {
 pub struct ProviderPunishment<Balance> {
     pub success: EraIndex,
     pub failed: EraIndex,
-    pub punished_value: Balance
+    pub value: Balance
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -504,10 +504,10 @@ impl<T: Trait> Module<T> {
         } else {
 
         }
-        if punishment.success + punishment.failed >= punish_duration && punishment.punished_value < so.amount {
+        if punishment.success + punishment.failed >= punish_duration && punishment.value < so.amount {
             // 2. Do slash
-            let real_punish_value = Self::do_slash_provider(&so, &punishment, &punish_duration);
-            punishment.punished_value += real_punish_value;
+            let real_punish_value = Self::punish_provider(&so, &punishment, &punish_duration);
+            punishment.value += real_punish_value;
             // TODO: add closed status here.
             // 3. Reset Provider Punishment
             punishment.success = 0;
@@ -518,7 +518,7 @@ impl<T: Trait> Module<T> {
         <ProviderPunishments<T>>::insert(&order_id, punishment);
     }
 
-    pub fn do_slash_provider(
+    pub fn punish_provider(
         so: &StorageOrder<T::AccountId, BalanceOf<T>>,
         punishment: &ProviderPunishment<BalanceOf<T>>,
         punish_duration: &EraIndex
@@ -536,7 +536,7 @@ impl<T: Trait> Module<T> {
 
         // Do slash
         if !real_punish_value.is_zero() {
-            real_punish_value = real_punish_value.min(so.amount - punishment.punished_value);
+            real_punish_value = real_punish_value.min(so.amount - punishment.value);
             T::Currency::slash(&so.provider, real_punish_value);
             // Update ledger
             let mut pledge_ledger = Self::pledge_ledgers(&so.provider);
@@ -595,7 +595,7 @@ impl<T: Trait> Module<T> {
             let slash_record = ProviderPunishment {
                 success: 0,
                 failed: 0,
-                punished_value: Zero::zero()
+                value: Zero::zero()
             };
             <ProviderPunishments<T>>::insert(&order_id, slash_record);
 

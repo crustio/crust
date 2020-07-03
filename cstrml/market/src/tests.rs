@@ -20,23 +20,25 @@ fn test_for_storage_order_should_work() {
         let provider: u64 = 100;
         let client: u64 = 0;
         let file_size = 16; // should less than provider
-        let duration = 360; // file should store at least 30 minutes
-        let fee = 10;
+        let duration = 10;
+        let fee: u64 = 1;
+        let amount: u64 = 10;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 80);
+        let _ = Balances::make_free_balance_be(&source, 60);
 
         // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&provider, 80);
+        let _ = Balances::make_free_balance_be(&provider, 60);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
         assert_ok!(Market::cut_pledge(Origin::signed(provider.clone()), 60));
-        assert!(!<PledgeLedgers<Test>>::contains_key(provider.clone()));
+        assert!(!<Pledges<Test>>::contains_key(provider.clone()));
         assert_eq!(Balances::locks(provider.clone()).len(), 0);
+
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone()));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
 
         assert_noop!(
             Market::place_storage_order(
-                Origin::signed(provider.clone()), provider.clone(), fee,
+                Origin::signed(provider.clone()), provider.clone(),
                 file_identifier.clone(), file_size, duration
             ),
             DispatchError::Module {
@@ -46,13 +48,14 @@ fn test_for_storage_order_should_work() {
             }
         );
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), provider, fee,
+            Origin::signed(source), provider,
             file_identifier.clone(), file_size, duration
         ));
 
         let order_id = H256::default();
         assert_eq!(Market::providers(&provider).unwrap(), Provision {
             address_info,
+            storage_price: fee,
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
         assert_eq!(Market::clients(&client).unwrap(), vec![order_id.clone()]);
@@ -61,23 +64,25 @@ fn test_for_storage_order_should_work() {
             file_size: 16,
             created_on: 50,
             completed_on: 50,
-            expired_on: 410,
+            expired_on: 50+10*10,
             provider,
             client,
-            amount: fee,
+            amount,
             status: OrderStatus::Pending
         });
 
         // 2. Register after get order, address should update but others should not
         let another_address_info = "ws://127.0.0.1:9900".as_bytes().to_vec();
-        assert_ok!(Market::register(Origin::signed(provider.clone()), another_address_info.clone()));
+        let another_price: u64 = 2;
+        assert_ok!(Market::register(Origin::signed(provider.clone()), another_address_info.clone(), another_price));
         assert_eq!(Market::providers(&provider).unwrap(), Provision {
             address_info: another_address_info.clone(),
+            storage_price: another_price,
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 60,
-            used: fee
+            used: amount
         });
     });
 }
@@ -93,16 +98,16 @@ fn test_for_storage_order_should_fail_due_to_file_size() {
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let provider = 100;
         let file_size = 200; // should less than provider
-        let duration = 360;
-        let fee = 10;
+        let duration = 10;
+        let fee = 1;
         let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
 
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0));
-        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
+        assert_ok!(Market::register(Origin::signed(provider), address.clone(), fee));
         assert_noop!(
             Market::place_storage_order(
-                Origin::signed(source.clone()), provider, fee,
+                Origin::signed(source.clone()), provider,
                 file_identifier, file_size, duration
             ),
             DispatchError::Module {
@@ -115,7 +120,7 @@ fn test_for_storage_order_should_fail_due_to_file_size() {
 }
 
 #[test]
-fn test_for_storage_order_should_fail_due_to_wrong_expired() {
+fn test_for_storage_order_should_fail_due_to_duration_too_short() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -125,15 +130,15 @@ fn test_for_storage_order_should_fail_due_to_wrong_expired() {
             hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let provider = 100;
         let file_size = 60; // should less than provider
-        let duration = 20;
-        let fee = 10;
+        let duration = 1; // shoule more than 1 minute
+        let fee = 1;
         let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0));
-        assert_ok!(Market::register(Origin::signed(provider), address.clone()));
+        assert_ok!(Market::register(Origin::signed(provider), address.clone(), fee));
         assert_noop!(
             Market::place_storage_order(
-                Origin::signed(source.clone()), provider, fee,
+                Origin::signed(source.clone()), provider,
                 file_identifier, file_size, duration
             ),
             DispatchError::Module {
@@ -146,7 +151,27 @@ fn test_for_storage_order_should_fail_due_to_wrong_expired() {
 }
 
 #[test]
-fn test_for_storage_order_should_fail_due_to_exist_of_wr() {
+fn test_for_register_should_fail_due_to_low_price() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let provider = 100;
+        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0));
+        assert_noop!(
+            Market::register(Origin::signed(provider), address.clone(), 0),
+            DispatchError::Module {
+                index: 0,
+                error: 10,
+                message: Some("LowStoragePrice"),
+            }
+        );
+    });
+}
+
+#[test]
+fn test_for_storage_order_should_fail_due_to_wr_not_exist() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -155,7 +180,7 @@ fn test_for_storage_order_should_fail_due_to_exist_of_wr() {
         let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 0));
         assert_noop!(
-            Market::register(Origin::signed(provider), address.clone()),
+            Market::register(Origin::signed(provider), address.clone(), 1),
             DispatchError::Module {
                 index: 0,
                 error: 1,
@@ -176,12 +201,11 @@ fn test_for_storage_order_should_fail_due_to_provider_not_register() {
             hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let provider = 100;
         let file_size = 80; // should less than provider
-        let duration = 360;
-        let fee = 10;
+        let duration = 10;
 
         assert_noop!(
             Market::place_storage_order(
-                Origin::signed(source.clone()), provider, fee,
+                Origin::signed(source.clone()), provider,
                 file_identifier, file_size, duration
             ),
             DispatchError::Module {
@@ -202,18 +226,18 @@ fn test_for_pledge_should_work() {
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&provider, 200);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 180));
-        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone(), 1));
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 180,
             used: 0
         });
         assert_ok!(Market::cut_pledge(Origin::signed(provider), 20));
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 160,
             used: 0
         });
         assert_ok!(Market::pledge_extra(Origin::signed(provider), 10));
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 170,
             used: 0
         });
@@ -221,7 +245,7 @@ fn test_for_pledge_should_work() {
 }
 
 #[test]
-fn test_for_pledge_extra_should_fail_due_to_provider_not_pledge() {
+fn test_for_pledge_extra_should_fail_due_to_provider_not_pledges() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -276,25 +300,27 @@ fn test_for_pledge_should_fail_due_to_insufficient_pledge() {
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let provider = 100;
         let file_size = 16; // should less than provider
-        let duration = 360; // file should store at least 30 minutes
-        let fee = 50;
+        let duration = 50;
+        let fee = 1;
+        let amount: u64 = 50;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 80);
         let _ = Balances::make_free_balance_be(&provider, 80);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 70));
-        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
+
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone(), fee));
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), provider, fee,
+            Origin::signed(source), provider,
             file_identifier.clone(), file_size, duration
         ));
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 70,
-            used: fee
+            used: amount
         });
         assert_ok!(Market::cut_pledge(Origin::signed(provider), 20));
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 50,
-            used: fee
+            used: amount
         });
         assert_noop!(
             Market::cut_pledge(
@@ -321,16 +347,17 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let provider = 100;
         let file_size = 16; // should less than provider
-        let duration = 360; // file should store at least 30 minutes
-        let fee = 60;
+        let duration = 60;
+        let fee = 1;
+        let amount: u64 = 60;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 80);
         let _ = Balances::make_free_balance_be(&provider, 80);
         assert_ok!(Market::pledge(Origin::signed(provider), 0));
-        assert_ok!(Market::register(Origin::signed(provider), address_info.clone()));
+        assert_ok!(Market::register(Origin::signed(provider), address_info.clone(), fee));
         assert_noop!(
             Market::place_storage_order(
-                Origin::signed(source.clone()), provider, fee,
+                Origin::signed(source.clone()), provider,
                 file_identifier.clone(), file_size, duration
             ),
             DispatchError::Module {
@@ -339,29 +366,14 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
                 message: Some("InsufficientPledge"),
             }
         );
-        assert_ok!(Market::pledge_extra(Origin::signed(provider), 40));
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
-            total: 40,
-            used: 0
-        });
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(source.clone()), provider, fee,
-                file_identifier.clone(), file_size, duration
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 5,
-                message: Some("InsufficientPledge"),
-            }
-        );
-        assert_ok!(Market::pledge_extra(Origin::signed(provider), 20));
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+
+        assert_ok!(Market::pledge_extra(Origin::signed(provider), 60));
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 60,
             used: 0
         });
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), provider, fee,
+            Origin::signed(source), provider,
             file_identifier.clone(), file_size, duration
         ));
 
@@ -369,21 +381,22 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
         
         assert_eq!(Market::providers(&provider).unwrap(), Provision {
             address_info,
+            storage_price: fee,
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
-        assert_eq!(Market::clients(0).unwrap(), vec![order_id.clone()]);
+        assert_eq!(Market::clients(&0).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
             file_identifier,
             file_size: 16,
             created_on: 50,
             completed_on: 50,
-            expired_on: 410,
+            expired_on: 50+60*10,
             provider: 100,
             client: 0,
-            amount: fee,
+            amount,
             status: Default::default()
         });
-        assert_eq!(Market::pledge_ledgers(provider), PledgeLedger {
+        assert_eq!(Market::pledges(provider), Pledge {
             total: 60,
             used: 60
         });
@@ -406,7 +419,7 @@ fn test_for_pledge_should_fail_due_to_double_pledge() {
             DispatchError::Module {
                 index: 0,
                 error: 8,
-                message: Some("DoublePledged")
+                message: Some("AlreadyPledged")
             }
         );
     });

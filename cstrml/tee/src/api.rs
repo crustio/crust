@@ -224,4 +224,6 @@ DaVzWh5aiEx+idkSGMnX
         }
         None
     }
+    // ✅ 1. use wasm version, (p256 -> scep256k1 | x509 -> wasm version)
+    // 2. offchain_worker? forkless upgrade?
 }

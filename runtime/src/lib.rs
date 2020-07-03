@@ -47,7 +47,10 @@ use session::{historical as session_historical};
 pub use timestamp::Call as TimestampCall;
 
 /// Crust primitives
-use primitives::{constants::{time::*, currency::*}, *};
+use primitives::{
+    constants::{time::*, currency::*, tee::REPORT_SLOT},
+    *
+};
 
 #[cfg(feature = "std")]
 pub use staking::StakerStatus;
@@ -405,13 +408,23 @@ impl tee::Trait for Runtime {
     type MarketInterface = Market;
 }
 
+parameter_types! {
+    /// Unit is pico
+	pub const MinimumStoragePrice: Balance = 40;
+	/// Unit is minute
+	pub const MinimumSorderDuration: u32 = 30;
+}
+
 impl market::Trait for Runtime {
     type Currency = Balances;
+    type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = Event;
     type Randomness = RandomnessCollectiveFlip;
     // TODO: Bonding with balance module(now we impl inside Market)
     type Payment = Payment;
     type OrderInspector = Tee;
+    type MinimumStoragePrice = MinimumStoragePrice;
+    type MinimumSorderDuration = MinimumSorderDuration;
 }
 
 impl payment::Trait for Runtime {

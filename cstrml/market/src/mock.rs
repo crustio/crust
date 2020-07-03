@@ -8,7 +8,7 @@ use frame_support::{
 use sp_core::H256;
 use sp_runtime::{
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
+    traits::{BlakeTwo256, IdentityLookup, SaturatedConversion},
     Perbill,
 };
 use std::{cell::RefCell};
@@ -39,11 +39,37 @@ impl Get<u64> for ExistentialDeposit {
     }
 }
 
+pub struct CurrencyToVoteHandler;
+impl Convert<u64, u64> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u64 {
+        x
+    }
+}
+impl Convert<u128, u64> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u64 {
+        x.saturated_into()
+    }
+}
+
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 {
+        x
+    }
+}
+
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
+    }
+}
+
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const MaximumBlockWeight: Weight = 1024;
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
+    pub const MinimumStoragePrice: Balance = 1;
+    pub const MinimumSorderDuration: u32 = 1;
 }
 
 impl system::Trait for Test {
@@ -112,10 +138,13 @@ impl Payment<<Test as system::Trait>::AccountId,
 
 impl Trait for Test {
     type Currency = Balances;
+    type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();
     type Randomness = ();
     type Payment = Market;
     type OrderInspector = TestOrderInspector;
+    type MinimumStoragePrice = MinimumStoragePrice;
+    type MinimumSorderDuration = MinimumSorderDuration;
 }
 
 pub type Market = Module<Test>;

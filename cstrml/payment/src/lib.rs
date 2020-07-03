@@ -9,9 +9,16 @@ use frame_support::{
         Currency, ReservableCurrency
     }
 };
-use sp_std::{prelude::*, convert::{TryInto}};
+use sp_std::{
+    prelude::*,
+    convert::{TryInto}
+};
 use system::{ensure_root};
-use sp_runtime::{traits::{Dispatchable, Zero, Convert}};
+use sp_runtime::{
+    traits::{
+        Dispatchable, Zero, Convert, CheckedDiv
+    }
+};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -52,24 +59,20 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
     fn pay_sorder(sorder_id: &T::Hash) {
         // 1. Storage order should exist
         if let Some(so) = T::MarketInterface::maybe_get_sorder(sorder_id) {
-            if let Some(ledger) = Self::payments(sorder_id) {
-                // 2. Calculate duration
+            if <Payments<T>>::contains_key(sorder_id) {
+                // 2. Calculate slots
+                // TODO: Change fixed time frequency to fixed slots
                 let minute = TryInto::<T::BlockNumber>::try_into(MINUTES).ok().unwrap();
-                let duration = (so.expired_on - so.completed_on) / MINUTES + 1;
+                let slots = (so.expired_on - so.completed_on) / MINUTES;
+                let slot_amount = so.amount.checked_div(&<T::CurrencyToBalance
+                    as Convert<u64, BalanceOf<T>>>::convert(slots as u64)).unwrap();
 
-                // 3. Calculate slot payment amount
-                let total_amount = ledger.total;
-                let slot_amount: BalanceOf<T> =
-                    <T::CurrencyToBalance as Convert<u128, BalanceOf<T>>>::
-                    convert(<T::CurrencyToBalance as Convert<BalanceOf<T>, u128>>::
-                    convert(total_amount) / duration as u128 + 1);
-
-                // 4. Arrange a scheduler
+                // 3. Arrange a scheduler
                 // TODO: What if returning an error?
                 let _ = T::Scheduler::schedule_named(
                     sorder_id.encode(),
                     <system::Module<T>>::block_number() + minute, // must have a delay
-                    Some((minute, duration)),
+                    Some((minute, slots)),
                     HARD_DEADLINE,
                     Call::slot_pay(sorder_id.clone(), slot_amount).into(),
                 );
@@ -99,8 +102,8 @@ pub trait Trait: system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
-    /// Used to transfer
-    type CurrencyToBalance: Convert<BalanceOf<Self>, u128> + Convert<u128, BalanceOf<Self>>;
+    /// Used to calculate payment
+    type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
 
     /// The Scheduler.
     type Scheduler: ScheduleNamed<Self::BlockNumber, Self::Proposal>;

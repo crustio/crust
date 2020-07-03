@@ -3,7 +3,7 @@ use crate::*;
 use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{ OnInitialize, OnFinalize, Get}
+    traits::{OnInitialize, OnFinalize, Get}
 };
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};

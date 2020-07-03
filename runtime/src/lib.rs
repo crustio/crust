@@ -410,9 +410,9 @@ impl tee::Trait for Runtime {
 
 parameter_types! {
     /// Unit is pico
-	pub const MinimumStoragePrice: Balance = 40;
-	/// Unit is minute
-	pub const MinimumSorderDuration: u32 = 30;
+    pub const MinimumStoragePrice: Balance = 40;
+    /// Unit is minute
+    pub const MinimumSorderDuration: u32 = 30;
     pub const PunishDuration: market::EraIndex = 300;
 }
 

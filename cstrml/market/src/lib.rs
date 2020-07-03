@@ -206,7 +206,8 @@ pub trait Trait: system::Trait {
 
     /// Minimum storage order duration
     type MinimumSorderDuration: Get<u32>;
-    /// Slashing Duration
+
+    /// Punishment Duration
     type PunishDuration: Get<EraIndex>;
 }
 

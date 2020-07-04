@@ -48,7 +48,7 @@ pub use timestamp::Call as TimestampCall;
 
 /// Crust primitives
 use primitives::{
-    constants::{time::*, currency::*, tee::REPORT_SLOT},
+    constants::{time::*, currency::*},
     *
 };
 
@@ -410,9 +410,10 @@ impl tee::Trait for Runtime {
 
 parameter_types! {
     /// Unit is pico
-	pub const MinimumStoragePrice: Balance = 40;
-	/// Unit is minute
-	pub const MinimumSorderDuration: u32 = 30;
+    pub const MinimumStoragePrice: Balance = 40;
+    /// Unit is minute
+    pub const MinimumSorderDuration: u32 = 30;
+    pub const PunishDuration: market::EraIndex = 300;
 }
 
 impl market::Trait for Runtime {
@@ -425,6 +426,7 @@ impl market::Trait for Runtime {
     type OrderInspector = Tee;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
+    type PunishDuration = PunishDuration;
 }
 
 impl payment::Trait for Runtime {

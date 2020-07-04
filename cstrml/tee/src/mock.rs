@@ -3,16 +3,16 @@ use crate::*;
 use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{ OnInitialize, OnFinalize, Get }
+    traits::{OnInitialize, OnFinalize, Get}
 };
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup},
+    traits::{BlakeTwo256, IdentityLookup, Zero},
     Perbill,
 };
-use market::{Provision, StorageOrder};
+use market::{Provision, StorageOrder, ProviderPunishment};
 use primitives::{MerkleRoot, Hash};
 use balances::AccountData;
 use std::{cell::RefCell};
@@ -93,6 +93,9 @@ impl market::Payment<<Test as system::Trait>::AccountId,
     fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
 }
 
+parameter_types! {
+    pub const PunishDuration: market::EraIndex = 100;
+}
 
 impl market::Trait for Test {
     type Currency = balances::Module<Self>;
@@ -103,6 +106,7 @@ impl market::Trait for Test {
     type OrderInspector = Tee;
     type MinimumStoragePrice = ();
     type MinimumSorderDuration = ();
+    type PunishDuration = PunishDuration;
 }
 
 impl Trait for Test {
@@ -204,4 +208,10 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
     };
     <market::Providers<Test>>::insert(who, provision);
     <market::StorageOrders<Test>>::insert(sorder_id, sorder);
+    let punishment = ProviderPunishment {
+        success: 0,
+        failed: 0,
+        value: Zero::zero()
+    };
+    <market::ProviderPunishments<Test>>::insert(sorder_id, punishment);
 }

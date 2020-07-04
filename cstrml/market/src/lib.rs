@@ -12,6 +12,7 @@ use frame_support::{
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
 use sp_runtime::{
+    Perbill,
     traits::{StaticLookup, Zero, CheckedMul, Convert}
 };
 
@@ -31,6 +32,9 @@ mod mock;
 mod tests;
 
 const MARKET_ID: LockIdentifier = *b"market  ";
+
+/// Counter for the number of eras that have passed.
+pub type EraIndex = u32;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -53,6 +57,14 @@ pub enum OrderStatus {
     Success,
     Failed,
     Pending
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct ProviderPunishment<Balance> {
+    pub success: EraIndex,
+    pub failed: EraIndex,
+    pub value: Balance
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -115,6 +127,8 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
     /// (Maybe) set storage order's status
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>);
+    /// Upsert slash record and (Maybe) do slash
+    fn maybe_punish_provider(order_id: &Hash);
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
@@ -131,6 +145,10 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
     }
 
     fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId, Balance>) {
+
+    }
+
+    fn maybe_punish_provider(_: &Hash) {
 
     }
 }
@@ -156,6 +174,10 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
                         so: &StorageOrder<<T as system::Trait>::AccountId, BalanceOf<T>>) {
         Self::maybe_set_sorder(order_id, so);
+    }
+
+    fn maybe_punish_provider(order_id: &<T as system::Trait>::Hash) {
+        Self::maybe_punish_provider(order_id);
     }
 }
 
@@ -184,6 +206,9 @@ pub trait Trait: system::Trait {
 
     /// Minimum storage order duration
     type MinimumSorderDuration: Get<u32>;
+
+    /// Punishment Duration
+    type PunishDuration: Get<EraIndex>;
 }
 
 // This module's storage items.
@@ -200,6 +225,10 @@ decl_storage! {
         /// Order details iterated by order id
         pub StorageOrders get(fn storage_orders):
         map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
+
+        /// Order status counts used for slashing
+        pub ProviderPunishments get(fn provider_punishments):
+        map hasher(twox_64_concat) T::Hash => Option<ProviderPunishment<BalanceOf<T>>>;
 
         /// Pledge details iterated by provider id
         pub Pledges get(fn pledges):
@@ -458,14 +487,65 @@ impl<T: Trait> Module<T> {
                     T::Payment::pay_sorder(order_id);
                 }
 
-                // TODO: add market slashing here
-                // TODO: Record `failed_count` from `Success` to `Failed`
-                // TODO: Record `failed_duration` from `Failed` to `Success`
-
                 // 2. Update storage order
                 <StorageOrders<T>>::insert(order_id, so);
             }
         }
+    }
+
+    pub fn maybe_punish_provider(order_id: &<T as system::Trait>::Hash) {
+        // 1. Update Provider Punishment
+        let so = Self::storage_orders(order_id).unwrap();
+        let mut punishment = Self::provider_punishments(order_id).unwrap();
+        let punish_duration = T::PunishDuration::get();
+        if so.status == OrderStatus::Success {
+            punishment.success += 1;
+        } else if so.status == OrderStatus::Failed {
+            punishment.failed += 1;
+        } else {
+
+        }
+        if punishment.success + punishment.failed >= punish_duration && punishment.value < so.amount {
+            // 2. Do slash
+            let real_punish_value = Self::punish_provider(&so, &punishment, &punish_duration);
+            punishment.value += real_punish_value;
+            // TODO: add closed status here.
+            // 3. Reset Provider Punishment
+            punishment.success = 0;
+            punishment.failed = 0;
+        } else {
+
+        }
+        <ProviderPunishments<T>>::insert(&order_id, punishment);
+    }
+
+    pub fn punish_provider(
+        so: &StorageOrder<T::AccountId, BalanceOf<T>>,
+        punishment: &ProviderPunishment<BalanceOf<T>>,
+        punish_duration: &EraIndex
+    ) -> BalanceOf<T> {
+        // Calculate real punish value
+        let mut real_punish_value = Zero::zero();
+        if punishment.success >= ((*punish_duration as f64) * 0.95) as EraIndex {
+        } 
+        else if punishment.success >= ((*punish_duration as f64) * 0.90) as EraIndex {
+            real_punish_value = (Perbill::from_percent(50)) * so.amount;
+        } 
+        else {
+            real_punish_value = so.amount;
+        }
+
+        // Do slash
+        if !real_punish_value.is_zero() {
+            real_punish_value = real_punish_value.min(so.amount - punishment.value);
+            T::Currency::slash(&so.provider, real_punish_value);
+            // Update ledger
+            let mut pledge = Self::pledges(&so.provider);
+            pledge.total -= real_punish_value;
+            pledge.used -= real_punish_value;
+            Self::upsert_pledge(&so.provider, &pledge);
+        }
+        real_punish_value
     }
 
     // MUTABLE PRIVATE
@@ -511,6 +591,14 @@ impl<T: Trait> Module<T> {
                     provision.file_map.insert(so.file_identifier.clone(), order_ids.clone());
                 }
             });
+
+            // 4. Add OrderSlashRecord
+            let slash_record = ProviderPunishment {
+                success: 0,
+                failed: 0,
+                value: Zero::zero()
+            };
+            <ProviderPunishments<T>>::insert(&order_id, slash_record);
 
             true
         }

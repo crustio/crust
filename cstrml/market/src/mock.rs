@@ -136,6 +136,10 @@ impl Payment<<Test as system::Trait>::AccountId,
     fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
 }
 
+parameter_types! {
+    pub const TestPunishDuration: EraIndex = 100;
+}
+
 impl Trait for Test {
     type Currency = Balances;
     type CurrencyToBalance = CurrencyToVoteHandler;
@@ -145,6 +149,7 @@ impl Trait for Test {
     type OrderInspector = TestOrderInspector;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
+    type PunishDuration = TestPunishDuration;
 }
 
 pub type Market = Module<Test>;

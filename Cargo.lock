@@ -973,6 +973,7 @@ dependencies = [
  "frame-system",
  "hex",
  "parity-scale-codec",
+ "rand_chacha 0.2.2",
  "serde",
  "serde_json",
  "sp-core",

@@ -4,7 +4,7 @@
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, Parameter,
-    storage::IterableStorageMap,
+    storage::IterableStorageDoubleMap,
     weights::Weight,
     traits::{
         ExistenceRequirement, Currency, ReservableCurrency
@@ -19,6 +19,10 @@ use sp_runtime::{
         Dispatchable, Zero, Convert, CheckedDiv
     }
 };
+
+use sp_io::hashing::blake2_256;
+use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
+const SEED: u32 = 0;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -68,7 +72,9 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
                     as Convert<u64, BalanceOf<T>>>::convert(slots as u64)).unwrap();
 
                 // 3. Arrange this slot pay
-                <SlotPayments<T>>::insert(sorder_id, slot_amount);
+                let mut rng = ChaChaRng::from_seed(SEED.using_encoded(blake2_256));
+                let payment_factor = rng.next_u32() as BlockNumber % FREQUENCY;
+                <SlotPayments<T>>::insert(payment_factor, sorder_id, slot_amount);
             }
         }
     }
@@ -111,7 +117,7 @@ decl_storage! {
 
         /// A mapping from storage order id to slot value info
         pub SlotPayments get(fn slot_payments):
-        map hasher(twox_64_concat) T::Hash => BalanceOf<T>;
+        double_map hasher(twox_64_concat) BlockNumber, hasher(twox_64_concat) T::Hash => BalanceOf<T>;
     }
 }
 
@@ -137,10 +143,8 @@ decl_module! {
 
 
         fn on_initialize(now: T::BlockNumber) -> Weight {
-            let frequency = TryInto::<T::BlockNumber>::try_into(FREQUENCY).ok().unwrap();
-            if (now % frequency).is_zero() {
-                Self::regular_batch_transfer();
-            }
+            let now = TryInto::<BlockNumber>::try_into(now).ok().unwrap();
+            Self::regular_batch_transfer(now % FREQUENCY);
             // TODO: Calculate accurate weight.
             0
         }
@@ -148,9 +152,8 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // TODO: Make it more robust and efficient
-    pub fn regular_batch_transfer() {
-        for (sorder_id, slot_value) in <SlotPayments<T>>::iter() {
+    pub fn regular_batch_transfer(payment_factor: BlockNumber) {
+        for (sorder_id, slot_value) in <SlotPayments<T>>::iter_prefix(payment_factor) {
             // 3. Prepare payment amount
             let ledger = Self::payments(&sorder_id).unwrap_or_default();
             let real_amount = slot_value.min(ledger.total - ledger.paid);
@@ -193,7 +196,6 @@ impl<T: Trait> Module<T> {
         match sorder.status {
             OrderStatus::Success => {
                 // 5. [DB Write] (Maybe) Transfer the amount
-                // TODO: What if this failed several time, paid will be smaller than it should be?
                 if T::Currency::transfer(&client, &provider, real_amount, ExistenceRequirement::AllowDeath).is_ok() {
                     // 6. [DB Write] Update ledger
                     <Payments<T>>::mutate(&sorder_id, |ledger| {
@@ -202,6 +204,15 @@ impl<T: Trait> Module<T> {
                         }
                     });
                     Self::deposit_event(RawEvent::PaymentSuccess(client));
+                } else {
+                    // 7. Reserve it back
+                    // TODO: Double check this behavior since it should be a workaround. Maybe a special status is better?
+                    let _ = T::Currency::reserve(&client, real_amount);
+                    <Payments<T>>::mutate(&sorder_id, |ledger| {
+                        if let Some(p) = ledger {
+                            p.unreserved -= real_amount;
+                        }
+                    });
                 }
             },
             _ => {}

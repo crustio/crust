@@ -94,7 +94,7 @@ fn test_for_storage_order_and_payment_should_work() {
         });
 
         for i in 0..31 {
-            run_to_block(300 + i * 10);
+            run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(client.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(client.clone()), 10);
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
@@ -201,7 +201,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
         });
 
         for i in 1..11 {
-            run_to_block(300 + i * 10);
+            run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10);
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
@@ -218,7 +218,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             }
         });
         for i in 11..21 {
-            run_to_block(300 + i * 10);
+            run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10 + (i - 10) * 2 );
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20);
@@ -237,7 +237,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
         });
 
         for i in 21..31 {
-            run_to_block(300 + i * 10);
+            run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 30 );
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20 + (i - 20) * 2);

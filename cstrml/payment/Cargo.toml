@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-payment"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -14,15 +14,15 @@ serde = { optional = true, version = '1.0.106' }
 serde_json = "1.0.51"
 
 # substrate frames
-system = { package = 'frame-system', default-features = false, version = '2.0.0-rc2' }
-frame-support = { default-features = false, version = '2.0.0-rc2' }
+system = { package = 'frame-system', default-features = false, version = '2.0.0-rc4' }
+frame-support = { default-features = false, version = '2.0.0-rc4' }
 
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-rc2' }
-sp-io = { default-features = false, version = '2.0.0-rc2' }
-sp-runtime = { default-features = false, version = '2.0.0-rc2' }
-sp-std = { default-features = false, version = '2.0.0-rc2' }
+sp-core = { default-features = false, version = '2.0.0-rc4' }
+sp-io = { default-features = false, version = '2.0.0-rc4' }
+sp-runtime = { default-features = false, version = '2.0.0-rc4' }
+sp-std = { default-features = false, version = '2.0.0-rc4' }
 
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
@@ -46,8 +46,8 @@ std = [
 
 [dev-dependencies]
 hex = '0.4.2'
-keyring = { package = "sp-keyring", version = '2.0.0-rc2' }
+keyring = { package = "sp-keyring", version = '2.0.0-rc4' }
 tee = { package = 'cstrml-tee', path = '../tee' }
 balances = { package = 'cstrml-balances', path = '../balances' }
-scheduler = { package = 'pallet-scheduler', version = '2.0.0-rc2' }
+scheduler = { package = 'pallet-scheduler', version = '2.0.0-rc4' }
 

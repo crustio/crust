@@ -1,6 +1,6 @@
 [package]
 name = 'crust'
-version = '0.5.0'
+version = '0.6.0'
 authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
@@ -18,34 +18,34 @@ log = "0.4.8"
 structopt = "0.3.8"
 
 # substrate client dependencies
-babe = { version = '0.8.0-rc2', package = 'sc-consensus-babe' }
-grandpa = { version = "0.8.0-rc2", package = "sc-finality-grandpa" }
-sc-basic-authorship = '0.8.0-rc2'
-authority-discovery = { version = '0.8.0-rc2', package= 'sc-authority-discovery' }
-sc-client-api = '2.0.0-rc2'
-sc-cli = '0.8.0-rc2'
-sc-consensus = '0.8.0-rc2'
-sc-executor = '0.8.0-rc2'
-sc-network = '0.8.0-rc2'
-sc-service = '0.8.0-rc2'
+babe = { version = '0.8.0-rc4', package = 'sc-consensus-babe' }
+grandpa = { version = "0.8.0-rc4", package = "sc-finality-grandpa" }
+sc-basic-authorship = '0.8.0-rc4'
+authority-discovery = { version = '0.8.0-rc4', package= 'sc-authority-discovery' }
+sc-client-api = '2.0.0-rc4'
+sc-cli = '0.8.0-rc4'
+sc-consensus = '0.8.0-rc4'
+sc-executor = '0.8.0-rc4'
+sc-network = '0.8.0-rc4'
+sc-service = '0.8.0-rc4'
 
-sc-transaction-pool = '2.0.0-rc2'
+sc-transaction-pool = '2.0.0-rc4'
 
 # substrate primitives
-sp-transaction-pool = '2.0.0-rc2'
-sp-core = '2.0.0-rc2'
-sp-consensus = '0.8.0-rc2'
-sp-consensus-babe = '0.8.0-rc2'
-sp-inherents = '2.0.0-rc2'
-sp-io = '2.0.0-rc2'
-sp-runtime = '2.0.0-rc2'
-grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc2' }
+sp-transaction-pool = '2.0.0-rc4'
+sp-core = '2.0.0-rc4'
+sp-consensus = '0.8.0-rc4'
+sp-consensus-babe = '0.8.0-rc4'
+sp-inherents = '2.0.0-rc4'
+sp-io = '2.0.0-rc4'
+sp-runtime = '2.0.0-rc4'
+grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc4' }
 
 # crust runtime modules
-crust-runtime = { path = '../runtime', version = '0.5.0' }
-cstrml-staking = { path = '../cstrml/staking', version = '0.5.0' }
-cstrml-tee = { path = '../cstrml/tee', version = '0.5.0' }
-primitives = { package = 'cst-primitives', path = '../primitives', version = '0.5.0' }
+crust-runtime = { path = '../runtime', version = '0.6.0' }
+cstrml-staking = { path = '../cstrml/staking', version = '0.6.0' }
+cstrml-tee = { path = '../cstrml/tee', version = '0.6.0' }
+primitives = { package = 'cst-primitives', path = '../primitives', version = '0.6.0' }
 
 [build-dependencies]
-build-script-utils = { version = "2.0.0-rc2", package = "substrate-build-script-utils" }
+build-script-utils = { version = "2.0.0-rc4", package = "substrate-build-script-utils" }

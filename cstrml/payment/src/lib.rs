@@ -69,6 +69,14 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
             }
         }
     }
+
+    fn close_sorder(sorder_id: &T::Hash, client: &T::AccountId) {
+        let ledger = Self::payments(&sorder_id).unwrap_or_default();
+        T::Currency::unreserve(
+            &client,
+            ledger.unreserved);
+        <Payments<T>>::remove(&sorder_id);
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]

@@ -103,6 +103,8 @@ pub trait Payment<AccountId, Hash, Balance> {
     fn reserve_sorder(sorder_id: &Hash, client: &AccountId, amount: Balance) -> bool;
     /// Start delayed payment for a reserved storage order
     fn pay_sorder(sorder_id: &Hash);
+    /// To remove closed sorder's payment info
+    fn close_sorder(sorder_id: &Hash, client: &AccountId);
 }
 
 /// A trait for checking order's legality
@@ -183,7 +185,7 @@ pub trait Trait: system::Trait {
     /// Something that provides randomness in the runtime.
     type Randomness: Randomness<Self::Hash>;
 
-    /// Connector with balance module
+    /// Connector with payment module
     type Payment: Payment<Self::AccountId, Self::Hash, BalanceOf<Self>>;
 
     /// Connector with tee module

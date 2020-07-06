@@ -135,6 +135,8 @@ impl Payment<<Test as system::Trait>::AccountId,
     }
 
     fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
+
+    fn close_sorder(_: &Hash, _: &AccountId) { }
 }
 
 parameter_types! {

@@ -90,7 +90,7 @@ fn test_for_register_success() {
         ));
 
         id.pub_key = hex::decode("4dbb6401508323b18f649f04f17433fd4b87201ef3ff634b684b715c848bb60b905dd5305e24761b4968a8875dfd9f6abfb3110d9fa494dd530daaeccc8353e1").unwrap();
-        let id_registered = Tee::tee_identities(applier.clone()).unwrap();
+        let id_registered = Tee::identities(applier.clone()).unwrap();
 
         assert_eq!(id.clone(), id_registered);
     });

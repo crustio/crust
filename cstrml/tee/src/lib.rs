@@ -101,7 +101,7 @@ decl_storage! {
         pub Code get(fn code) config(): TeeCode;
 
         /// The TEE identities, mapping from controller to optional identity value
-        pub TeeIdentities get(fn tee_identities) config():
+        pub Identities get(fn identities) config():
             map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
         /// Node's work report, mapping from controller to optional work_report
@@ -198,9 +198,9 @@ decl_module! {
             identity.pub_key = maybe_pk.unwrap();
 
             // 5. Applier is new add or needs to be updated
-            if !Self::tee_identities(applier).contains(&identity) {
+            if !Self::identities(applier).contains(&identity) {
                 // Store the tee identity
-                <TeeIdentities<T>>::insert(applier, &identity);
+                <Identities<T>>::insert(applier, &identity);
 
                 // Emit event
                 Self::deposit_event(RawEvent::RegisterSuccess(who));
@@ -220,8 +220,8 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
-            ensure!(<TeeIdentities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
-            ensure!(&<TeeIdentities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
+            ensure!(<Identities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
+            ensure!(&<Identities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
 
             // 2. Do timing check
             ensure!(Self::work_report_timing_check(&work_report).is_ok(), Error::<T>::InvalidReportTime);
@@ -264,7 +264,7 @@ impl<T: Trait> Module<T> {
         let mut total_reserved = 0;
 
         // TODO: avoid iterate all identities
-        let workload_map: Vec<(T::AccountId, u128)> = <TeeIdentities<T>>::iter().map(|(controller, _)| {
+        let workload_map: Vec<(T::AccountId, u128)> = <Identities<T>>::iter().map(|(controller, _)| {
             // a. calculate this controller's order file map
             // TC = O(nm), `n` is stored files number and `m` is corresponding order ids
             let mut order_files: Vec<(MerkleRoot, T::Hash)> = vec![];
@@ -433,7 +433,7 @@ impl<T: Trait> Module<T> {
     fn sig_is_unique(sig: &TeeSignature) -> bool {
         let mut is_unique = true;
 
-        for (_, id) in <TeeIdentities<T>>::iter() {
+        for (_, id) in <Identities<T>>::iter() {
             if &id.sig == sig {
                 is_unique = false;
                 break

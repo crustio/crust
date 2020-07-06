@@ -133,7 +133,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         Sr25519Keyring::Bob.to_account_id(),
     ];
 
-    let tee_identities = accounts
+    let identities = accounts
         .iter()
         .map(|id| {
             (
@@ -158,7 +158,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         // Test temp code
         code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
         current_report_slot: 0,
-        tee_identities,
+        identities,
         work_reports,
     }
     .assimilate_storage(&mut t)

@@ -1,6 +1,8 @@
 use super::*;
 
-use crate::mock::{new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider, Market};
+use crate::mock::{
+    new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider, Market
+};
 use frame_support::{
     assert_ok, assert_noop,
     dispatch::DispatchError,
@@ -28,6 +30,7 @@ fn get_valid_identity() -> Identity<AccountId> {
         account_id: applier,
         isv_body: isv_body.to_vec(),
         pub_key: vec![],
+        code: vec![],
         sig
     }
 }
@@ -40,7 +43,6 @@ fn get_valid_work_report() -> WorkReport {
         (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816)
     ].to_vec();
     let sig = hex::decode("9c12986c01efe715ed8bed80b7e391601c45bf152e280693ffcfd10a4b386deaaa0f088fc26b0ebeca64c33cf122d372ebd787aa77beaaba9d2e499ce40a76e6").unwrap();
-
 
     WorkReport {
         pub_key,
@@ -89,8 +91,10 @@ fn test_for_register_success() {
             id.clone()
         ));
 
+        let id_registered = Tee::identities(applier.clone()).unwrap();
+        
         id.pub_key = hex::decode("4dbb6401508323b18f649f04f17433fd4b87201ef3ff634b684b715c848bb60b905dd5305e24761b4968a8875dfd9f6abfb3110d9fa494dd530daaeccc8353e1").unwrap();
-        let id_registered = Tee::tee_identities(applier.clone()).unwrap();
+        id.code = hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap();
 
         assert_eq!(id.clone(), id_registered);
     });
@@ -108,6 +112,7 @@ fn test_for_register_failed_by_duplicate_sig() {
             account_id: account.clone(),
             isv_body: vec![],
             pub_key: vec![],
+            code: vec![],
             sig: vec![]
         };
 
@@ -364,7 +369,7 @@ fn test_for_work_report_timing_check_failed_by_wrong_hash() {
 #[test]
 fn test_for_work_report_timing_check_failed_by_slot_outdated() {
     new_test_ext().execute_with(|| {
-        // generate 50 blocks first
+        // generate 103 blocks first
         run_to_block(103);
 
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
@@ -386,6 +391,45 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
                 index: 0,
                 error: 5,
                 message: Some("InvalidReportTime"),
+            }
+        );
+    });
+}
+
+#[test]
+fn test_for_report_works_for_ab_upgrade_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 303 blocks first
+        run_to_block(303);
+
+        // Upgrade tee with new enclave code and expired block
+        // Currently, enclave code already updated
+        // Old code will expire at 200 block
+        assert_ok!(Tee::upgrade(Origin::ROOT, hex::decode("1111").unwrap(), 500));
+
+        // Bob can still report works with old code and identities
+        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let works = get_valid_work_report();
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            works.clone()
+        ));
+
+        // Run to 400, Bob report works should be ok
+        run_to_block(400);
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            works.clone()
+        ));
+
+        // Run to 500, Bob's identity should be expired
+        run_to_block(500);
+        assert_noop!(
+            Tee::report_works(Origin::signed(account), works),
+            DispatchError::Module {
+                index: 0,
+                error: 7,
+                message: Some("UntrustedCode"),
             }
         );
     });

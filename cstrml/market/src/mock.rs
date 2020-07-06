@@ -187,7 +187,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     let _ = tee::GenesisConfig::<Test> {
         current_report_slot: 0,
         code: vec![],
-        tee_identities: identities
+        identities: identities
             .iter()
             .map(|id| (*id, Default::default()))
             .collect(),

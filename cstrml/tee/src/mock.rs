@@ -133,7 +133,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         Sr25519Keyring::Bob.to_account_id(),
     ];
 
-    let tee_identities = accounts
+    let identities = accounts
         .iter()
         .map(|id| {
             (
@@ -144,6 +144,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
                     account_id: id.clone(),
                     isv_body: vec![],
                     pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
+                    code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
                     sig: vec![]
                 },
             )
@@ -158,7 +159,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         // Test temp code
         code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
         current_report_slot: 0,
-        tee_identities,
+        identities,
         work_reports,
     }
     .assimilate_storage(&mut t)

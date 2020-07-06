@@ -43,6 +43,7 @@ pub struct Identity<AccountId> {
     pub account_id: AccountId,
     pub isv_body: ISVBody,
     pub pub_key: PubKey,
+    pub code: TeeCode,
     pub sig: TeeSignature,
 }
 
@@ -100,6 +101,9 @@ decl_storage! {
         /// The TEE enclave code, this should be managed by sudo/democracy
         pub Code get(fn code) config(): TeeCode;
 
+        /// The AB upgrade expired block, this should be managed by sudo/democracy
+        pub ABExpire get(fn ab_expire): Option<T::BlockNumber>;
+
         /// The TEE identities, mapping from controller to optional identity value
         pub Identities get(fn identities) config():
             map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
@@ -148,6 +152,8 @@ decl_error! {
         InvalidReportTime,
         /// Illegal work report signature
         IllegalWorkReportSig,
+        /// Enclave code is illegal or expired
+        UntrustedCode
     }
 }
 
@@ -159,20 +165,22 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        /// Set new enclave code
+        /// AB Upgrade, this should only be called by `root` origin
+        /// Ruled by `sudo/democracy`
         ///
         /// # <weight>
         /// - O(1)
-        /// - 1 DB try
+        /// - 2 DB try
         /// # </weight>
         #[weight = 1_000_000]
-        pub fn set_code(origin, new_code: TeeCode) {
+        pub fn upgrade(origin, new_code: TeeCode, expire_block: T::BlockNumber) {
             ensure_root(origin)?;
 
             <Code>::put(new_code);
+            <ABExpire<T>>::put(expire_block);
         }
 
-        /// Register as new trusted tee node
+        /// Register as new trusted node
         ///
         /// # <weight>
         /// - O(n)
@@ -193,9 +201,10 @@ decl_module! {
             let maybe_pk = Self::check_and_get_pk(&unparsed_identity);
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalTrustedChain);
 
-            // 4. Construct a parsed identity(with public key)
+            // 4. Construct a parsed identity(with public key and enclave code)
             let mut identity = unparsed_identity.clone();
             identity.pub_key = maybe_pk.unwrap();
+            identity.code = Self::code();
 
             // 5. Applier is new add or needs to be updated
             if !Self::identities(applier).contains(&identity) {
@@ -221,17 +230,22 @@ decl_module! {
 
             // 1. Ensure reporter is verified
             ensure!(<Identities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
-            ensure!(&<Identities<T>>::get(&who).unwrap().pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
 
-            // 2. Do timing check
+            let id = <Identities<T>>::get(&who).unwrap();
+            ensure!(&id.pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
+
+            // 2. Ensure reporter's id is valid
+            ensure!(Self::work_report_code_check(&id.code), Error::<T>::UntrustedCode);
+
+            // 3. Do timing check
             ensure!(Self::work_report_timing_check(&work_report).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 3. Do sig check
+            // 4. Do sig check
             ensure!(Self::work_report_sig_check(&work_report), Error::<T>::IllegalWorkReportSig);
 
-            // 4. Maybe upsert work report
+            // 5. Maybe upsert work report
             if Self::maybe_upsert_work_report(&who, &work_report) {
-                // 5. Emit workload event
+                // Emit report works event
                 Self::deposit_event(RawEvent::WorksReportSuccess(who, work_report));
             }
             Ok(())
@@ -455,6 +469,16 @@ impl<T: Trait> Module<T> {
             &id.sig,
             &enclave_code,
         )
+    }
+
+    fn work_report_code_check(id_code: &TeeCode) -> bool {
+        let code: TeeCode = Self::code();
+        let current_bn = <system::Module<T>>::block_number();
+
+        // Reporter's code == On-chain code
+        // or
+        // Current block < AB Expired block
+        id_code == &code || (Self::ab_expire().is_some() && current_bn < Self::ab_expire().unwrap())
     }
 
     fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {

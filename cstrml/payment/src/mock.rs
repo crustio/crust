@@ -202,6 +202,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
                 tee::Identity {
                     ias_sig: vec![],
                     pub_key: pk.clone(),
+                    code: vec![],
                     account_id: id.clone(),
                     sig: vec![],
                     ias_cert: vec![],

@@ -25,8 +25,8 @@ impl_outer_origin! {
 impl_outer_dispatch! {
     pub enum Call for Test where origin: Origin {
         system::System,
-	    balances::Balances,
-	    payment::Payment,
+        balances::Balances,
+        payment::Payment,
 	}
 }
 

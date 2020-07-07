@@ -23,10 +23,10 @@ impl_outer_origin! {
 }
 
 impl_outer_dispatch! {
-	pub enum Call for Test where origin: Origin {
+    pub enum Call for Test where origin: Origin {
+        system::System,
         balances::Balances,
         payment::Payment,
-        system::System,
 	}
 }
 
@@ -79,8 +79,9 @@ parameter_types! {
 }
 
 impl system::Trait for Test {
+    type BaseCallFilter = ();
     type Origin = Origin;
-    type Call = ();
+    type Call = Call;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
@@ -112,7 +113,6 @@ impl market::OrderInspector<AccountId> for TestOrderInspector {
         true
     }
 }
-
 
 parameter_types! {
 	pub const MaximumWeight: u32 = 1000000;
@@ -164,7 +164,6 @@ impl Trait for Test {
     type Event = ();
     type CurrencyToBalance = CurrencyToVoteHandler;
     type Scheduler = Scheduler;
-    // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
 }
 

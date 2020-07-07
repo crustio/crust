@@ -34,7 +34,7 @@ fn force_unstake_works() {
         // Force unstake requires root.
         assert_noop!(Staking::force_unstake(Origin::signed(11), 11), BadOrigin);
         // We now force them to unstake
-        assert_ok!(Staking::force_unstake(Origin::ROOT, 11));
+        assert_ok!(Staking::force_unstake(Origin::root(), 11));
         // No longer bonded.
         assert_eq!(Staking::bonded(&11), None);
         // Transfer works.
@@ -1756,7 +1756,7 @@ fn on_free_balance_zero_stash_removes_validator() {
             assert_eq!(Balances::total_balance(&11), 0);
 
             // Reap the stash
-            assert_ok!(Staking::reap_stash(Origin::NONE, 11));
+            assert_ok!(Staking::reap_stash(Origin::none(), 11));
 
             // Check storage items do not exist
             assert!(!<Ledger<Test>>::contains_key(&10));
@@ -1818,7 +1818,7 @@ fn on_free_balance_zero_stash_removes_guarantor() {
             assert_eq!(Balances::total_balance(&11), 0);
 
             // Reap the stash
-            assert_ok!(Staking::reap_stash(Origin::NONE, 11));
+            assert_ok!(Staking::reap_stash(Origin::none(), 11));
 
             // Check storage items do not exist
             assert!(!<Ledger<Test>>::contains_key(&10));
@@ -2379,7 +2379,7 @@ fn offence_forces_new_era() {
 #[test]
 fn offence_ensures_new_era_without_clobbering() {
     ExtBuilder::default().build().execute_with(|| {
-        assert_ok!(Staking::force_new_era_always(Origin::ROOT));
+        assert_ok!(Staking::force_new_era_always(Origin::root()));
 
         on_offence_now(
             &[OffenceDetails {
@@ -2724,7 +2724,7 @@ fn garbage_collection_after_slashing() {
             assert_eq!(Balances::free_balance(&11), 0);
             assert_eq!(Balances::total_balance(&11), 0);
 
-            assert_ok!(Staking::reap_stash(Origin::NONE, 11));
+            assert_ok!(Staking::reap_stash(Origin::none(), 11));
             assert!(<Staking as crate::Store>::SlashingSpans::get(&11).is_none());
             assert_eq!(
                 <Staking as crate::Store>::SpanSlash::get(&(11, 0)).amount_slashed(),
@@ -3032,7 +3032,7 @@ fn remove_deferred() {
                 1,
             );
 
-            Staking::cancel_deferred_slash(Origin::ROOT, 1, vec![0]).unwrap();
+            Staking::cancel_deferred_slash(Origin::root(), 1, vec![0]).unwrap();
 
             assert_eq!(Balances::free_balance(&11), 1000);
             assert_eq!(Balances::free_balance(&101), 2000);
@@ -3103,7 +3103,7 @@ fn remove_multi_deferred() {
             );
 
             assert_eq!(<Staking as Store>::UnappliedSlashes::get(&1).len(), 3);
-            Staking::cancel_deferred_slash(Origin::ROOT, 1, vec![0, 2]).unwrap();
+            Staking::cancel_deferred_slash(Origin::root(), 1, vec![0, 2]).unwrap();
 
             let slashes = <Staking as Store>::UnappliedSlashes::get(&1);
             assert_eq!(slashes.len(), 1);

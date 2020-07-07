@@ -107,11 +107,13 @@ parameter_types! {
 	pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
 	pub const MaximumBlockLength: u32 = 5 * 1024 * 1024;
 	pub const Version: RuntimeVersion = VERSION;
-	pub const MaximumExtrinsicWeight: Weight = AvailableBlockRatio::get()
+	pub MaximumExtrinsicWeight: Weight = AvailableBlockRatio::get()
 		.saturating_sub(Perbill::from_percent(10)) * MaximumBlockWeight::get();
 }
 
 impl system::Trait for Runtime {
+    /// The basic call filter to use in dispatchable.
+    type BaseCallFilter = ();
     /// The ubiquitous origin type.
     type Origin = Origin;
     /// The aggregated dispatch type that is available for extrinsics.
@@ -245,8 +247,8 @@ impl grandpa::Trait for Runtime {
 }
 
 parameter_types! {
-    pub const WindowSize: BlockNumber = finality_tracker::DEFAULT_WINDOW_SIZE.into();
-    pub const ReportLatency: BlockNumber = finality_tracker::DEFAULT_REPORT_LATENCY.into();
+    pub WindowSize: BlockNumber = finality_tracker::DEFAULT_WINDOW_SIZE.into();
+    pub ReportLatency: BlockNumber = finality_tracker::DEFAULT_REPORT_LATENCY.into();
 }
 
 impl finality_tracker::Trait for Runtime {
@@ -351,7 +353,7 @@ impl staking::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const OffencesWeightSoftLimit: Weight = Perbill::from_percent(60) * MaximumBlockWeight::get();
+	pub OffencesWeightSoftLimit: Weight = Perbill::from_percent(60) * MaximumBlockWeight::get();
 }
 
 impl offences::Trait for Runtime {

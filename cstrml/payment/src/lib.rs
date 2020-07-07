@@ -68,8 +68,8 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
                     as Convert<u64, BalanceOf<T>>>::convert(slots as u64)).unwrap();
 
                 // 3. Arrange this slot pay
-                let payment_factor = so.completed_on % FREQUENCY;
-                <SlotPayments<T>>::insert(payment_factor, sorder_id, slot_amount);
+                let slot_factor = so.completed_on % FREQUENCY;
+                <SlotPayments<T>>::insert(slot_factor, sorder_id, slot_amount);
             }
         }
     }
@@ -139,7 +139,7 @@ decl_module! {
 
         fn on_initialize(now: T::BlockNumber) -> Weight {
             let now = TryInto::<BlockNumber>::try_into(now).ok().unwrap();
-            Self::regular_batch_transfer(now % FREQUENCY);
+            Self::batch_transfer(now % FREQUENCY);
             // TODO: Calculate accurate weight.
             0
         }
@@ -147,8 +147,8 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    pub fn regular_batch_transfer(payment_factor: BlockNumber) {
-        for (sorder_id, slot_value) in <SlotPayments<T>>::iter_prefix(payment_factor) {
+    pub fn batch_transfer(slot_factor: BlockNumber) {
+        for (sorder_id, slot_value) in <SlotPayments<T>>::iter_prefix(slot_factor) {
             // 3. Prepare payment amount
             let ledger = Self::payments(&sorder_id).unwrap_or_default();
             let real_amount = slot_value.min(ledger.total - ledger.paid);
@@ -161,6 +161,7 @@ impl<T: Trait> Module<T> {
                     // TODO: Deal with failure
                 }
             } else {
+                // TODO: Deal with success(Based on 20200707 dicussion, we should do nothing)
             }
         }
     }

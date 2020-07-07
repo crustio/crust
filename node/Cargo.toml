@@ -23,12 +23,11 @@ grandpa = { version = "0.8.0-rc4", package = "sc-finality-grandpa" }
 sc-basic-authorship = '0.8.0-rc4'
 authority-discovery = { version = '0.8.0-rc4', package= 'sc-authority-discovery' }
 sc-client-api = '2.0.0-rc4'
-sc-cli = '0.8.0-rc4'
+sc-cli = { version = '0.8.0-rc4', features = ["wasmtime"] }
 sc-consensus = '0.8.0-rc4'
-sc-executor = '0.8.0-rc4'
+sc-executor = { version = '0.8.0-rc4', features = ["wasmtime"] }
 sc-network = '0.8.0-rc4'
-sc-service = '0.8.0-rc4'
-
+sc-service = { version = '0.8.0-rc4', features = ["wasmtime"] }
 sc-transaction-pool = '2.0.0-rc4'
 
 # substrate primitives
@@ -48,4 +47,4 @@ cstrml-tee = { path = '../cstrml/tee', version = '0.6.0' }
 primitives = { package = 'cst-primitives', path = '../primitives', version = '0.6.0' }
 
 [build-dependencies]
-build-script-utils = { version = "2.0.0-rc4", package = "substrate-build-script-utils" }
+build-script-utils = { version = "2.0.0-rc4",  package = "substrate-build-script-utils" }

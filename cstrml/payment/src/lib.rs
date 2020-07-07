@@ -20,10 +20,6 @@ use sp_runtime::{
     }
 };
 
-use sp_io::hashing::blake2_256;
-use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
-const SEED: u32 = 0;
-
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
@@ -72,8 +68,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
                     as Convert<u64, BalanceOf<T>>>::convert(slots as u64)).unwrap();
 
                 // 3. Arrange this slot pay
-                let mut rng = ChaChaRng::from_seed(SEED.using_encoded(blake2_256));
-                let payment_factor = rng.next_u32() as BlockNumber % FREQUENCY;
+                let payment_factor = so.completed_on % FREQUENCY;
                 <SlotPayments<T>>::insert(payment_factor, sorder_id, slot_amount);
             }
         }

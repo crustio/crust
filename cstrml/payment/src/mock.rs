@@ -18,6 +18,10 @@ use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
 pub type AccountId = AccountId32;
 
+use primitives::{
+    constants::time::MINUTES, BlockNumber
+};
+
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
 }
@@ -117,6 +121,7 @@ impl market::OrderInspector<AccountId> for TestOrderInspector {
 parameter_types! {
     pub const MinimumStoragePrice: Balance = 1;
     pub const MinimumSorderDuration: u32 = 1;
+    pub const Frequency: BlockNumber = MINUTES;
 }
 
 impl balances::Trait for Test {
@@ -157,6 +162,7 @@ impl Trait for Test {
     type CurrencyToBalance = CurrencyToVoteHandler;
     // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
+    type Frequency = Frequency;
 }
 
 pub type Market = market::Module<Test>;

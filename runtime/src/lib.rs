@@ -416,6 +416,7 @@ parameter_types! {
     /// Unit is minute
     pub const MinimumSorderDuration: u32 = 30;
     pub const PunishDuration: market::EraIndex = 300;
+    pub const Frequency: BlockNumber = MINUTES;
 }
 
 impl market::Trait for Runtime {
@@ -438,6 +439,7 @@ impl payment::Trait for Runtime {
     type CurrencyToBalance = CurrencyToVoteHandler;
     // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
+    type Frequency = Frequency;
 }
 
 construct_runtime! {

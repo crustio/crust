@@ -7,7 +7,7 @@ use frame_support::{
     storage::IterableStorageDoubleMap,
     weights::Weight,
     traits::{
-        ExistenceRequirement, Currency, ReservableCurrency
+        ExistenceRequirement, Currency, ReservableCurrency, Get
     }
 };
 use sp_std::{
@@ -24,13 +24,9 @@ use sp_runtime::{
 use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
-use primitives::{
-    constants::time::MINUTES, BlockNumber
-};
+use primitives::BlockNumber;
 
 use market::{OrderStatus, MarketInterface, Payment};
-
-const FREQUENCY: BlockNumber = MINUTES;
 
 #[cfg(test)]
 mod mock;
@@ -63,12 +59,12 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
             if <Payments<T>>::contains_key(sorder_id) {
                 // 2. Calculate slots
                 // TODO: Change fixed time frequency to fixed slots
-                let slots = (so.expired_on - so.completed_on) / FREQUENCY;
+                let slots = (so.expired_on - so.completed_on) / T::Frequency::get();
                 let slot_amount = so.amount.checked_div(&<T::CurrencyToBalance
                     as Convert<u64, BalanceOf<T>>>::convert(slots as u64)).unwrap();
 
                 // 3. Arrange this slot pay
-                let slot_factor = so.completed_on % FREQUENCY;
+                let slot_factor = so.completed_on % T::Frequency::get();
                 <SlotPayments<T>>::insert(slot_factor, sorder_id, slot_amount);
             }
         }
@@ -101,6 +97,9 @@ pub trait Trait: system::Trait {
 
     /// Interface for interacting with a market module.
     type MarketInterface: MarketInterface<Self::AccountId, Self::Hash, BalanceOf<Self>>;
+
+    /// Minimum storage order duration
+    type Frequency: Get<BlockNumber>;
 }
 
 // This module's storage items.
@@ -139,7 +138,7 @@ decl_module! {
 
         fn on_initialize(now: T::BlockNumber) -> Weight {
             let now = TryInto::<BlockNumber>::try_into(now).ok().unwrap();
-            Self::batch_transfer(now % FREQUENCY);
+            Self::batch_transfer(now % T::Frequency::get());
             // TODO: Calculate accurate weight.
             0
         }

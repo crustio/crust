@@ -216,7 +216,7 @@ decl_storage! {
         pub StorageOrders get(fn storage_orders):
         map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
 
-        /// Order status counts used for slashing
+        /// Order status counts used for punishment
         pub ProviderPunishments get(fn provider_punishments):
         map hasher(twox_64_concat) T::Hash => Option<ProviderPunishment<BalanceOf<T>>>;
 
@@ -583,15 +583,44 @@ impl<T: Trait> Module<T> {
             });
 
             // 4. Add OrderSlashRecord
-            let slash_record = ProviderPunishment {
+            let provider_punishment = ProviderPunishment {
                 success: 0,
                 failed: 0,
                 value: Zero::zero()
             };
-            <ProviderPunishments<T>>::insert(&order_id, slash_record);
+            <ProviderPunishments<T>>::insert(&order_id, provider_punishment);
 
             true
         }
+    }
+
+    fn close_sorder(order_id: &<T as system::Trait>::Hash) {
+        let so = Self::storage_orders(order_id).unwrap();
+        // 1. Remove sorder's payment info
+        T::Payment::close_sorder(order_id, &so.client);
+        // 2. Remove `file_identifier` -> `order_id`s from provider's file_map
+        <Providers<T>>::mutate(&so.provider, |maybe_provision| {
+            // `provision` cannot be None
+            if let Some(provision) = maybe_provision {
+                let mut order_ids: Vec::<T::Hash> = vec![];
+                if let Some(o_ids) = provision.file_map.get(&so.file_identifier) {
+                    order_ids = o_ids.clone();
+                }
+
+                order_ids.retain(|&e| {e != order_id.clone()});
+                provision.file_map.insert(so.file_identifier.clone(), order_ids.clone());
+            }
+        });
+        // 3. Update Pledge for provider
+        let punishment = Self::provider_punishments(order_id).unwrap();
+        let real_used_value = so.amount.min(so.amount - punishment.value);
+        let mut pledge = Self::pledges(&so.provider);
+        pledge.used -= real_used_value;
+        Self::upsert_pledge(&so.provider, &pledge);
+        // 4. Remove Provider Punishment
+        <ProviderPunishments<T>>::remove(order_id);
+        // 5. Remove Storage Order
+        <StorageOrders<T>>::remove(order_id);
     }
 
     fn upsert_pledge(

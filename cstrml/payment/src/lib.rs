@@ -76,6 +76,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
             &client,
             ledger.unreserved);
         <Payments<T>>::remove(&sorder_id);
+        // TODO: Remove slot pay
     }
 }
 

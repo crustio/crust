@@ -9,8 +9,6 @@ mod slashing;
 #[cfg(test)]
 mod tests;
 
-pub mod inflation;
-
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_module, decl_event, decl_storage, ensure, decl_error,

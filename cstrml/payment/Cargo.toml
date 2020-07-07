@@ -17,7 +17,6 @@ serde_json = "1.0.51"
 system = { package = 'frame-system', default-features = false, version = '2.0.0-rc4' }
 frame-support = { default-features = false, version = '2.0.0-rc4' }
 
-
 # substrate primitives
 sp-core = { default-features = false, version = '2.0.0-rc4' }
 sp-io = { default-features = false, version = '2.0.0-rc4' }
@@ -28,6 +27,7 @@ sp-std = { default-features = false, version = '2.0.0-rc4' }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 market = { package = 'cstrml-market', path = '../market', default-features = false }
 balances = { default-features = false, package = 'cstrml-balances', path = '../balances' }
+
 [features]
 default = ['std']
 std = [

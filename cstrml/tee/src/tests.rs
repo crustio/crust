@@ -405,7 +405,7 @@ fn test_for_report_works_for_ab_upgrade_should_work() {
         // Upgrade tee with new enclave code and expired block
         // Currently, enclave code already updated
         // Old code will expire at 200 block
-        assert_ok!(Tee::upgrade(Origin::ROOT, hex::decode("1111").unwrap(), 500));
+        assert_ok!(Tee::upgrade(Origin::root(), hex::decode("1111").unwrap(), 500));
 
         // Bob can still report works with old code and identities
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();

@@ -98,7 +98,7 @@ pub trait Trait: system::Trait {
     /// Interface for interacting with a market module.
     type MarketInterface: MarketInterface<Self::AccountId, Self::Hash, BalanceOf<Self>>;
 
-    /// Minimum storage order duration
+    /// Slot pay frequency
     type Frequency: Get<BlockNumber>;
 }
 

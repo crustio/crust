@@ -42,7 +42,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
 {
     fn reserve_sorder(sorder_id: &T::Hash, client: &T::AccountId, amount: BalanceOf<T>) -> bool {
         if T::Currency::reserve(&client, amount.clone()).is_ok() {
-            <Payments<T>>::insert(sorder_id, Ledger {
+            <Payments<T>>::insert(sorder_id, PaymentLedger {
                 total: amount,
                 paid: Zero::zero(),
                 unreserved: Zero::zero()
@@ -73,7 +73,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Ledger<Balance: HasCompact + Zero> {
+pub struct PaymentLedger<Balance: HasCompact + Zero> {
     #[codec(compact)]
     pub total: Balance,
     #[codec(compact)]
@@ -107,7 +107,7 @@ decl_storage! {
     trait Store for Module<T: Trait> as Market {
         /// A mapping from storage order id to payment ledger info
         pub Payments get(fn payments):
-        map hasher(twox_64_concat) T::Hash => Option<Ledger<BalanceOf<T>>>;
+        map hasher(twox_64_concat) T::Hash => Option<PaymentLedger<BalanceOf<T>>>;
 
         /// A mapping from storage order id to slot value info
         pub SlotPayments get(fn slot_payments):

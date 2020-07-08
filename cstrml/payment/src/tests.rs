@@ -7,7 +7,7 @@ use frame_support::{
 };
 use hex;
 use tee::WorkReport;
-use crate::Ledger;
+use crate::PaymentLedger;
 
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
@@ -66,13 +66,13 @@ fn test_for_storage_order_and_payment_should_work() {
         let order_id = H256::default();
         assert_eq!(Balances::free_balance(client.clone()), 10);
         assert_eq!(Balances::reserved_balance(client.clone()), 60);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
             unreserved: 0
         });
         run_to_block(303);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
             unreserved: 0
@@ -87,7 +87,7 @@ fn test_for_storage_order_and_payment_should_work() {
         ));
         assert_eq!(Balances::reserved_balance(client.clone()), 60);
         assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
             unreserved: 0
@@ -98,7 +98,7 @@ fn test_for_storage_order_and_payment_should_work() {
             assert_eq!(Balances::reserved_balance(client.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(client.clone()), 10);
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+            assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: i * 2,
                 unreserved: i * 2,
@@ -172,14 +172,14 @@ fn test_for_storage_order_and_payment_should_suspend() {
         let order_id = H256::default();
         assert_eq!(Balances::free_balance(source.clone()), 10);
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
             unreserved: 0
         });
 
         run_to_block(303);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
             unreserved: 0
@@ -194,7 +194,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
         ));
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);
-        assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
             unreserved: 0
@@ -205,7 +205,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10);
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+            assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: i * 2,
                 unreserved: i * 2
@@ -222,7 +222,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10 + (i - 10) * 2 );
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+            assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: 20,
                 unreserved: i * 2
@@ -241,7 +241,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 30 );
             assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20 + (i - 20) * 2);
-            assert_eq!(CstrmlPayment::payments(order_id).unwrap(), Ledger {
+            assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: 20 + (i - 20) * 2,
                 unreserved: i * 2

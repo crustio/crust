@@ -42,7 +42,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
 {
     fn reserve_sorder(sorder_id: &T::Hash, client: &T::AccountId, amount: BalanceOf<T>) -> bool {
         if T::Currency::reserve(&client, amount.clone()).is_ok() {
-            <Payments<T>>::insert(sorder_id, PaymentLedger {
+            <PaymentLedgers<T>>::insert(sorder_id, PaymentLedger {
                 total: amount,
                 paid: Zero::zero(),
                 unreserved: Zero::zero()
@@ -56,7 +56,7 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
     fn pay_sorder(sorder_id: &T::Hash) {
         // 1. Storage order should exist
         if let Some(so) = T::MarketInterface::maybe_get_sorder(sorder_id) {
-            if <Payments<T>>::contains_key(sorder_id) {
+            if <PaymentLedgers<T>>::contains_key(sorder_id) {
                 // 2. Calculate slots
                 // TODO: Change fixed time frequency to fixed slots
                 let slots = (so.expired_on - so.completed_on) / T::Frequency::get();
@@ -106,7 +106,7 @@ pub trait Trait: system::Trait {
 decl_storage! {
     trait Store for Module<T: Trait> as Market {
         /// A mapping from storage order id to payment ledger info
-        pub Payments get(fn payments):
+        pub PaymentLedgers get(fn payment_ledgers):
         map hasher(twox_64_concat) T::Hash => Option<PaymentLedger<BalanceOf<T>>>;
 
         /// A mapping from storage order id to slot value info
@@ -149,7 +149,7 @@ impl<T: Trait> Module<T> {
     pub fn batch_transfer(slot_factor: BlockNumber) {
         for (sorder_id, slot_value) in <SlotPayments<T>>::iter_prefix(slot_factor) {
             // 3. Prepare payment amount
-            let ledger = Self::payments(&sorder_id).unwrap_or_default();
+            let ledger = Self::payment_ledgers(&sorder_id).unwrap_or_default();
             let real_amount = slot_value.min(ledger.total - ledger.paid);
 
             // 4. Ensure amount > 0
@@ -181,7 +181,7 @@ impl<T: Trait> Module<T> {
         // Unreserved value will be added anyway.
         // If the status of storage order status is `Failed`,
         // the CRUs will be just unreserved(aka, unlocked) to client-self.
-        <Payments<T>>::mutate(&sorder_id, |ledger| {
+        <PaymentLedgers<T>>::mutate(&sorder_id, |ledger| {
             if let Some(p) = ledger {
                 p.unreserved += real_amount;
             }
@@ -193,7 +193,7 @@ impl<T: Trait> Module<T> {
                 // 5. [DB Write] (Maybe) Transfer the amount
                 if T::Currency::transfer(&client, &provider, real_amount, ExistenceRequirement::AllowDeath).is_ok() {
                     // 6. [DB Write] Update ledger
-                    <Payments<T>>::mutate(&sorder_id, |ledger| {
+                    <PaymentLedgers<T>>::mutate(&sorder_id, |ledger| {
                         if let Some(l) = ledger {
                             l.paid += real_amount;
                         }
@@ -203,7 +203,7 @@ impl<T: Trait> Module<T> {
                     // 7. Reserve it back
                     // TODO: Double check this behavior since it should be a workaround. Maybe a special status is better?
                     let _ = T::Currency::reserve(&client, real_amount);
-                    <Payments<T>>::mutate(&sorder_id, |ledger| {
+                    <PaymentLedgers<T>>::mutate(&sorder_id, |ledger| {
                         if let Some(p) = ledger {
                             p.unreserved -= real_amount;
                         }

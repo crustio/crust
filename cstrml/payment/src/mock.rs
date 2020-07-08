@@ -18,6 +18,10 @@ use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
 pub type AccountId = AccountId32;
 
+use primitives::{
+    constants::time::MINUTES, BlockNumber
+};
+
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
 }
@@ -115,16 +119,9 @@ impl market::OrderInspector<AccountId> for TestOrderInspector {
 }
 
 parameter_types! {
-	pub const MaximumWeight: u32 = 1000000;
     pub const MinimumStoragePrice: Balance = 1;
     pub const MinimumSorderDuration: u32 = 1;
-}
-
-impl scheduler::Trait for Test {
-	type Event = ();
-	type Origin = Origin;
-	type Call = Call;
-	type MaximumWeight = MaximumWeight;
+    pub const Frequency: BlockNumber = MINUTES;
 }
 
 impl balances::Trait for Test {
@@ -163,14 +160,14 @@ impl Trait for Test {
     type Currency = Balances;
     type Event = ();
     type CurrencyToBalance = CurrencyToVoteHandler;
-    type Scheduler = Scheduler;
+    // TODO: Bonding with balance module(now we impl inside Market)
     type MarketInterface = Market;
+    type Frequency = Frequency;
 }
 
 pub type Market = market::Module<Test>;
 pub type System = system::Module<Test>;
 pub type Tee = tee::Module<Test>;
-pub type Scheduler = scheduler::Module<Test>;
 pub type Payment = Module<Test>;
 pub type Balances = balances::Module<Test>;
 
@@ -234,10 +231,9 @@ pub fn run_to_block(n: u64) {
         <system::BlockHash<Test>>::insert(System::block_number(), fake_bh.clone());
         if System::block_number() > 1 {
             System::on_finalize(System::block_number());
-            Scheduler::on_finalize(System::block_number());
         }
         System::set_block_number(System::block_number() + 1);
         System::on_initialize(System::block_number());
-        Scheduler::on_initialize(System::block_number());
+        Payment::on_initialize(System::block_number());
     }
 }

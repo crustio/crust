@@ -121,8 +121,6 @@ pub trait OrderInspector<AccountId> {
 pub trait MarketInterface<AccountId, Hash, Balance> {
     /// Provision{files} will be used for tee module.
     fn providers(account_id: &AccountId) -> Option<Provision<Hash, Balance>>;
-    /// Vec{order_id} will be used for payment module.
-    fn clients(account_id: &AccountId) -> Option<Vec<Hash>>;
     /// Get storage order
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
     /// (Maybe) set storage order's status
@@ -133,10 +131,6 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
     fn providers(_: &AId) -> Option<Provision<Hash, Balance>> {
-        None
-    }
-
-    fn clients(_: &AId) -> Option<Vec<Hash>> {
         None
     }
 
@@ -159,11 +153,6 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     fn providers(account_id: &<T as system::Trait>::AccountId)
         -> Option<Provision<<T as system::Trait>::Hash, BalanceOf<T>>> {
         Self::providers(account_id)
-    }
-
-    fn clients(account_id: &<T as system::Trait>::AccountId)
-               -> Option<Vec<<T as system::Trait>::Hash>> {
-        Self::clients(account_id)
     }
 
     fn maybe_get_sorder(order_id: &<T as system::Trait>::Hash)

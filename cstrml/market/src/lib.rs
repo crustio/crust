@@ -46,7 +46,6 @@ pub struct StorageOrder<AccountId, Balance> {
     pub expired_on: BlockNumber,
     pub provider: AccountId,
     pub client: AccountId,
-    // Payment amount in each slot
     pub amount: Balance,
     pub status: OrderStatus
 }

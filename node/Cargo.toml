@@ -16,6 +16,7 @@ name = 'crust'
 futures = "0.3.4"
 log = "0.4.8"
 structopt = "0.3.8"
+hex-literal = "0.2.1"
 
 # substrate client dependencies
 babe = { version = '0.8.0-rc4', package = 'sc-consensus-babe' }

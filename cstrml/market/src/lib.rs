@@ -104,7 +104,7 @@ pub trait Payment<AccountId, Hash, Balance> {
     /// Start delayed payment for a reserved storage order
     fn pay_sorder(sorder_id: &Hash);
     /// To remove closed sorder's payment info
-    fn close_sorder(sorder_id: &Hash, client: &AccountId);
+    fn close_sorder(sorder_id: &Hash, client: &AccountId, amount: &BlockNumber);
 }
 
 /// A trait for checking order's legality
@@ -499,14 +499,16 @@ impl<T: Trait> Module<T> {
             // 2. Do slash
             let real_punish_value = Self::punish_provider(&so, &punishment, &punish_duration);
             punishment.value += real_punish_value;
-            // TODO: add closed status here.
             // 3. Reset Provider Punishment
             punishment.success = 0;
             punishment.failed = 0;
         } else {
 
         }
-        <ProviderPunishments<T>>::insert(&order_id, punishment);
+        <ProviderPunishments<T>>::insert(&order_id, punishment.clone());
+        if punishment.value >= so.amount {
+            Self::close_sorder(&order_id);
+        }
     }
 
     pub fn punish_provider(
@@ -596,8 +598,9 @@ impl<T: Trait> Module<T> {
 
     fn close_sorder(order_id: &<T as system::Trait>::Hash) {
         let so = Self::storage_orders(order_id).unwrap();
+        let punishment = Self::provider_punishments(order_id).unwrap();
         // 1. Remove sorder's payment info
-        T::Payment::close_sorder(order_id, &so.client);
+        T::Payment::close_sorder(order_id, &so.client, &so.completed_on);
         // 2. Remove `file_identifier` -> `order_id`s from provider's file_map
         <Providers<T>>::mutate(&so.provider, |maybe_provision| {
             // `provision` cannot be None
@@ -612,7 +615,6 @@ impl<T: Trait> Module<T> {
             }
         });
         // 3. Update Pledge for provider
-        let punishment = Self::provider_punishments(order_id).unwrap();
         let real_used_value = so.amount.min(so.amount - punishment.value);
         let mut pledge = Self::pledges(&so.provider);
         pledge.used -= real_used_value;

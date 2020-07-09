@@ -70,13 +70,15 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         }
     }
 
-    fn close_sorder(sorder_id: &T::Hash, client: &T::AccountId) {
-        let ledger = Self::payments(&sorder_id).unwrap_or_default();
+    fn close_sorder(sorder_id: &T::Hash, client: &T::AccountId, complted_on: &BlockNumber) {
+        let ledger = Self::payment_ledgers(&sorder_id).unwrap_or_default();
         T::Currency::unreserve(
             &client,
-            ledger.unreserved);
-        <Payments<T>>::remove(&sorder_id);
-        // TODO: Remove slot pay
+            ledger.total - ledger.unreserved);
+        <PaymentLedgers<T>>::remove(&sorder_id);
+
+        let slot_factor = complted_on % T::Frequency::get();
+        <SlotPayments<T>>::remove(slot_factor, sorder_id);
     }
 }
 

@@ -521,14 +521,14 @@ fn test_for_half_punish_should_work() {
             used: 0
         });
 
-        // total fee has been punished.
-        set_punishment_in_success_count(&order_id, 90);
-
+        // total fee has been punished. The order has been closed
         assert_eq!(Balances::free_balance(&provider), 190);
         assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<ProviderPunishments<Test>>::contains_key(&order_id));
     });
 }
 
@@ -589,12 +589,13 @@ fn test_for_full_punish_should_work() {
             used: 0
         });
 
-        set_punishment_in_success_count(&order_id, 90);
-
+        // total fee has been punished. The order has been closed
         assert_eq!(Balances::free_balance(&provider), 190);
         assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<ProviderPunishments<Test>>::contains_key(&order_id));
     });
 }

@@ -830,6 +830,7 @@ dependencies = [
  "cstrml-staking",
  "cstrml-tee",
  "futures 0.3.5",
+ "hex-literal",
  "log",
  "sc-authority-discovery",
  "sc-basic-authorship",

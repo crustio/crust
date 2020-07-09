@@ -973,7 +973,6 @@ dependencies = [
  "frame-support",
  "frame-system",
  "hex",
- "pallet-scheduler",
  "parity-scale-codec",
  "serde",
  "serde_json",

@@ -265,6 +265,7 @@ impl<T: Trait> Module<T> {
     /// TC = O(2n)
     /// DB try is 2n+5+Works_DB_try
     pub fn update_identities() {
+        // TODO: do this in previous session instead of end era.
         // Ideally, reported_rs should be current_rs + 1
         let reported_rs = Self::get_reported_slot();
         let current_rs = Self::current_report_slot();

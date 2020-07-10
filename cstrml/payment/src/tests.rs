@@ -1,20 +1,28 @@
 use super::*;
 use crate::mock::*;
 use crate::mock::Payment as CstrmlPayment;
+use crate::PaymentLedger;
 use frame_support::{
     assert_noop, assert_ok,
     dispatch::DispatchError,
 };
 use hex;
-use tee::WorkReport;
-use crate::PaymentLedger;
+use primitives::*;
 
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
 type AccountId = AccountId32;
 
+struct ReportWorksInfo {
+    pub_key: PubKey,
+    block_number: u64,
+    block_hash: Vec<u8>,
+    reserved: u64,
+    files: Vec<(MerkleRoot, u64)>,
+    sig: TeeSignature
+}
 
-fn get_valid_work_report() -> WorkReport {
+fn valid_report_works_info() -> ReportWorksInfo {
     let pub_key = hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap();
     let block_hash = hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap();
     let files: Vec<(Vec<u8>, u64)> = [
@@ -23,12 +31,10 @@ fn get_valid_work_report() -> WorkReport {
     ].to_vec();
     let sig = hex::decode("9c12986c01efe715ed8bed80b7e391601c45bf152e280693ffcfd10a4b386deaaa0f088fc26b0ebeca64c33cf122d372ebd787aa77beaaba9d2e499ce40a76e6").unwrap();
 
-
-    WorkReport {
+    ReportWorksInfo {
         pub_key,
         block_number: 300,
         block_hash,
-        used: 0,
         reserved: 4294967296,
         sig,
         files
@@ -81,9 +87,15 @@ fn test_for_storage_order_and_payment_should_work() {
         // Check workloads
         assert_eq!(Tee::reserved(), 0);
 
+        let report_works_info = valid_report_works_info();
         assert_ok!(Tee::report_works(
             Origin::signed(provider.clone()),
-            get_valid_work_report()
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
         ));
         assert_eq!(Balances::reserved_balance(client.clone()), 60);
         assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);
@@ -188,9 +200,15 @@ fn test_for_storage_order_and_payment_should_suspend() {
         // Check workloads
         assert_eq!(Tee::reserved(), 0);
 
+        let report_works_info = valid_report_works_info();
         assert_ok!(Tee::report_works(
             Origin::signed(provider.clone()),
-            get_valid_work_report()
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
         ));
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);

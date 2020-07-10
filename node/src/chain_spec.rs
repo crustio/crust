@@ -7,7 +7,7 @@ use crust_runtime::{
     WASM_BINARY
 };
 use cstrml_staking::Forcing;
-use cstrml_tee::{WorkReport, Identity};
+use cstrml_tee::WorkReport;
 use grandpa_primitives::AuthorityId as GrandpaId;
 use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
@@ -253,30 +253,16 @@ fn rocky_staging_testnet_config_genesis() -> GenesisConfig {
             current_report_slot: 0,
             identities: endowed_accounts
                 .iter()
-                .map(|x| (
-                    x.clone(),
-                    Identity {
-                        ias_sig: vec![],
-                        ias_cert: vec![],
-                        account_id: x.clone(),
-                        isv_body: vec![],
-                        pub_key: vec![],
-                        code: vec![],
-                        sig: vec![]
-                    }
-                ))
+                .map(|x| (x.clone(), Default::default()))
                 .collect(),
             work_reports: endowed_accounts
                 .iter()
                 .map(|x| (
                     x.clone(),
                     WorkReport {
-                        pub_key: vec![],
                         block_number: 0,
-                        block_hash: vec![],
                         files: vec![],
                         reserved: WORKLOAD,
-                        sig: vec![],
                         used: 0
                     },
                 ))
@@ -364,12 +350,9 @@ fn testnet_genesis(
                     (
                         x.clone(),
                         WorkReport {
-                            pub_key: vec![],
                             block_number: 0,
-                            block_hash: vec![],
                             files: vec![],
                             reserved: WORKLOAD,
-                            sig: vec![],
                             used: 0
                         },
                     )

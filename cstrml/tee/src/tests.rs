@@ -14,7 +14,24 @@ use primitives::Hash;
 
 type AccountId = AccountId32;
 
-fn get_valid_identity() -> Identity<AccountId> {
+struct RegisterInfo {
+    ias_sig: IASSig,
+    ias_cert: Cert,
+    account_id: AccountId,
+    isv_body: ISVBody,
+    sig: TeeSignature
+}
+
+struct ReportWorksInfo {
+    pub_key: PubKey,
+    block_number: u64,
+    block_hash: Vec<u8>,
+    reserved: u64,
+    files: Vec<(MerkleRoot, u64)>,
+    sig: TeeSignature
+}
+
+fn valid_register_info() -> RegisterInfo {
     let applier: AccountId =
         AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
             .expect("valid ss58 address");
@@ -24,18 +41,16 @@ fn get_valid_identity() -> Identity<AccountId> {
     let isv_body = "{\"id\":\"28059165425966003836075402765879561587\",\"timestamp\":\"2020-06-23T10:02:29.441419\",\"version\":3,\"epidPseudonym\":\"4tcrS6EX9pIyhLyxtgpQJuMO1VdAkRDtha/N+u/rRkTsb11AhkuTHsY6UXRPLRJavxG3nsByBdTfyDuBDQTEjMYV6NBXjn3P4UyvG1Ae2+I4lE1n+oiKgLA8CR8pc2nSnSY1Wz1Pw/2l9Q5Er6hM6FdeECgMIVTZzjScYSma6rE=\",\"isvEnclaveQuoteStatus\":\"GROUP_OUT_OF_DATE\",\"platformInfoBlob\":\"1502006504000F00000F0F02040101070000000000000000000B00000B00000002000000000000142AA23C001F46C3A71CFB50557CE2E2292DFB24EDE2621957E890432F166F6AC6FA37CD8166DBE6323CD39D3C6AA0CB41779FC7EDE281C5E50BCDCA00935E00A9DF\",\"isvEnclaveQuoteBody\":\"AgABACoUAAAKAAkAAAAAAP7yPH5zo3mCPOcf8onPvAcAAAAAAAAAAAAAAAAAAAAACA7///8CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAHAAAAAAAAAOJWq0y16RNrwcERUIj8QMofQYJUXqdXaVeMINhDAozVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACD1xnnferKFHD2uvYqTXdDA8iZ22kCD5xw7h38CMfOngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABNu2QBUIMjsY9knwTxdDP9S4cgHvP/Y0toS3FchIu2C5Bd1TBeJHYbSWioh139n2q/sxENn6SU3VMNquzMg1Ph\"}".as_bytes();
     let sig = hex::decode("3022068d50f3edaf63b5aab8f47089091d1cc4c0cf7f55991da40e244a3d26ea6beecaec1b513d281f951dc211338146c31007ff370b296aaf8d9295b2806b65").unwrap();
 
-    Identity {
+    RegisterInfo {
         ias_sig: ias_sig.to_vec(),
         ias_cert: ias_cert.to_vec(),
         account_id: applier,
         isv_body: isv_body.to_vec(),
-        pub_key: vec![],
-        code: vec![],
         sig
     }
 }
 
-fn get_valid_work_report() -> WorkReport {
+fn valid_report_works_info() -> ReportWorksInfo {
     let pub_key = hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap();
     let block_hash = hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap();
     let files: Vec<(Vec<u8>, u64)> = [
@@ -44,11 +59,10 @@ fn get_valid_work_report() -> WorkReport {
     ].to_vec();
     let sig = hex::decode("9c12986c01efe715ed8bed80b7e391601c45bf152e280693ffcfd10a4b386deaaa0f088fc26b0ebeca64c33cf122d372ebd787aa77beaaba9d2e499ce40a76e6").unwrap();
 
-    WorkReport {
+    ReportWorksInfo {
         pub_key,
         block_number: 300,
         block_hash,
-        used: 0,
         reserved: 4294967296,
         sig,
         files
@@ -80,49 +94,63 @@ fn add_success_sorder() {
 #[test]
 fn test_for_register_success() {
     new_test_ext().execute_with(|| {
-        // Alice is validator in genesis block
         let applier: AccountId =
             AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                 .expect("valid ss58 address");
-        let mut id = get_valid_identity();
+        let register_info = valid_register_info();
 
         assert_ok!(Tee::register(
             Origin::signed(applier.clone()),
-            id.clone()
+            register_info.ias_sig,
+            register_info.ias_cert,
+            register_info.account_id,
+            register_info.isv_body,
+            register_info.sig
         ));
 
         let id_registered = Tee::identities(applier.clone()).unwrap();
-        
-        id.pub_key = hex::decode("4dbb6401508323b18f649f04f17433fd4b87201ef3ff634b684b715c848bb60b905dd5305e24761b4968a8875dfd9f6abfb3110d9fa494dd530daaeccc8353e1").unwrap();
-        id.code = hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap();
 
-        assert_eq!(id.clone(), id_registered);
+        let id = Identity {
+            pub_key: hex::decode("4dbb6401508323b18f649f04f17433fd4b87201ef3ff634b684b715c848bb60b905dd5305e24761b4968a8875dfd9f6abfb3110d9fa494dd530daaeccc8353e1").unwrap(),
+            code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap()
+        };
+
+        assert_eq!(id, id_registered);
     });
 }
 
 #[test]
-fn test_for_register_failed_by_duplicate_sig() {
+fn test_for_register_failed_by_duplicate_id() {
     new_test_ext().execute_with(|| {
-        // Bob is not validator before
-        let account: AccountId32 = Sr25519Keyring::Charlie.to_account_id();
+        let applier: AccountId =
+            AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                .expect("valid ss58 address");
+        let register_info = valid_register_info();
 
-        let id = Identity {
-            ias_sig: vec![],
-            ias_cert: vec![],
-            account_id: account.clone(),
-            isv_body: vec![],
-            pub_key: vec![],
-            code: vec![],
-            sig: vec![]
-        };
+        // First register should be ok
+        assert_ok!(Tee::register(
+            Origin::signed(applier.clone()),
+            register_info.ias_sig.clone(),
+            register_info.ias_cert.clone(),
+            register_info.account_id.clone(),
+            register_info.isv_body.clone(),
+            register_info.sig.clone()
+        ));
 
-        assert!(Tee::register(Origin::signed(account.clone()), id.clone()).is_err());
+        // Second register should failed
         assert_noop!(
-            Tee::register(Origin::signed(account.clone()), id.clone()),
+            Tee::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 1,
-                message: Some("DuplicateSig"),
+                message: Some("DuplicateId"),
             }
         );
     });
@@ -135,11 +163,18 @@ fn test_for_register_failed_by_invalid_ca() {
             AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                 .expect("valid ss58 address");
 
-        let mut id = get_valid_identity();
-        id.ias_cert = "wrong_ca".as_bytes().to_vec();
+        let mut register_info = valid_register_info();
+        register_info.ias_cert = "wrong_ca".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::register(Origin::signed(applier.clone()), id.clone()),
+            Tee::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 2,
@@ -156,11 +191,18 @@ fn test_for_register_failed_by_illegal_ca() {
             AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                 .expect("valid ss58 address");
 
-        let mut id = get_valid_identity();
-        id.ias_cert = "-----BEGIN CERTIFICATE-----\nMIIFFjCCAv4CCQChGbr81on1kDANBgkqhkiG9w0BAQsFADBNMQswCQYDVQQGEwJD\nTjERMA8GA1UECAwIU2hhbmdoYWkxETAPBgNVBAcMCFNoYW5naGFpMQswCQYDVQQK\nDAJaazELMAkGA1UECwwCWkgwHhcNMjAwNjIzMDUwODQyWhcNMjEwNjIzMDUwODQy\nWjBNMQswCQYDVQQGEwJDTjERMA8GA1UECAwIU2hhbmdoYWkxETAPBgNVBAcMCFNo\nYW5naGFpMQswCQYDVQQKDAJaazELMAkGA1UECwwCWkgwggIiMA0GCSqGSIb3DQEB\nAQUAA4ICDwAwggIKAoICAQC7oznSx9/gjE1/cEgXGKLATEvDPAdnvJ/T2lopEDZ/\nJEsNu0qBQsbOSAgJUhqAfX6ahwAn/Epz7yXy7PxCKZJi/wvESJ/WX4x+b7tE1nU1\nK7p7bKGJ6erww/ZrmGV+4+6GvdCg5dcOAA5TXAE2ZjTeIoR76Y3IZb0L78i/S+q1\ndZpx4YRfzwHNELCqpgwaJAS0FHIH1g+6X59EbF0UFT0YcM90Xxa0gHkPlYIoEoWS\n+UA/UW1MjuUwNaS5mNB3IpcrMhSeOkkqLglMdanu6r5MZpjuLBl7+sACoH0P7Rda\nx1c/NadmrbZf3/+AHvMZ6M9HrciyKKMauBZM9PUMrzLnTfF8iHitrSlum1UIfUuN\nvXXXzNLWskTxcXuWuyBgXpKM7D5XG7VnENDAbEYiN5Ej6zz5Zi/2OHVyErI3f1Ka\nvwTC8AjJMemCOBgPrgqMH7l6SAXr55eozXaSQVa4HG9iPGJixXZU5PUIiVFVO7Hj\nXtE3yfa2zaucB4rKhOJLwSD9qYgqFKB+vQ1X2GUkkPpsAMrL4n/VDQcJkrvjK3tt\n7AES9Q3TLmbVK91E2scF063XKUc3vT5Q8hcvg4MMLHn7gzMEaWTzjknRo1fLNWPY\nlPV3lZhBwkxdHKYodY7d6subE8nOsiFibq8X6Nf0UNIG0MXeFTAM2WfG2s6AlnZR\nHwIDAQABMA0GCSqGSIb3DQEBCwUAA4ICAQA5NL5fFP1eSBN/WEd8z6vJRWPyOz1t\ntrQF5o7Fazh3AtFcb3j3ab8NG/4qDTr7FrYFyOD+oHgIoHlzK4TFxlhSZquvU2Xb\nSMQyIQChojz8jbTa771ZPsjQjDWU0R0r83vI1ywc1v6eFpXIpV5oidT0afbJ85n4\ngwhVd6S2eTHh91U11BKf2gV4nhewzON4r7YuFg7sMMDVl3wx1HtXCKg5dMtgePyc\nGejdpyxdWX4BIxnvIY8QdAa4gvi9etzRf83mcNfwr+gM0rTyqGEBXuPW8bwq9BRL\nXz6zeL1Anb2HsjMQ6+MKWbXRhBFBCbB+APDcnjHv7OZXUaILi0B1JoTPu/jjSK1U\n7yAnK1sRtVpADVpa2N4STk9ImdTKfqTHZR9iTaheoqxRuTm7vzwGy72V4HEeEyOa\njyYpiCD8we3gJfro1pjzFLOqE3yU14vUc0SwQCZWlEH8LR/a8m/ZCPuqN4a2xPJO\nwksgMSCDkui5yUr4uTINFpROXHzz1dpOuUnvkkCAjKieZHWCyYyoEE0tedgejwee\nWv3UtR7svhpbAVoIQ8Z8EV2Ys1IN0Tp+4pltRbcgeZK0huEFOz4BL/1EGezwLbjE\nvoOMtTumWI9Mw5FTG4iTbRxvWL/KnLMvZr7V+o5ovmm0jeLW03Eh/E+aHH0B0tQp\nf6FKPRF7+Imo/g==\n-----END CERTIFICATE-----\n".as_bytes().to_vec();
+        let mut register_info = valid_register_info();
+        register_info.ias_cert = "-----BEGIN CERTIFICATE-----\nMIIFFjCCAv4CCQChGbr81on1kDANBgkqhkiG9w0BAQsFADBNMQswCQYDVQQGEwJD\nTjERMA8GA1UECAwIU2hhbmdoYWkxETAPBgNVBAcMCFNoYW5naGFpMQswCQYDVQQK\nDAJaazELMAkGA1UECwwCWkgwHhcNMjAwNjIzMDUwODQyWhcNMjEwNjIzMDUwODQy\nWjBNMQswCQYDVQQGEwJDTjERMA8GA1UECAwIU2hhbmdoYWkxETAPBgNVBAcMCFNo\nYW5naGFpMQswCQYDVQQKDAJaazELMAkGA1UECwwCWkgwggIiMA0GCSqGSIb3DQEB\nAQUAA4ICDwAwggIKAoICAQC7oznSx9/gjE1/cEgXGKLATEvDPAdnvJ/T2lopEDZ/\nJEsNu0qBQsbOSAgJUhqAfX6ahwAn/Epz7yXy7PxCKZJi/wvESJ/WX4x+b7tE1nU1\nK7p7bKGJ6erww/ZrmGV+4+6GvdCg5dcOAA5TXAE2ZjTeIoR76Y3IZb0L78i/S+q1\ndZpx4YRfzwHNELCqpgwaJAS0FHIH1g+6X59EbF0UFT0YcM90Xxa0gHkPlYIoEoWS\n+UA/UW1MjuUwNaS5mNB3IpcrMhSeOkkqLglMdanu6r5MZpjuLBl7+sACoH0P7Rda\nx1c/NadmrbZf3/+AHvMZ6M9HrciyKKMauBZM9PUMrzLnTfF8iHitrSlum1UIfUuN\nvXXXzNLWskTxcXuWuyBgXpKM7D5XG7VnENDAbEYiN5Ej6zz5Zi/2OHVyErI3f1Ka\nvwTC8AjJMemCOBgPrgqMH7l6SAXr55eozXaSQVa4HG9iPGJixXZU5PUIiVFVO7Hj\nXtE3yfa2zaucB4rKhOJLwSD9qYgqFKB+vQ1X2GUkkPpsAMrL4n/VDQcJkrvjK3tt\n7AES9Q3TLmbVK91E2scF063XKUc3vT5Q8hcvg4MMLHn7gzMEaWTzjknRo1fLNWPY\nlPV3lZhBwkxdHKYodY7d6subE8nOsiFibq8X6Nf0UNIG0MXeFTAM2WfG2s6AlnZR\nHwIDAQABMA0GCSqGSIb3DQEBCwUAA4ICAQA5NL5fFP1eSBN/WEd8z6vJRWPyOz1t\ntrQF5o7Fazh3AtFcb3j3ab8NG/4qDTr7FrYFyOD+oHgIoHlzK4TFxlhSZquvU2Xb\nSMQyIQChojz8jbTa771ZPsjQjDWU0R0r83vI1ywc1v6eFpXIpV5oidT0afbJ85n4\ngwhVd6S2eTHh91U11BKf2gV4nhewzON4r7YuFg7sMMDVl3wx1HtXCKg5dMtgePyc\nGejdpyxdWX4BIxnvIY8QdAa4gvi9etzRf83mcNfwr+gM0rTyqGEBXuPW8bwq9BRL\nXz6zeL1Anb2HsjMQ6+MKWbXRhBFBCbB+APDcnjHv7OZXUaILi0B1JoTPu/jjSK1U\n7yAnK1sRtVpADVpa2N4STk9ImdTKfqTHZR9iTaheoqxRuTm7vzwGy72V4HEeEyOa\njyYpiCD8we3gJfro1pjzFLOqE3yU14vUc0SwQCZWlEH8LR/a8m/ZCPuqN4a2xPJO\nwksgMSCDkui5yUr4uTINFpROXHzz1dpOuUnvkkCAjKieZHWCyYyoEE0tedgejwee\nWv3UtR7svhpbAVoIQ8Z8EV2Ys1IN0Tp+4pltRbcgeZK0huEFOz4BL/1EGezwLbjE\nvoOMtTumWI9Mw5FTG4iTbRxvWL/KnLMvZr7V+o5ovmm0jeLW03Eh/E+aHH0B0tQp\nf6FKPRF7+Imo/g==\n-----END CERTIFICATE-----\n".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::register(Origin::signed(applier.clone()), id.clone()),
+            Tee::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 2,
@@ -177,12 +219,19 @@ fn test_for_register_failed_by_illegal_isv_body() {
             AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                 .expect("valid ss58 address");
 
-        let mut id = get_valid_identity();
-
+        let mut register_info = valid_register_info();
         // Another isv body with wrong enclave code and public key
-        id.isv_body = "{\"id\":\"125366127848601794295099877969265555107\",\"timestamp\":\"2020-06-22T11:34:54.845374\",\"version\":3,\"epidPseudonym\":\"4tcrS6EX9pIyhLyxtgpQJuMO1VdAkRDtha/N+u/rRkTsb11AhkuTHsY6UXRPLRJavxG3nsByBdTfyDuBDQTEjMYV6NBXjn3P4UyvG1Ae2+I4lE1n+oiKgLA8CR8pc2nSnSY1Wz1Pw/2l9Q5Er6hM6FdeECgMIVTZzjScYSma6rE=\",\"isvEnclaveQuoteStatus\":\"GROUP_OUT_OF_DATE\",\"platformInfoBlob\":\"1502006504000F00000F0F02040101070000000000000000000B00000B00000002000000000000142A70382C3A557904D4AB5766B2D3BAAD8ED8B7B372FB8F25C7E06212DEF369A389047D2249CF2ACDB22197AD7EE604634D47B3720BB1837E35C5C7D66F256117B6\",\"isvEnclaveQuoteBody\":\"AgABACoUAAAKAAkAAAAAAP7yPH5zo3mCPOcf8onPvAcAAAAAAAAAAAAAAAAAAAAACA7///8CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAHAAAAAAAAAJY6Ggjlm1yvKL0sgypJx2BBrGbValVEq8cCi/0sViQcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACD1xnnferKFHD2uvYqTXdDA8iZ22kCD5xw7h38CMfOngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADagmwZsR+S1ZNqgDg6HobleD6S6tRtqtsF1j81Bw7CnoP9/ZGNDEEzMEh+EKk1jAPW8PE+YKpum0xkVhh2J5Y8\"}".as_bytes().to_vec();
+        register_info.isv_body = "{\"id\":\"125366127848601794295099877969265555107\",\"timestamp\":\"2020-06-22T11:34:54.845374\",\"version\":3,\"epidPseudonym\":\"4tcrS6EX9pIyhLyxtgpQJuMO1VdAkRDtha/N+u/rRkTsb11AhkuTHsY6UXRPLRJavxG3nsByBdTfyDuBDQTEjMYV6NBXjn3P4UyvG1Ae2+I4lE1n+oiKgLA8CR8pc2nSnSY1Wz1Pw/2l9Q5Er6hM6FdeECgMIVTZzjScYSma6rE=\",\"isvEnclaveQuoteStatus\":\"GROUP_OUT_OF_DATE\",\"platformInfoBlob\":\"1502006504000F00000F0F02040101070000000000000000000B00000B00000002000000000000142A70382C3A557904D4AB5766B2D3BAAD8ED8B7B372FB8F25C7E06212DEF369A389047D2249CF2ACDB22197AD7EE604634D47B3720BB1837E35C5C7D66F256117B6\",\"isvEnclaveQuoteBody\":\"AgABACoUAAAKAAkAAAAAAP7yPH5zo3mCPOcf8onPvAcAAAAAAAAAAAAAAAAAAAAACA7///8CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAHAAAAAAAAAJY6Ggjlm1yvKL0sgypJx2BBrGbValVEq8cCi/0sViQcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACD1xnnferKFHD2uvYqTXdDA8iZ22kCD5xw7h38CMfOngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADagmwZsR+S1ZNqgDg6HobleD6S6tRtqtsF1j81Bw7CnoP9/ZGNDEEzMEh+EKk1jAPW8PE+YKpum0xkVhh2J5Y8\"}".as_bytes().to_vec();
+
         assert_noop!(
-            Tee::register(Origin::signed(applier.clone()), id.clone()),
+            Tee::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 2,
@@ -199,12 +248,19 @@ fn test_for_register_failed_by_illegal_sig() {
             AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                 .expect("valid ss58 address");
 
-        let mut id = get_valid_identity();
-
+        let mut register_info = valid_register_info();
         // Another identity sig
-        id.sig = hex::decode("f45e401778623de9b27726ab749549da35b1f8c0fd7bb56e0c1c3bba86948eb41717c9e13bf57113d85a1cc64d5cc2fc95c12d8b3108ab6fadeff621dfb6a486").unwrap();
+        register_info.sig = hex::decode("f45e401778623de9b27726ab749549da35b1f8c0fd7bb56e0c1c3bba86948eb41717c9e13bf57113d85a1cc64d5cc2fc95c12d8b3108ab6fadeff621dfb6a486").unwrap();
+
         assert_noop!(
-            Tee::register(Origin::signed(applier.clone()), id.clone()),
+            Tee::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 2,
@@ -221,12 +277,19 @@ fn test_for_register_failed_by_illegal_ias_sig() {
             AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                 .expect("valid ss58 address");
 
-        let mut id = get_valid_identity();
-
+        let mut register_info = valid_register_info();
         // Another ias sig
-        id.ias_sig = "cU3uOnd5XghR3ngJTbSFr48ttEIrJtbHHtuRM3hgzX7LHGacuTBMVRy0VK3ldqeM7KPBS+g3Da2anDHEJsSgITTXfHh+dxjUPO9v2hC+okjtWSY9fWhaFlR31lFWmSSbUfJSe2rtkLQRoj5VgKpOVkVuGzQjl/xF+SQZU4gjq130TwO8Gr/TvPLA3vJnM3/d8FUpcefp5Q5dbBka7y2ej8hDTyOjix3ZXSVD2SrSySfIg6kvIPS/EEJYoz/eMOFciSWuIIPrUj9M0eUc4xHsUxgNcgjOmtRt621RlzAwgY+yPFoqJwKtmlVNYy/FyvSbIMSB3kJbmlA+qHwOBgPQ0A==".as_bytes().to_vec();
+        register_info.ias_sig = "cU3uOnd5XghR3ngJTbSFr48ttEIrJtbHHtuRM3hgzX7LHGacuTBMVRy0VK3ldqeM7KPBS+g3Da2anDHEJsSgITTXfHh+dxjUPO9v2hC+okjtWSY9fWhaFlR31lFWmSSbUfJSe2rtkLQRoj5VgKpOVkVuGzQjl/xF+SQZU4gjq130TwO8Gr/TvPLA3vJnM3/d8FUpcefp5Q5dbBka7y2ej8hDTyOjix3ZXSVD2SrSySfIg6kvIPS/EEJYoz/eMOFciSWuIIPrUj9M0eUc4xHsUxgNcgjOmtRt621RlzAwgY+yPFoqJwKtmlVNYy/FyvSbIMSB3kJbmlA+qHwOBgPQ0A==".as_bytes().to_vec();
+
         assert_noop!(
-            Tee::register(Origin::signed(applier.clone()), id.clone()),
+            Tee::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 2,
@@ -247,13 +310,19 @@ fn test_for_report_works_success() {
         assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 0);
 
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let report_works_info = valid_report_works_info();
 
         // Check workloads
         assert_eq!(Tee::reserved(), 0);
 
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
-            get_valid_work_report()
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
         ));
 
         // Check workloads after work report
@@ -276,13 +345,19 @@ fn test_for_report_works_success_without_sorder() {
         run_to_block(303);
 
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let report_works_info = valid_report_works_info();
 
         // Check workloads
         assert_eq!(Tee::reserved(), 0);
 
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
-            get_valid_work_report()
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
         ));
 
         // Check workloads after work report
@@ -296,11 +371,19 @@ fn test_for_report_works_failed_by_pub_key_is_not_found() {
     new_test_ext().execute_with(|| {
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
 
-        let mut works = get_valid_work_report();
-        works.pub_key = "another_pub_key".as_bytes().to_vec();
+        let mut report_works_info = valid_report_works_info();
+        report_works_info.pub_key = "another_pub_key".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::report_works(Origin::signed(account), works),
+            Tee::report_works(
+                Origin::signed(account.clone()),
+                report_works_info.pub_key,
+                report_works_info.block_number,
+                report_works_info.block_hash,
+                report_works_info.reserved,
+                report_works_info.files,
+                report_works_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 4,
@@ -315,18 +398,25 @@ fn test_for_report_works_failed_by_reporter_is_not_registered() {
     new_test_ext().execute_with(|| {
         let account: AccountId32 = Sr25519Keyring::Dave.to_account_id();
 
-        let works = WorkReport {
+        let report_works_info = ReportWorksInfo {
             pub_key: "pub_key_bob".as_bytes().to_vec(),
             block_number: 50,
             block_hash: "block_hash".as_bytes().to_vec(),
-            used: 2000,
             reserved: 2000,
             sig: "sig_key_bob".as_bytes().to_vec(),
             files: vec![]
         };
 
         assert_noop!(
-            Tee::report_works(Origin::signed(account), works),
+            Tee::report_works(
+                Origin::signed(account.clone()),
+                report_works_info.pub_key,
+                report_works_info.block_number,
+                report_works_info.block_hash,
+                report_works_info.reserved,
+                report_works_info.files,
+                report_works_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 3,
@@ -337,7 +427,7 @@ fn test_for_report_works_failed_by_reporter_is_not_registered() {
 }
 
 #[test]
-fn test_for_work_report_timing_check_failed_by_wrong_hash() {
+fn test_for_work_report_timing_check_failed_by_wrong_block_hash() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -345,18 +435,25 @@ fn test_for_work_report_timing_check_failed_by_wrong_hash() {
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
         let block_hash = [1; 32].to_vec();
 
-        let works = WorkReport {
+        let report_works_info = ReportWorksInfo {
             pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
             block_number: 50,
             block_hash,
-            used: 0,
             reserved: 0,
             sig: "sig_key_alice".as_bytes().to_vec(),
             files: vec![]
         };
 
         assert_noop!(
-            Tee::report_works(Origin::signed(account), works),
+            Tee::report_works(
+                Origin::signed(account.clone()),
+                report_works_info.pub_key,
+                report_works_info.block_number,
+                report_works_info.block_hash,
+                report_works_info.reserved,
+                report_works_info.files,
+                report_works_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 5,
@@ -375,18 +472,25 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
         let block_hash = [0; 32].to_vec();
 
-        let works = WorkReport {
+        let report_works_info = ReportWorksInfo {
             pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
             block_number: 50,
             block_hash,
-            used: 0,
             reserved: 1999,
             sig: "sig_key_alice".as_bytes().to_vec(),
             files: vec![]
         };
 
         assert_noop!(
-            Tee::report_works(Origin::signed(account), works),
+            Tee::report_works(
+                Origin::signed(account.clone()),
+                report_works_info.pub_key,
+                report_works_info.block_number,
+                report_works_info.block_hash,
+                report_works_info.reserved,
+                report_works_info.files,
+                report_works_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 5,
@@ -409,23 +513,41 @@ fn test_for_report_works_for_ab_upgrade_should_work() {
 
         // Bob can still report works with old code and identities
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let works = get_valid_work_report();
+        let report_works_info = valid_report_works_info();
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
-            works.clone()
+            report_works_info.pub_key.clone(),
+            report_works_info.block_number.clone(),
+            report_works_info.block_hash.clone(),
+            report_works_info.reserved.clone(),
+            report_works_info.files.clone(),
+            report_works_info.sig.clone()
         ));
 
         // Run to 400, Bob report works should be ok
         run_to_block(400);
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
-            works.clone()
+            report_works_info.pub_key.clone(),
+            report_works_info.block_number.clone(),
+            report_works_info.block_hash.clone(),
+            report_works_info.reserved.clone(),
+            report_works_info.files.clone(),
+            report_works_info.sig.clone()
         ));
 
         // Run to 500, Bob's identity should be expired
         run_to_block(500);
         assert_noop!(
-            Tee::report_works(Origin::signed(account), works),
+            Tee::report_works(
+                Origin::signed(account.clone()),
+                report_works_info.pub_key,
+                report_works_info.block_number,
+                report_works_info.block_hash,
+                report_works_info.reserved,
+                report_works_info.files,
+                report_works_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 7,
@@ -438,7 +560,7 @@ fn test_for_report_works_for_ab_upgrade_should_work() {
 #[test]
 fn test_for_work_report_sig_check_failed() {
     new_test_ext().execute_with(|| {
-        // generate 53 blocks first
+        // generate 303 blocks first
         run_to_block(303);
 
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
@@ -450,18 +572,25 @@ fn test_for_work_report_sig_check_failed() {
         ].to_vec();
         let sig = hex::decode("9c12986c01efe715ed8bed80b7e391601c45bf152e280693ffcfd10a4b386deaaa0f088fc26b0ebeca64c33cf122d372ebd787aa77beaaba9d2e499ce40a76e6").unwrap();
 
-        let works = WorkReport {
+        let report_works_info = ReportWorksInfo {
             pub_key,
             block_number: 300,
             block_hash,
-            used: 0,
             reserved: 4294967296,
             sig,
             files
         };
 
         assert_noop!(
-            Tee::report_works(Origin::signed(account), works),
+            Tee::report_works(
+                Origin::signed(account.clone()),
+                report_works_info.pub_key,
+                report_works_info.block_number,
+                report_works_info.block_hash,
+                report_works_info.reserved,
+                report_works_info.files,
+                report_works_info.sig
+            ),
             DispatchError::Module {
                 index: 0,
                 error: 6,
@@ -479,18 +608,25 @@ fn test_for_wr_check_failed_order() {
         // generate 303 blocks first
         run_to_block(303);
 
+        let report_works_info = valid_report_works_info();
+
         // report works should ok
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
-            get_valid_work_report()
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
         ));
 
         // check work report and workload, current_report_slot updating should work
         Tee::update_identities();
+
         // Check this 99 order should be failed
         assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap_or_default().status,
                    OrderStatus::Failed);
-
     });
 }
 
@@ -498,19 +634,27 @@ fn test_for_wr_check_failed_order() {
 fn test_for_outdated_work_reports() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let wr = get_valid_work_report(); // let used be 0, we don't check it here
         // generate 303 blocks first
         run_to_block(303);
+
+        let report_works_info = valid_report_works_info();
+        let wr = WorkReport {
+            block_number: report_works_info.block_number,
+            used: 0,
+            reserved: report_works_info.reserved.clone(),
+            files: report_works_info.files.clone()
+        };
 
         // report works should ok
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
-            get_valid_work_report()
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
         ));
-        assert_eq!(
-            Tee::work_reports(&account),
-            Some(wr.clone())
-        );
 
         // check work report and workload, current_report_slot updating should work
         assert_eq!(Tee::current_report_slot(), 0);
@@ -559,7 +703,13 @@ fn test_for_outdated_work_reports() {
 fn test_abnormal_era() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let wr = get_valid_work_report(); // let used be 0, we don't check it here
+        let report_works_info = valid_report_works_info();
+        let wr = WorkReport {
+            block_number: report_works_info.block_number,
+            used: 0,
+            reserved: report_works_info.reserved.clone(),
+            files: report_works_info.files.clone()
+        };
 
         // If new era happens in 101, next work is not reported
         run_to_block(101);
@@ -604,7 +754,12 @@ fn test_abnormal_era() {
         run_to_block(304);
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
-            get_valid_work_report()
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
         ));
         assert_eq!(Tee::work_reports(&account), Some(wr));
         // total workload should keep same, cause we only updated in a new era

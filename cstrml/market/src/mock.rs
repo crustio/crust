@@ -173,13 +173,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
                 (
                     *id,
                     tee::WorkReport {
-                        pub_key: vec![],
                         block_number: 0,
-                        block_hash: vec![],
                         files: vec![],
                         used: 0,
                         reserved: *id,
-                        sig: vec![],
                     },
                 )
             })

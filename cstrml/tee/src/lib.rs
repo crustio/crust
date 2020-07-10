@@ -37,26 +37,18 @@ pub type BalanceOf<T> =
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Identity<AccountId> {
-    pub ias_sig: IASSig,
-    pub ias_cert: Cert,
-    pub account_id: AccountId,
-    pub isv_body: ISVBody,
+pub struct Identity {
     pub pub_key: PubKey,
     pub code: TeeCode,
-    pub sig: TeeSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct WorkReport {
-    pub pub_key: PubKey,
     pub block_number: u64,
-    pub block_hash: Vec<u8>,
     pub used: u64,
     pub reserved: u64,
     pub files: Vec<(MerkleRoot, u64)>,
-    pub sig: TeeSignature,
 }
 
 /// An event handler for reporting works
@@ -104,11 +96,11 @@ decl_storage! {
         /// The AB upgrade expired block, this should be managed by sudo/democracy
         pub ABExpire get(fn ab_expire): Option<T::BlockNumber>;
 
-        /// The TEE identities, mapping from controller to optional identity value
+        /// The TEE identities, mapping from controller to an optional identity value
         pub Identities get(fn identities) config():
-            map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
+            map hasher(blake2_128_concat) T::AccountId => Option<Identity>;
 
-        /// Node's work report, mapping from controller to optional work_report
+        /// Node's work report, mapping from controller to an optional work report
         pub WorkReports get(fn work_reports) config():
             map hasher(blake2_128_concat) T::AccountId  => Option<WorkReport>;
 
@@ -140,8 +132,8 @@ decl_error! {
     pub enum Error for Module<T: Trait> {
         /// Illegal applier
         IllegalApplier,
-        /// Duplicate identity signature
-        DuplicateSig,
+        /// Duplicate identity
+        DuplicateId,
         /// Identity check failed
         IllegalTrustedChain,
         /// Illegal reporter
@@ -187,33 +179,38 @@ decl_module! {
         /// - 3 DB try
         /// # </weight>
         #[weight = 1_000_000]
-        pub fn register(origin, unparsed_identity: Identity<T::AccountId>) -> DispatchResult {
+        pub fn register(
+            origin,
+            ias_sig: IASSig,
+            ias_cert: Cert,
+            applier: T::AccountId,
+            isv_body: ISVBody,
+            sig: TeeSignature
+        ) -> DispatchResult {
             let who = ensure_signed(origin)?;
-            let applier = &unparsed_identity.account_id;
 
             // 1. Ensure who is applier
-            ensure!(&who == applier, Error::<T>::IllegalApplier);
+            ensure!(&who == &applier, Error::<T>::IllegalApplier);
 
-            // 2. Ensure sig is unique
-            ensure!(Self::sig_is_unique(&unparsed_identity.sig), Error::<T>::DuplicateSig);
-
-            // 3. Ensure unparsed_identity trusted chain id legal
-            let maybe_pk = Self::check_and_get_pk(&unparsed_identity);
+            // 2. Ensure unparsed_identity trusted chain id legal
+            let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalTrustedChain);
 
-            // 4. Construct a parsed identity(with public key and enclave code)
-            let mut identity = unparsed_identity.clone();
-            identity.pub_key = maybe_pk.unwrap();
-            identity.code = Self::code();
+            // 3. Ensure public key is unique
+            let pk = maybe_pk.unwrap();
+            ensure!(Self::id_is_unique(&pk), Error::<T>::DuplicateId);
+
+            // 4. Construct the identity
+            let identity = Identity {
+                pub_key: pk,
+                code: Self::code()
+            };
 
             // 5. Applier is new add or needs to be updated
-            if !Self::identities(applier).contains(&identity) {
-                // Store the tee identity
-                <Identities<T>>::insert(applier, &identity);
+            <Identities<T>>::insert(applier, &identity);
 
-                // Emit event
-                Self::deposit_event(RawEvent::RegisterSuccess(who));
-            }
+            // 6. Emit event
+            Self::deposit_event(RawEvent::RegisterSuccess(who));
 
             Ok(())
         }
@@ -225,25 +222,44 @@ decl_module! {
         /// - 3n+8 DB try
         /// # </weight>
         #[weight = 1_000_000]
-        pub fn report_works(origin, work_report: WorkReport) -> DispatchResult {
+        pub fn report_works(
+            origin,
+            pub_key: PubKey,
+            block_number: u64,
+            block_hash: Vec<u8>,
+            reserved: u64,
+            files: Vec<(MerkleRoot, u64)>,
+            sig: TeeSignature
+        ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure reporter is verified
             ensure!(<Identities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
 
             let id = <Identities<T>>::get(&who).unwrap();
-            ensure!(&id.pub_key == &work_report.pub_key, Error::<T>::InvalidPubKey);
+            ensure!(&id.pub_key == &pub_key, Error::<T>::InvalidPubKey);
 
             // 2. Ensure reporter's id is valid
             ensure!(Self::work_report_code_check(&id.code), Error::<T>::UntrustedCode);
 
             // 3. Do timing check
-            ensure!(Self::work_report_timing_check(&work_report).is_ok(), Error::<T>::InvalidReportTime);
+            ensure!(Self::work_report_timing_check(block_number, &block_hash).is_ok(), Error::<T>::InvalidReportTime);
 
             // 4. Do sig check
-            ensure!(Self::work_report_sig_check(&work_report), Error::<T>::IllegalWorkReportSig);
+            ensure!(
+                Self::work_report_sig_check(&pub_key, block_number, &block_hash, reserved, &files, &sig),
+                Error::<T>::IllegalWorkReportSig
+            );
 
-            // 5. Maybe upsert work report
+            // 5. Construct work report
+            let work_report = WorkReport {
+                block_number,
+                used: 0,
+                reserved,
+                files
+            };
+
+            // 6. Maybe upsert work report
             if Self::maybe_upsert_work_report(&who, &work_report) {
                 // Emit report works event
                 Self::deposit_event(RawEvent::WorksReportSuccess(who, work_report));
@@ -347,6 +363,7 @@ impl<T: Trait> Module<T> {
         let mut updated_wr = wr.clone();
         let file_map = T::MarketInterface::providers(who).unwrap_or_default().file_map;
         updated_wr.used = wr.files.iter().fold(0, |used, (f_id, f_size)| {
+            // TODO: Abstract and make this logic be a seperated function
             if let Some(order_ids) = file_map.get(f_id) {
                 for order_id in order_ids {
                     // Get order status(should exist) and (maybe) change the status
@@ -442,14 +459,14 @@ impl<T: Trait> Module<T> {
     }
 
     // PRIVATE IMMUTABLES
-    /// This function is judging if the identity{sig} already be registered
+    /// This function is judging if the identity already be registered
     /// TC is O(n)
     /// DB try is O(1)
-    fn sig_is_unique(sig: &TeeSignature) -> bool {
+    fn id_is_unique(pk: &PubKey) -> bool {
         let mut is_unique = true;
 
         for (_, id) in <Identities<T>>::iter() {
-            if &id.sig == sig {
+            if &id.pub_key == pk {
                 is_unique = false;
                 break
             }
@@ -458,16 +475,22 @@ impl<T: Trait> Module<T> {
         is_unique
     }
 
-    fn check_and_get_pk(id: &Identity<T::AccountId>) -> Option<Vec<u8>> {
+    fn check_and_get_pk(
+        ias_sig: &IASSig,
+        ias_cert: &Cert,
+        account_id: &T::AccountId,
+        isv_body: &ISVBody,
+        sig: &TeeSignature
+    ) -> Option<Vec<u8>> {
         let enclave_code = Self::code();
-        let applier = id.account_id.encode();
+        let applier = account_id.encode();
 
         api::crypto::verify_identity(
-            &id.ias_sig,
-            &id.ias_cert,
+            ias_sig,
+            ias_cert,
             &applier,
-            &id.isv_body,
-            &id.sig,
+            isv_body,
+            sig,
             &enclave_code,
         )
     }
@@ -482,34 +505,44 @@ impl<T: Trait> Module<T> {
         id_code == &code || (Self::ab_expire().is_some() && current_bn < Self::ab_expire().unwrap())
     }
 
-    fn work_report_timing_check(wr: &WorkReport) -> DispatchResult {
+    fn work_report_timing_check(
+        wr_block_number: u64,
+        wr_block_hash: &Vec<u8>
+    ) -> DispatchResult {
         // 1. Check block hash
-        let wr_block_number: T::BlockNumber = wr.block_number.try_into().ok().unwrap();
-        let wr_block_hash = <system::Module<T>>::block_hash(wr_block_number)
+        let block_number: T::BlockNumber = wr_block_number.try_into().ok().unwrap();
+        let block_hash = <system::Module<T>>::block_hash(block_number)
             .as_ref()
             .to_vec();
         ensure!(
-            &wr_block_hash == &wr.block_hash,
+            &block_hash == wr_block_hash,
             "work report hash is illegal"
         );
 
         // 2. Check work report timing
         ensure!(
-            wr.block_number == 1 || wr.block_number == Self::get_reported_slot(),
+            wr_block_number == 1 || wr_block_number == Self::get_reported_slot(),
             "work report is outdated or beforehand"
         );
 
         Ok(())
     }
 
-    fn work_report_sig_check(wr: &WorkReport) -> bool {
+    fn work_report_sig_check(
+        pub_key: &PubKey,
+        block_number: u64,
+        block_hash: &Vec<u8>,
+        reserved: u64,
+        files: &Vec<(MerkleRoot, u64)>,
+        sig: &TeeSignature
+    ) -> bool {
         api::crypto::verify_work_report_sig(
-            &wr.pub_key,
-            wr.block_number,
-            &wr.block_hash,
-            wr.reserved,
-            &wr.files,
-            &wr.sig,
+            pub_key,
+            block_number,
+            block_hash,
+            reserved,
+            files,
+            sig,
         )
     }
 

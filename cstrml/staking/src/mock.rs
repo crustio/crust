@@ -415,12 +415,9 @@ impl ExtBuilder {
                 (
                     *id,
                     tee::WorkReport {
-                        pub_key: vec![],
                         block_number: 0,
-                        block_hash: vec![],
                         used: 0,
                         reserved: 20000000000000,
-                        sig: vec![],
                         files: vec![]
                     },
                 )

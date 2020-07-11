@@ -302,6 +302,8 @@ impl<T: Trait> Module<T> {
             if let Some(provision) = T::MarketInterface::providers(&controller) {
                 for (f_id, order_ids) in provision.file_map.iter() {
                     for order_id in order_ids {
+                        // Do it before updating current work report
+                        T::MarketInterface::maybe_punish_provider(order_id);
                         // Get order status(should exist) and (maybe) change the status
                         let sorder =
                             T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
@@ -441,7 +443,6 @@ impl<T: Trait> Module<T> {
                         sorder.status = OrderStatus::Failed;
                         T::MarketInterface::maybe_set_sorder(order_id, &sorder);
                     }
-                    T::MarketInterface::maybe_punish_provider(order_id);
                 }
 
                 // 3. Return reserved and used

@@ -299,19 +299,33 @@ impl<T: Trait> Module<T> {
             // a. calculate this controller's order file map
             // TC = O(nm), `n` is stored files number and `m` is corresponding order ids
             let mut order_files: Vec<(MerkleRoot, T::Hash)> = vec![];
+            let mut punishment_order_ids: Vec<T::Hash> = vec![];
+            let mut overdue_order_ids: Vec<T::Hash> = vec![];
             if let Some(provision) = T::MarketInterface::providers(&controller) {
                 for (f_id, order_ids) in provision.file_map.iter() {
                     for order_id in order_ids {
-                        // Do it before updating current work report
-                        T::MarketInterface::maybe_punish_provider(order_id);
+                        
                         // Get order status(should exist) and (maybe) change the status
                         let sorder =
                             T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
                         if sorder.status == OrderStatus::Success {
                             order_files.push((f_id.clone(), order_id.clone()))
                         }
+                        if sorder.completed_on >= Self::get_current_block_number() {
+                            overdue_order_ids.push(order_id.clone());
+                        } else {
+                            punishment_order_ids.push(order_id.clone());
+                        }
                     }
                 }
+            }
+            // do punishment
+            for order_id in punishment_order_ids {
+                T::MarketInterface::maybe_punish_provider(&order_id);
+            }
+            // close overdue storage order
+            for order_id in overdue_order_ids {
+                T::MarketInterface::close_sorder(&order_id);
             }
 
             // b. calculate controller's own reserved and used space

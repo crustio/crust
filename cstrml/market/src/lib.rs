@@ -128,6 +128,8 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>);
     /// Upsert slash record and (Maybe) do slash
     fn maybe_punish_provider(order_id: &Hash);
+    /// close storage order
+    fn close_sorder(order_id: &Hash);
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
@@ -145,6 +147,10 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
 
     fn maybe_punish_provider(_: &Hash) {
 
+    }
+
+    fn close_sorder(_: &Hash) {
+        
     }
 }
 
@@ -168,6 +174,10 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
 
     fn maybe_punish_provider(order_id: &<T as system::Trait>::Hash) {
         Self::maybe_punish_provider(order_id);
+    }
+
+    fn close_sorder(order_id: &<T as system::Trait>::Hash) {
+        Self::close_sorder(order_id);
     }
 }
 
@@ -484,31 +494,33 @@ impl<T: Trait> Module<T> {
     }
 
     pub fn maybe_punish_provider(order_id: &<T as system::Trait>::Hash) {
-        // 1. Update Provider Punishment
-        let so = Self::storage_orders(order_id).unwrap();
-        let mut punishment = Self::provider_punishments(order_id).unwrap();
-        let punish_duration = T::PunishDuration::get();
-        if so.status == OrderStatus::Success {
-            punishment.success += 1;
-        } else if so.status == OrderStatus::Failed {
-            punishment.failed += 1;
-        } else {
-
-        }
-        if punishment.success + punishment.failed >= punish_duration && punishment.value < so.amount {
-            // 2. Do slash
-            let real_punish_value = Self::punish_provider(&so, &punishment, &punish_duration);
-            punishment.value += real_punish_value;
-            // 3. Reset Provider Punishment
-            punishment.success = 0;
-            punishment.failed = 0;
-        } else {
-
-        }
-        <ProviderPunishments<T>>::insert(&order_id, punishment.clone());
-        if punishment.value >= so.amount {
-            Self::close_sorder(&order_id);
-        }
+        if let Some(so) = Self::storage_orders(order_id) {
+            if let Some(mut punishment) = Self::provider_punishments(order_id) {
+                // 1. Update Provider Punishment
+                let punish_duration = T::PunishDuration::get();
+                if so.status == OrderStatus::Success {
+                    punishment.success += 1;
+                } else if so.status == OrderStatus::Failed {
+                    punishment.failed += 1;
+                } else {
+        
+                }
+                if punishment.success + punishment.failed >= punish_duration && punishment.value < so.amount {
+                    // 2. Do slash
+                    let real_punish_value = Self::punish_provider(&so, &punishment, &punish_duration);
+                    punishment.value += real_punish_value;
+                    // 3. Reset Provider Punishment
+                    punishment.success = 0;
+                    punishment.failed = 0;
+                } else {
+        
+                }
+                <ProviderPunishments<T>>::insert(&order_id, punishment.clone());
+                if punishment.value >= so.amount {
+                    Self::close_sorder(&order_id);
+                }
+            }
+        }   
     }
 
     pub fn punish_provider(
@@ -597,32 +609,34 @@ impl<T: Trait> Module<T> {
     }
 
     fn close_sorder(order_id: &<T as system::Trait>::Hash) {
-        let so = Self::storage_orders(order_id).unwrap();
-        let punishment = Self::provider_punishments(order_id).unwrap();
-        // 1. Remove sorder's payment info
-        T::Payment::close_sorder(order_id, &so.client, &so.completed_on);
-        // 2. Remove `file_identifier` -> `order_id`s from provider's file_map
-        <Providers<T>>::mutate(&so.provider, |maybe_provision| {
-            // `provision` cannot be None
-            if let Some(provision) = maybe_provision {
-                let mut order_ids: Vec::<T::Hash> = vec![];
-                if let Some(o_ids) = provision.file_map.get(&so.file_identifier) {
-                    order_ids = o_ids.clone();
-                }
+        if let Some(so) = Self::storage_orders(order_id) {
+            if let Some(punishment) = Self::provider_punishments(order_id) {
+                // 1. Remove sorder's payment info
+                T::Payment::close_sorder(order_id, &so.client, &so.completed_on);
+                // 2. Remove `file_identifier` -> `order_id`s from provider's file_map
+                <Providers<T>>::mutate(&so.provider, |maybe_provision| {
+                    // `provision` cannot be None
+                    if let Some(provision) = maybe_provision {
+                        let mut order_ids: Vec::<T::Hash> = vec![];
+                        if let Some(o_ids) = provision.file_map.get(&so.file_identifier) {
+                            order_ids = o_ids.clone();
+                        }
 
-                order_ids.retain(|&e| {e != order_id.clone()});
-                provision.file_map.insert(so.file_identifier.clone(), order_ids.clone());
+                        order_ids.retain(|&e| {e != order_id.clone()});
+                        provision.file_map.insert(so.file_identifier.clone(), order_ids.clone());
+                    }
+                });
+                // 3. Update Pledge for provider
+                let real_used_value = so.amount.min(so.amount - punishment.value);
+                let mut pledge = Self::pledges(&so.provider);
+                pledge.used -= real_used_value;
+                Self::upsert_pledge(&so.provider, &pledge);
+                // 4. Remove Provider Punishment
+                <ProviderPunishments<T>>::remove(order_id);
+                // 5. Remove Storage Order
+                <StorageOrders<T>>::remove(order_id);
             }
-        });
-        // 3. Update Pledge for provider
-        let real_used_value = so.amount.min(so.amount - punishment.value);
-        let mut pledge = Self::pledges(&so.provider);
-        pledge.used -= real_used_value;
-        Self::upsert_pledge(&so.provider, &pledge);
-        // 4. Remove Provider Punishment
-        <ProviderPunishments<T>>::remove(order_id);
-        // 5. Remove Storage Order
-        <StorageOrders<T>>::remove(order_id);
+        }
     }
 
     fn upsert_pledge(

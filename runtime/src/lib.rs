@@ -655,9 +655,9 @@ impl_runtime_apis! {
             // Trying to add benchmarks directly to the Session Pallet caused cyclic dependency issues.
             // To get around that, we separated the Session benchmarks into its own crate, which is why
             // we need these two lines below.
-
+            let whitelist: Vec<Vec<u8>> = vec![];
             let mut batches = Vec::<BenchmarkBatch>::new();
-            let params = (&pallet, &benchmark, &lowest_range_values, &highest_range_values, &steps, repeat);
+            let params = (&pallet, &benchmark, &lowest_range_values, &highest_range_values, &steps, repeat, &whitelist);
             
             add_benchmark!(params, batches, b"balances", Balances);
 

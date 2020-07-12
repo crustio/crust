@@ -865,6 +865,7 @@ dependencies = [
  "cstrml-payment",
  "cstrml-staking",
  "cstrml-tee",
+ "frame-benchmarking",
  "frame-executive",
  "frame-support",
  "frame-system",

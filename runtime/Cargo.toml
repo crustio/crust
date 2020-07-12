@@ -37,7 +37,7 @@ transaction-payment = { default-features = false, package = 'pallet-transaction-
 scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc4' }
 sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc4' }
 offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc4' }
-frame-benchmarking = { version = "2.0.0-rc2", default-features = false, optional = true }
+frame-benchmarking = { version = "2.0.0-rc4", default-features = false, optional = true }
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc4' }

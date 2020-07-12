@@ -4,9 +4,10 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::chain_spec;
-use crate::cli::Cli;
+use crate::cli::{Cli, Subcommand};
 use crate::service;
 use sc_cli::SubstrateCli;
+use crust_runtime::opaque::Block;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> &'static str { "Crust Node" }
@@ -41,9 +42,20 @@ pub fn run() -> sc_cli::Result<()> {
 	let cli = Cli::from_args();
 
 	match &cli.subcommand {
-		Some(subcommand) => {
-			let runner = cli.create_runner(subcommand)?;
-			runner.run_subcommand(subcommand, |config| Ok(new_full_start!(config).0))
+		Some(Subcommand::Benchmark(cmd)) => {
+			if cfg!(feature = "runtime-benchmarks") {
+				let runner = cli.create_runner(cmd)?;
+
+				runner.sync_run(|config| cmd.run::<Block, service::Executor>(config))
+			} else {
+				println!("Benchmarking wasn't enabled when building the node. \
+				You can enable it with `--features runtime-benchmarks`.");
+				Ok(())
+			}
+		}
+		Some(Subcommand::Base(cmd)) => {
+			let runner = cli.create_runner(cmd)?;
+			runner.run_subcommand(cmd, |config| Ok(new_full_start!(config).0))
 		}
 		None => {
 			let runner = cli.create_runner(&cli.run)?;

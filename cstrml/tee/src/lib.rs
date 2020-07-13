@@ -96,9 +96,10 @@ decl_storage! {
         /// The AB upgrade expired block, this should be managed by sudo/democracy
         pub ABExpire get(fn ab_expire): Option<T::BlockNumber>;
 
-        /// The TEE identities, mapping from controller to an optional identity value
+        /// The TEE identities, mapping from controller to an optional identity tuple
+        /// (old_id, new_id) = (before-upgrade identity, upgraded identity)
         pub Identities get(fn identities) config():
-            map hasher(blake2_128_concat) T::AccountId => Option<Identity>;
+            map hasher(blake2_128_concat) T::AccountId => (Option<Identity>, Option<Identity>);
 
         /// Node's work report, mapping from controller to an optional work report
         pub WorkReports get(fn work_reports) config():
@@ -465,7 +466,7 @@ impl<T: Trait> Module<T> {
     fn id_is_unique(pk: &PubKey) -> bool {
         let mut is_unique = true;
 
-        for (_, id) in <Identities<T>>::iter() {
+        for (_, (_, id)) in <Identities<T>>::iter() {
             if &id.pub_key == pk {
                 is_unique = false;
                 break

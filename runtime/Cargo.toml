@@ -37,6 +37,8 @@ transaction-payment = { default-features = false, package = 'pallet-transaction-
 scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc4' }
 sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc4' }
 offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc4' }
+frame-benchmarking = { default-features = false, version = '2.0.0-rc4', optional = true }
+frame-system-benchmarking = { default-features = false, version = '2.0.0-rc4', optional = true }
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc4' }
@@ -76,6 +78,7 @@ std = [
     'collective/std',
     'frame-executive/std',
     'frame-support/std',
+    'frame-benchmarking/std',
     'grandpa/std',
     'finality-tracker/std',
     'im-online/std',
@@ -107,4 +110,13 @@ std = [
     'market/std',
     'payment/std',
     'primitives/std'
+]
+runtime-benchmarks = [
+	"frame-benchmarking",
+	"frame-support/runtime-benchmarks",
+	"system/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+    "collective/runtime-benchmarks",
+	"balances/runtime-benchmarks",
+    "frame-system-benchmarking"
 ]

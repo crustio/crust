@@ -22,6 +22,7 @@ use primitives::{
     ISVBody, Cert, TeeCode
 };
 use market::{OrderStatus, MarketInterface, OrderInspector};
+use frame_support::storage::unhashed::get_or_else;
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -48,6 +49,7 @@ pub struct WorkReport {
     pub block_number: u64,
     pub used: u64,
     pub reserved: u64,
+    pub cached_reserved: u64,
     pub files: Vec<(MerkleRoot, u64)>,
 }
 
@@ -97,7 +99,7 @@ decl_storage! {
         pub ABExpire get(fn ab_expire): Option<T::BlockNumber>;
 
         /// The TEE identities, mapping from controller to an optional identity tuple
-        /// (old_id, new_id) = (before-upgrade identity, upgraded identity)
+        /// (elder_id, current_id) = (before-upgrade identity, upgraded identity)
         pub Identities get(fn identities) config():
             map hasher(blake2_128_concat) T::AccountId => (Option<Identity>, Option<Identity>);
 
@@ -144,9 +146,7 @@ decl_error! {
         /// Invalid timing
         InvalidReportTime,
         /// Illegal work report signature
-        IllegalWorkReportSig,
-        /// Enclave code is illegal or expired
-        UntrustedCode
+        IllegalWorkReportSig
     }
 }
 
@@ -208,10 +208,10 @@ decl_module! {
             };
 
             // 5. Applier is new add or needs to be updated
-            <Identities<T>>::insert(applier, &identity);
-
-            // 6. Emit event
-            Self::deposit_event(RawEvent::RegisterSuccess(who));
+            if Self::maybe_upsert_id(&applier, &identity) {
+                // Emit event
+                Self::deposit_event(RawEvent::RegisterSuccess(who));
+            }
 
             Ok(())
         }
@@ -237,11 +237,9 @@ decl_module! {
             // 1. Ensure reporter is verified
             ensure!(<Identities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
 
-            let id = <Identities<T>>::get(&who).unwrap();
-            ensure!(&id.pub_key == &pub_key, Error::<T>::InvalidPubKey);
-
             // 2. Ensure reporter's id is valid
-            ensure!(Self::work_report_code_check(&id.code), Error::<T>::UntrustedCode);
+            let (elder_reported, current_reported) = Self::work_report_id_check(&who, &pub_key);
+            ensure!(elder_reported || current_reported, Error::<T>::InvalidPubKey);
 
             // 3. Do timing check
             ensure!(Self::work_report_timing_check(block_number, &block_hash).is_ok(), Error::<T>::InvalidReportTime);
@@ -253,12 +251,7 @@ decl_module! {
             );
 
             // 5. Construct work report
-            let work_report = WorkReport {
-                block_number,
-                used: 0,
-                reserved,
-                files
-            };
+            let work_report = Self:merged_work_report(&who, reserved, &files, block_number, elder_reported, current_reported);
 
             // 6. Maybe upsert work report
             if Self::maybe_upsert_work_report(&who, &work_report) {
@@ -338,6 +331,45 @@ impl<T: Trait> Module<T> {
     }
 
     // PRIVATE MUTABLES
+    /// This function will (maybe) insert or update a identity, in details:
+    /// 0. Do nothing if `current_id` == `id`
+    /// 1. Update `current_id` if `current_id.code` == `id.code`
+    /// 2. Update `current_id` and `elder_id` if `current_id.code` != `id.code`
+    fn maybe_upsert_id(who: &T::AccountId, id: &Identity) -> bool {
+        let maybe_ids = Self::identities(who);
+        let upserted = match maybe_ids {
+            // New id
+            (None, None) => {
+                Identities::<T>::insert(who, (None, id.clone()));
+                true
+            },
+            // Update/upgrade id
+            (_, Some(current_id)) => {
+                // Duplicate identity
+                if &current_id == id {
+                    false
+                } else {
+                    if current_id.code == id.code {
+                        // Update(enclave code not change)
+                        Identity::<T>::mutate(who, |(_, maybe_cid)| {
+                            if let Some(cid) = maybe_cid {
+                                cid = current_id.clone();
+                            }
+                        })
+                    } else {
+                        // Upgrade(new enclave code detected)
+                        // current_id -> elder_id
+                        // id         -> current_id
+                        Identities::<T>::insert(who, (Some(current_id), Some(id)));
+                    }
+                    true
+                }
+            },
+        };
+
+        upserted
+    }
+
     /// This function will (maybe) update or insert a work report, in details:
     /// 1. calculate used from reported files
     /// 2. set `ReportedInSlot` to true
@@ -460,14 +492,66 @@ impl<T: Trait> Module<T> {
     }
 
     // PRIVATE IMMUTABLES
+    /// This function will generated the merged work report, merging includes:
+    /// 1. `files`: merged with same block number, covered with different block number
+    /// 2. `cached_reserved`: valued only `elder_reported == true` and `block_number != wr.block_number`
+    /// 3. `merged_reserved`: added with `cached_reserved` when `current_reported == true`
+    /// 3. `reserved`:
+    fn merged_work_report(who: &T::AccountId,
+                          reserved: u64,
+                          files: &Vec<(MerkleRoot, u64)>,
+                          block_number: u64,
+                          elder_reported: bool,
+                          current_reported: bool) -> WorkReport {
+        let mut merged_reserved = reserved;
+        let mut merged_files = files;
+        let mut cached_reserved: u64 = 0;
+
+        if let Some(wr) = Self::work_reports(who) {
+            // I. New report slot round
+            if wr.block_number < block_number {
+                // 1. Cover the files(aka. do nothing)
+                if current_reported {
+                    // 2. If the current id reported first: merged_reserved = reserved(aka. do nothing)
+                } else if elder_reported {
+                    // 3. If the elder id reported first: merged_reserved = wr.reserved(aka. keep the same)
+                    merged_reserved = wr.reserved;
+                }
+                // 4. Cached the reserved;
+                cached_reserved = reserved;
+
+            // II. Merge the work report(with different files)
+            // TODO: bug with same id(current+current, elder+elder)
+            } else if wr.block_number == block_number {
+                // 1. Merge the files
+                merged_files = Self::merge_files(files, wr.files);
+
+                // 2. Merge the reserved
+                // ps: this will not cause the condition that adding n-times reserved space,
+                // cause we only use the cached_reserved, it only be valued when the new work report
+                // generated(only once).
+                merged_reserved = wr.cached_reserved + reserved;
+            }
+            // III. wr.block_number > block_number
+        }
+
+        WorkReport {
+            block_number,
+            used: 0,
+            reserved: merged_reserved,
+            cached_reserved,
+            files: merged_files.clone()
+        }
+    }
+
     /// This function is judging if the identity already be registered
     /// TC is O(n)
     /// DB try is O(1)
     fn id_is_unique(pk: &PubKey) -> bool {
         let mut is_unique = true;
 
-        for (_, (_, id)) in <Identities<T>>::iter() {
-            if &id.pub_key == pk {
+        for (_, (_, current_id)) in <Identities<T>>::iter() {
+            if &current_id.pub_key == pk {
                 is_unique = false;
                 break
             }
@@ -496,14 +580,31 @@ impl<T: Trait> Module<T> {
         )
     }
 
-    fn work_report_code_check(id_code: &TeeCode) -> bool {
-        let code: TeeCode = Self::code();
-        let current_bn = <system::Module<T>>::block_number();
+    /// This function is judging if the work report identity is legal,
+    /// return (`elder_reported`, `current_reported`), including:
+    /// 1. Reported from `current_id` and the public key is match, then return (false, true)
+    /// 2. Reported from `elder_id`(ab expire is legal), and the public ket is match, then return (true, false)
+    /// 3. Or, return (false, false)
+    fn work_report_id_check(reporter: &T::AccountId, wr_pk: &PubKey) -> (bool, bool) {
+        let (maybe_eid, maybe_cid): (Option<Identity>, Option<Identity>) = Self::identities(reporter);
+        if let Some(cid) = maybe_cid {
+            let code: TeeCode = Self::code();
 
-        // Reporter's code == On-chain code
-        // or
-        // Current block < AB Expired block
-        id_code == &code || (Self::ab_expire().is_some() && current_bn < Self::ab_expire().unwrap())
+            if &cid.code == &code && wr_pk == &cid.pub_key {
+                // Reported with new pk
+                return (false, true);
+            } else {
+                // Reported with old pk, this require current block number < ab_expire block number
+                if let Some(eid) = maybe_eid {
+                    let current_bn = <system::Module<T>>::block_number();
+                    return (
+                        wr_pk == &eid.pub_key &&
+                            (Self::ab_expire().is_some() && current_bn < Self::ab_expire().unwrap()),
+                        false)
+                }
+            }
+        }
+        (false, false)
     }
 
     fn work_report_timing_check(

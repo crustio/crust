@@ -13,7 +13,7 @@ usage() {
 
 PUBLISH=0
 
-while getopts ":hp:" opt; do
+while getopts ":hp" opt; do
     case ${opt} in
         h )
 			      usage
@@ -53,7 +53,7 @@ else
     exit 1
 fi
 
-echo "build success"
+log_info "build success"
 if [ "$PUBLISH" -eq "1" ]; then
     echo "will publish image to $IMAGEID"
     docker push $IMAGEID

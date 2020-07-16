@@ -90,8 +90,13 @@ function build_crust {
 
   RUN_OPTS="-v $BUILD_DIR:/opt/crust -v $CACHEDIR:/opt/cache"
 
+  CIDFILE=`mktemp`
+  rm $CIDFILE
   echo_c 33 "using run opts: $RUN_OPTS"
-  docker run -i -t --env CARGO_HOME=/opt/cache $RUN_OPTS crustio/crust-build:${TOOLCHAIN_VER} /bin/bash -c "cd /opt/crust; cargo build --release;  echo done building"
+  docker run --cidfile $CIDFILE -i -t --env CARGO_HOME=/opt/cache $RUN_OPTS crustio/crust-build:${TOOLCHAIN_VER} /bin/bash -c "cd /opt/crust; cargo build --release;  echo done building"
+  CID=`cat $CIDFILE`
+  log_info "cleanup temp container $CID"
+  docker rm $CID
   echo_c 33 "build done, validting result"
 
   if [ ! -f $DIST_FILE ]; then

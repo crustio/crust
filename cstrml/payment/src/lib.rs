@@ -69,6 +69,18 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
             }
         }
     }
+
+    fn close_sorder(sorder_id: &T::Hash, client: &T::AccountId, complted_on: &BlockNumber) {
+        if let Some(ledger) = Self::payment_ledgers(&sorder_id) {
+            T::Currency::unreserve(
+                &client,
+                ledger.total - ledger.unreserved);
+            <PaymentLedgers<T>>::remove(&sorder_id);
+        }
+
+        let slot_factor = complted_on % T::Frequency::get();
+        <SlotPayments<T>>::remove(slot_factor, sorder_id);
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]

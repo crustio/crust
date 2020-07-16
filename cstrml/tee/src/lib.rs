@@ -301,22 +301,38 @@ impl<T: Trait> Module<T> {
         let workload_map: Vec<(T::AccountId, u128)> = <Identities<T>>::iter().map(|(controller, _)| {
             // a. calculate this controller's order file map
             // TC = O(nm), `n` is stored files number and `m` is corresponding order ids
-            let mut order_files: Vec<(MerkleRoot, T::Hash)> = vec![];
+            let mut success_sorder_files: Vec<(MerkleRoot, T::Hash)> = vec![];
+            let mut ongoing_sorder_ids: Vec<T::Hash> = vec![];
+            let mut overdue_sorder_ids: Vec<T::Hash> = vec![];
             if let Some(provision) = T::MarketInterface::providers(&controller) {
                 for (f_id, order_ids) in provision.file_map.iter() {
                     for order_id in order_ids {
+                        
                         // Get order status(should exist) and (maybe) change the status
                         let sorder =
                             T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
                         if sorder.status == OrderStatus::Success {
-                            order_files.push((f_id.clone(), order_id.clone()))
+                            success_sorder_files.push((f_id.clone(), order_id.clone()))
+                        }
+                        ongoing_sorder_ids.push(order_id.clone());
+                        if sorder.completed_on >= Self::get_current_block_number() {
+                            // TODO: add extra punishment logic when we close overdue sorder
+                            overdue_sorder_ids.push(order_id.clone());
                         }
                     }
                 }
             }
+            // do punishment
+            for order_id in ongoing_sorder_ids {
+                T::MarketInterface::maybe_punish_provider(&order_id);
+            }
+            // close overdue storage order
+            for order_id in overdue_sorder_ids {
+                T::MarketInterface::close_sorder(&order_id);
+            }
 
             // b. calculate controller's own reserved and used space
-            let (reserved, used) = Self::update_and_get_workload(&controller, &order_files, current_rs);
+            let (reserved, used) = Self::update_and_get_workload(&controller, &success_sorder_files, current_rs);
 
             // c. add to total
             total_used += used;
@@ -490,7 +506,6 @@ impl<T: Trait> Module<T> {
                         sorder.status = OrderStatus::Failed;
                         T::MarketInterface::maybe_set_sorder(order_id, &sorder);
                     }
-                    T::MarketInterface::maybe_punish_provider(order_id);
                 }
 
                 // 3. Return reserved and used

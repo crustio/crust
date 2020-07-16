@@ -521,14 +521,14 @@ fn test_for_half_punish_should_work() {
             used: 0
         });
 
-        // total fee has been punished.
-        set_punishment_in_success_count(&order_id, 90);
-
+        // total fee has been punished. The order has been closed
         assert_eq!(Balances::free_balance(&provider), 190);
         assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<ProviderPunishments<Test>>::contains_key(&order_id));
     });
 }
 
@@ -589,12 +589,75 @@ fn test_for_full_punish_should_work() {
             used: 0
         });
 
-        set_punishment_in_success_count(&order_id, 90);
-
+        // total fee has been punished. The order has been closed
         assert_eq!(Balances::free_balance(&provider), 190);
         assert_eq!(Market::pledges(&provider), Pledge {
             total: 50,
             used: 0
         });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<ProviderPunishments<Test>>::contains_key(&order_id));
+    });
+}
+
+#[test]
+fn test_for_close_sorder() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let provider: u64 = 100;
+        let client: u64 = 0;
+        let file_size = 16; // should less than provider
+        let duration = 10;
+        let fee: u64 = 1;
+        let amount: u64 = 10;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 60);
+
+        // 1. Normal flow, aka happy pass 😃
+        let _ = Balances::make_free_balance_be(&provider, 200);
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), provider,
+            file_identifier.clone(), file_size, duration
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 50,
+            completed_on: 50,
+            expired_on: 50+10*10,
+            provider,
+            client,
+            amount,
+            status: OrderStatus::Pending
+        });
+
+        Market::close_sorder(&order_id);
+        // storage order has been closed
+        assert_eq!(Balances::free_balance(&provider), 200);
+        assert_eq!(Market::pledges(&provider), Pledge {
+            total: 60,
+            used: 0
+        });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<ProviderPunishments<Test>>::contains_key(&order_id));
+        // delete it twice would not have bad effect
+        Market::close_sorder(&order_id);
+        assert_eq!(Balances::free_balance(&provider), 200);
+        assert_eq!(Market::pledges(&provider), Pledge {
+            total: 60,
+            used: 0
+        });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<ProviderPunishments<Test>>::contains_key(&order_id));
     });
 }

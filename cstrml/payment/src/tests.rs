@@ -267,3 +267,90 @@ fn test_for_storage_order_and_payment_should_suspend() {
         }
     });
 }
+
+
+#[test]
+fn test_for_close_storage_order_in_payment() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let pledge_amount = 200;
+        let source: AccountId = Sr25519Keyring::Alice.to_account_id();
+        let file_identifier =
+        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let provider: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let file_size = 16; // should less than provider
+        let duration = 30;
+        let fee = 2;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 70);
+        let _ = Balances::make_free_balance_be(&provider, pledge_amount);
+        assert_eq!(Balances::free_balance(source.clone()), 70);
+
+        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount));
+        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), provider.clone(),
+            file_identifier.clone(), file_size, duration
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Balances::free_balance(source.clone()), 10);
+        assert_eq!(Balances::reserved_balance(source.clone()), 60);
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
+            total: 60,
+            paid: 0,
+            unreserved: 0
+        });
+
+        run_to_block(303);
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
+            total: 60,
+            paid: 0,
+            unreserved: 0
+        });
+
+        // Check workloads
+        assert_eq!(Tee::reserved(), 0);
+
+        let report_works_info = valid_report_works_info();
+        assert_ok!(Tee::report_works(
+            Origin::signed(provider.clone()),
+            report_works_info.pub_key,
+            report_works_info.block_number,
+            report_works_info.block_hash,
+            report_works_info.reserved,
+            report_works_info.files,
+            report_works_info.sig
+        ));
+        assert_eq!(Balances::reserved_balance(source.clone()), 60);
+        assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);
+        assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
+            total: 60,
+            paid: 0,
+            unreserved: 0
+        });
+
+        for i in 1..11 {
+            run_to_block(303 + i * 10);
+            assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
+            assert_eq!(Balances::free_balance(source.clone()), 10);
+            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
+            assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
+                total: 60,
+                paid: i * 2,
+                unreserved: i * 2
+            });
+        }
+        CstrmlPayment::close_sorder(&order_id, &source, &333);
+        assert_eq!(Balances::reserved_balance(source.clone()), 0);
+        assert_eq!(Balances::free_balance(source.clone()), 50);
+        assert!(!<PaymentLedgers<Test>>::contains_key(order_id.clone()));
+        for i in 11..21 {
+            run_to_block(303 + i * 10);
+            assert_eq!(Balances::reserved_balance(source.clone()), 0);
+            assert_eq!(Balances::free_balance(source.clone()), 50);
+            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20);
+        }
+    });
+}

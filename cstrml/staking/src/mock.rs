@@ -418,6 +418,7 @@ impl ExtBuilder {
                         block_number: 0,
                         used: 0,
                         reserved: 20000000000000,
+                        cached_reserved: 0,
                         files: vec![]
                     },
                 )

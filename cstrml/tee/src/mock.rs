@@ -139,10 +139,13 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .map(|id| {
             (
                 id.clone(),
-                Identity {
-                    pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
-                    code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
-                },
+                (
+                    None,
+                    Some(Identity {
+                        pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
+                        code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
+                    })
+                )
             )
         })
         .collect();

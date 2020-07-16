@@ -531,6 +531,7 @@ impl<T: Trait> Module<T> {
                     // 2. If the current id reported first: merged_reserved = reserved(aka. update to this slot round)
                 } else if elder_reported {
                     // 3. If the elder id reported first: merged_reserved = wr.reserved(aka. keep the last slot round)
+                    // FIXME: If node won't do upgrade, it will keep old value until ab expired
                     merged_reserved = wr.reserved;
                 }
                 // 4. Cached the reserved;
@@ -632,8 +633,8 @@ impl<T: Trait> Module<T> {
                 // 1. Reported with new pk
                 return (false, true);
             } else if &cid.code != &code {
-                // 2. Current pk still not upgraded
-                return (false, wr_pk == &cid.pub_key && not_expired)
+                // 2. Current pk still not upgraded(treat as elder pk)
+                return (wr_pk == &cid.pub_key && not_expired, false)
             } else {
                 // 3. Reported with elder pk
                 // this require current block number < ab_expire block number

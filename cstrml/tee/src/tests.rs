@@ -108,7 +108,7 @@ fn test_for_register_success() {
             register_info.sig
         ));
 
-        let id_registered = Tee::identities(applier.clone()).unwrap();
+        let id_registered = Tee::identities(applier.clone()).1.unwrap();
 
         let id = Identity {
             pub_key: hex::decode("4dbb6401508323b18f649f04f17433fd4b87201ef3ff634b684b715c848bb60b905dd5305e24761b4968a8875dfd9f6abfb3110d9fa494dd530daaeccc8353e1").unwrap(),
@@ -550,8 +550,8 @@ fn test_for_report_works_for_ab_upgrade_should_work() {
             ),
             DispatchError::Module {
                 index: 0,
-                error: 7,
-                message: Some("UntrustedCode"),
+                error: 4,
+                message: Some("InvalidPubKey"),
             }
         );
     });
@@ -642,6 +642,7 @@ fn test_for_outdated_work_reports() {
             block_number: report_works_info.block_number,
             used: 0,
             reserved: report_works_info.reserved.clone(),
+            cached_reserved: report_works_info.reserved.clone(),
             files: report_works_info.files.clone()
         };
 
@@ -660,6 +661,7 @@ fn test_for_outdated_work_reports() {
         assert_eq!(Tee::current_report_slot(), 0);
         Tee::update_identities();
         assert_eq!(Tee::current_report_slot(), 300);
+
         // Check workloads
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 0);
@@ -670,7 +672,7 @@ fn test_for_outdated_work_reports() {
             Tee::work_reports(&account),
             Some(wr.clone())
         );
-        assert!(Tee::reported_in_slot(&account, 300));
+        assert!(Tee::reported_in_slot(&account, 300).1);
 
         // generate 602 blocks
         run_to_block(602);
@@ -681,7 +683,7 @@ fn test_for_outdated_work_reports() {
             Tee::work_reports(&account),
             Some(wr.clone())
         );
-        assert!(!Tee::reported_in_slot(&account, 600));
+        assert!(!Tee::reported_in_slot(&account, 600).1);
 
         // Check workloads
         assert_eq!(Tee::reserved(), 4294967296);
@@ -708,6 +710,7 @@ fn test_abnormal_era() {
             block_number: report_works_info.block_number,
             used: 0,
             reserved: report_works_info.reserved.clone(),
+            cached_reserved: report_works_info.reserved.clone(),
             files: report_works_info.files.clone()
         };
 
@@ -732,7 +735,7 @@ fn test_abnormal_era() {
             Tee::current_report_slot(),
             300
         );
-        assert!(Tee::reported_in_slot(&account, 0));
+        assert!(Tee::reported_in_slot(&account, 0).1);
 
         // If next new era happens on 303, then nothing should happen
         run_to_block(303);
@@ -745,8 +748,8 @@ fn test_abnormal_era() {
             Tee::current_report_slot(),
             300
         );
-        assert!(Tee::reported_in_slot(&account, 0));
-        assert!(!Tee::reported_in_slot(&account, 300));
+        assert!(Tee::reported_in_slot(&account, 0).1);
+        assert!(!Tee::reported_in_slot(&account, 300).1);
 
         // Then report works
         // reserved: 4294967296,
@@ -765,6 +768,6 @@ fn test_abnormal_era() {
         // total workload should keep same, cause we only updated in a new era
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 0);
-        assert!(Tee::reported_in_slot(&account, 300));
+        assert!(Tee::reported_in_slot(&account, 300).1);
     })
 }

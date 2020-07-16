@@ -8,7 +8,7 @@ use frame_support::{
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency}
 };
-use sp_std::{str, convert::TryInto, prelude::*};
+use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use system::{ensure_root, ensure_signed};
 
 #[cfg(feature = "std")]
@@ -22,7 +22,6 @@ use primitives::{
     ISVBody, Cert, TeeCode
 };
 use market::{OrderStatus, MarketInterface, OrderInspector};
-use frame_support::storage::unhashed::get_or_else;
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
@@ -244,25 +243,30 @@ decl_module! {
 
             // 3. Ensure this work report has not been reported before
             let (elder_reported, current_reported) = Self::reported_in_slot(&who, block_number);
-            // TODO: Pass the duplicate reported
 
-            // 4. Do timing check
+            // 4. Ensure works not duplicate reported
+            if (current_reported && is_current_report) || (elder_reported && is_elder_report) {
+                return Ok(());
+            }
+
+            // 5. Do timing check
             ensure!(Self::work_report_timing_check(block_number, &block_hash).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 5. Do sig check
+            // 6. Do sig check
             ensure!(
                 Self::work_report_sig_check(&pub_key, block_number, &block_hash, reserved, &files, &sig),
                 Error::<T>::IllegalWorkReportSig
             );
 
-            // 6. Construct work report
-            let work_report = Self:merged_work_report(&who, reserved, &files, block_number, is_elder_report, is_current_report);
+            // 7. Construct work report
+            let work_report = Self::merged_work_report(&who, reserved, &files, block_number, is_elder_report, is_current_report);
 
-            // 7. Maybe upsert work report
-            if Self::maybe_upsert_work_report(&who, &work_report) {
-                // 8. Emit report works event
+            // 8. Maybe upsert work report
+            if Self::maybe_upsert_work_report(&who, &work_report, is_elder_report, is_current_report) {
+                // Emit report works event
                 Self::deposit_event(RawEvent::WorksReportSuccess(who, work_report));
             }
+
             Ok(())
         }
     }
@@ -341,11 +345,12 @@ impl<T: Trait> Module<T> {
     /// 1. Update `current_id` if `current_id.code` == `id.code`
     /// 2. Update `current_id` and `elder_id` if `current_id.code` != `id.code`
     fn maybe_upsert_id(who: &T::AccountId, id: &Identity) -> bool {
-        let maybe_ids = Self::identities(who);
-        let upserted = match maybe_ids {
+        let upserted = match Self::identities(who) {
             // New id
-            (None, None) => {
-                Identities::<T>::insert(who, (None, id.clone()));
+            (_, None) => {
+                // This shit needs type annotation
+                let pair: (Option<Identity>, Option<Identity>) = (None, Some(id.clone()));
+                Identities::<T>::insert(who, pair);
                 true
             },
             // Update/upgrade id
@@ -356,16 +361,16 @@ impl<T: Trait> Module<T> {
                 } else {
                     if current_id.code == id.code {
                         // Update(enclave code not change)
-                        Identity::<T>::mutate(who, |(_, maybe_cid)| {
+                        Identities::<T>::mutate(who, |(_, maybe_cid)| {
                             if let Some(cid) = maybe_cid {
-                                cid = current_id.clone();
+                                *cid = current_id.clone();
                             }
-                        })
+                        });
                     } else {
                         // Upgrade(new enclave code detected)
                         // current_id -> elder_id
                         // id         -> current_id
-                        Identities::<T>::insert(who, (Some(current_id), Some(id)));
+                        Identities::<T>::insert(who, (Some(current_id), Some(id.clone())));
                     }
                     true
                 }
@@ -435,8 +440,8 @@ impl<T: Trait> Module<T> {
 
         // 4. Mark who has reported in this (report)slot, and which public key did he/she used
         <ReportedInSlot<T>>::mutate(who, rs, |(e, c)| {
-            *e = e || elder_reported;
-            *c = c || current_reported;
+            *e = elder_reported || *e;
+            *c = current_reported || *c;
         });
 
         // 5. Update workload
@@ -515,7 +520,7 @@ impl<T: Trait> Module<T> {
                           elder_reported: bool,
                           current_reported: bool) -> WorkReport {
         let mut merged_reserved = reserved;
-        let mut merged_files = files;
+        let mut merged_files = files.clone();
         let mut cached_reserved: u64 = 0;
 
         if let Some(wr) = Self::work_reports(who) {
@@ -536,10 +541,12 @@ impl<T: Trait> Module<T> {
             // otherwise this could lead a BIG trouble.
             } else if wr.block_number == block_number {
                 // 1. Merge the files
-                merged_files = Self::merge_files(files, wr.files);
+                merged_files = Self::merged_files(files, &wr.files);
 
                 // 2. Sum up the reserved
                 merged_reserved = wr.cached_reserved + reserved;
+
+                // 3. Clean up cached_reserved
             }
         }
 
@@ -548,8 +555,27 @@ impl<T: Trait> Module<T> {
             used: 0,
             reserved: merged_reserved,
             cached_reserved,
-            files: merged_files.clone()
+            files: merged_files
         }
+    }
+
+    /// This function will merge SetA(`files_a`) and SetB(`files_b`)
+    fn merged_files(files_a: &Vec<(MerkleRoot, u64)>,
+                    files_b: &Vec<(MerkleRoot, u64)>) -> Vec<(MerkleRoot, u64)> {
+
+        let mut root_hashes: BTreeSet<MerkleRoot> = BTreeSet::new();
+        let mut unmerged_files = files_a.clone();
+        unmerged_files.extend(files_b.clone());
+        let mut merged_files: Vec<(MerkleRoot, u64)> = vec![];
+
+        for (root_hash, size) in unmerged_files {
+            if !root_hashes.contains(&root_hash) {
+                merged_files.push((root_hash.clone(), size));
+                root_hashes.insert(root_hash.clone());
+            }
+        }
+
+        merged_files
     }
 
     /// This function is judging if the identity already be registered
@@ -558,10 +584,12 @@ impl<T: Trait> Module<T> {
     fn id_is_unique(pk: &PubKey) -> bool {
         let mut is_unique = true;
 
-        for (_, (_, current_id)) in <Identities<T>>::iter() {
-            if &current_id.pub_key == pk {
-                is_unique = false;
-                break
+        for (_, (_, maybe_current_id)) in <Identities<T>>::iter() {
+            if let Some(current_id) = maybe_current_id {
+                if &current_id.pub_key == pk {
+                    is_unique = false;
+                    break
+                }
             }
         }
 
@@ -597,18 +625,20 @@ impl<T: Trait> Module<T> {
         let (maybe_eid, maybe_cid): (Option<Identity>, Option<Identity>) = Self::identities(reporter);
         if let Some(cid) = maybe_cid {
             let code: TeeCode = Self::code();
+            let current_bn = <system::Module<T>>::block_number();
+            let not_expired = Self::ab_expire().is_some() && current_bn < Self::ab_expire().unwrap();
 
             if &cid.code == &code && wr_pk == &cid.pub_key {
-                // Reported with new pk
+                // 1. Reported with new pk
                 return (false, true);
+            } else if &cid.code != &code {
+                // 2. Current pk still not upgraded
+                return (false, wr_pk == &cid.pub_key && not_expired)
             } else {
-                // Reported with old pk, this require current block number < ab_expire block number
+                // 3. Reported with elder pk
+                // this require current block number < ab_expire block number
                 if let Some(eid) = maybe_eid {
-                    let current_bn = <system::Module<T>>::block_number();
-                    return (
-                        wr_pk == &eid.pub_key &&
-                            (Self::ab_expire().is_some() && current_bn < Self::ab_expire().unwrap()),
-                        false)
+                    return (wr_pk == &eid.pub_key && not_expired, false)
                 }
             }
         }

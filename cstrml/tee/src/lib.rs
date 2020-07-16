@@ -113,12 +113,13 @@ decl_storage! {
         /// Recording whether the validator reported works of each era
         /// We leave it keep all era's report info
         /// cause B-tree won't build index on key2(ReportSlot)
+        /// value (bool, bool) represent two id (elder_reported, current_reported)
         pub ReportedInSlot get(fn reported_in_slot) build(|config: &GenesisConfig<T>| {
             config.work_reports.iter().map(|(account_id, _)|
-                (account_id.clone(), 0, true)
+                (account_id.clone(), 0, (false, true))
             ).collect::<Vec<_>>()
         }): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) ReportSlot
-        => bool = false;
+        => (bool, bool) = (false, false);
 
         /// The used workload, used for calculating stake limit in the end of era
         /// default is 0
@@ -238,24 +239,28 @@ decl_module! {
             ensure!(<Identities<T>>::contains_key(&who), Error::<T>::IllegalReporter);
 
             // 2. Ensure reporter's id is valid
-            let (elder_reported, current_reported) = Self::work_report_id_check(&who, &pub_key);
-            ensure!(elder_reported || current_reported, Error::<T>::InvalidPubKey);
+            let (is_elder_report, is_current_report) = Self::work_report_id_check(&who, &pub_key);
+            ensure!(is_elder_report || is_current_report, Error::<T>::InvalidPubKey);
 
-            // 3. Do timing check
+            // 3. Ensure this work report has not been reported before
+            let (elder_reported, current_reported) = Self::reported_in_slot(&who, block_number);
+            // TODO: Pass the duplicate reported
+
+            // 4. Do timing check
             ensure!(Self::work_report_timing_check(block_number, &block_hash).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 4. Do sig check
+            // 5. Do sig check
             ensure!(
                 Self::work_report_sig_check(&pub_key, block_number, &block_hash, reserved, &files, &sig),
                 Error::<T>::IllegalWorkReportSig
             );
 
-            // 5. Construct work report
-            let work_report = Self:merged_work_report(&who, reserved, &files, block_number, elder_reported, current_reported);
+            // 6. Construct work report
+            let work_report = Self:merged_work_report(&who, reserved, &files, block_number, is_elder_report, is_current_report);
 
-            // 6. Maybe upsert work report
+            // 7. Maybe upsert work report
             if Self::maybe_upsert_work_report(&who, &work_report) {
-                // Emit report works event
+                // 8. Emit report works event
                 Self::deposit_event(RawEvent::WorksReportSuccess(who, work_report));
             }
             Ok(())
@@ -372,10 +377,10 @@ impl<T: Trait> Module<T> {
 
     /// This function will (maybe) update or insert a work report, in details:
     /// 1. calculate used from reported files
-    /// 2. set `ReportedInSlot` to true
+    /// 2. set `ReportedInSlot`
     /// 3. update `Used` and `Reserved`
     /// 4. call `Works::report_works` interface
-    fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport) -> bool {
+    fn maybe_upsert_work_report(who: &T::AccountId, wr: &WorkReport, elder_reported: bool, current_reported: bool) -> bool {
         let mut old_used: u128 = 0;
         let mut old_reserved: u128 = 0;
         let rs = Self::get_reported_slot();
@@ -425,11 +430,16 @@ impl<T: Trait> Module<T> {
             used
         });
 
-        // 3. Upsert work report and mark who has reported in this (report)slot
+        // 3. Upsert work report
         <WorkReports<T>>::insert(who, &updated_wr);
-        <ReportedInSlot<T>>::insert(who, rs, true);
 
-        // 4. Update workload
+        // 4. Mark who has reported in this (report)slot, and which public key did he/she used
+        <ReportedInSlot<T>>::mutate(who, rs, |(e, c)| {
+            *e = e || elder_reported;
+            *c = c || current_reported;
+        });
+
+        // 5. Update workload
         let used = updated_wr.used as u128;
         let reserved = updated_wr.reserved as u128;
         let total_used = Self::used() - old_used + used;
@@ -439,7 +449,7 @@ impl<T: Trait> Module<T> {
         Reserved::put(total_reserved);
         let total_workload = total_used + total_reserved;
 
-        // 5. Update work report for every identity
+        // 6. Update work report for every identity
         // TC = O(N)
         // N DB try
         for (controller, wr) in <WorkReports<T>>::iter() {
@@ -461,7 +471,8 @@ impl<T: Trait> Module<T> {
     fn update_and_get_workload(controller: &T::AccountId, order_map: &Vec<(MerkleRoot, T::Hash)>, current_rs: u64) -> (u128, u128) {
         // Judge if this controller reported works in this current era
         if let Some(wr) = Self::work_reports(controller) {
-            if Self::reported_in_slot(controller, current_rs) {
+            let (elder_reported, current_reported) = Self::reported_in_slot(controller, current_rs);
+            if elder_reported || current_reported {
                 // 1. Get all work report files
                 let wr_files: Vec<MerkleRoot> = wr.files.iter().map(|(f_id, _)| f_id.clone()).collect();
 
@@ -512,27 +523,24 @@ impl<T: Trait> Module<T> {
             if wr.block_number < block_number {
                 // 1. Cover the files(aka. do nothing)
                 if current_reported {
-                    // 2. If the current id reported first: merged_reserved = reserved(aka. do nothing)
+                    // 2. If the current id reported first: merged_reserved = reserved(aka. update to this slot round)
                 } else if elder_reported {
-                    // 3. If the elder id reported first: merged_reserved = wr.reserved(aka. keep the same)
+                    // 3. If the elder id reported first: merged_reserved = wr.reserved(aka. keep the last slot round)
                     merged_reserved = wr.reserved;
                 }
                 // 4. Cached the reserved;
                 cached_reserved = reserved;
 
-            // II. Merge the work report(with different files)
-            // TODO: bug with same id(current+current, elder+elder)
+            // II. Merge the work reports(elder + current)
+            // NOTE: NOT permit multiple submit with same public key(current/elder can only report once),
+            // otherwise this could lead a BIG trouble.
             } else if wr.block_number == block_number {
                 // 1. Merge the files
                 merged_files = Self::merge_files(files, wr.files);
 
-                // 2. Merge the reserved
-                // ps: this will not cause the condition that adding n-times reserved space,
-                // cause we only use the cached_reserved, it only be valued when the new work report
-                // generated(only once).
+                // 2. Sum up the reserved
                 merged_reserved = wr.cached_reserved + reserved;
             }
-            // III. wr.block_number > block_number
         }
 
         WorkReport {

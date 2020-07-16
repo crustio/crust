@@ -92,6 +92,8 @@ impl market::Payment<<Test as system::Trait>::AccountId,
     }
 
     fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
+
+    fn close_sorder(_: &Hash, _: &AccountId, _: &BlockNumber) { }
 }
 
 parameter_types! {
@@ -192,7 +194,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
         expired_on: 0,
         provider: who.clone(),
         client: who.clone(),
-        amount: 0,
+        amount: 10,
         status: os
     };
     if let Some(orders) = file_map.get_mut(f_id) {

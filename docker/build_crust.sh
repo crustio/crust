@@ -12,6 +12,7 @@ usage() {
     echo "     -p publish image"
     echo "     -m use Chinese mirror"
     echo "     -c [dir] use cache directory"
+    echo "     -r rebuild, will do clean and build"
 
 	  exit 1;
 }
@@ -19,8 +20,9 @@ usage() {
 PUBLISH=0
 MIRROR=0
 CACHEDIR=""
+REBUILD=0
 
-while getopts ":hmpc:" opt; do
+while getopts ":hmrpc:" opt; do
     case ${opt} in
         h )
 			      usage
@@ -30,6 +32,9 @@ while getopts ":hmpc:" opt; do
             ;;
         m )
             MIRROR=1
+            ;;
+        r )
+            REBUILD=1
             ;;
         c )
             CACHEDIR=$OPTARG
@@ -41,22 +46,7 @@ while getopts ":hmpc:" opt; do
     esac
 done
 
-
-function echo_c {
-    echo -e "\e[1;$1m$2\e[0m"
-}
-
-function log_info {
-    echo_c 33 "$1"
-}
-
-function log_success {
-    echo_c 32 "$1"
-}
-
-function log_err {
-    echo_c 35 "$1"
-}
+source docker/utils.sh
 
 log_info "using cache dir: $CACHEDIR"
 if [ ! -d $CACHEDIR ]; then
@@ -93,19 +83,26 @@ function build_crust {
   CIDFILE=`mktemp`
   rm $CIDFILE
   echo_c 33 "using run opts: $RUN_OPTS"
-  docker run --cidfile $CIDFILE -i -t --env CARGO_HOME=/opt/cache $RUN_OPTS crustio/crust-build:${TOOLCHAIN_VER} /bin/bash -c "cd /opt/crust; cargo build --release;  echo done building"
+  CMD=""
+  if [ $REBUILD -eq "1" ]; then
+      CMD="cargo clean --release; "
+  fi
+  CMD="$CMD cargo build --release;"
+
+  log_info "build using command: $CMD"
+  docker run --workdir /opt/crust --cidfile $CIDFILE -i -t --env CARGO_HOME=/opt/cache $RUN_OPTS crustio/crust-build:${TOOLCHAIN_VER} /bin/bash -c "$CMD"
   CID=`cat $CIDFILE`
   log_info "cleanup temp container $CID"
   docker rm $CID
   echo_c 33 "build done, validting result"
 
   if [ ! -f $DIST_FILE ]; then
-    echo_c 33 "build failed, $DIST_FILE does not exist"
+    log_err "build failed, $DIST_FILE does not exist"
     exit 1
   else
     log_success "$DIST_FILE exists - passed"
-    echo_c 33 "build validation passed"
   fi
+  log_info "crust built at: $DIST_FILE"
 }
 
 build_crust

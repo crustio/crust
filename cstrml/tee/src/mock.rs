@@ -168,9 +168,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 /// Run until a particular block.
-pub fn run_to_block(n: u64) {
+pub fn run_to_block(n: u64, maybe_bh: Option<Vec<u8>>) {
     // This block hash is for the valid work report
-    let fake_bh = H256::from_slice(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap().as_slice());
+    let bh = maybe_bh.unwrap_or(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap());
+    let fake_bh = H256::from_slice(bh.as_slice());
     while System::block_number() < n {
         <system::BlockHash<Test>>::insert(System::block_number(), fake_bh.clone());
         if System::block_number() > 1 {

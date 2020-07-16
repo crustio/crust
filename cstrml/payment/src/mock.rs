@@ -195,10 +195,13 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .map(|(id, pk)| {
             (
                 id.clone(),
-                tee::Identity {
-                    pub_key: pk.clone(),
-                    code: vec![],
-                },
+                (
+                    None,
+                    Some(tee::Identity {
+                        pub_key: pk.clone(),
+                        code: vec![],
+                    })
+                ),
             )
         })
         .collect();

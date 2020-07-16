@@ -108,7 +108,7 @@ fn test_for_register_success() {
             register_info.sig
         ));
 
-        let id_registered = Tee::identities(applier.clone()).unwrap();
+        let id_registered = Tee::identities(applier.clone()).1.unwrap();
 
         let id = Identity {
             pub_key: hex::decode("4dbb6401508323b18f649f04f17433fd4b87201ef3ff634b684b715c848bb60b905dd5305e24761b4968a8875dfd9f6abfb3110d9fa494dd530daaeccc8353e1").unwrap(),
@@ -303,7 +303,7 @@ fn test_for_register_failed_by_illegal_ias_sig() {
 fn test_for_report_works_success() {
     new_test_ext().execute_with(|| {
         // generate 303 blocks first
-        run_to_block(303);
+        run_to_block(303, None);
         // prepare sorder
         add_pending_sorder();
 
@@ -342,7 +342,7 @@ fn test_for_report_works_success() {
 fn test_for_report_works_success_without_sorder() {
     new_test_ext().execute_with(|| {
         // generate 303 blocks first
-        run_to_block(303);
+        run_to_block(303, None);
 
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
         let report_works_info = valid_report_works_info();
@@ -430,7 +430,7 @@ fn test_for_report_works_failed_by_reporter_is_not_registered() {
 fn test_for_work_report_timing_check_failed_by_wrong_block_hash() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
-        run_to_block(50);
+        run_to_block(50, None);
 
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
         let block_hash = [1; 32].to_vec();
@@ -467,7 +467,7 @@ fn test_for_work_report_timing_check_failed_by_wrong_block_hash() {
 fn test_for_work_report_timing_check_failed_by_slot_outdated() {
     new_test_ext().execute_with(|| {
         // generate 103 blocks first
-        run_to_block(103);
+        run_to_block(103, None);
 
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
         let block_hash = [0; 32].to_vec();
@@ -501,67 +501,10 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
 }
 
 #[test]
-fn test_for_report_works_for_ab_upgrade_should_work() {
-    new_test_ext().execute_with(|| {
-        // generate 303 blocks first
-        run_to_block(303);
-
-        // Upgrade tee with new enclave code and expired block
-        // Currently, enclave code already updated
-        // Old code will expire at 200 block
-        assert_ok!(Tee::upgrade(Origin::root(), hex::decode("1111").unwrap(), 500));
-
-        // Bob can still report works with old code and identities
-        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let report_works_info = valid_report_works_info();
-        assert_ok!(Tee::report_works(
-            Origin::signed(account.clone()),
-            report_works_info.pub_key.clone(),
-            report_works_info.block_number.clone(),
-            report_works_info.block_hash.clone(),
-            report_works_info.reserved.clone(),
-            report_works_info.files.clone(),
-            report_works_info.sig.clone()
-        ));
-
-        // Run to 400, Bob report works should be ok
-        run_to_block(400);
-        assert_ok!(Tee::report_works(
-            Origin::signed(account.clone()),
-            report_works_info.pub_key.clone(),
-            report_works_info.block_number.clone(),
-            report_works_info.block_hash.clone(),
-            report_works_info.reserved.clone(),
-            report_works_info.files.clone(),
-            report_works_info.sig.clone()
-        ));
-
-        // Run to 500, Bob's identity should be expired
-        run_to_block(500);
-        assert_noop!(
-            Tee::report_works(
-                Origin::signed(account.clone()),
-                report_works_info.pub_key,
-                report_works_info.block_number,
-                report_works_info.block_hash,
-                report_works_info.reserved,
-                report_works_info.files,
-                report_works_info.sig
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 7,
-                message: Some("UntrustedCode"),
-            }
-        );
-    });
-}
-
-#[test]
 fn test_for_work_report_sig_check_failed() {
     new_test_ext().execute_with(|| {
         // generate 303 blocks first
-        run_to_block(303);
+        run_to_block(303, None);
 
         let account: AccountId32 = Sr25519Keyring::Bob.to_account_id();
         let pub_key = hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap();
@@ -606,7 +549,7 @@ fn test_for_wr_check_failed_order() {
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
         add_success_sorder();
         // generate 303 blocks first
-        run_to_block(303);
+        run_to_block(303, None);
 
         let report_works_info = valid_report_works_info();
 
@@ -635,13 +578,14 @@ fn test_for_outdated_work_reports() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
         // generate 303 blocks first
-        run_to_block(303);
+        run_to_block(303, None);
 
         let report_works_info = valid_report_works_info();
         let wr = WorkReport {
             block_number: report_works_info.block_number,
             used: 0,
             reserved: report_works_info.reserved.clone(),
+            cached_reserved: report_works_info.reserved.clone(),
             files: report_works_info.files.clone()
         };
 
@@ -660,20 +604,21 @@ fn test_for_outdated_work_reports() {
         assert_eq!(Tee::current_report_slot(), 0);
         Tee::update_identities();
         assert_eq!(Tee::current_report_slot(), 300);
+
         // Check workloads
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 0);
 
         // generate 401 blocks, wr still valid
-        run_to_block(401);
+        run_to_block(401, None);
         assert_eq!(
             Tee::work_reports(&account),
             Some(wr.clone())
         );
-        assert!(Tee::reported_in_slot(&account, 300));
+        assert!(Tee::reported_in_slot(&account, 300).1);
 
         // generate 602 blocks
-        run_to_block(602);
+        run_to_block(602, None);
         assert_eq!(Tee::current_report_slot(), 300);
         Tee::update_identities();
         assert_eq!(Tee::current_report_slot(), 600);
@@ -681,13 +626,13 @@ fn test_for_outdated_work_reports() {
             Tee::work_reports(&account),
             Some(wr.clone())
         );
-        assert!(!Tee::reported_in_slot(&account, 600));
+        assert!(!Tee::reported_in_slot(&account, 600).1);
 
         // Check workloads
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 0);
 
-        run_to_block(903);
+        run_to_block(903, None);
         assert_eq!(Tee::current_report_slot(), 600);
         Tee::update_identities();
         assert_eq!(Tee::current_report_slot(), 900);
@@ -708,11 +653,12 @@ fn test_abnormal_era() {
             block_number: report_works_info.block_number,
             used: 0,
             reserved: report_works_info.reserved.clone(),
+            cached_reserved: report_works_info.reserved.clone(),
             files: report_works_info.files.clone()
         };
 
         // If new era happens in 101, next work is not reported
-        run_to_block(101);
+        run_to_block(101, None);
         Tee::update_identities();
         assert_eq!(
             Tee::work_reports(&account),
@@ -722,7 +668,7 @@ fn test_abnormal_era() {
         assert_eq!(Tee::current_report_slot(), 0);
 
         // If new era happens on 301, we should update work report and current report slot
-        run_to_block(301);
+        run_to_block(301, None);
         Tee::update_identities();
         assert_eq!(
             Tee::work_reports(&account),
@@ -732,10 +678,10 @@ fn test_abnormal_era() {
             Tee::current_report_slot(),
             300
         );
-        assert!(Tee::reported_in_slot(&account, 0));
+        assert!(Tee::reported_in_slot(&account, 0).1);
 
         // If next new era happens on 303, then nothing should happen
-        run_to_block(303);
+        run_to_block(303, None);
         Tee::update_identities();
         assert_eq!(
             Tee::work_reports(&account),
@@ -745,13 +691,13 @@ fn test_abnormal_era() {
             Tee::current_report_slot(),
             300
         );
-        assert!(Tee::reported_in_slot(&account, 0));
-        assert!(!Tee::reported_in_slot(&account, 300));
+        assert!(Tee::reported_in_slot(&account, 0).1);
+        assert!(!Tee::reported_in_slot(&account, 300).1);
 
         // Then report works
         // reserved: 4294967296,
         // used: 1676266280,
-        run_to_block(304);
+        run_to_block(304, None);
         assert_ok!(Tee::report_works(
             Origin::signed(account.clone()),
             report_works_info.pub_key,
@@ -765,6 +711,92 @@ fn test_abnormal_era() {
         // total workload should keep same, cause we only updated in a new era
         assert_eq!(Tee::reserved(), 4294967296);
         assert_eq!(Tee::used(), 0);
-        assert!(Tee::reported_in_slot(&account, 300));
+        assert!(Tee::reported_in_slot(&account, 300).1);
     })
+}
+
+#[test]
+fn test_ab_upgrade_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 303 blocks first
+        run_to_block(303, None);
+
+        // Upgrade tee with new enclave code and expired block
+        // Currently, enclave code already updated
+        // Old code will expire at 500 block
+        assert_ok!(Tee::upgrade(Origin::root(), hex::decode("1111").unwrap(), 500));
+
+        // Bob can still report works with old code and identities
+        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let report_works_info = valid_report_works_info();
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            report_works_info.pub_key.clone(),
+            report_works_info.block_number.clone(),
+            report_works_info.block_hash.clone(),
+            report_works_info.reserved.clone(),
+            report_works_info.files.clone(),
+            report_works_info.sig.clone()
+        ));
+
+        // Run to 400, Bob report works should be ok
+        run_to_block(400, None);
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            report_works_info.pub_key.clone(),
+            report_works_info.block_number.clone(),
+            report_works_info.block_hash.clone(),
+            report_works_info.reserved.clone(),
+            report_works_info.files.clone(),
+            report_works_info.sig.clone()
+        ));
+
+        // Run to 500, Bob's identity should be expired
+        run_to_block(500, None);
+        assert_noop!(
+            Tee::report_works(
+                Origin::signed(account.clone()),
+                report_works_info.pub_key,
+                report_works_info.block_number,
+                report_works_info.block_hash,
+                report_works_info.reserved,
+                report_works_info.files,
+                report_works_info.sig
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 4,
+                message: Some("InvalidPubKey"),
+            }
+        );
+
+        // Upgrade tee with new enclave code and expired block
+        // Currently, enclave code already updated
+        // Old code will expire at 128800 block
+        run_to_block(128800, Some(hex::decode("b3cbf5dbc20e0727c39615fc0ab23a345408ded3a6e1cd45aefd403eaa94ef60").unwrap()));
+        assert_ok!(Tee::upgrade(Origin::root(), hex::decode("bc55e1730c64d9d9788e25161825b3dca016b2288c51daa844bc95f29a010241").unwrap(), 130000));
+
+        // Bob do upgrade
+        let elder_id = Tee::identities(&account).1;
+        let new_id = Identity {
+            pub_key: hex::decode("4727a3e2bd4629725e5abe5045cc8b974db0f0ac6c87f19af21a40bd54ac7eaa1d8eaf507797d01f9c21914c39ded87a07b6652993f9568c83b39bfcc3e342f5").unwrap(),
+            code: hex::decode("bc55e1730c64d9d9788e25161825b3dca016b2288c51daa844bc95f29a010241").unwrap(),
+        };
+        assert!(Tee::maybe_upsert_id(&account, &new_id));
+
+        assert_eq!(Tee::identities(&account), (elder_id, Some(new_id)));
+
+        // Report with new identity should work
+        assert_ok!(Tee::report_works(
+            Origin::signed(account.clone()),
+            hex::decode("4727a3e2bd4629725e5abe5045cc8b974db0f0ac6c87f19af21a40bd54ac7eaa1d8eaf507797d01f9c21914c39ded87a07b6652993f9568c83b39bfcc3e342f5").unwrap(),
+            128_700,
+            hex::decode("b3cbf5dbc20e0727c39615fc0ab23a345408ded3a6e1cd45aefd403eaa94ef60").unwrap(),
+            53_687_091_200,
+            vec![],
+            hex::decode("3d7bfe9e1d681d8b2f51c6647d17adc933e00b1c650b341104c86bd669c6e8da178f30efca64f22e71adccc884b240ea6be398af702c96c058037b65f245f266").unwrap(),
+        ));
+        
+        // TODO: Reporting with elder and current test cases
+    });
 }

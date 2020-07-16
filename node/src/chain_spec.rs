@@ -263,7 +263,8 @@ fn rocky_staging_testnet_config_genesis() -> GenesisConfig {
                         block_number: 0,
                         files: vec![],
                         reserved: WORKLOAD,
-                        used: 0
+                        used: 0,
+                        cached_reserved: 0
                     },
                 ))
                 .collect(),
@@ -353,7 +354,8 @@ fn testnet_genesis(
                             block_number: 0,
                             files: vec![],
                             reserved: WORKLOAD,
-                            used: 0
+                            used: 0,
+                            cached_reserved: 0
                         },
                     )
                 })

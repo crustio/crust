@@ -141,10 +141,13 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .map(|id| {
             (
                 id.clone(),
-                Identity {
-                    pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
-                    code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
-                },
+                (
+                    None,
+                    Some(Identity {
+                        pub_key: hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap(),
+                        code: hex::decode("e256ab4cb5e9136bc1c1115088fc40ca1f4182545ea75769578c20d843028cd5").unwrap(),
+                    })
+                )
             )
         })
         .collect();
@@ -167,9 +170,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 /// Run until a particular block.
-pub fn run_to_block(n: u64) {
+pub fn run_to_block(n: u64, maybe_bh: Option<Vec<u8>>) {
     // This block hash is for the valid work report
-    let fake_bh = H256::from_slice(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap().as_slice());
+    let bh = maybe_bh.unwrap_or(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap());
+    let fake_bh = H256::from_slice(bh.as_slice());
     while System::block_number() < n {
         <system::BlockHash<Test>>::insert(System::block_number(), fake_bh.clone());
         if System::block_number() > 1 {

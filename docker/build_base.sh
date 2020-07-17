@@ -32,9 +32,9 @@ done
 
 
 TOOLCHAIN_VER="`cat docker/rust-toolchain`"
-IMAGEID="crustio/crust-build:${TOOLCHAIN_VER}"
+IMAGEID="crustio/crust-env:${TOOLCHAIN_VER}"
 
-docker build docker/crust-build --build-arg TOOLCHAIN="${TOOLCHAIN_VER}" -t $IMAGEID
+docker build docker/crust-env --build-arg TOOLCHAIN="${TOOLCHAIN_VER}" -t $IMAGEID
 
 if [ $? -eq "0" ]; then
     echo "done building crust base image, tag: $IMAGEID"

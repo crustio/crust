@@ -525,9 +525,9 @@ impl<T: Trait> Module<T> {
     // PRIVATE IMMUTABLES
     /// This function will generated the merged work report, merging includes:
     /// 1. `files`: merged with same block number, covered with different block number
-    /// 2. `cached_reserved`: valued only `elder_reported == true` and `block_number != wr.block_number`
+    /// 2. `cached_reserved`: valued only `elder_reported == true` and `block_number != wr.block_number`,
+    /// will be clear when it been used, this value also used to
     /// 3. `merged_reserved`: added with `cached_reserved` when `current_reported == true`
-    /// 3. `reserved`:
     fn merged_work_report(who: &T::AccountId,
                           reserved: u64,
                           files: &Vec<(MerkleRoot, u64)>,
@@ -545,9 +545,16 @@ impl<T: Trait> Module<T> {
                 if current_reported {
                     // 2. If the current id reported first: merged_reserved = reserved(aka. update to this slot round)
                 } else if elder_reported {
-                    // 3. If the elder id reported first: merged_reserved = wr.reserved(aka. keep the last slot round)
-                    // FIXME: If node won't do upgrade, it will keep old value until ab expired
-                    merged_reserved = wr.reserved;
+                    // 3. If the elder id reported first:
+                    // a. If wr.cached_reserved == 0 (which means node already upgraded and sum up with 2 identities)
+                    //    -> merged_reserved = wr.reserved(aka. keep the last slot round)
+                    // b. If wr.cached_reserved != 0 (which means node has not been upgraded)
+                    //    -> merged_reserved = reserved(aka. use the submited workload)
+                    if wr.cached_reserved == 0 {
+                        merged_reserved = wr.reserved;
+                    } else {
+                        // Do nothing with initial value
+                    }
                 }
                 // 4. Cached the reserved;
                 cached_reserved = reserved;

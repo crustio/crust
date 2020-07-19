@@ -29,6 +29,8 @@ sp-runtime = { default-features = false, version = '2.0.0-rc4', git = 'http://gi
 sp-runtime-interface = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 sp-std = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 
+frame-benchmarking = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5', default-features = false, optional = true }
+
 # crust runtime modules
 market = { package = 'cstrml-market', path = '../market', default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
@@ -36,6 +38,7 @@ primitives = { package = 'cst-primitives', path = '../../primitives', default-fe
 [dev-dependencies]
 keyring = { package = "sp-keyring", version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 balances = { package = 'cstrml-balances', path = '../balances' }
+frame-benchmarking = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 
 [features]
 default = ['std']
@@ -52,4 +55,7 @@ std = [
     'sp-runtime-interface/std',
     'market/std',
     'primitives/std'
+]
+runtime-benchmarks = [
+	"frame-benchmarking",
 ]

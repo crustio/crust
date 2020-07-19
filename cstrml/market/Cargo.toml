@@ -23,6 +23,8 @@ sp-io = { default-features = false, version = '2.0.0-rc4', git = 'http://github.
 sp-runtime = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 sp-std = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 
+frame-benchmarking = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5', default-features = false, optional = true }
+
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
@@ -39,8 +41,12 @@ std = [
     'system/std',
     'primitives/std',
 ]
+runtime-benchmarks = [
+	"frame-benchmarking",
+]
 
 [dev-dependencies]
 hex = '0.4.2'
 tee = { package = 'cstrml-tee', path = '../tee' }
 balances = { package = 'cstrml-balances', path = '../balances' }
+frame-benchmarking = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }

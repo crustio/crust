@@ -14,14 +14,14 @@ serde = { optional = true, version = '1.0.106' }
 serde_json = "1.0.51"
 
 # substrate frames
-system = { package = 'frame-system', default-features = false, version = '2.0.0-rc4' }
-frame-support = { default-features = false, version = '2.0.0-rc4' }
+system = { package = 'frame-system', default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+frame-support = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-rc4' }
-sp-io = { default-features = false, version = '2.0.0-rc4' }
-sp-runtime = { default-features = false, version = '2.0.0-rc4' }
-sp-std = { default-features = false, version = '2.0.0-rc4' }
+sp-core = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+sp-io = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+sp-runtime = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+sp-std = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
@@ -46,6 +46,6 @@ std = [
 
 [dev-dependencies]
 hex = '0.4.2'
-keyring = { package = "sp-keyring", version = '2.0.0-rc4' }
+keyring = { package = "sp-keyring", version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 tee = { package = 'cstrml-tee', path = '../tee' }
 balances = { package = 'cstrml-balances', path = '../balances' }

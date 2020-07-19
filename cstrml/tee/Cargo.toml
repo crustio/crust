@@ -19,22 +19,22 @@ base64 = "0.12.2"
 openssl = { optional = true, version = "0.10.29" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = '2.0.0-rc4' }
-system = { package = 'frame-system', default-features = false, version = '2.0.0-rc4' }
+frame-support = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+system = { package = 'frame-system', default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-rc4' }
-sp-io = { default-features = false, version = '2.0.0-rc4' }
-sp-runtime = { default-features = false, version = '2.0.0-rc4' }
-sp-runtime-interface = { default-features = false, version = '2.0.0-rc4' }
-sp-std = { default-features = false, version = '2.0.0-rc4' }
+sp-core = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+sp-io = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+sp-runtime = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+sp-runtime-interface = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+sp-std = { default-features = false, version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 
 # crust runtime modules
 market = { package = 'cstrml-market', path = '../market', default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-keyring = { package = "sp-keyring", version = '2.0.0-rc4' }
+keyring = { package = "sp-keyring", version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 balances = { package = 'cstrml-balances', path = '../balances' }
 
 [features]

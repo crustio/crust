@@ -68,7 +68,11 @@ impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
         if let Some(wr) = Self::work_reports(provider) {
               wr.reserved > file_size
         } else {
-            false
+            if cfg!(feature = "runtime-benchmarks"){
+                true
+            } else {
+                false
+            }
         }
     }
 }

@@ -118,5 +118,6 @@ runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
     "collective/runtime-benchmarks",
 	"balances/runtime-benchmarks",
-    "frame-system-benchmarking"
+    "frame-system-benchmarking",
+    "staking/runtime-benchmarks"
 ]

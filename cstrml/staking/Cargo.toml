@@ -29,11 +29,15 @@ sp-staking = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substr
 # crust runtime modules
 tee = { package = "cstrml-tee", path = "../tee", default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
+frame-benchmarking = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5', default-features = false, optional = true }
+rand_chacha = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
 sp-core = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
 balances = { package = 'cstrml-balances', path = '../balances' }
 pallet-timestamp = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+frame-benchmarking = { version = '2.0.0-rc4', git = 'http://github.com/paritytech/substrate.git', rev = 'fd55c45a0a1fd705297e9a0888acdf277e1149a5' }
+rand_chacha = "0.2"
 
 # private crate inside substrate
 substrate-test-utils = { version = '2.0.0-alpha.5', git = 'https://github.com/paritytech/substrate.git', rev = 'd1b9ccad107e4899978858de5ddd2868b9777aab'}
@@ -56,4 +60,8 @@ std = [
 	"frame-system/std",
 	"pallet-authorship/std",
 	"tee/std"
+]
+runtime-benchmarks = [
+	"rand_chacha",
+	"frame-benchmarking",
 ]

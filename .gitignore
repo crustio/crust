@@ -14,4 +14,4 @@
 .vs
 /docker/.cache
 /.cargo
-/docker/crust-runner/crust
+/docker/crust/crust

@@ -48,7 +48,7 @@ done
 
 source docker/utils.sh
 
-log_info "using cache dir: $CACHEDIR"
+log_info "Using cache dir: $CACHEDIR"
 if [ ! -d $CACHEDIR ]; then
     log_err "directory $CACHEDIR doesn't exist!"
     exit 1
@@ -56,53 +56,53 @@ fi
 
 if [ -z $CACHEDIR ]; then
     CACHEDIR="${BUILD_DIR}/docker/.cache"
-    log_info "using default cache dir: $CACHEDIR"
-    log_info "using a custom location for cache directory is recommended"
+    log_info "Using default cache dir: $CACHEDIR"
+    log_info "Using a custom location for cache directory is recommended"
     mkdir -p $CACHEDIR
 fi
 
-function build_crust {
-  echo_c 33 "using build dir: $BUILD_DIR"
+function build_bin {
+  echo_c 33 "Using build dir: $BUILD_DIR"
 
-  log_success "prepare docker build image, run docker pull"
+  log_success "Preparing docker build image, running docker pull"
   docker pull crustio/crust-env:${TOOLCHAIN_VER}
   if [ $? -ne 0 ]; then
-    echo "failed to pull docker image"
+    echo "Failed to pull docker image."
     exit 1
   fi
 
 
   if [ $MIRROR -eq "1" ]; then
-      echo "config mirror..."
+      echo "Config mirror..."
       mkdir -p .cargo
-      cp ./docker/cargo.config .cargo/config
+      cp ./docker/Cargo.config .cargo/config
   fi
 
   RUN_OPTS="-v $BUILD_DIR:/opt/crust -v $CACHEDIR:/opt/cache"
 
   CIDFILE=`mktemp`
   rm $CIDFILE
-  echo_c 33 "using run opts: $RUN_OPTS"
+  echo_c 33 "Using run opts: $RUN_OPTS"
   CMD=""
   if [ $REBUILD -eq "1" ]; then
       CMD="cargo clean --release; "
   fi
   CMD="$CMD cargo build --release;"
 
-  log_info "build using command: $CMD"
+  log_info "Building command: $CMD"
   docker run --workdir /opt/crust --cidfile $CIDFILE -i -t --env CARGO_HOME=/opt/cache $RUN_OPTS crustio/crust-env:${TOOLCHAIN_VER} /bin/bash -c "$CMD"
   CID=`cat $CIDFILE`
-  log_info "cleanup temp container $CID"
+  log_info "Cleanup temp container $CID"
   docker rm $CID
-  echo_c 33 "build done, validting result"
+  echo_c 33 "Build done, checking results"
 
   if [ ! -f $DIST_FILE ]; then
-    log_err "build failed, $DIST_FILE does not exist"
+    log_err "Build failed, $DIST_FILE does not exist"
     exit 1
   else
     log_success "$DIST_FILE exists - passed"
   fi
-  log_info "crust built at: $DIST_FILE"
+  log_info "Crust built at: $DIST_FILE"
 }
 
-build_crust
+build_bin

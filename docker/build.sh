@@ -36,25 +36,25 @@ CRUST_VER=`head -n 10 runtime/Cargo.toml|awk '/version/{print $3}' |sed  s"/'//g
 IMAGEID="crustio/crust:${CRUST_VER}"
 
 if [ ! -f "$DIST_FILE" ]; then
-    log_err "application $DIST_FILE doesn't exist, please build crust first!"
+    log_err "Binary from $DIST_FILE doesn't exist, please build crust binary first."
     exit 1
 fi
 
-log_info "building runner image, crust version: ${CRUST_VER}, dist file $DIST_FILE"
+log_info "Building crust image, version: ${CRUST_VER}, bin file $DIST_FILE"
 
-cp -f $DIST_FILE docker/crust-runner/crust
+cp -f $DIST_FILE docker/crust/crust
 
-docker build docker/crust-runner -t $IMAGEID
+docker build docker/crust -t $IMAGEID
 
 if [ $? -eq "0" ]; then
-    echo "done building crust runner image, tag: $IMAGEID"
+    echo "Done building crust image, tag: $IMAGEID"
 else
-    echo "failed build crust runner!"
+    echo "Failed on building crust."
     exit 1
 fi
 
-log_info "build success"
+log_info "Build success"
 if [ "$PUBLISH" -eq "1" ]; then
-    echo "will publish image to $IMAGEID"
+    echo "Publishing image to $IMAGEID"
     docker push $IMAGEID
 fi

@@ -1,4 +1,3 @@
-
 function echo_c {
     echo -e "\e[1;$1m$2\e[0m"
 }

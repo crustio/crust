@@ -24,12 +24,11 @@ while getopts ":hp" opt; do
             PUBLISH=1
             ;;
         \? )
-            echo "Invalid Option: -$OPTARG" 1>&2
+            echo "Invalid options: -$OPTARG" 1>&2
             exit 1
             ;;
     esac
 done
-
 
 TOOLCHAIN_VER="`cat docker/rust-toolchain`"
 IMAGEID="crustio/crust-env:${TOOLCHAIN_VER}"
@@ -37,15 +36,15 @@ IMAGEID="crustio/crust-env:${TOOLCHAIN_VER}"
 docker build docker/crust-env --build-arg TOOLCHAIN="${TOOLCHAIN_VER}" -t $IMAGEID
 
 if [ $? -eq "0" ]; then
-    echo "done building crust base image, tag: $IMAGEID"
+    echo "Done with building crust env image, tag: $IMAGEID"
 else
-    echo "failed build crust base image!"
+    echo "Failed on building crust env image."
     exit 1
 fi
 
-echo "build success"
+echo "Build success."
 if [ "$PUBLISH" -eq "1" ]; then
-    echo "will publish image to $IMAGEID"
+    echo "Publishing image to $IMAGEID"
     docker push $IMAGEID
 fi
 

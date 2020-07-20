@@ -1,6 +1,6 @@
 # Dockerize crust
 
-## Structure
+## Scripts
 
 - `build.sh`: Build crust official docker image.
 - `build_env.sh`: Build crust's dependencies, including `rust`, `nightly toochain` and `wasm toochain`.

@@ -141,47 +141,47 @@ benchmarks! {
 	}: _(RawOrigin::Signed(controller), prefs)
 
 
-	// guarantee {
-	// 	let v in 1 .. 2;
-	// 	let n in 1 .. 2;
-	// 	let m in 1 .. 2;
-	// 	MinimumValidatorCount::put(1);
-	// 	let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
-	// }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
+	guarantee {
+		let v in 1 .. 2;
+		let n in 1 .. 2;
+		let m in 1 .. 2;
+		MinimumValidatorCount::put(1);
+		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
+	}: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
 
 
-	// cut_guarantee {
-	// 	let v in 1 .. 1;
-	// 	let n in 1 .. 1;
-	// 	let m in 1 .. 1;
-	// 	MinimumValidatorCount::put(1);
-	// 	let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
-	// 	Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
-	// 	(v_lookup.clone(), T::Currency::minimum_balance().into()))?;
-	// }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
+	cut_guarantee {
+		let v in 1 .. 2;
+		let n in 1 .. 2;
+		let m in 1 .. 2;
+		MinimumValidatorCount::put(1);
+		let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
+		Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
+		(v_lookup.clone(), T::Currency::minimum_balance().into()))?;
+	}: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
 
 
-	// new_era {
-	// 	let v in 1 .. 1;
-	// 	let n in 1 .. 1;
-	// 	let m in 1 .. 1;
-	// 	MinimumValidatorCount::put(1);
-	// 	create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
-	// 	let session_index = SessionIndex::one();
-	// }: {
-	// 	let validators = Staking::<T>::new_era(session_index).ok_or("`new_era` failed")?;
-	// }
+	new_era {
+		let v in 1 .. 2;
+		let n in 1 .. 2;
+		let m in 1 .. 2;
+		MinimumValidatorCount::put(1);
+		create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
+		let session_index = SessionIndex::one();
+	}: {
+		let validators = Staking::<T>::new_era(session_index).ok_or("`new_era` failed")?;
+	}
 
-	// select_validators {
-	// 	let v in 1 .. 1;
-	// 	let n in 1 .. 1;
-	// 	let m in 1 .. 1;
-	// 	MinimumValidatorCount::put(1);
-	// 	create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
-	// 	let session_index = SessionIndex::one();
-	// }: {
-	// 	Staking::<T>::select_validators();
-	// }
+	select_validators {
+		let v in 1 .. 2;
+		let n in 1 .. 2;
+		let m in 1 .. 2;
+		MinimumValidatorCount::put(1);
+		create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
+		let session_index = SessionIndex::one();
+	}: {
+		Staking::<T>::select_validators();
+	}
 }
 
 #[cfg(test)]
@@ -214,9 +214,10 @@ mod tests {
 			assert_ok!(test_benchmark_bond::<Test>());
 			assert_ok!(test_benchmark_bond_extra::<Test>());
 			assert_ok!(test_benchmark_validate::<Test>());
-			// assert_ok!(test_benchmark_guarantee::<Test>());
-			// assert_ok!(test_benchmark_cut_guarantee::<Test>());
-			// assert_ok!(test_benchmark_new_era::<Test>());
+			assert_ok!(test_benchmark_guarantee::<Test>());
+			assert_ok!(test_benchmark_cut_guarantee::<Test>());
+			assert_ok!(test_benchmark_new_era::<Test>());
+			assert_ok!(test_benchmark_select_validators::<Test>());
 		});
 	}
 }

@@ -1,14 +1,13 @@
 #! /usr/bin/env bash
 
-
-echo "building crust base image"
+echo "Building crust env image"
 
 usage() {
     echo "Usage:"
 		echo "    $0 -h                      Display this help message."
 		echo "    $0 [options]"
     echo "Options:"
-    echo "     -p publish image"
+    echo "     -p Publish image"
 
 	  exit 1;
 }

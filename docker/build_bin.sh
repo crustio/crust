@@ -40,7 +40,7 @@ while getopts ":hmrpc:" opt; do
             CACHEDIR=$OPTARG
             ;;
         \? )
-            echo "Invalid Option: -$OPTARG" 1>&2
+            echo "Invalid options: -$OPTARG" 1>&2
             exit 1
             ;;
     esac

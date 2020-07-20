@@ -10,7 +10,9 @@ Go to our [Crust Client](https://github.com/crustio/crust-client), follow the RE
 
 ## Building
 
-### 1. Install Rust
+### Build from source
+
+#### 1. Install Rust
 
 > If, after installation, running `rustc --version` in the console fails, refer to [it](https://www.rust-lang.org/tools/install) to repair.
 
@@ -18,19 +20,25 @@ Go to our [Crust Client](https://github.com/crustio/crust-client), follow the RE
 curl https://sh.rustup.rs -sSf | sh
 ```
 
-### 2. Initialize your Wasm Build environment
+#### 2. Initialize your Wasm Build environment
 
 ```shell
 ./scripts/init.sh
 ```
 
-### 3. Build Wasm and native code
+#### 3. Build Wasm and native code
 
 ```bash
 cargo build --release
 ```
 
-### 4. Single Node Development Chain
+## Build from docker
+
+Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust) to see how to build and run crust with docker.
+
+## Network
+
+### 1. Run as dev
 
 Purge any existing developer chain state:
 
@@ -46,13 +54,13 @@ Start a development chain with:
 
 Detailed logs may be shown by running the node with the following environment variables set: `RUST_LOG=debug RUST_BACKTRACE=1 cargo run -- --dev`.
 
-### 5. Multi-Node Local Testnet
+### 2. Run as local
 
 If you want to see the multi-node consensus algorithm in action locally, then you can create a local testnet with two validator nodes for Alice and Bob, who are the initial authorities of the genesis chain that have been endowed with testnet units.
 
 You'll need two terminal windows open.
 
-We'll start Alice's substrate node first on default TCP port 30333 with her chain database stored locally at `/tmp/alice`. The bootnode ID of her node is `QmRpheLN4JWdAnY7HGJfWFNbfkQCb6tFf4vvA6hgjMZKrR`, which is generated from the `--node-key` value that we specify below:
+We'll start Alice's substrate node first on default TCP port 30333 with her chain database stored locally at `/tmp/alice`. The bootnode ID of her node is `12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp`, which is generated from the `--node-key` value that we specify below:
 
 ```bash
 ./target/release/crust \
@@ -70,7 +78,7 @@ In the second terminal, we'll start Bob's substrate node on a different TCP port
   --chain local \
   --bob \
   --port 30334 \
-  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/QmRpheLN4JWdAnY7HGJfWFNbfkQCb6tFf4vvA6hgjMZKrR
+  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
 ```
 
 Additional CLI usage options are available and may be shown by running `cargo run -- --help`.

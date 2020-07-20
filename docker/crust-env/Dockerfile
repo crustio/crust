@@ -1,4 +1,4 @@
-# Crust build env image
+# Build crust env image
 From "rust:latest"
 
 ARG TOOLCHAIN

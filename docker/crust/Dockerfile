@@ -1,4 +1,4 @@
-# crust build base image
+# Build crust image
 From "ubuntu:20.04"
 
 RUN apt-get update

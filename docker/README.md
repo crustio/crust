@@ -8,7 +8,7 @@
 
 ## Usage
 
-Run the scripts at the the root of this repository. DO NOT run from the scripts folder!
+Run the scripts at the the ****root**** of this repository. DO NOT run from `docker` folder!
 
 ### Build and push crust environment image
 
@@ -25,10 +25,11 @@ Run the scripts at the the root of this repository. DO NOT run from the scripts 
     ```
 
     > Hints
-      - Use `-m` flag to use a Chinese cargo mirror, cargo package downloads will be much faster for Chinese users.
-      - Use `-c` flag to specify a custom cargo cache location,
-            it defaults to docker/.cache, you may want to change it if you want share cargo cache between multiple clones.
-      - Use `-r` to perform a full build (equals to `cargo clean & cargo build`).
+      
+  - Use `-m` flag to use a Chinese cargo mirror, cargo package downloads will be much faster for Chinese users.
+  - Use `-c` flag to specify a custom cargo cache location,
+        it defaults to docker/.cache, you may want to change it if you want share cargo cache between multiple clones.
+  - Use `-r` to perform a full build (equals to `cargo clean & cargo build`).
 
 - Then, build and push crust (with `docker push`)
 

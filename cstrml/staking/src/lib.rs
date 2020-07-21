@@ -590,7 +590,7 @@ decl_event!(
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
         // TODO: show reward link to account_id
-        Reward(Balance),
+        Reward(Balance, Balance),
         /// One validator (and its guarantors) has been slashed by the given amount.
         Slash(AccountId, Balance),
         /// An old slashing report from a prior era was discarded because it could
@@ -900,7 +900,7 @@ decl_module! {
                 new_total = old_nominations.total;
             }
 
-            let (target, votes) = target;  
+            let (target, votes) = target;
             // 1. Inserting a new edge
             if let Ok(v_stash) = T::Lookup::lookup(target) {
                 // v_stash is not validator
@@ -1292,7 +1292,7 @@ impl<T: Trait> Module<T> {
                 validations.guarantors = new_guarantors;
             });
         let removed = !<GuaranteeRel<T>>::contains_key(&g_stash, &v_stash);
-        return (removed, removed_votes);           
+        return (removed, removed_votes);
     }
 
 
@@ -1543,9 +1543,10 @@ impl<T: Trait> Module<T> {
                 |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
 
             // 1. Block authoring payout
+            let mut authoring_reward = Zero::zero();
             for (v, p) in validators.iter().zip(points.individual.into_iter()) {
                 if p != 0 {
-                    let authoring_reward =
+                    authoring_reward =
                         Perbill::from_rational_approximation(p, points.total) * total_authoring_payout;
                     total_imbalance.subsume(Self::reward_author(v, authoring_reward));
                 }
@@ -1555,17 +1556,14 @@ impl<T: Trait> Module<T> {
             let current_era = Self::current_era().unwrap_or(0);
             let total_staking_payout = Self::staking_rewards_in_era(current_era);
             let total_stakes = Self::total_stakes();
+            let mut staking_reward = Zero::zero();
             <Stakers<T>>::iter().for_each(|(v, e)| {
-                let staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
+                staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
                 total_imbalance.subsume(Self::reward_validator(&v, staking_reward));
             });
 
-            // 3. assert!(total_imbalance.peek() == total_payout)
-            // This actually should be equal
-            let total_payout = total_imbalance.peek();
-
-            // 4. Deposit event
-            Self::deposit_event(RawEvent::Reward(total_payout));
+            // 3. Deposit reward event
+            Self::deposit_event(RawEvent::Reward(authoring_reward, staking_reward));
 
             T::Reward::on_unbalanced(total_imbalance);
             // This is not been used

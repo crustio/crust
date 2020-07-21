@@ -32,6 +32,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
+
 pub type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 

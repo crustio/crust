@@ -57,5 +57,5 @@ std = [
     'primitives/std'
 ]
 runtime-benchmarks = [
-	"frame-benchmarking",
+	"frame-benchmarking"
 ]

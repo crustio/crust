@@ -7,14 +7,14 @@ use sp_runtime::{
 };
 use sp_std::vec::Vec;
 
+use sp_core::crypto::AccountId32;
+
 pub mod constants;
 pub mod traits;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
 
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
 /// The type for looking up accounts. We don't expect more than 4 billion of them, but you

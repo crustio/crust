@@ -121,5 +121,6 @@ runtime-benchmarks = [
     "frame-system-benchmarking",
     "staking/runtime-benchmarks",
     "market/runtime-benchmarks",
-    "tee/runtime-benchmarks"
+    "tee/runtime-benchmarks",
+    "primitives/runtime-benchmarks"
 ]

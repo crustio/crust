@@ -379,7 +379,7 @@ impl<T: Trait> Module<T> {
                         // Update(enclave code not change)
                         Identities::<T>::mutate(who, |(_, maybe_cid)| {
                             if let Some(cid) = maybe_cid {
-                                *cid = current_id.clone();
+                                *cid = id.clone();
                             }
                         });
                     } else {

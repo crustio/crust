@@ -12,3 +12,6 @@
 .vscode
 .idea
 .vs
+/docker/.cache
+/.cargo
+/docker/crust/crust

@@ -147,7 +147,6 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-
         fn on_initialize(now: T::BlockNumber) -> Weight {
             let now = TryInto::<BlockNumber>::try_into(now).ok().unwrap();
             Self::batch_transfer(now % T::Frequency::get());

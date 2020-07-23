@@ -119,7 +119,8 @@ pub struct Validations<AccountId, Balance: HasCompact + Zero> {
     pub guarantee_fee: Perbill,
 
     // TODO: add reversal fee, let validator can give more reward to guarantors
-    /// Record who vote me, this is used for guarantors to change their voting behaviour
+    /// Record who vote me, this is used for guarantors to change their voting behaviour,
+    /// `guarantors` represents the voting sequence, allow duplicate vote.
     pub guarantors: Vec<AccountId>,
 }
 
@@ -137,7 +138,7 @@ impl<AccountId, Balance: HasCompact + Zero> Default for Validations<AccountId, B
 /// A record of the nominations made by a specific account.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Nominations<AccountId, Balance: HasCompact> {
-    /// The targets of nomination.
+    /// The targets of nomination, this vector's element is unique.
     pub targets: Vec<AccountId>,
     /// The total votes of nomination.
     #[codec(compact)]
@@ -971,7 +972,7 @@ decl_module! {
                 new_total -= removed_votes;
                 if removed {
                     // Update targets
-                    new_targets.remove_item(&v_stash);
+                    new_targets.retain(|target| *target != v_stash.clone());
                 }
             }
 
@@ -1712,7 +1713,7 @@ impl<T: Trait> Module<T> {
                     });
 
                     let is_empty = Self::guarantee_rel(&guarantor, &v_stash).len() == 0; // used to remove GuaranteeRel and targets in Nominations
-                    // Remove it
+                    // Remove guarantee relationship
                     if is_empty {
                         <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
                     }
@@ -1721,7 +1722,7 @@ impl<T: Trait> Module<T> {
                         if let Some(n) = nominations {
                             n.total -= to_balance(votes);
                             if is_empty {
-                                n.targets.remove_item(v_stash);	
+                                n.targets.retain(|target| *target != v_stash.clone());
                             }
                         }
                     });
@@ -1774,7 +1775,6 @@ impl<T: Trait> Module<T> {
                 <Stakers<T>>::insert(v_stash, exposure);
 
                 // d. UPDATE NODE: `Validator`
-
             }
         }
 

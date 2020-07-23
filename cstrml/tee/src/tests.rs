@@ -307,7 +307,7 @@ fn test_for_report_works_success() {
         // prepare sorder
         add_pending_sorder();
 
-        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 0);
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 350);
 
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
         let report_works_info = valid_report_works_info();
@@ -334,7 +334,7 @@ fn test_for_report_works_success() {
                    OrderStatus::Success);
         assert_eq!(Market::storage_orders(Hash::repeat_byte(2)).unwrap_or_default().status,
                    OrderStatus::Success);
-        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 303);
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 653);
     });
 }
 
@@ -568,7 +568,7 @@ fn test_for_wr_check_failed_order() {
         Tee::update_identities();
 
         // Check this 99 order should be failed
-        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap_or_default().status,
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
                    OrderStatus::Failed);
     });
 }

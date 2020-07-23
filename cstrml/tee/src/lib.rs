@@ -315,7 +315,7 @@ impl<T: Trait> Module<T> {
                             success_sorder_files.push((f_id.clone(), order_id.clone()))
                         }
                         ongoing_sorder_ids.push(order_id.clone());
-                        if sorder.completed_on >= Self::get_current_block_number() {
+                        if Self::get_current_block_number() >= sorder.expired_on {
                             // TODO: add extra punishment logic when we close overdue sorder
                             overdue_sorder_ids.push(order_id.clone());
                         }

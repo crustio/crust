@@ -3,8 +3,11 @@ use super::*;
 use system::{self as frame_system, RawOrigin};
 use frame_benchmarking::{benchmarks, account};
 
+use crate::Module as Tee;
+
 const MAX_EXISTENTIAL_DEPOSIT: u32 = 1000;
 const MAX_USER_INDEX: u32 = 1000;
+const BLOCK_NUMBER: u32 = 200;
 
 benchmarks! {
 	_ {
@@ -13,7 +16,10 @@ benchmarks! {
     }
 
     register {
-        let u in ...;
+		let u in ...;
+		let code: Vec<u8> = vec![226,86,171,76,181,233,19,107,193,193,17,80,136,252,64,202,31,65,130,84,94,167,87,105,87,140,32,216,67,2,140,213];	
+		let expire_block: T::BlockNumber = BLOCK_NUMBER.into();
+		Tee::<T>::upgrade(RawOrigin::Root.into(), code, expire_block);
         let user: Vec<u8> = vec![166,239,163,116,112,15,134,64,183,119,188,146,199,125,52,68,124,85,136,215,235,124,78,201,132,50,60,125,176,152,48,9];
         let caller = T::AccountId::decode(&mut &user[..]).unwrap_or_default();
         let ias_sig = "Lb17i6Gb2LUoMTYz/fRIjZrsF9X8vxv8S5IZtWjJ2i/BklZO8xeWuS9ItM/8JgDI2qv+zZwZtdgoywK2drH8sV/d0GN/bu5RR4u+bTOJnDWRFkU6lZC9N6AT4ntdFrrkCIfPgikd3dQr21e8v9ShfUy6FT44oLCx21p5knbO1ygxFXzm73nvpLqTB7avRqT3JtHEdzvHjPBymDq18dX7a2cRbK2EwvO48cTcTXihwLZxKjdw7Kds9RC79IaSOVSoBhqBjGtccn9xitj2kPJp65KLU5KpsguTiDwrF79UMsbWI0eKv4voXodNL6YEZdFYELGsp9SpwR6sd4t0628fHg==".as_bytes().to_vec();

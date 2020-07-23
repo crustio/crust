@@ -553,6 +553,7 @@ impl<T: Trait> Module<T> {
     }
 
     // MUTABLE PRIVATE
+    // Create a new order
     // `sorder` is equal to storage order
     fn maybe_insert_sorder(client: &T::AccountId,
                            provider: &T::AccountId,
@@ -608,32 +609,47 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    // Remove a sorder
     fn close_sorder(order_id: &<T as system::Trait>::Hash) {
         if let Some(so) = Self::storage_orders(order_id) {
             if let Some(punishment) = Self::provider_punishments(order_id) {
                 // 1. Remove sorder's payment info
                 T::Payment::close_sorder(order_id, &so.client, &so.completed_on);
+
                 // 2. Remove `file_identifier` -> `order_id`s from provider's file_map
                 <Providers<T>>::mutate(&so.provider, |maybe_provision| {
                     // `provision` cannot be None
                     if let Some(provision) = maybe_provision {
-                        let mut order_ids: Vec::<T::Hash> = vec![];
-                        if let Some(o_ids) = provision.file_map.get(&so.file_identifier) {
-                            order_ids = o_ids.clone();
-                        }
+                        let mut sorder_ids: Vec<T::Hash> = provision
+                            .file_map
+                            .get(&so.file_identifier)
+                            .unwrap_or(&vec![])
+                            .clone();
+                        sorder_ids.retain(|&id| {&id != order_id});
 
-                        order_ids.retain(|&e| {e != order_id.clone()});
-                        provision.file_map.insert(so.file_identifier.clone(), order_ids.clone());
+                        if sorder_ids.is_empty() {
+                            provision.file_map.remove(&so.file_identifier);
+                        } else {
+                            provision.file_map.insert(so.file_identifier.clone(), sorder_ids.clone());
+                        }
                     }
                 });
-                // 3. Update Pledge for provider
+
+                // 3. Update `Pledge` for provider
                 let real_used_value = so.amount.min(so.amount - punishment.value);
                 let mut pledge = Self::pledges(&so.provider);
-                pledge.used -= real_used_value;
+                // `checked_sub`, prevent overflow
+                if real_used_value >= pledge.used {
+                    pledge.used = Zero::zero();
+                } else {
+                    pledge.used -= real_used_value;
+                }
                 Self::upsert_pledge(&so.provider, &pledge);
+
                 // 4. Remove Provider Punishment
                 <ProviderPunishments<T>>::remove(order_id);
-                // 5. Remove Storage Order
+
+                // 5. Remove storage order
                 <StorageOrders<T>>::remove(order_id);
             }
         }

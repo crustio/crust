@@ -622,7 +622,6 @@ fn test_for_close_sorder() {
         let _ = Balances::make_free_balance_be(&provider, 200);
         assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
         assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
-
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), provider,
             file_identifier.clone(), file_size, duration
@@ -642,6 +641,7 @@ fn test_for_close_sorder() {
         });
 
         Market::close_sorder(&order_id);
+
         // storage order has been closed
         assert_eq!(Balances::free_balance(&provider), 200);
         assert_eq!(Market::pledges(&provider), Pledge {
@@ -650,6 +650,13 @@ fn test_for_close_sorder() {
         });
         assert!(!<StorageOrders<Test>>::contains_key(&order_id));
         assert!(!<ProviderPunishments<Test>>::contains_key(&order_id));
+        assert_eq!(Market::providers(&provider).unwrap(), Provision {
+            address_info: address_info.clone(),
+            storage_price: fee,
+            file_map: vec![].into_iter().collect()
+        });
+
+
         // delete it twice would not have bad effect
         Market::close_sorder(&order_id);
         assert_eq!(Balances::free_balance(&provider), 200);

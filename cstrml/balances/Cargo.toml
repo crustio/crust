@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-balances"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Crustio"]
 edition = "2018"
 license = "GPL-3.0"

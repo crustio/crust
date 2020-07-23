@@ -7,8 +7,6 @@ use sp_runtime::{
 };
 use sp_std::vec::Vec;
 
-use sp_core::crypto::AccountId32;
-
 pub mod constants;
 pub mod traits;
 

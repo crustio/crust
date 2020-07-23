@@ -8,10 +8,11 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+mod impls;
+
 use sp_core::OpaqueMetadata;
 use sp_runtime::traits::{
-    BlakeTwo256, Block as BlockT, Convert, OpaqueKeys, SaturatedConversion,
-    IdentityLookup, Saturating
+    BlakeTwo256, Block as BlockT, OpaqueKeys, IdentityLookup, Saturating
 };
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys, ApplyExtrinsicResult, Perbill, KeyTypeId,
@@ -43,8 +44,9 @@ pub use im_online::sr25519::AuthorityId as ImOnlineId;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use session::{historical as session_historical};
-
 pub use timestamp::Call as TimestampCall;
+
+use impls::CurrencyToVoteHandler;
 
 /// Crust primitives
 use primitives::{
@@ -309,30 +311,6 @@ parameter_types! {
     pub const SlashDeferDuration: staking::EraIndex = 28;
 }
 
-/// Simple structure that exposes how u64 currency can be represented as... u64.
-pub struct CurrencyToVoteHandler;
-impl Convert<u64, u64> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u64 {
-        x
-    }
-}
-impl Convert<u128, u128> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u128 {
-        x
-    }
-}
-impl Convert<u128, u64> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u64 {
-        x.saturated_into()
-    }
-}
-
-impl Convert<u64, u128> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u128 {
-        x as u128
-    }
-}
-
 impl staking::Trait for Runtime {
     type Currency = Balances;
     type Time = Timestamp;
@@ -367,7 +345,7 @@ parameter_types! {
     pub const ExistentialDeposit: u128 = 1 * CENTS;
 }
 
-/// TODO: re-think about this
+// TODO: Enable fee handler, now we just burn it.
 /*pub type DealWithFees = SplitTwoWays<
     Balance,
     NegativeImbalance<Runtime>,

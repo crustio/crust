@@ -1,6 +1,6 @@
 [package]
 name = 'crust'
-version = '0.6.0'
+version = '0.6.1'
 authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
@@ -42,10 +42,10 @@ sp-runtime = '2.0.0-rc4'
 grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc4' }
 
 # crust runtime modules
-crust-runtime = { path = '../runtime', version = '0.6.0' }
-cstrml-staking = { path = '../cstrml/staking', version = '0.6.0' }
-cstrml-tee = { path = '../cstrml/tee', version = '0.6.0' }
-primitives = { package = 'cst-primitives', path = '../primitives', version = '0.6.0' }
+crust-runtime = { path = '../runtime', version = '0.6.1' }
+cstrml-staking = { path = '../cstrml/staking', version = '0.6.1' }
+cstrml-tee = { path = '../cstrml/tee', version = '0.6.1' }
+primitives = { package = 'cst-primitives', path = '../primitives', version = '0.6.1' }
 
 [build-dependencies]
 build-script-utils = { version = "2.0.0-rc4",  package = "substrate-build-script-utils" }

@@ -27,6 +27,34 @@ benchmarks! {
         let isv_body = "{\"id\":\"28059165425966003836075402765879561587\",\"timestamp\":\"2020-06-23T10:02:29.441419\",\"version\":3,\"epidPseudonym\":\"4tcrS6EX9pIyhLyxtgpQJuMO1VdAkRDtha/N+u/rRkTsb11AhkuTHsY6UXRPLRJavxG3nsByBdTfyDuBDQTEjMYV6NBXjn3P4UyvG1Ae2+I4lE1n+oiKgLA8CR8pc2nSnSY1Wz1Pw/2l9Q5Er6hM6FdeECgMIVTZzjScYSma6rE=\",\"isvEnclaveQuoteStatus\":\"GROUP_OUT_OF_DATE\",\"platformInfoBlob\":\"1502006504000F00000F0F02040101070000000000000000000B00000B00000002000000000000142AA23C001F46C3A71CFB50557CE2E2292DFB24EDE2621957E890432F166F6AC6FA37CD8166DBE6323CD39D3C6AA0CB41779FC7EDE281C5E50BCDCA00935E00A9DF\",\"isvEnclaveQuoteBody\":\"AgABACoUAAAKAAkAAAAAAP7yPH5zo3mCPOcf8onPvAcAAAAAAAAAAAAAAAAAAAAACA7///8CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAHAAAAAAAAAOJWq0y16RNrwcERUIj8QMofQYJUXqdXaVeMINhDAozVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACD1xnnferKFHD2uvYqTXdDA8iZ22kCD5xw7h38CMfOngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABNu2QBUIMjsY9knwTxdDP9S4cgHvP/Y0toS3FchIu2C5Bd1TBeJHYbSWioh139n2q/sxENn6SU3VMNquzMg1Ph\"}".as_bytes().to_vec();
         let sig: Vec<u8> = vec![48,34,6,141,80,243,237,175,99,181,170,184,244,112,137,9,29,28,196,192,207,127,85,153,29,164,14,36,74,61,38,234,107,238,202,236,27,81,61,40,31,149,29,194,17,51,129,70,195,16,7,255,55,11,41,106,175,141,146,149,178,128,107,101];
     }: _(RawOrigin::Signed(caller.clone()), ias_sig, ias_cert, caller.clone(), isv_body, sig)
+
+    report_works {
+        let u in ...;
+        let code: Vec<u8> = vec![226,86,171,76,181,233,19,107,193,193,17,80,136,252,64,202,31,65,130,84,94,167,87,105,87,140,32,216,67,2,140,213];    
+        let expire_block: T::BlockNumber = BLOCK_NUMBER.into();
+        Tee::<T>::upgrade(RawOrigin::Root.into(), code.clone(), expire_block).expect("failed to insert code");
+        let user: Vec<u8> = vec![142,175,4,21,22,135,115,99,38,201,254,161,126,37,252,82,135,97,54,147,201,18,144,156,178,38,170,71,148,242,106,72];
+        let caller = T::AccountId::decode(&mut &user[..]).unwrap_or_default();
+        let pub_key = vec![176,176,193,145,153,96,115,198,119,71,235,16,104,206,83,3,109,118,135,5,22,162,151,60,239,80,108,41,170,55,50,56,146,197,204,95,55,159,23,230,58,100,187,123,198,159,190,161,64,22,238,167,109,174,97,244,103,194,61,226,149,215,246,137];
+        let block_number = 300;
+        let block_hash = vec![5,64,75,105,11,12,120,91,241,128,178,221,130,164,49,216,141,41,186,243,19,70,197,61,189,169,94,131,227,76,138,117];
+		// let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+		let reserved = 4294967296;
+        let files: Vec<(Vec<u8>, u64)> = vec![
+            (vec![91,183,6,50,10,252,99,59,251,132,49,8,228,146,25,43,23,210,182,185,217,238,11,121,94,233,84,23,254,8,182,96],134289408),
+            (vec![136,205,179,21,200,195,126,45,192,15,162,168,199,254,81,184,20,155,54,61,41,244,4,68,25,130,249,109,43,186,230,95],268578816)
+        ];
+        let sig: Vec<u8> = vec![156,18,152,108,1,239,231,21,237,139,237,128,183,227,145,96,28,69,191,21,46,40,6,147,255,207,209,10,75,56,109,234,170,15,8,143,194,107,14,190,202,100,195,60,241,34,211,114,235,215,135,170,119,190,170,186,157,46,73,156,228,10,118,230];
+        let identity = Identity {
+            pub_key: pub_key.clone(),
+            code: code
+        };
+        Tee::<T>::maybe_upsert_id(&caller, &identity);
+        system::Module::<T>::set_block_number(303.into());
+        let fake_bh:T::Hash = T::Hash::decode(&mut &block_hash[..]).unwrap_or_default();
+        let t_block_number:T::BlockNumber = 300.into();
+        <system::BlockHash<T>>::insert(t_block_number, fake_bh);
+    }: _(RawOrigin::Signed(caller.clone()), pub_key, block_number, block_hash, reserved, files, sig)
 }
 
 #[cfg(test)]
@@ -39,6 +67,13 @@ mod tests {
     fn register() {
         new_test_ext().execute_with(|| {
             assert_ok!(test_benchmark_register::<Test>());
+        });
+    }
+    
+    #[test]
+    fn report_works() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(test_benchmark_report_works::<Test>());
         });
     }
 }

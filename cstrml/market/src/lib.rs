@@ -481,14 +481,15 @@ impl<T: Trait> Module<T> {
     pub fn maybe_set_sorder(order_id: &T::Hash, so: &StorageOrder<T::AccountId, BalanceOf<T>>) {
         if let Some(old_sorder) = Self::storage_orders(order_id) {
             if &old_sorder != so {
-                // 1. Order has been confirmed in the first time { Pending -> Success }
+                // 1. Update storage order first(`pay_sorder` depends on the newest `completed_on`)
+                <StorageOrders<T>>::insert(order_id, so);
+
+                // 2. Order has been confirmed in the first time { Pending -> Success }
+                // `pay_sorder` will trigger the payment scheduler.
                 if old_sorder.status == OrderStatus::Pending &&
                     so.status == OrderStatus::Success {
                     T::Payment::pay_sorder(order_id);
                 }
-
-                // 2. Update storage order
-                <StorageOrders<T>>::insert(order_id, so);
             }
         }
     }

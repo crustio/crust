@@ -133,6 +133,18 @@ benchmarks! {
     }: _(RawOrigin::Signed(stash), max_additional)
 
 
+    unbond {
+        let u in ...;
+        let stash = create_funded_user::<T>("stash",u);
+        let controller = create_funded_user::<T>("controller", u);
+        let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
+        let max_additional = T::Currency::minimum_balance() * 10.into();
+        let reward_destination = RewardDestination::Staked;
+        let amount = T::Currency::minimum_balance() * 10.into();
+        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
+    }: _(RawOrigin::Signed(controller), max_additional)
+
+
     validate {
         let u in ...;
         let (stash, controller) = create_stash_controller::<T>(u)?;
@@ -182,6 +194,43 @@ benchmarks! {
     }: {
         Staking::<T>::select_validators();
     }
+
+    chill {
+        let u in ...;
+        let (_, controller) = create_stash_controller::<T>(u)?;
+    }: _(RawOrigin::Signed(controller))
+
+    set_payee {
+        let u in ...;
+        let (stash, controller) = create_stash_controller::<T>(u)?;
+        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Staked);
+    }: _(RawOrigin::Signed(controller), RewardDestination::Controller)
+    verify {
+        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Controller);
+    }
+
+    set_controller {
+        let u in ...;
+        let (stash, _) = create_stash_controller::<T>(u)?;
+        let new_controller = create_funded_user::<T>("new_controller", u);
+        let new_controller_lookup = T::Lookup::unlookup(new_controller.clone());
+    }: _(RawOrigin::Signed(stash), new_controller_lookup)
+    verify {
+        assert!(Ledger::<T>::contains_key(&new_controller));
+    }
+
+    // Withdraw only updates the ledger
+    withdraw_unbonded {
+        let u in ...;
+        let stash = create_funded_user::<T>("stash",u);
+        let controller = create_funded_user::<T>("controller", u);
+        let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
+        let max_additional = T::Currency::minimum_balance() * 10.into();
+        let reward_destination = RewardDestination::Staked;
+        let amount = T::Currency::minimum_balance() * 10.into();
+        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
+        Staking::<T>::unbond(RawOrigin::Signed(controller.clone()).into(), max_additional)?;
+    }: _(RawOrigin::Signed(controller.clone()))
 }
 
 #[cfg(test)]
@@ -213,11 +262,16 @@ mod tests {
         ExtBuilder::default().build().execute_with(|| {
             assert_ok!(test_benchmark_bond::<Test>());
             assert_ok!(test_benchmark_bond_extra::<Test>());
+            assert_ok!(test_benchmark_unbond::<Test>());
             assert_ok!(test_benchmark_validate::<Test>());
             assert_ok!(test_benchmark_guarantee::<Test>());
             assert_ok!(test_benchmark_cut_guarantee::<Test>());
             assert_ok!(test_benchmark_new_era::<Test>());
             assert_ok!(test_benchmark_select_validators::<Test>());
+            assert_ok!(test_benchmark_chill::<Test>());
+            assert_ok!(test_benchmark_set_payee::<Test>());
+            assert_ok!(test_benchmark_set_controller::<Test>());
+            assert_ok!(test_benchmark_withdraw_unbonded::<Test>());
         });
     }
 }

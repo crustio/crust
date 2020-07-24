@@ -633,7 +633,7 @@ decl_error! {
         /// Can not validate without workloads
         NoWorkloads,
         /// Attempting to target a stash that still has funds.
-		FundedTarget,
+        FundedTarget,
     }
 }
 
@@ -823,23 +823,23 @@ decl_module! {
         #[weight = 400_000_000]
         fn withdraw_unbonded(origin) {
             let controller = ensure_signed(origin)?;
-			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-			let stash = ledger.stash.clone();
-			if let Some(current_era) = Self::current_era() {
-				ledger = ledger.consolidate_unlocked(current_era)
-			}
+            let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+            let stash = ledger.stash.clone();
+            if let Some(current_era) = Self::current_era() {
+                ledger = ledger.consolidate_unlocked(current_era)
+            }
 
-			if ledger.unlocking.is_empty() && ledger.active.is_zero() {
-				// This account must have called `unbond()` with some value that caused the active
-				// portion to fall below existential deposit + will have no more unlocking chunks
-				// left. We can now safely remove all staking-related information.
-				Self::kill_stash(&stash);
-				// remove the lock.
-				T::Currency::remove_lock(STAKING_ID, &stash);
-			} else {
-				// This was the consequence of a partial unbond. just update the ledger and move on.
-				Self::update_ledger(&controller, &ledger);
-			}
+            if ledger.unlocking.is_empty() && ledger.active.is_zero() {
+                // This account must have called `unbond()` with some value that caused the active
+                // portion to fall below existential deposit + will have no more unlocking chunks
+                // left. We can now safely remove all staking-related information.
+                Self::kill_stash(&stash);
+                // remove the lock.
+                T::Currency::remove_lock(STAKING_ID, &stash);
+            } else {
+                // This was the consequence of a partial unbond. just update the ledger and move on.
+                Self::update_ledger(&controller, &ledger);
+            }
         }
 
         /// Declare the desire to validate for the origin controller.
@@ -1150,27 +1150,27 @@ decl_module! {
         }
 
         /// Remove all data structure concerning a staker/stash once its balance is zero.
-		/// This is essentially equivalent to `withdraw_unbonded` except it can be called by anyone
-		/// and the target `stash` must have no funds left.
-		///
-		/// This can be called from any origin.
-		///
-		/// - `stash`: The stash account to reap. Its balance must be zero.
-		///
-		/// # <weight>
-		/// Complexity: O(S) where S is the number of slashing spans on the account.
-		/// Base Weight: 75.94 + 2.396 * S µs
-		/// DB Weight:
-		/// - Reads: Stash Account, Bonded, Slashing Spans, Locks
-		/// - Writes: Bonded, Slashing Spans (if S > 0), Ledger, Payee, Validators, Nominators, Stash Account, Locks
-		/// - Writes Each: SpanSlash * S
-		/// # </weight>
-		#[weight = 1_000_000]
-		fn reap_stash(_origin, stash: T::AccountId) {
-			ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
-			Self::kill_stash(&stash);
-			T::Currency::remove_lock(STAKING_ID, &stash);
-		}
+        /// This is essentially equivalent to `withdraw_unbonded` except it can be called by anyone
+        /// and the target `stash` must have no funds left.
+        ///
+        /// This can be called from any origin.
+        ///
+        /// - `stash`: The stash account to reap. Its balance must be zero.
+        ///
+        /// # <weight>
+        /// Complexity: O(S) where S is the number of slashing spans on the account.
+        /// Base Weight: 75.94 + 2.396 * S µs
+        /// DB Weight:
+        /// - Reads: Stash Account, Bonded, Slashing Spans, Locks
+        /// - Writes: Bonded, Slashing Spans (if S > 0), Ledger, Payee, Validators, Nominators, Stash Account, Locks
+        /// - Writes Each: SpanSlash * S
+        /// # </weight>
+        #[weight = 1_000_000]
+        fn reap_stash(_origin, stash: T::AccountId) {
+            ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
+            Self::kill_stash(&stash);
+            T::Currency::remove_lock(STAKING_ID, &stash);
+        }
     }
 }
 
@@ -1790,14 +1790,14 @@ impl<T: Trait> Module<T> {
                 suppressed: _,
             } = nominations;
 
-			// Filter out nomination targets which were guaranteed before the most recent
-			// slashing span.
-			targets.retain(|stash| {
-				<Self as Store>::SlashingSpans::get(&stash).map_or(
-					true,
-					|spans| submitted_in >= spans.last_nonzero_slash(),
-				)
-			});
+            // Filter out nomination targets which were guaranteed before the most recent
+            // slashing span.
+            targets.retain(|stash| {
+                <Self as Store>::SlashingSpans::get(&stash).map_or(
+                    true,
+                    |spans| submitted_in >= spans.last_nonzero_slash(),
+                )
+            });
 
             // 1. Init all guarantor's valid stakes
             let g_controller = Self::bonded(&g_stash).unwrap();

@@ -13,11 +13,11 @@ pub struct Cli {
 /// Possible subcommands of the main binary.
 #[derive(Debug, StructOpt)]
 pub enum Subcommand {
-	/// A set of base subcommands handled by `sc_cli`.
-	#[structopt(flatten)]
-	Base(sc_cli::Subcommand),
+    /// A set of base subcommands handled by `sc_cli`.
+    #[structopt(flatten)]
+    Base(sc_cli::Subcommand),
 
-	/// The custom benchmark subcommmand benchmarking runtime pallets.
-	#[structopt(name = "benchmark", about = "Benchmark runtime pallets.")]
-	Benchmark(frame_benchmarking_cli::BenchmarkCmd),
+    /// The custom benchmark subcommmand benchmarking runtime pallets.
+    #[structopt(name = "benchmark", about = "Benchmark runtime pallets.")]
+    Benchmark(frame_benchmarking_cli::BenchmarkCmd),
 }

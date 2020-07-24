@@ -31,7 +31,7 @@ impl_outer_dispatch! {
         system::System,
         balances::Balances,
         payment::Payment,
-	}
+    }
 }
 
 pub struct CurrencyToVoteHandler;

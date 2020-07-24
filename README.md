@@ -6,7 +6,7 @@ Implementation of a [Crust protocol](https://crust.network) node with [substrate
 
 ## Join to play
 
-Go to our [Crust Client](https://github.com/crustio/crust-client), follow the README.
+Go to our [Crust Node](https://github.com/crustio/crust-node), follow the README.
 
 ## Building
 

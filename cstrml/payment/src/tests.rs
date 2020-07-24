@@ -330,6 +330,7 @@ fn test_for_close_storage_order_in_payment() {
             paid: 0,
             unreserved: 0
         });
+        assert_eq!(CstrmlPayment::slot_payments())
 
         for i in 1..11 {
             run_to_block(303 + i * 10);
@@ -346,6 +347,8 @@ fn test_for_close_storage_order_in_payment() {
         assert_eq!(Balances::reserved_balance(source.clone()), 0);
         assert_eq!(Balances::free_balance(source.clone()), 50);
         assert!(!<PaymentLedgers<Test>>::contains_key(order_id.clone()));
+        assert!(!<SlotPayments<Test>>::contains_key(3, &order_id));
+
         for i in 11..21 {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 0);

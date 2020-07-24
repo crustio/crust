@@ -27,8 +27,8 @@ while getopts ":hp" opt; do
             ;;
     esac
 done
-
-source docker/utils.sh
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source $DIR/utils.sh
 
 BUILD_DIR="`pwd`"
 DIST_FILE="target/release/crust"

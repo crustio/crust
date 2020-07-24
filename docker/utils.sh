@@ -1,5 +1,5 @@
 function echo_c {
-    echo -e "\e[1;$1m$2\e[0m"
+    printf "\033[0;$1m$2\033[0m\n"
 }
 
 function log_info {

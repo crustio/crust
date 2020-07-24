@@ -70,15 +70,15 @@ impl<T: Trait> Payment<<T as system::Trait>::AccountId,
         }
     }
 
-    fn close_sorder(sorder_id: &T::Hash, client: &T::AccountId, complted_on: &BlockNumber) {
-        if let Some(ledger) = Self::payment_ledgers(&sorder_id) {
+    fn close_sorder(sorder_id: &T::Hash, client: &T::AccountId, completed_on: &BlockNumber) {
+        if let Some(pl) = Self::payment_ledgers(&sorder_id) {
             T::Currency::unreserve(
                 &client,
-                ledger.total - ledger.unreserved);
+                pl.total - pl.unreserved);
             <PaymentLedgers<T>>::remove(&sorder_id);
         }
 
-        let slot_factor = complted_on % T::Frequency::get();
+        let slot_factor = completed_on % T::Frequency::get();
         <SlotPayments<T>>::remove(slot_factor, sorder_id);
     }
 }
@@ -164,14 +164,14 @@ impl<T: Trait> Module<T> {
             let real_amount = slot_value.min(ledger.total - ledger.paid);
 
             // 4. Ensure amount > 0
-            if !Zero::is_zero(&real_amount) {
+            if real_amount > Zero::zero() {
                 if Self::slot_pay(sorder_id.clone(), real_amount.clone()).is_ok() {
 
                 } else {
                     // TODO: Deal with failure
                 }
             } else {
-                // TODO: Deal with success(Based on 20200707 dicussion, we should do nothing)
+                // TODO: Deal with success(Based on 20200707 discussion, we should do nothing)
             }
         }
     }
@@ -192,9 +192,9 @@ impl<T: Trait> Module<T> {
         // Unreserved value will be added anyway.
         // If the status of storage order status is `Failed`,
         // the CRUs will be just unreserved(aka, unlocked) to client-self.
-        <PaymentLedgers<T>>::mutate(&sorder_id, |ledger| {
-            if let Some(p) = ledger {
-                p.unreserved += real_amount;
+        <PaymentLedgers<T>>::mutate(&sorder_id, |maybe_pl| {
+            if let Some(pl) = maybe_pl {
+                pl.unreserved += real_amount;
             }
         });
 

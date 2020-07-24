@@ -46,7 +46,8 @@ while getopts ":hmrpc:" opt; do
     esac
 done
 
-source docker/utils.sh
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source $DIR/utils.sh
 
 log_info "Using cache dir: $CACHEDIR"
 if [ ! -d $CACHEDIR ]; then

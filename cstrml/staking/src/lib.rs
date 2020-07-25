@@ -402,6 +402,9 @@ pub trait Trait: frame_system::Trait {
 
     /// Interface for interacting with a tee module
     type TeeInterface: self::TeeInterface;
+
+    /// Storage power ratio for crust network phase 1
+    type SPowerRatio: Get<u128>;
 }
 
 /// Mode of era-forcing.
@@ -1182,8 +1185,9 @@ impl<T: Trait> Module<T> {
             .unwrap_or_default()
     }
 
-    fn stake_limit_of(own_workloads: u128, total_workloads: u128) -> BalanceOf<T> {
-        let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
+    fn stake_limit_of(own_workloads: u128, _: u128) -> BalanceOf<T> {
+        // TODO: Stake limit calculation, this should be enable in different phase.
+        /*let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
             .ok()
             .unwrap();
 
@@ -1195,6 +1199,16 @@ impl<T: Trait> Module<T> {
                 .min(u64::max_value() as u128);
 
             workloads_to_stakes.try_into().ok().unwrap()
+        }*/
+
+        // Now, we apply directly mapping algorithm for the early stage:
+        // 1. Maxwell 1.0: 1 terabytes -> 80,000 CRUs
+        // 2. Olympus 1.0: 1 terabytes -> 30 CRUs(tmp)
+        // ps: we treat 1 terabytes as 1_000_000_000_000 for make `mapping_ratio = 1`
+        if let Some(storage_stakes) = own_workloads.checked_mul(T::SPowerRatio::get()) {
+            storage_stakes.try_into().ok().unwrap()
+        } else {
+            (u64::max_value() as u128).try_into().ok().unwrap()
         }
     }
 

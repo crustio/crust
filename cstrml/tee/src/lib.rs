@@ -6,7 +6,8 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::DispatchResult,
     storage::IterableStorageMap,
-    traits::{Currency, ReservableCurrency}
+    traits::{Currency, ReservableCurrency, Get},
+    weights::constants::WEIGHT_PER_MICROS,
 };
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use system::{ensure_root, ensure_signed};
@@ -173,13 +174,25 @@ decl_module! {
             <ABExpire<T>>::put(expire_block);
         }
 
-        /// Register as new trusted node
+        /// Register as new trusted node, can only called from sWorker.
+        /// All `inputs` can only be generated from sWorker TEE enclave
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller account.
+        ///
+        /// Emits `RegisterSuccess` if new id has been registered.
         ///
         /// # <weight>
-        /// - O(n)
-        /// - 3 DB try
-        /// # </weight>
-        #[weight = 1_000_000]
+		/// - Independent of the arguments. Moderate complexity.
+		/// - TC depends on identities' number.
+		/// - DB try depends on identities' number.
+		///
+		/// ------------------
+		/// Base Weight: 154.8 µs
+		/// DB Weight:
+		/// - Read: Identities
+		/// - Write: 3
+		/// # </weight>
+        #[weight = 154 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(13, 3)]
         pub fn register(
             origin,
             ias_sig: IASSig,
@@ -216,13 +229,25 @@ decl_module! {
             Ok(())
         }
 
-        /// Register as new trusted tee node
+        /// Report storage works from sWorker
+        /// All `inputs` can only be generated from sWorker TEE enclave
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller account.
+        ///
+        /// Emits `WorksReportSuccess` if new work report has been reported
         ///
         /// # <weight>
-        /// - O(2n)
-        /// - 3n+8 DB try
-        /// # </weight>
-        #[weight = 1_000_000]
+		/// - Independent of the arguments. Moderate complexity.
+		/// - TC depends on identities' size and market.Provider.file_map size
+		/// - DB try depends on identities and market.Provider.file_map
+		///
+		/// ------------------
+		/// Base Weight: 212 µs
+		/// DB Weight:
+		/// - Read: Identities, ReportedInSlot, Code, market.Provider, market.SOrder
+		/// - Write: WorkReport, ReportedInSlot, market.SOrder
+		/// # </weight>
+        #[weight = 212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7)]
         pub fn report_works(
             origin,
             pub_key: PubKey,
@@ -307,7 +332,6 @@ impl<T: Trait> Module<T> {
             if let Some(provision) = T::MarketInterface::providers(&controller) {
                 for (f_id, order_ids) in provision.file_map.iter() {
                     for order_id in order_ids {
-                        
                         // Get order status(should exist) and (maybe) change the status
                         let sorder =
                             T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();

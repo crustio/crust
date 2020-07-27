@@ -317,6 +317,7 @@ fn multi_era_reward_should_work() {
     // total_stakes and session_reward.
     ExtBuilder::default()
         .guarantee(false)
+        .own_workload(u128::max_value())
         .build()
         .execute_with(|| {
             let init_balance_10 = Balances::total_balance(&10);
@@ -912,14 +913,14 @@ fn double_staking_should_fail() {
             Error::<Test>::NotController
         );
 
-        // 2 = controller  => guaranting should work. But only 750 is invalid since stake limit and 100's 250
+        // 2 = controller  => guarantee should work. But only 750 is invalid since stake limit and 100's 250
         assert_ok!(Staking::guarantee(
             Origin::signed(2),
             (11, arbitrary_value)
         ));
         assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), Some(&(750 as Balance)));
         assert_eq!(Staking::guarantee_rel(101, 11).get(&(0 as u32)), Some(&(250 as Balance)));
-        start_era(1, true);
+        start_era(1, false);
         assert_eq!(
             Staking::ledger(&2),
             Some(StakingLedger {
@@ -2062,6 +2063,7 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
     ExtBuilder::default()
         .validator_count(3)
         .guarantee(false)
+        .own_workload(u128::max_value())
         .minimum_validator_count(1)
         .build()
         .execute_with(|| {
@@ -2105,12 +2107,13 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             assert_eq!(Balances::free_balance(&2), init_balance_2);
 
             let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-            assert_eq!(total_staking_payout_1, 285192790326260); // Test is meaningfull if reward something
+            assert_eq!(total_staking_payout_1, 285192790326260); // Test is meaningful if reward something
             reward_all_elected();
             start_era(2, true);
 
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
-            assert_eq!(Staking::total_stakes(), 291396645848756);
+            // Stake limit strategy effecting
+            assert_eq!(Staking::total_stakes(), /*291396645848756*/ 431520493191596);
 
             // round to 0.000001 CRU
             assert_eq!(
@@ -3470,7 +3473,7 @@ fn guarantee_order_should_work() {
 fn multi_guarantees_with_stake_limit_should_work() {
     ExtBuilder::default()
         .guarantee(false)
-        .own_workload(1)
+        .own_workload(2)
         .total_workload(100000000)
         .build()
         .execute_with(|| {
@@ -3479,6 +3482,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
                 let _ = Balances::deposit_creating(&i, 5000);
             }
 
+            // Stake limit effecting
             start_era(1, false);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 5000);
             start_era(4, false);
@@ -3526,7 +3530,6 @@ fn multi_guarantees_with_stake_limit_should_work() {
             );
             assert_eq!(Staking::guarantee_rel(3, 11).get(&(0 as u32)), Some(&(1000 as Balance)));
 
-
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
@@ -3547,7 +3550,6 @@ fn multi_guarantees_with_stake_limit_should_work() {
                 }
             );
 
-
             assert_ok!(Staking::guarantee(Origin::signed(2), (11, 750)));
             assert_eq!(Staking::guarantee_rel(1, 11).get(&(0 as u32)), Some(&(250 as Balance)));
             assert_eq!(Staking::guarantee_rel(1, 11).get(&(1 as u32)), Some(&(750 as Balance)));
@@ -3562,7 +3564,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
 
             start_era_with_new_workloads(5, false, 1, 200000000);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 2500);
-            // 3 would be removed from validators due to stake limite
+            // 3 would be removed from validators due to stake limit
             assert_eq!(
                 Staking::validators(&11),
                 Validations{
@@ -3617,7 +3619,7 @@ fn multi_guarantees_with_stake_limit_should_work() {
 fn new_era_with_stake_limit_should_work() {
     ExtBuilder::default()
         .guarantee(false)
-        .own_workload(1)
+        .own_workload(2)
         .total_workload(100000000)
         .build()
         .execute_with(|| {
@@ -3755,7 +3757,7 @@ fn new_era_with_stake_limit_should_work() {
 fn new_era_with_stake_limit_for_nominations_should_work() {
     ExtBuilder::default()
         .guarantee(false)
-        .own_workload(1)
+        .own_workload(2)
         .total_workload(100000000)
         .build()
         .execute_with(|| {
@@ -3879,7 +3881,7 @@ fn new_era_with_stake_limit_for_nominations_should_work() {
             start_era_with_new_workloads(5, false, 1, 200000000);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 2500);
             assert_eq!(Staking::stake_limit(&21).unwrap_or_default(), 2500);
-            // 3 would be removed from validators due to stake limite
+            // 3 would be removed from validators due to stake limit
             assert_eq!(
                 Staking::validators(&11),
                 Validations{

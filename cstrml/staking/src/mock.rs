@@ -210,6 +210,7 @@ parameter_types! {
     pub const SessionsPerEra: SessionIndex = 3;
     pub const BondingDuration: EraIndex = 3;
     pub const MaxNominatorRewardedPerValidator: u32 = 64;
+    pub const SPowerRatio: u128 = 2_500;
 }
 impl Trait for Test {
     type Currency = balances::Module<Self>;
@@ -225,6 +226,7 @@ impl Trait for Test {
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
     type TeeInterface = Self;
+    type SPowerRatio = SPowerRatio;
 }
 
 pub struct ExtBuilder {

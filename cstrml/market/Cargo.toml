@@ -1,7 +1,7 @@
 [package]
 name = "cstrml-market"
-version = "0.6.1"
-authors = ["Crustio"]
+version = "0.7.0"
+authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
 homepage = "https://crust.network"

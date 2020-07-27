@@ -7,7 +7,8 @@ use frame_support::{
     traits::{
         Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
         WithdrawReasons, Get
-    }
+    },
+    weights::constants::WEIGHT_PER_MICROS
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use system::ensure_signed;
@@ -272,8 +273,16 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        /// Register to be a provider, you should provide your storage layer's address info
-        #[weight = 1_000_000]
+        /// Register to be a provider, you should provide your storage layer's address info,
+        /// this will require you to pledge first, complexity depends on `Pledges`(P) and `tee.WorkReports`(W).
+        ///
+        /// # <weight>
+		/// Complexity: O(logP)
+		/// - Base: 30.26 µs
+		/// - Read: Pledge
+		/// - Write: WorkReports, Providers
+		/// # </weight>
+		#[weight = 30 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 3)]
         pub fn register(
             origin,
             address_info: AddressInfo,
@@ -313,7 +322,15 @@ decl_module! {
         }
 
         /// Register to be a provider, you should provide your storage layer's address info
-        #[weight = 1_000_000]
+        /// this will require you to pledge first, complexity depends on `Pledges`(P).
+        ///
+        /// # <weight>
+		/// Complexity: O(logP)
+		/// - Base: 69.86 µs
+		/// - Read: Pledge
+		/// - Write: Pledge
+		/// # </weight>
+		#[weight = 70 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
         pub fn pledge(
             origin,
             #[compact] value: BalanceOf<T>
@@ -345,7 +362,14 @@ decl_module! {
         }
 
         /// Pledge extra amount of currency to accept market order.
-        #[weight = 1_000_000]
+        ///
+        /// # <weight>
+		/// Complexity: O(logP)
+		/// - Base: 66.6 µs
+		/// - Read: Pledge
+		/// - Write: Pledge
+		/// # </weight>
+		#[weight = 67 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
         pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -372,7 +396,14 @@ decl_module! {
         }
 
         /// Decrease pledge amount of currency for market order.
-        #[weight = 1_000_000]
+        ///
+        /// # <weight>
+		/// Complexity: O(logP)
+		/// - Base: 73.5 µs
+		/// - Read: Pledge
+		/// - Write: Pledge
+		/// # </weight>
+		#[weight = 73 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
         pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -405,6 +436,7 @@ decl_module! {
         }
 
         /// Place a storage order
+        // TODO: Reconsider this weight
         #[weight = 1_000_000]
         pub fn place_storage_order(
             origin,

@@ -397,7 +397,7 @@ parameter_types! {
     /// Unit is minute
     pub const MinimumSorderDuration: u32 = 30;
     pub const PunishDuration: market::EraIndex = 300;
-    pub const Frequency: BlockNumber = MINUTES;
+    pub const Frequency: BlockNumber = 10 * MINUTES;
 }
 
 impl market::Trait for Runtime {

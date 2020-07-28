@@ -1681,10 +1681,9 @@ impl<T: Trait> Module<T> {
                 |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
 
             // 1. Block authoring payout
-            let mut authoring_reward = Zero::zero();
             for (v, p) in validators.iter().zip(points.individual.into_iter()) {
                 if p != 0 {
-                    authoring_reward =
+                    let authoring_reward =
                         Perbill::from_rational_approximation(p, points.total) * total_authoring_payout;
                     total_imbalance.subsume(Self::reward_author(v, authoring_reward));
                 }
@@ -1694,14 +1693,13 @@ impl<T: Trait> Module<T> {
             let current_era = Self::current_era().unwrap_or(0);
             let total_staking_payout = Self::staking_rewards_in_era(current_era);
             let total_stakes = Self::total_stakes();
-            let mut staking_reward = Zero::zero();
             <Stakers<T>>::iter().for_each(|(v, e)| {
-                staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
+                let staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
                 total_imbalance.subsume(Self::reward_validator(&v, staking_reward));
             });
 
             // 3. Deposit reward event
-            Self::deposit_event(RawEvent::Reward(authoring_reward, staking_reward));
+            Self::deposit_event(RawEvent::Reward(total_authoring_payout, total_staking_payout));
 
             T::Reward::on_unbalanced(total_imbalance);
             // This is not been used

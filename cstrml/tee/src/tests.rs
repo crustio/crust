@@ -1,8 +1,6 @@
 use super::*;
 
-use crate::mock::{
-    new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider, Market
-};
+use crate::mock::{new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider, Market, remove_work_report};
 use frame_support::{
     assert_ok, assert_noop,
     dispatch::DispatchError,
@@ -78,16 +76,16 @@ fn add_pending_sorder() {
     ].to_vec();
 
     for (idx, file) in files.iter().enumerate() {
-        upsert_sorder_to_provider(&account, file, idx as u8, OrderStatus::Pending);
+        upsert_sorder_to_provider(&account, file, idx as u8, 350, OrderStatus::Pending);
     }
 }
 
-fn add_success_sorder() {
+fn add_success_sorder(expired_on: u32) {
     let account: AccountId = Sr25519Keyring::Bob.to_account_id();
     let file: MerkleRoot =
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b661").unwrap();
 
-    upsert_sorder_to_provider(&account, &file, 99, OrderStatus::Success);
+    upsert_sorder_to_provider(&account, &file, 99, expired_on, OrderStatus::Success);
 
 }
 
@@ -544,10 +542,10 @@ fn test_for_work_report_sig_check_failed() {
 }
 
 #[test]
-fn test_for_wr_check_failed_order() {
+fn test_for_wr_check_failed_order_by_no_file_in_wr() {
     new_test_ext().execute_with(|| {
         let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        add_success_sorder();
+        add_success_sorder(350);
         // generate 303 blocks first
         run_to_block(303, None);
 
@@ -568,6 +566,44 @@ fn test_for_wr_check_failed_order() {
         Tee::update_identities();
 
         // Check this 99 order should be failed
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
+                   OrderStatus::Failed);
+    });
+}
+
+#[test]
+fn test_for_wr_check_failed_order_by_not_reported() {
+    new_test_ext().execute_with(|| {
+        // 1st era
+        run_to_block(303, None);
+        Tee::update_identities();
+
+        add_success_sorder(650);
+
+        // 2nd era
+        run_to_block(606, None);
+        Tee::update_identities();
+
+        // Check this 99 order should be failed, cause wr is outdated
+        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
+                   OrderStatus::Failed);
+    });
+}
+
+#[test]
+fn test_for_wr_check_failed_order_by_no_wr() {
+    new_test_ext().execute_with(|| {
+        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
+        // 1st era
+        run_to_block(303, None);
+        add_success_sorder(350);
+
+        // This won't happen when previous test case occurs, cause `not reported` will
+        // set sorder.status = Failed, but we still design this test case anyway.
+        remove_work_report(&account);
+        Tee::update_identities();
+
+        // Check this 99 order should be failed, cause wr is outdated
         assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
                    OrderStatus::Failed);
     });

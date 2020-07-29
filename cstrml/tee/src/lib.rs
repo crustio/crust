@@ -514,36 +514,39 @@ impl<T: Trait> Module<T> {
     /// 2. (maybe) remove outdated work report
     /// 3. return the (reserved, used) storage of this controller account
     fn update_and_get_workload(controller: &T::AccountId, order_map: &Vec<(MerkleRoot, T::Hash)>, current_rs: u64) -> (u128, u128) {
+        let mut wr_files: Vec<MerkleRoot> = vec![];
+        let mut works: (u128, u128) = (0, 0);
+
         // Judge if this controller reported works in this current era
         if let Some(wr) = Self::work_reports(controller) {
             let (elder_reported, current_reported) = Self::reported_in_slot(controller, current_rs);
             if elder_reported || current_reported {
                 // 1. Get all work report files
-                let wr_files: Vec<MerkleRoot> = wr.files.iter().map(|(f_id, _)| f_id.clone()).collect();
+                wr_files = wr.files.iter().map(|(f_id, _)| f_id.clone()).collect();
 
-                // 2. Check every order files are stored by controller
-                for (f_id, order_id) in order_map {
-                    if !wr_files.contains(f_id) {
-                        // 3. Set status to failed
-                        let mut sorder =
-                            T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
-                        sorder.status = OrderStatus::Failed;
-                        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
-                    }
-                }
-
-                // 3. Return reserved and used
-                (wr.reserved as u128, wr.used as u128)
+                // 2. Get reserved and used
+                works =  (wr.reserved as u128, wr.used as u128)
             } else {
-                // Remove work report when it is outdated
+                // 2. Remove work report when it is outdated
                 if wr.block_number < current_rs {
                     <WorkReports<T>>::remove(controller);
                 }
-                (0, 0)
             }
-        } else {
-            (0, 0)
         }
+        // Or work report not exist at all
+
+        // 3. Check every order files are stored by controller
+        for (f_id, order_id) in order_map {
+            if !wr_files.contains(f_id) {
+                // Set status to failed, sorder.status should be successful before.
+                let mut sorder =
+                    T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
+                sorder.status = OrderStatus::Failed;
+                T::MarketInterface::maybe_set_sorder(order_id, &sorder);         
+            }
+        }
+
+        return works
     }
 
     // PRIVATE IMMUTABLES

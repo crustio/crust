@@ -184,7 +184,7 @@ pub fn run_to_block(n: u64, maybe_bh: Option<Vec<u8>>) {
     }
 }
 
-pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os: OrderStatus) {
+pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
     let mut file_map = Market::providers(who).unwrap_or_default().file_map;
     let sorder_id: Hash = Hash::repeat_byte(rd);
     let sorder = StorageOrder {
@@ -192,7 +192,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
         file_size: 0,
         created_on: 0,
         completed_on: 0,
-        expired_on: 350,
+        expired_on,
         provider: who.clone(),
         client: who.clone(),
         amount: 10,
@@ -217,4 +217,8 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, os:
         value: Zero::zero()
     };
     <market::ProviderPunishments<Test>>::insert(sorder_id, punishment);
+}
+
+pub fn remove_work_report(who: &AccountId) {
+    <WorkReports<Test>>::remove(who);
 }

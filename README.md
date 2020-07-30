@@ -32,7 +32,7 @@ curl https://sh.rustup.rs -sSf | sh
 cargo build --release
 ```
 
-## Build from docker
+### Build from docker
 
 Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust) to see how to build and run crust with docker.
 

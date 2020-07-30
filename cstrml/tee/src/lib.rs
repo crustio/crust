@@ -446,7 +446,7 @@ impl<T: Trait> Module<T> {
         let mut updated_wr = wr.clone();
         let file_map = T::MarketInterface::providers(who).unwrap_or_default().file_map;
         updated_wr.used = wr.files.iter().fold(0, |used, (f_id, f_size)| {
-            // TODO: Abstract and make this logic be a seperated function
+            // TODO: Abstract and make this logic be a separated function
             if let Some(order_ids) = file_map.get(f_id) {
                 for order_id in order_ids {
                     // Get order status(should exist) and (maybe) change the status

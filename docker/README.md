@@ -10,13 +10,13 @@
 
 Run the scripts at the the ****root**** of this repository. DO NOT run from `docker` folder!
 
-### Build and push crust environment image
+### Build crust environment image
 
 ```bash
-  docker/build_env.sh -p
+  docker/build_env.sh
 ```
 
-### Build and push crust
+### Build crust
 
 - First build `crust_bin`
 
@@ -30,6 +30,7 @@ Run the scripts at the the ****root**** of this repository. DO NOT run from `doc
   - Use `-c` flag to specify a custom cargo cache location,
         it defaults to docker/.cache, you may want to change it if you want share cargo cache between multiple clones.
   - Use `-r` to perform a full build (equals to `cargo clean & cargo build`).
+  - Use `-p` to push to [Docker Hub](https://hub.docker.com/)
 
 - Then, build and push crust (with `docker push`)
 

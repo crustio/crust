@@ -7,7 +7,9 @@ use frame_support::{
     dispatch::DispatchResult,
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency, Get},
-    weights::constants::WEIGHT_PER_MICROS,
+    weights::{
+        DispatchClass, constants::WEIGHT_PER_MICROS
+    }
 };
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use system::{ensure_root, ensure_signed};
@@ -192,7 +194,7 @@ decl_module! {
 		/// - Read: Identities
 		/// - Write: 3
 		/// # </weight>
-        #[weight = 154 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(13, 3)]
+        #[weight = (154 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(13, 3), DispatchClass::Operational)]
         pub fn register(
             origin,
             ias_sig: IASSig,
@@ -247,7 +249,7 @@ decl_module! {
 		/// - Read: Identities, ReportedInSlot, Code, market.Provider, market.SOrder
 		/// - Write: WorkReport, ReportedInSlot, market.SOrder
 		/// # </weight>
-        #[weight = 212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7)]
+        #[weight = (212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7), DispatchClass::Operational)]
         pub fn report_works(
             origin,
             pub_key: PubKey,

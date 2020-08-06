@@ -2,10 +2,7 @@
   "name": "Maxwell",
   "id": "maxwell1",
   "chainType": "Live",
-  "bootNodes": [
-    "/ip4/139.196.122.228/tcp/6014/p2p/12D3KooW9wpjcH8jk9n95MFsXdTLd5oxUdjUHzAn8Ex3LmpgGcAc",
-    "/ip4/101.132.117.183/tcp/30333/p2p/12D3KooWJhoHWWEjasgPCQ75NsD3YDpBqriNcHp7HCgscbJV8t5u"
-  ],
+  "bootNodes": [],
   "telemetryEndpoints": null,
   "protocolId": "max1",
   "properties": {

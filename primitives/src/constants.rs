@@ -47,7 +47,7 @@ pub mod fee {
     pub const TARGET_BLOCK_FULLNESS: Perbill = Perbill::from_percent(25);
 }
 
-pub mod tee {
+pub mod swork {
     use super::time::*;
 
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64 * 3;

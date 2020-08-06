@@ -38,7 +38,7 @@ use frame_system::{self as system, ensure_root, ensure_signed};
 use sp_runtime::{Deserialize, Serialize};
 
 // Crust runtime modules
-use tee;
+use swork;
 use primitives::{
     constants::{currency::*, time::*},
     traits::TransferrableCurrency
@@ -347,13 +347,13 @@ impl<T: Trait> SessionInterface<<T as frame_system::Trait>::AccountId> for T whe
     }
 }
 
-pub trait TeeInterface: frame_system::Trait {
+pub trait SworkInterface: frame_system::Trait {
     fn update_identities();
 }
 
-impl<T: Trait> TeeInterface for T where T: tee::Trait {
+impl<T: Trait> SworkInterface for T where T: swork::Trait {
     fn update_identities() {
-        <tee::Module<T>>::update_identities();
+        <swork::Module<T>>::update_identities();
     }
 }
 
@@ -400,8 +400,8 @@ pub trait Trait: frame_system::Trait {
     /// Interface for interacting with a session module.
     type SessionInterface: self::SessionInterface<Self::AccountId>;
 
-    /// Interface for interacting with a tee module
-    type TeeInterface: self::TeeInterface;
+    /// Interface for interacting with a swork module
+    type SworkInterface: self::SworkInterface;
 
     /// Storage power ratio for crust network phase 1
     type SPowerRatio: Get<u128>;
@@ -1771,8 +1771,8 @@ impl<T: Trait> Module<T> {
     ///
     /// Assumes storage is coherent with the declaration.
     fn select_validators() -> Option<Vec<T::AccountId>> {
-        // Update all tee identities work report and clear stakers
-        T::TeeInterface::update_identities();
+        // Update all swork identities work report and clear stakers
+        T::SworkInterface::update_identities();
         Self::clear_stakers();
 
         let validators: Vec<(T::AccountId, Validations<T::AccountId, BalanceOf<T>>)> =
@@ -2117,7 +2117,7 @@ impl<T: Trait> historical::SessionManager<T::AccountId, Exposure<T::AccountId, B
     }
 }
 
-impl<T: Trait> tee::Works<T::AccountId> for Module<T> {
+impl<T: Trait> swork::Works<T::AccountId> for Module<T> {
     fn report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
         Self::update_stake_limit(controller, own_workload, total_workload);
     }

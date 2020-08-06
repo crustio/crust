@@ -1,5 +1,5 @@
 [package]
-name = "cstrml-tee"
+name = "cstrml-swork"
 version = "0.7.0"
 authors = ["crustio"]
 edition = "2018"

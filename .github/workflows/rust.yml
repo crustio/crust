@@ -10,24 +10,24 @@ on:
       - master
       - feature/*
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
+  build_and_test:
+    name: Build & Test
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@master
       - name: Cache cargo registry
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
       - name: Cache cargo index
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.toml') }}
       - name: Cache target directory
         id: cache-target
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target2-${{ hashFiles('**/Cargo.toml') }}
@@ -43,50 +43,30 @@ jobs:
         with:
           use-cross: false
           command: build
-  test-staking:
-    name: Test Staking Module
-    needs: build
-    steps:
       - name: Cargo test staking
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
           args: --package cstrml-staking --lib tests
-  test-swork:
-    name: Test sWork Module  
-    needs: build
-    steps:
       - name: Cargo test swork
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
           args: --package cstrml-swork --lib tests
-  test-market:
-    name: Test Markst Module
-    needs: build
-    steps:
-      - name: Cargo test storage order
+      - name: Cargo test market
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
           args: --package cstrml-market --lib tests
-  test-payment:
-    name: Test Payment Module
-    needs: build
-    steps:
       - name: Cargo test payment
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
           args: --package cstrml-payment --lib tests
-  test-balances:
-    name: Test Balances Module
-    needs: build
-    steps:
       - name: Cargo test balances
         uses: actions-rs/cargo@v1
         with:

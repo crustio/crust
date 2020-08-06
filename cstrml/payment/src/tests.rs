@@ -14,12 +14,12 @@ use sp_core::{crypto::AccountId32, H256};
 type AccountId = AccountId32;
 
 struct ReportWorksInfo {
-    pub_key: PubKey,
+    pub_key: SworkerPubKey,
     block_number: u64,
     block_hash: Vec<u8>,
     reserved: u64,
     files: Vec<(MerkleRoot, u64)>,
-    sig: TeeSignature
+    sig: SworkerSignature
 }
 
 fn valid_report_works_info() -> ReportWorksInfo {
@@ -52,20 +52,20 @@ fn test_for_storage_order_and_payment_should_work() {
         let client: AccountId = Sr25519Keyring::Alice.to_account_id();
         let file_identifier =
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let provider: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let file_size = 16; // should less than provider
+        let merchant: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let file_size = 16; // should less than merchant
         let duration = 30;
         let fee = 2;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&client, 70);
-        let _ = Balances::make_free_balance_be(&provider, pledge_amount);
+        let _ = Balances::make_free_balance_be(&merchant, pledge_amount);
         assert_eq!(Balances::free_balance(client.clone()), 70);
 
         // Call register and place storage order
-        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount));
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), pledge_amount));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
         assert_ok!(Market::place_storage_order(
-            Origin::signed(client.clone()), provider.clone(),
+            Origin::signed(client.clone()), merchant.clone(),
             file_identifier.clone(), file_size, duration
         ));
 
@@ -85,11 +85,11 @@ fn test_for_storage_order_and_payment_should_work() {
         });
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
         let report_works_info = valid_report_works_info();
-        assert_ok!(Tee::report_works(
-            Origin::signed(provider.clone()),
+        assert_ok!(Swork::report_works(
+            Origin::signed(merchant.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
             report_works_info.block_hash,
@@ -98,7 +98,7 @@ fn test_for_storage_order_and_payment_should_work() {
             report_works_info.sig
         ));
         assert_eq!(Balances::reserved_balance(client.clone()), 60);
-        assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);
+        assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount);
         assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
@@ -109,7 +109,7 @@ fn test_for_storage_order_and_payment_should_work() {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(client.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(client.clone()), 10);
-            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
+            assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount + i * 2);
             assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: i * 2,
@@ -129,22 +129,22 @@ fn test_for_storage_order_and_payment_should_failed_by_insufficient_currency() {
         let source: AccountId = Sr25519Keyring::Alice.to_account_id();
         let file_identifier =
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let provider: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let file_size = 16; // should less than provider
+        let merchant: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let file_size = 16; // should less than merchant
         let duration = 60;
         let fee = 1;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
 
         Balances::make_free_balance_be(&source, 40);
-        Balances::make_free_balance_be(&provider, 60);
+        Balances::make_free_balance_be(&merchant, 60);
         assert_eq!(Balances::free_balance(source.clone()), 40);
-        assert_eq!(Balances::free_balance(provider.clone()), 60);
+        assert_eq!(Balances::free_balance(merchant.clone()), 60);
 
-        assert_ok!(Market::pledge(Origin::signed(provider.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
         assert_noop!(
             Market::place_storage_order(
-            Origin::signed(source.clone()), provider.clone(),
+            Origin::signed(source.clone()), merchant.clone(),
             file_identifier.clone(), file_size, duration),
             DispatchError::Module {
                 index: 0,
@@ -165,19 +165,19 @@ fn test_for_storage_order_and_payment_should_suspend() {
         let source: AccountId = Sr25519Keyring::Alice.to_account_id();
         let file_identifier =
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let provider: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let file_size = 16; // should less than provider
+        let merchant: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let file_size = 16; // should less than merchant
         let duration = 30;
         let fee = 2;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 70);
-        let _ = Balances::make_free_balance_be(&provider, pledge_amount);
+        let _ = Balances::make_free_balance_be(&merchant, pledge_amount);
         assert_eq!(Balances::free_balance(source.clone()), 70);
 
-        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount));
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), pledge_amount));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), provider.clone(),
+            Origin::signed(source.clone()), merchant.clone(),
             file_identifier.clone(), file_size, duration
         ));
 
@@ -198,11 +198,11 @@ fn test_for_storage_order_and_payment_should_suspend() {
         });
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
         let report_works_info = valid_report_works_info();
-        assert_ok!(Tee::report_works(
-            Origin::signed(provider.clone()),
+        assert_ok!(Swork::report_works(
+            Origin::signed(merchant.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
             report_works_info.block_hash,
@@ -211,7 +211,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             report_works_info.sig
         ));
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
-        assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);
+        assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount);
         assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
@@ -222,7 +222,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10);
-            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
+            assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount + i * 2);
             assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: i * 2,
@@ -239,7 +239,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10 + (i - 10) * 2 );
-            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20);
+            assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount + 20);
             assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: 20,
@@ -258,7 +258,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 30 );
-            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20 + (i - 20) * 2);
+            assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount + 20 + (i - 20) * 2);
             assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: 20 + (i - 20) * 2,
@@ -278,19 +278,19 @@ fn test_for_close_storage_order_in_payment() {
         let source: AccountId = Sr25519Keyring::Alice.to_account_id();
         let file_identifier =
         hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let provider: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let file_size = 16; // should less than provider
+        let merchant: AccountId = Sr25519Keyring::Bob.to_account_id();
+        let file_size = 16; // should less than merchant
         let duration = 30;
         let fee = 2;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 70);
-        let _ = Balances::make_free_balance_be(&provider, pledge_amount);
+        let _ = Balances::make_free_balance_be(&merchant, pledge_amount);
         assert_eq!(Balances::free_balance(source.clone()), 70);
 
-        assert_ok!(Market::pledge(Origin::signed(provider.clone()), pledge_amount));
-        assert_ok!(Market::register(Origin::signed(provider.clone()), address_info.clone(), fee));
+        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), pledge_amount));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), provider.clone(),
+            Origin::signed(source.clone()), merchant.clone(),
             file_identifier.clone(), file_size, duration
         ));
 
@@ -311,11 +311,11 @@ fn test_for_close_storage_order_in_payment() {
         });
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
         let report_works_info = valid_report_works_info();
-        assert_ok!(Tee::report_works(
-            Origin::signed(provider.clone()),
+        assert_ok!(Swork::report_works(
+            Origin::signed(merchant.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
             report_works_info.block_hash,
@@ -324,7 +324,7 @@ fn test_for_close_storage_order_in_payment() {
             report_works_info.sig
         ));
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
-        assert_eq!(Balances::free_balance(provider.clone()), pledge_amount);
+        assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount);
         assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
             total: 60,
             paid: 0,
@@ -336,7 +336,7 @@ fn test_for_close_storage_order_in_payment() {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 60 - i * 2);
             assert_eq!(Balances::free_balance(source.clone()), 10);
-            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + i * 2);
+            assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount + i * 2);
             assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
                 total: 60,
                 paid: i * 2,
@@ -353,7 +353,7 @@ fn test_for_close_storage_order_in_payment() {
             run_to_block(303 + i * 10);
             assert_eq!(Balances::reserved_balance(source.clone()), 0);
             assert_eq!(Balances::free_balance(source.clone()), 50);
-            assert_eq!(Balances::free_balance(provider.clone()), pledge_amount + 20);
+            assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount + 20);
         }
     });
 }

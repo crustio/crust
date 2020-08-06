@@ -44,7 +44,7 @@ grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc4' }
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.7.0' }
 cstrml-staking = { path = '../cstrml/staking', version = '0.7.0' }
-cstrml-tee = { path = '../cstrml/tee', version = '0.7.0' }
+cstrml-swork = { path = '../cstrml/swork', version = '0.7.0' }
 primitives = { package = 'cst-primitives', path = '../primitives', version = '0.7.0' }
 
 [build-dependencies]

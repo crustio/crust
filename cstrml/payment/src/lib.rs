@@ -181,7 +181,7 @@ impl<T: Trait> Module<T> {
         // 1. Get storage order
         let sorder = T::MarketInterface::maybe_get_sorder(&sorder_id).unwrap_or_default();
         let client = sorder.client.clone();
-        let provider = sorder.provider.clone();
+        let merchant = sorder.merchant.clone();
 
         // 2. [DB Write] Unreserved 1 slot amount
         T::Currency::unreserve(
@@ -202,7 +202,7 @@ impl<T: Trait> Module<T> {
         match sorder.status {
             OrderStatus::Success => {
                 // 5. [DB Write] (Maybe) Transfer the amount
-                if T::Currency::transfer(&client, &provider, real_amount, ExistenceRequirement::AllowDeath).is_ok() {
+                if T::Currency::transfer(&client, &merchant, real_amount, ExistenceRequirement::AllowDeath).is_ok() {
                     // 6. [DB Write] Update ledger
                     <PaymentLedgers<T>>::mutate(&sorder_id, |ledger| {
                         if let Some(l) = ledger {

@@ -38,7 +38,25 @@ Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust
 
 ## Network
 
-### 1. Run as dev
+### 1. Connect to maxwell
+
+```shell
+./target/release/crust --chain=maxwell
+```
+
+Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Maxwell-1.0-User-Guide).
+
+### 2. Connect to rocky
+
+> Archived chain for only **internal test** now.
+
+```shell
+./target/release/crust --chain=rocky
+```
+
+Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Join-Crust-Rocky).
+
+### 3. Run as dev
 
 Purge any existing developer chain state:
 
@@ -54,7 +72,7 @@ Start a development chain with:
 
 Detailed logs may be shown by running the node with the following environment variables set: `RUST_LOG=debug RUST_BACKTRACE=1 cargo run -- --dev`.
 
-### 2. Run as local
+### 4. Run as local
 
 If you want to see the multi-node consensus algorithm in action locally, then you can create a local testnet with two validator nodes for Alice and Bob, who are the initial authorities of the genesis chain that have been endowed with testnet units.
 
@@ -85,29 +103,7 @@ Additional CLI usage options are available and may be shown by running `cargo ru
 
 ## Contribution
 
-Thank you for considering to help out with the source code! We welcome contributions from anyone on the internet, and are grateful for even the smallest of fixes!
-
-If you'd like to contribute to crust, please **fork, fix, commit and send a pull request for the maintainers to review and merge into the main codebase**.
-
-### Rules
-
-Please make sure your contribution adhere to our coding guideliness:
-
-- **No --force pushes** or modifying the master branch history in any way. If you need to rebase, ensure you do it in your own repo.
-- Code must adhere to the [house coding style](https://wiki.parity.io/Substrate-Style-Guide)
-- Pull requests need to be based on and opened against the `master branch`.
-- A pull-request **must not be merged until CI** has finished successfully.
-- Make sure your every `commit` is [signed](https://help.github.com/en/github/authenticating-to-github/about-commit-signature-verification)
-
-### Merge process
-
-Merging pull requests once CI is successful:
-
-- A PR needs to be reviewed and approved by project maintainers;
-- Once a PR is ready for review please add the [`pleasereview`](https://github.com/crustio/crust/labels/pleasereview) label. Generally PRs should sit with this label for 48 hours in order to garner feedback. It may be merged before if all relevant parties had a look at it.
-- PRs that break the external API must be tagged with [`breaksapi`](https://github.com/crustio/crust/labels/breaksapi), when it changes the FRAME or consensus of running system with [`breaksconsensus`](https://github.com/crustio/crust/labels/breaksconsensus);
-- No PR should be merged until **all reviews' comments** are addressed;
-- PR merge should use the **Squash Merging**;
+Please follow the contributions guidelines as outlined in [docs/CONTRIBUTION.md](https://github.com/crustio/crust/blob/master/docs/CONTRIBUTION.md). In all communications and contributions, this project follows the [Contributor Covenant Code of Conduct](https://github.com/paritytech/substrate/blob/master/docs/CODE_OF_CONDUCT.adoc).
 
 ## License
 

@@ -112,7 +112,7 @@ impl system::Trait for Test {
 pub struct TestOrderInspector;
 
 impl market::OrderInspector<AccountId> for TestOrderInspector {
-    // file size should smaller than provider's num
+    // file size should smaller than merchant's num
     fn check_works(_provider: &AccountId, _file_size: u64) -> bool {
         true
     }
@@ -132,7 +132,7 @@ impl balances::Trait for Test {
     type AccountStore = System;
 }
 
-impl tee::Trait for Test {
+impl swork::Trait for Test {
     type Currency = Balances;
     type Event = ();
     type Works = ();
@@ -167,7 +167,7 @@ impl Trait for Test {
 
 pub type Market = market::Module<Test>;
 pub type System = system::Module<Test>;
-pub type Tee = tee::Module<Test>;
+pub type Swork = swork::Module<Test>;
 pub type Payment = Module<Test>;
 pub type Balances = balances::Module<Test>;
 
@@ -197,7 +197,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
                 id.clone(),
                 (
                     None,
-                    Some(tee::Identity {
+                    Some(swork::Identity {
                         pub_key: pk.clone(),
                         code: vec![],
                     })
@@ -210,7 +210,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .map(|(x, _)| (x.clone(), Default::default()))
         .collect();
 
-    let _ = tee::GenesisConfig::<Test> {
+    let _ = swork::GenesisConfig::<Test> {
         current_report_slot: 0,
         code: vec![],
         identities,

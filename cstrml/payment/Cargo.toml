@@ -47,5 +47,5 @@ std = [
 [dev-dependencies]
 hex = '0.4.2'
 keyring = { package = "sp-keyring", version = '2.0.0-rc4' }
-tee = { package = 'cstrml-tee', path = '../tee' }
+swork = { package = 'cstrml-swork', path = '../swork' }
 balances = { package = 'cstrml-balances', path = '../balances' }

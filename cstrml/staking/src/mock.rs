@@ -190,7 +190,7 @@ impl pallet_timestamp::Trait for Test {
     type MinimumPeriod = MinimumPeriod;
 }
 pub struct TestStaking;
-impl tee::Works<AccountId> for TestStaking {
+impl swork::Works<AccountId> for TestStaking {
     fn report_works(controller: &AccountId, _own_workload: u128, _total_workload: u128) {
         // Disable work report in mock test
         Staking::update_stake_limit(controller,
@@ -199,7 +199,7 @@ impl tee::Works<AccountId> for TestStaking {
     }
 }
 
-impl tee::Trait for Test {
+impl swork::Trait for Test {
     type Currency = Balances;
     type Event = ();
     type Works = TestStaking;
@@ -225,7 +225,7 @@ impl Trait for Test {
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type TeeInterface = Self;
+    type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
 }
 
@@ -362,7 +362,7 @@ impl ExtBuilder {
             vec![]
         };
 
-        // tee genesis
+        // swork genesis
         let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
         let _ = GenesisConfig::<Test> {
             stakers: vec![
@@ -411,12 +411,12 @@ impl ExtBuilder {
         }
         .assimilate_storage(&mut storage);
 
-        let work_reports: Vec<(u64, tee::WorkReport)> = identities
+        let work_reports: Vec<(u64, swork::WorkReport)> = identities
             .iter()
             .map(|id| {
                 (
                     *id,
-                    tee::WorkReport {
+                    swork::WorkReport {
                         block_number: 0,
                         used: 0,
                         reserved: 20000000000000,
@@ -427,7 +427,7 @@ impl ExtBuilder {
             })
             .collect();
 
-        let _ = tee::GenesisConfig::<Test> {
+        let _ = swork::GenesisConfig::<Test> {
             current_report_slot: 0,
             code: vec![],
             identities: identities

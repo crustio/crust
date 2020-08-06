@@ -102,9 +102,9 @@ impl system::Trait for Test {
 pub struct TestOrderInspector;
 
 impl OrderInspector<AccountId> for TestOrderInspector {
-    // file size should smaller than provider's num
-    fn check_works(provider: &AccountId, file_size: u64) -> bool {
-        if let Some(wr) = Tee::work_reports(provider) {
+    // file size should smaller than merchant's num
+    fn check_works(merchant: &AccountId, file_size: u64) -> bool {
+        if let Some(wr) = Swork::work_reports(merchant) {
             wr.reserved > file_size
         } else {
             false
@@ -120,7 +120,7 @@ impl balances::Trait for Test {
     type AccountStore = System;
 }
 
-impl tee::Trait for Test {
+impl swork::Trait for Test {
     type Currency = Balances;
     type Event = ();
     type Works = ();
@@ -157,7 +157,7 @@ impl Trait for Test {
 
 pub type Market = Module<Test>;
 pub type System = system::Module<Test>;
-pub type Tee = tee::Module<Test>;
+pub type Swork = swork::Module<Test>;
 pub type Balances = balances::Module<Test>;
 
 // This function basically just builds a genesis storage key/value store according to
@@ -167,14 +167,14 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .build_storage::<Test>()
     .unwrap();
 
-    // tee genesis
+    // swork genesis
     let identities: Vec<u64> = vec![0, 100, 200];
-    let work_reports: Vec<(u64, tee::WorkReport)> = identities
+    let work_reports: Vec<(u64, swork::WorkReport)> = identities
             .iter()
             .map(|id| {
                 (
                     *id,
-                    tee::WorkReport {
+                    swork::WorkReport {
                         block_number: 0,
                         files: vec![],
                         used: 0,
@@ -185,7 +185,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             })
             .collect();
 
-    let _ = tee::GenesisConfig::<Test> {
+    let _ = swork::GenesisConfig::<Test> {
         current_report_slot: 0,
         code: vec![],
         identities: identities

@@ -828,7 +828,7 @@ dependencies = [
  "crust-runtime",
  "cst-primitives",
  "cstrml-staking",
- "cstrml-tee",
+ "cstrml-swork",
  "futures 0.3.5",
  "hex-literal",
  "log",
@@ -864,7 +864,7 @@ dependencies = [
  "cstrml-market",
  "cstrml-payment",
  "cstrml-staking",
- "cstrml-tee",
+ "cstrml-swork",
  "frame-executive",
  "frame-support",
  "frame-system",
@@ -949,7 +949,7 @@ version = "0.7.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
- "cstrml-tee",
+ "cstrml-swork",
  "frame-support",
  "frame-system",
  "hex",
@@ -969,7 +969,7 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-market",
- "cstrml-tee",
+ "cstrml-swork",
  "frame-support",
  "frame-system",
  "hex",
@@ -989,7 +989,7 @@ version = "0.7.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
- "cstrml-tee",
+ "cstrml-swork",
  "frame-support",
  "frame-system",
  "pallet-authorship",
@@ -1008,7 +1008,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cstrml-tee"
+name = "cstrml-swork"
 version = "0.7.0"
 dependencies = [
  "base64 0.12.3",

@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::mock::{new_test_ext, run_to_block, Origin, Tee, upsert_sorder_to_provider, Market, remove_work_report};
+use crate::mock::{new_test_ext, run_to_block, Origin, Swork, upsert_sorder_to_provider, Market, remove_work_report};
 use frame_support::{
     assert_ok, assert_noop,
     dispatch::DispatchError,
@@ -14,19 +14,19 @@ type AccountId = AccountId32;
 
 struct RegisterInfo {
     ias_sig: IASSig,
-    ias_cert: Cert,
+    ias_cert: SworkerCert,
     account_id: AccountId,
     isv_body: ISVBody,
-    sig: TeeSignature
+    sig: SworkerSignature
 }
 
 struct ReportWorksInfo {
-    pub_key: PubKey,
+    pub_key: SworkerPubKey,
     block_number: u64,
     block_hash: Vec<u8>,
     reserved: u64,
     files: Vec<(MerkleRoot, u64)>,
-    sig: TeeSignature
+    sig: SworkerSignature
 }
 
 fn valid_register_info() -> RegisterInfo {
@@ -97,7 +97,7 @@ fn test_for_register_success() {
                 .expect("valid ss58 address");
         let register_info = valid_register_info();
 
-        assert_ok!(Tee::register(
+        assert_ok!(Swork::register(
             Origin::signed(applier.clone()),
             register_info.ias_sig,
             register_info.ias_cert,
@@ -106,7 +106,7 @@ fn test_for_register_success() {
             register_info.sig
         ));
 
-        let id_registered = Tee::identities(applier.clone()).1.unwrap();
+        let id_registered = Swork::identities(applier.clone()).1.unwrap();
 
         let id = Identity {
             pub_key: hex::decode("4dbb6401508323b18f649f04f17433fd4b87201ef3ff634b684b715c848bb60b905dd5305e24761b4968a8875dfd9f6abfb3110d9fa494dd530daaeccc8353e1").unwrap(),
@@ -126,7 +126,7 @@ fn test_for_register_failed_by_duplicate_id() {
         let register_info = valid_register_info();
 
         // First register should be ok
-        assert_ok!(Tee::register(
+        assert_ok!(Swork::register(
             Origin::signed(applier.clone()),
             register_info.ias_sig.clone(),
             register_info.ias_cert.clone(),
@@ -137,7 +137,7 @@ fn test_for_register_failed_by_duplicate_id() {
 
         // Second register should failed
         assert_noop!(
-            Tee::register(
+            Swork::register(
                 Origin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
@@ -165,7 +165,7 @@ fn test_for_register_failed_by_invalid_ca() {
         register_info.ias_cert = "wrong_ca".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::register(
+            Swork::register(
                 Origin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
@@ -193,7 +193,7 @@ fn test_for_register_failed_by_illegal_ca() {
         register_info.ias_cert = "-----BEGIN CERTIFICATE-----\nMIIFFjCCAv4CCQChGbr81on1kDANBgkqhkiG9w0BAQsFADBNMQswCQYDVQQGEwJD\nTjERMA8GA1UECAwIU2hhbmdoYWkxETAPBgNVBAcMCFNoYW5naGFpMQswCQYDVQQK\nDAJaazELMAkGA1UECwwCWkgwHhcNMjAwNjIzMDUwODQyWhcNMjEwNjIzMDUwODQy\nWjBNMQswCQYDVQQGEwJDTjERMA8GA1UECAwIU2hhbmdoYWkxETAPBgNVBAcMCFNo\nYW5naGFpMQswCQYDVQQKDAJaazELMAkGA1UECwwCWkgwggIiMA0GCSqGSIb3DQEB\nAQUAA4ICDwAwggIKAoICAQC7oznSx9/gjE1/cEgXGKLATEvDPAdnvJ/T2lopEDZ/\nJEsNu0qBQsbOSAgJUhqAfX6ahwAn/Epz7yXy7PxCKZJi/wvESJ/WX4x+b7tE1nU1\nK7p7bKGJ6erww/ZrmGV+4+6GvdCg5dcOAA5TXAE2ZjTeIoR76Y3IZb0L78i/S+q1\ndZpx4YRfzwHNELCqpgwaJAS0FHIH1g+6X59EbF0UFT0YcM90Xxa0gHkPlYIoEoWS\n+UA/UW1MjuUwNaS5mNB3IpcrMhSeOkkqLglMdanu6r5MZpjuLBl7+sACoH0P7Rda\nx1c/NadmrbZf3/+AHvMZ6M9HrciyKKMauBZM9PUMrzLnTfF8iHitrSlum1UIfUuN\nvXXXzNLWskTxcXuWuyBgXpKM7D5XG7VnENDAbEYiN5Ej6zz5Zi/2OHVyErI3f1Ka\nvwTC8AjJMemCOBgPrgqMH7l6SAXr55eozXaSQVa4HG9iPGJixXZU5PUIiVFVO7Hj\nXtE3yfa2zaucB4rKhOJLwSD9qYgqFKB+vQ1X2GUkkPpsAMrL4n/VDQcJkrvjK3tt\n7AES9Q3TLmbVK91E2scF063XKUc3vT5Q8hcvg4MMLHn7gzMEaWTzjknRo1fLNWPY\nlPV3lZhBwkxdHKYodY7d6subE8nOsiFibq8X6Nf0UNIG0MXeFTAM2WfG2s6AlnZR\nHwIDAQABMA0GCSqGSIb3DQEBCwUAA4ICAQA5NL5fFP1eSBN/WEd8z6vJRWPyOz1t\ntrQF5o7Fazh3AtFcb3j3ab8NG/4qDTr7FrYFyOD+oHgIoHlzK4TFxlhSZquvU2Xb\nSMQyIQChojz8jbTa771ZPsjQjDWU0R0r83vI1ywc1v6eFpXIpV5oidT0afbJ85n4\ngwhVd6S2eTHh91U11BKf2gV4nhewzON4r7YuFg7sMMDVl3wx1HtXCKg5dMtgePyc\nGejdpyxdWX4BIxnvIY8QdAa4gvi9etzRf83mcNfwr+gM0rTyqGEBXuPW8bwq9BRL\nXz6zeL1Anb2HsjMQ6+MKWbXRhBFBCbB+APDcnjHv7OZXUaILi0B1JoTPu/jjSK1U\n7yAnK1sRtVpADVpa2N4STk9ImdTKfqTHZR9iTaheoqxRuTm7vzwGy72V4HEeEyOa\njyYpiCD8we3gJfro1pjzFLOqE3yU14vUc0SwQCZWlEH8LR/a8m/ZCPuqN4a2xPJO\nwksgMSCDkui5yUr4uTINFpROXHzz1dpOuUnvkkCAjKieZHWCyYyoEE0tedgejwee\nWv3UtR7svhpbAVoIQ8Z8EV2Ys1IN0Tp+4pltRbcgeZK0huEFOz4BL/1EGezwLbjE\nvoOMtTumWI9Mw5FTG4iTbRxvWL/KnLMvZr7V+o5ovmm0jeLW03Eh/E+aHH0B0tQp\nf6FKPRF7+Imo/g==\n-----END CERTIFICATE-----\n".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::register(
+            Swork::register(
                 Origin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
@@ -222,7 +222,7 @@ fn test_for_register_failed_by_illegal_isv_body() {
         register_info.isv_body = "{\"id\":\"125366127848601794295099877969265555107\",\"timestamp\":\"2020-06-22T11:34:54.845374\",\"version\":3,\"epidPseudonym\":\"4tcrS6EX9pIyhLyxtgpQJuMO1VdAkRDtha/N+u/rRkTsb11AhkuTHsY6UXRPLRJavxG3nsByBdTfyDuBDQTEjMYV6NBXjn3P4UyvG1Ae2+I4lE1n+oiKgLA8CR8pc2nSnSY1Wz1Pw/2l9Q5Er6hM6FdeECgMIVTZzjScYSma6rE=\",\"isvEnclaveQuoteStatus\":\"GROUP_OUT_OF_DATE\",\"platformInfoBlob\":\"1502006504000F00000F0F02040101070000000000000000000B00000B00000002000000000000142A70382C3A557904D4AB5766B2D3BAAD8ED8B7B372FB8F25C7E06212DEF369A389047D2249CF2ACDB22197AD7EE604634D47B3720BB1837E35C5C7D66F256117B6\",\"isvEnclaveQuoteBody\":\"AgABACoUAAAKAAkAAAAAAP7yPH5zo3mCPOcf8onPvAcAAAAAAAAAAAAAAAAAAAAACA7///8CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAHAAAAAAAAAJY6Ggjlm1yvKL0sgypJx2BBrGbValVEq8cCi/0sViQcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACD1xnnferKFHD2uvYqTXdDA8iZ22kCD5xw7h38CMfOngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADagmwZsR+S1ZNqgDg6HobleD6S6tRtqtsF1j81Bw7CnoP9/ZGNDEEzMEh+EKk1jAPW8PE+YKpum0xkVhh2J5Y8\"}".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::register(
+            Swork::register(
                 Origin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
@@ -251,7 +251,7 @@ fn test_for_register_failed_by_illegal_sig() {
         register_info.sig = hex::decode("f45e401778623de9b27726ab749549da35b1f8c0fd7bb56e0c1c3bba86948eb41717c9e13bf57113d85a1cc64d5cc2fc95c12d8b3108ab6fadeff621dfb6a486").unwrap();
 
         assert_noop!(
-            Tee::register(
+            Swork::register(
                 Origin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
@@ -280,7 +280,7 @@ fn test_for_register_failed_by_illegal_ias_sig() {
         register_info.ias_sig = "cU3uOnd5XghR3ngJTbSFr48ttEIrJtbHHtuRM3hgzX7LHGacuTBMVRy0VK3ldqeM7KPBS+g3Da2anDHEJsSgITTXfHh+dxjUPO9v2hC+okjtWSY9fWhaFlR31lFWmSSbUfJSe2rtkLQRoj5VgKpOVkVuGzQjl/xF+SQZU4gjq130TwO8Gr/TvPLA3vJnM3/d8FUpcefp5Q5dbBka7y2ej8hDTyOjix3ZXSVD2SrSySfIg6kvIPS/EEJYoz/eMOFciSWuIIPrUj9M0eUc4xHsUxgNcgjOmtRt621RlzAwgY+yPFoqJwKtmlVNYy/FyvSbIMSB3kJbmlA+qHwOBgPQ0A==".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::register(
+            Swork::register(
                 Origin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
@@ -311,9 +311,9 @@ fn test_for_report_works_success() {
         let report_works_info = valid_report_works_info();
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(account.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
@@ -324,8 +324,8 @@ fn test_for_report_works_success() {
         ));
 
         // Check workloads after work report
-        assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 402868224);
+        assert_eq!(Swork::reserved(), 4294967296);
+        assert_eq!(Swork::used(), 402868224);
 
         // Check same file all been confirmed
         assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status,
@@ -346,9 +346,9 @@ fn test_for_report_works_success_without_sorder() {
         let report_works_info = valid_report_works_info();
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(account.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
@@ -359,8 +359,8 @@ fn test_for_report_works_success_without_sorder() {
         ));
 
         // Check workloads after work report
-        assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 0);
+        assert_eq!(Swork::reserved(), 4294967296);
+        assert_eq!(Swork::used(), 0);
     });
 }
 
@@ -373,7 +373,7 @@ fn test_for_report_works_failed_by_pub_key_is_not_found() {
         report_works_info.pub_key = "another_pub_key".as_bytes().to_vec();
 
         assert_noop!(
-            Tee::report_works(
+            Swork::report_works(
                 Origin::signed(account.clone()),
                 report_works_info.pub_key,
                 report_works_info.block_number,
@@ -406,7 +406,7 @@ fn test_for_report_works_failed_by_reporter_is_not_registered() {
         };
 
         assert_noop!(
-            Tee::report_works(
+            Swork::report_works(
                 Origin::signed(account.clone()),
                 report_works_info.pub_key,
                 report_works_info.block_number,
@@ -443,7 +443,7 @@ fn test_for_work_report_timing_check_failed_by_wrong_block_hash() {
         };
 
         assert_noop!(
-            Tee::report_works(
+            Swork::report_works(
                 Origin::signed(account.clone()),
                 report_works_info.pub_key,
                 report_works_info.block_number,
@@ -480,7 +480,7 @@ fn test_for_work_report_timing_check_failed_by_slot_outdated() {
         };
 
         assert_noop!(
-            Tee::report_works(
+            Swork::report_works(
                 Origin::signed(account.clone()),
                 report_works_info.pub_key,
                 report_works_info.block_number,
@@ -523,7 +523,7 @@ fn test_for_work_report_sig_check_failed() {
         };
 
         assert_noop!(
-            Tee::report_works(
+            Swork::report_works(
                 Origin::signed(account.clone()),
                 report_works_info.pub_key,
                 report_works_info.block_number,
@@ -552,7 +552,7 @@ fn test_for_wr_check_failed_order_by_no_file_in_wr() {
         let report_works_info = valid_report_works_info();
 
         // report works should ok
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(account.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
@@ -563,7 +563,7 @@ fn test_for_wr_check_failed_order_by_no_file_in_wr() {
         ));
 
         // check work report and workload, current_report_slot updating should work
-        Tee::update_identities();
+        Swork::update_identities();
 
         // Check this 99 order should be failed
         assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
@@ -576,13 +576,13 @@ fn test_for_wr_check_failed_order_by_not_reported() {
     new_test_ext().execute_with(|| {
         // 1st era
         run_to_block(303, None);
-        Tee::update_identities();
+        Swork::update_identities();
 
         add_success_sorder(650);
 
         // 2nd era
         run_to_block(606, None);
-        Tee::update_identities();
+        Swork::update_identities();
 
         // Check this 99 order should be failed, cause wr is outdated
         assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
@@ -601,7 +601,7 @@ fn test_for_wr_check_failed_order_by_no_wr() {
         // This won't happen when previous test case occurs, cause `not reported` will
         // set sorder.status = Failed, but we still design this test case anyway.
         remove_work_report(&account);
-        Tee::update_identities();
+        Swork::update_identities();
 
         // Check this 99 order should be failed, cause wr is outdated
         assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
@@ -626,7 +626,7 @@ fn test_for_outdated_work_reports() {
         };
 
         // report works should ok
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(account.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
@@ -637,46 +637,46 @@ fn test_for_outdated_work_reports() {
         ));
 
         // check work report and workload, current_report_slot updating should work
-        assert_eq!(Tee::current_report_slot(), 0);
-        Tee::update_identities();
-        assert_eq!(Tee::current_report_slot(), 300);
+        assert_eq!(Swork::current_report_slot(), 0);
+        Swork::update_identities();
+        assert_eq!(Swork::current_report_slot(), 300);
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 0);
+        assert_eq!(Swork::reserved(), 4294967296);
+        assert_eq!(Swork::used(), 0);
 
         // generate 401 blocks, wr still valid
         run_to_block(401, None);
         assert_eq!(
-            Tee::work_reports(&account),
+            Swork::work_reports(&account),
             Some(wr.clone())
         );
-        assert!(Tee::reported_in_slot(&account, 300).1);
+        assert!(Swork::reported_in_slot(&account, 300).1);
 
         // generate 602 blocks
         run_to_block(602, None);
-        assert_eq!(Tee::current_report_slot(), 300);
-        Tee::update_identities();
-        assert_eq!(Tee::current_report_slot(), 600);
+        assert_eq!(Swork::current_report_slot(), 300);
+        Swork::update_identities();
+        assert_eq!(Swork::current_report_slot(), 600);
         assert_eq!(
-            Tee::work_reports(&account),
+            Swork::work_reports(&account),
             Some(wr.clone())
         );
-        assert!(!Tee::reported_in_slot(&account, 600).1);
+        assert!(!Swork::reported_in_slot(&account, 600).1);
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 0);
+        assert_eq!(Swork::reserved(), 4294967296);
+        assert_eq!(Swork::used(), 0);
 
         run_to_block(903, None);
-        assert_eq!(Tee::current_report_slot(), 600);
-        Tee::update_identities();
-        assert_eq!(Tee::current_report_slot(), 900);
+        assert_eq!(Swork::current_report_slot(), 600);
+        Swork::update_identities();
+        assert_eq!(Swork::current_report_slot(), 900);
 
         // Check workloads
-        assert_eq!(Tee::work_reports(&account), None);
-        assert_eq!(Tee::reserved(), 0);
-        assert_eq!(Tee::used(), 0);
+        assert_eq!(Swork::work_reports(&account), None);
+        assert_eq!(Swork::reserved(), 0);
+        assert_eq!(Swork::used(), 0);
     });
 }
 
@@ -695,46 +695,46 @@ fn test_abnormal_era() {
 
         // If new era happens in 101, next work is not reported
         run_to_block(101, None);
-        Tee::update_identities();
+        Swork::update_identities();
         assert_eq!(
-            Tee::work_reports(&account),
+            Swork::work_reports(&account),
             Some(Default::default())
         );
-        assert_eq!(Tee::reserved(), 0);
-        assert_eq!(Tee::current_report_slot(), 0);
+        assert_eq!(Swork::reserved(), 0);
+        assert_eq!(Swork::current_report_slot(), 0);
 
         // If new era happens on 301, we should update work report and current report slot
         run_to_block(301, None);
-        Tee::update_identities();
+        Swork::update_identities();
         assert_eq!(
-            Tee::work_reports(&account),
+            Swork::work_reports(&account),
             Some(Default::default())
         );
         assert_eq!(
-            Tee::current_report_slot(),
+            Swork::current_report_slot(),
             300
         );
-        assert!(Tee::reported_in_slot(&account, 0).1);
+        assert!(Swork::reported_in_slot(&account, 0).1);
 
         // If next new era happens on 303, then nothing should happen
         run_to_block(303, None);
-        Tee::update_identities();
+        Swork::update_identities();
         assert_eq!(
-            Tee::work_reports(&account),
+            Swork::work_reports(&account),
             Some(Default::default())
         );
         assert_eq!(
-            Tee::current_report_slot(),
+            Swork::current_report_slot(),
             300
         );
-        assert!(Tee::reported_in_slot(&account, 0).1);
-        assert!(!Tee::reported_in_slot(&account, 300).1);
+        assert!(Swork::reported_in_slot(&account, 0).1);
+        assert!(!Swork::reported_in_slot(&account, 300).1);
 
         // Then report works
         // reserved: 4294967296,
         // used: 1676266280,
         run_to_block(304, None);
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(account.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
@@ -743,11 +743,11 @@ fn test_abnormal_era() {
             report_works_info.files,
             report_works_info.sig
         ));
-        assert_eq!(Tee::work_reports(&account), Some(wr));
+        assert_eq!(Swork::work_reports(&account), Some(wr));
         // total workload should keep same, cause we only updated in a new era
-        assert_eq!(Tee::reserved(), 4294967296);
-        assert_eq!(Tee::used(), 0);
-        assert!(Tee::reported_in_slot(&account, 300).1);
+        assert_eq!(Swork::reserved(), 4294967296);
+        assert_eq!(Swork::used(), 0);
+        assert!(Swork::reported_in_slot(&account, 300).1);
     })
 }
 
@@ -772,15 +772,15 @@ fn test_ab_upgrade_should_work() {
         };
 
         // 1. Normal report should be ✅
-        // a. Run to 37205 block first with old tee code
+        // a. Run to 37205 block first with old sworker code
         Code::put(old_code.clone());
         run_to_block(37205, Some(old_bh.clone()));
 
         // b. Identity should do `upgrade` with current_id.code != code
-        assert!(Tee::maybe_upsert_id(&reporter, &old_id));
+        assert!(Swork::maybe_upsert_id(&reporter, &old_id));
 
         // c. Report works with current id should be ✅
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(reporter.clone()),
             old_pub_key.clone(),
             37_200,
@@ -789,8 +789,8 @@ fn test_ab_upgrade_should_work() {
             old_files.clone(),
             hex::decode("a30eb07fd09687264a7b7215061cd9424f945c898bfeb326c9bfa5870ec3926639d10032d7f5141514b03af32142fec7bb8ad09f028d6e0c5e40f4bc03d56272").unwrap(),
         ));
-        assert_eq!(Tee::work_reports(&reporter).unwrap(), old_work_report.clone());
-        assert_eq!(Tee::reported_in_slot(&reporter, 37200), (false, true));
+        assert_eq!(Swork::work_reports(&reporter).unwrap(), old_work_report.clone());
+        assert_eq!(Swork::reported_in_slot(&reporter, 37200), (false, true));
 
         // 2. AB Upgrade should be ✅(accept 2 ids report works)
         // a. Bob do the upgrade
@@ -810,15 +810,15 @@ fn test_ab_upgrade_should_work() {
             files: new_files.clone()
         };
 
-        // b. Run to 38705 block with new tee code, and do the upgrade
+        // b. Run to 38705 block with new sworker code, and do the upgrade
         run_to_block(38705, Some(new_bh.clone()));
-        assert_ok!(Tee::upgrade(Origin::root(), new_code.clone(), 39000));
+        assert_ok!(Swork::upgrade(Origin::root(), new_code.clone(), 39000));
 
-        assert!(Tee::maybe_upsert_id(&reporter, &new_id));
-        assert_eq!(Tee::identities(&reporter), (Some(old_id.clone()), Some(new_id.clone())));
+        assert!(Swork::maybe_upsert_id(&reporter, &new_id));
+        assert_eq!(Swork::identities(&reporter), (Some(old_id.clone()), Some(new_id.clone())));
 
         // c. Report with new identity should be ✅
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(reporter.clone()),
             new_pk.clone(),
             38_700,
@@ -827,11 +827,11 @@ fn test_ab_upgrade_should_work() {
             new_files.clone(),
             hex::decode("525fd0d4afcd99965166c6fca2cb74ce34bb303109921d6ab0e172aafb00a4c3ec6086c59e4abe232782848170b88d19b2641d470bb30ba7827d5161ec5ad46e").unwrap(),
         ));
-        assert_eq!(Tee::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Tee::reported_in_slot(&reporter, 38700), (false, true));
+        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
+        assert_eq!(Swork::reported_in_slot(&reporter, 38700), (false, true));
 
         // d. Report with old identity should also be ✅
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(reporter.clone()),
             old_pub_key.clone(),
             38700,
@@ -845,15 +845,15 @@ fn test_ab_upgrade_should_work() {
         new_work_report.reserved += old_work_report.reserved;
         new_work_report.files = old_files.clone();
 
-        assert_eq!(Tee::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Tee::reported_in_slot(&reporter, 38700), (true, true));
+        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
+        assert_eq!(Swork::reported_in_slot(&reporter, 38700), (true, true));
 
         // 3. AB expire should work, replay the block authoring
         // a. Bob do not upgrade
-        assert_ok!(Tee::upgrade(Origin::root(), new_code.clone(), 38800));
+        assert_ok!(Swork::upgrade(Origin::root(), new_code.clone(), 38800));
 
         // b. Double report would be ignore in the first place ❌, even the sig is illegal
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(reporter.clone()),
             old_pub_key.clone(),
             38700,
@@ -862,7 +862,7 @@ fn test_ab_upgrade_should_work() {
             old_files.clone(),
             hex::decode("1111").unwrap(),
         ));
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(reporter.clone()),
             new_pk.clone(),
             38700,
@@ -871,11 +871,11 @@ fn test_ab_upgrade_should_work() {
             new_files.clone(),
             hex::decode("2222").unwrap(),
         ));
-        assert_eq!(Tee::work_reports(&reporter).unwrap(), new_work_report.clone());
+        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
 
         // c. Run to block 39005, report should ❌
         run_to_block(39005, Some(new_bh.clone()));
-        assert_noop!(Tee::report_works(
+        assert_noop!(Swork::report_works(
             Origin::signed(reporter.clone()),
             old_pub_key.clone(),
             39000,
@@ -890,10 +890,10 @@ fn test_ab_upgrade_should_work() {
         });
 
         // 4. Shrink attack(do not upgrade and shrink his disk) detection should works fine
-        assert_ok!(Tee::upgrade(Origin::root(), new_code.clone(), 39500));
+        assert_ok!(Swork::upgrade(Origin::root(), new_code.clone(), 39500));
 
         // a. Report with old identity should also be ✅
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(reporter.clone()),
             old_pub_key.clone(),
             39000,
@@ -906,12 +906,12 @@ fn test_ab_upgrade_should_work() {
         new_work_report.block_number = 39000;
         new_work_report.files = old_files.clone();
         // b. This will keep the same with elder work report
-        assert_eq!(Tee::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Tee::reported_in_slot(&reporter, 39000), (true, false));
+        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
+        assert_eq!(Swork::reported_in_slot(&reporter, 39000), (true, false));
 
         // c. Reporter with old identity, the reserved should be right(after shrink the workload)
         run_to_block(39305, Some(new_bh.clone()));
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(reporter.clone()),
             old_pub_key.clone(),
             39300,
@@ -923,7 +923,7 @@ fn test_ab_upgrade_should_work() {
         new_work_report.reserved = 0;
         new_work_report.cached_reserved = 0;
         new_work_report.block_number = 39300;
-        assert_eq!(Tee::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Tee::reported_in_slot(&reporter, 39300), (true, false));
+        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
+        assert_eq!(Swork::reported_in_slot(&reporter, 39300), (true, false));
     });
 }

@@ -38,7 +38,25 @@ Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust
 
 ## Network
 
-### 1. Run as dev
+### 1. Connect to maxwell
+
+```shell
+./target/release/crust --chain=maxwell
+```
+
+Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Maxwell-1.0-User-Guide).
+
+### 2. Connect to rocky
+
+> Archived chain for only **internal test** now.
+
+```shell
+./target/release/crust --chain=rocky
+```
+
+Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Join-Crust-Rocky).
+
+### 3. Run as dev
 
 Purge any existing developer chain state:
 
@@ -54,7 +72,7 @@ Start a development chain with:
 
 Detailed logs may be shown by running the node with the following environment variables set: `RUST_LOG=debug RUST_BACKTRACE=1 cargo run -- --dev`.
 
-### 2. Run as local
+### 4. Run as local
 
 If you want to see the multi-node consensus algorithm in action locally, then you can create a local testnet with two validator nodes for Alice and Bob, who are the initial authorities of the genesis chain that have been endowed with testnet units.
 

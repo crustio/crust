@@ -49,12 +49,12 @@ jobs:
           use-cross: false
           command: test
           args: --package cstrml-staking --lib tests
-      - name: Cargo test tee
+      - name: Cargo test swork
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
-          args: --package cstrml-tee --lib tests
+          args: --package cstrml-swork --lib tests
       - name: Cargo test storage order
         uses: actions-rs/cargo@v1
         with:

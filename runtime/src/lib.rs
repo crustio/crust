@@ -329,7 +329,7 @@ impl staking::Trait for Runtime {
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type TeeInterface = Self;
+    type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
 }
 
@@ -384,7 +384,7 @@ impl sudo::Trait for Runtime {
     type Call = Call;
 }
 
-impl tee::Trait for Runtime {
+impl swork::Trait for Runtime {
     type Currency = Balances;
     type Event = Event;
     type Works = Staking;
@@ -407,7 +407,7 @@ impl market::Trait for Runtime {
     type Randomness = RandomnessCollectiveFlip;
     // TODO: Bonding with balance module(now we impl inside Market)
     type Payment = Payment;
-    type OrderInspector = Tee;
+    type OrderInspector = Swork;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
     type PunishDuration = PunishDuration;
@@ -454,7 +454,7 @@ construct_runtime! {
         Scheduler: scheduler::{Module, Call, Storage, Event<T>},
 
         // Crust modules
-        Tee: tee::{Module, Call, Storage, Event<T>, Config<T>},
+        Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
         Market: market::{Module, Call, Storage, Event<T>},
         Payment: payment::{Module, Call, Storage, Event<T>},
 

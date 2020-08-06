@@ -3,11 +3,11 @@ use sp_core::{Pair, Public, sr25519, crypto::UncheckedInto};
 use crust_runtime::{
     AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
     AuthorityDiscoveryConfig, SessionConfig, SessionKeys, StakerStatus,
-    StakingConfig, IndicesConfig, SystemConfig, TeeConfig, SudoConfig,
+    StakingConfig, IndicesConfig, SystemConfig, SworkConfig, SudoConfig,
     WASM_BINARY
 };
 use cstrml_staking::Forcing;
-use cstrml_tee::WorkReport;
+use cstrml_swork::WorkReport;
 use grandpa_primitives::AuthorityId as GrandpaId;
 use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
@@ -240,7 +240,7 @@ fn testnet_genesis(
         authority_discovery: Some(AuthorityDiscoveryConfig {
             keys: vec![]
         }),
-        tee: Some(TeeConfig {
+        swork: Some(SworkConfig {
             code: vec![],
             current_report_slot: 0,
             identities: endowed_accounts
@@ -353,7 +353,7 @@ fn rocky_staging_testnet_config_genesis() -> GenesisConfig {
         authority_discovery: Some(AuthorityDiscoveryConfig {
             keys: vec![]
         }),
-        tee: Some(TeeConfig {
+        swork: Some(SworkConfig {
             code: vec![],
             current_report_slot: 0,
             identities: endowed_accounts
@@ -474,7 +474,7 @@ fn maxwell_staging_testnet_config_genesis() -> GenesisConfig {
         authority_discovery: Some(AuthorityDiscoveryConfig {
             keys: vec![]
         }),
-        tee: Some(TeeConfig {
+        swork: Some(SworkConfig {
             code: vec![],
             current_report_slot: 0,
             identities: endowed_accounts

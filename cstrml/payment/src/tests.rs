@@ -14,12 +14,12 @@ use sp_core::{crypto::AccountId32, H256};
 type AccountId = AccountId32;
 
 struct ReportWorksInfo {
-    pub_key: PubKey,
+    pub_key: SworkerPubKey,
     block_number: u64,
     block_hash: Vec<u8>,
     reserved: u64,
     files: Vec<(MerkleRoot, u64)>,
-    sig: TeeSignature
+    sig: SworkerSignature
 }
 
 fn valid_report_works_info() -> ReportWorksInfo {
@@ -85,10 +85,10 @@ fn test_for_storage_order_and_payment_should_work() {
         });
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
         let report_works_info = valid_report_works_info();
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(merchant.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
@@ -198,10 +198,10 @@ fn test_for_storage_order_and_payment_should_suspend() {
         });
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
         let report_works_info = valid_report_works_info();
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(merchant.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,
@@ -311,10 +311,10 @@ fn test_for_close_storage_order_in_payment() {
         });
 
         // Check workloads
-        assert_eq!(Tee::reserved(), 0);
+        assert_eq!(Swork::reserved(), 0);
 
         let report_works_info = valid_report_works_info();
-        assert_ok!(Tee::report_works(
+        assert_ok!(Swork::report_works(
             Origin::signed(merchant.clone()),
             report_works_info.pub_key,
             report_works_info.block_number,

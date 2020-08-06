@@ -27,7 +27,7 @@ sp-runtime = { version = '2.0.0-rc4', default-features = false }
 sp-staking = { version = '2.0.0-rc4', default-features = false }
 
 # crust runtime modules
-tee = { package = "cstrml-tee", path = "../tee", default-features = false }
+swork = { package = "cstrml-swork", path = "../swork", default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
@@ -55,5 +55,5 @@ std = [
 	"pallet-session/std",
 	"frame-system/std",
 	"pallet-authorship/std",
-	"tee/std"
+	"swork/std"
 ]

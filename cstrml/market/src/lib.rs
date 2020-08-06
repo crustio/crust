@@ -117,11 +117,11 @@ pub trait OrderInspector<AccountId> {
 
 /// Means for interacting with a specialized version of the `market` trait.
 ///
-/// This is needed because `Tee`
+/// This is needed because `sWork`
 /// 1. updates the `Merchants` of the `market::Trait`
 /// 2. use `Merchants` to judge work report
 pub trait MarketInterface<AccountId, Hash, Balance> {
-    /// MerchantInfo{files} will be used for tee module.
+    /// MerchantInfo{files} will be used for swork module.
     fn merchants(account_id: &AccountId) -> Option<MerchantInfo<Hash, Balance>>;
     /// Get storage order
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
@@ -199,7 +199,7 @@ pub trait Trait: system::Trait {
     /// Connector with payment module
     type Payment: Payment<Self::AccountId, Self::Hash, BalanceOf<Self>>;
 
-    /// Connector with tee module
+    /// Connector with swork module
     type OrderInspector: OrderInspector<Self::AccountId>;
 
     /// Minimum storage order price
@@ -274,7 +274,7 @@ decl_module! {
         fn deposit_event() = default;
 
         /// Register to be a merchant, you should provide your storage layer's address info,
-        /// this will require you to pledge first, complexity depends on `Pledges`(P) and `tee.WorkReports`(W).
+        /// this will require you to pledge first, complexity depends on `Pledges`(P) and `swork.WorkReports`(W).
         ///
         /// # <weight>
 		/// Complexity: O(logP)

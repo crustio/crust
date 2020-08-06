@@ -85,7 +85,7 @@ impl balances::Trait for Test {
 }
 
 impl market::Payment<<Test as system::Trait>::AccountId,
-    <Test as system::Trait>::Hash, BalanceOf<Test>> for Tee
+    <Test as system::Trait>::Hash, BalanceOf<Test>> for Swork
 {
     fn reserve_sorder(_: &Hash, _: &AccountId, _: Balance) -> bool {
         true
@@ -105,8 +105,8 @@ impl market::Trait for Test {
     type CurrencyToBalance = ();
     type Event = ();
     type Randomness = ();
-    type Payment = Tee;
-    type OrderInspector = Tee;
+    type Payment = Swork;
+    type OrderInspector = Swork;
     type MinimumStoragePrice = ();
     type MinimumSorderDuration = ();
     type PunishDuration = PunishDuration;
@@ -119,7 +119,7 @@ impl Trait for Test {
     type MarketInterface = Market;
 }
 
-pub type Tee = Module<Test>;
+pub type Swork = Module<Test>;
 pub type System = system::Module<Test>;
 pub type Market = market::Module<Test>;
 

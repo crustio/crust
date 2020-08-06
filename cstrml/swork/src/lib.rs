@@ -19,10 +19,10 @@ use serde::{Deserialize, Serialize};
 
 // Crust primitives and runtime modules
 use primitives::{
-    constants::tee::*,
-    MerkleRoot, PubKey, TeeSignature,
+    constants::swork::*,
+    MerkleRoot, SworkerPubKey, SworkerSignature,
     ReportSlot, BlockNumber, IASSig,
-    ISVBody, Cert, TeeCode
+    ISVBody, SworkerCert, SworkerCode
 };
 use market::{OrderStatus, MarketInterface, OrderInspector};
 
@@ -41,8 +41,8 @@ pub type BalanceOf<T> =
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Identity {
-    pub pub_key: PubKey,
-    pub code: TeeCode,
+    pub pub_key: SworkerPubKey,
+    pub code: SworkerCode,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -79,7 +79,7 @@ impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
     /// The payment balance.
-    /// TODO: remove this for abstracting MarketInterface into tee self
+    /// TODO: remove this for abstracting MarketInterface into sWorker self
     type Currency: ReservableCurrency<Self::AccountId>;
 
     /// The overarching event type.
@@ -93,14 +93,14 @@ pub trait Trait: system::Trait {
 }
 
 decl_storage! {
-    trait Store for Module<T: Trait> as Tee {
-        /// The TEE enclave code, this should be managed by sudo/democracy
-        pub Code get(fn code) config(): TeeCode;
+    trait Store for Module<T: Trait> as Swork {
+        /// The sWorker enclave code, this should be managed by sudo/democracy
+        pub Code get(fn code) config(): SworkerCode;
 
         /// The AB upgrade expired block, this should be managed by sudo/democracy
         pub ABExpire get(fn ab_expire): Option<T::BlockNumber>;
 
-        /// The TEE identities, mapping from controller to an optional identity tuple
+        /// The sWorker identities, mapping from controller to an optional identity tuple
         /// (elder_id, current_id) = (before-upgrade identity, upgraded identity)
         pub Identities get(fn identities) config():
             map hasher(blake2_128_concat) T::AccountId => (Option<Identity>, Option<Identity>);
@@ -134,7 +134,7 @@ decl_storage! {
 }
 
 decl_error! {
-    /// Error for the tee module.
+    /// Error for the swork module.
     pub enum Error for Module<T: Trait> {
         /// Illegal applier
         IllegalApplier,
@@ -169,7 +169,7 @@ decl_module! {
         /// - 2 DB try
         /// # </weight>
         #[weight = 1_000_000]
-        pub fn upgrade(origin, new_code: TeeCode, expire_block: T::BlockNumber) {
+        pub fn upgrade(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
             ensure_root(origin)?;
 
             <Code>::put(new_code);
@@ -177,7 +177,7 @@ decl_module! {
         }
 
         /// Register as new trusted node, can only called from sWorker.
-        /// All `inputs` can only be generated from sWorker TEE enclave
+        /// All `inputs` can only be generated from sWorker's enclave
         ///
         /// The dispatch origin for this call must be _Signed_ by the controller account.
         ///
@@ -198,10 +198,10 @@ decl_module! {
         pub fn register(
             origin,
             ias_sig: IASSig,
-            ias_cert: Cert,
+            ias_cert: SworkerCert,
             applier: T::AccountId,
             isv_body: ISVBody,
-            sig: TeeSignature
+            sig: SworkerSignature
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -232,7 +232,7 @@ decl_module! {
         }
 
         /// Report storage works from sWorker
-        /// All `inputs` can only be generated from sWorker TEE enclave
+        /// All `inputs` can only be generated from sWorker's enclave
         ///
         /// The dispatch origin for this call must be _Signed_ by the controller account.
         ///
@@ -252,12 +252,12 @@ decl_module! {
         #[weight = (212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7), DispatchClass::Operational)]
         pub fn report_works(
             origin,
-            pub_key: PubKey,
+            pub_key: SworkerPubKey,
             block_number: u64,
             block_hash: Vec<u8>,
             reserved: u64,
             files: Vec<(MerkleRoot, u64)>,
-            sig: TeeSignature
+            sig: SworkerSignature
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -633,7 +633,7 @@ impl<T: Trait> Module<T> {
     /// This function is judging if the identity already be registered
     /// TC is O(n)
     /// DB try is O(1)
-    fn id_is_unique(pk: &PubKey) -> bool {
+    fn id_is_unique(pk: &SworkerPubKey) -> bool {
         let mut is_unique = true;
 
         for (_, (_, maybe_current_id)) in <Identities<T>>::iter() {
@@ -650,10 +650,10 @@ impl<T: Trait> Module<T> {
 
     fn check_and_get_pk(
         ias_sig: &IASSig,
-        ias_cert: &Cert,
+        ias_cert: &SworkerCert,
         account_id: &T::AccountId,
         isv_body: &ISVBody,
-        sig: &TeeSignature
+        sig: &SworkerSignature
     ) -> Option<Vec<u8>> {
         let enclave_code = Self::code();
         let applier = account_id.encode();
@@ -673,10 +673,10 @@ impl<T: Trait> Module<T> {
     /// 1. Reported from `current_id` and the public key is match, then return (false, true)
     /// 2. Reported from `elder_id`(ab expire is legal), and the public ket is match, then return (true, false)
     /// 3. Or, return (false, false)
-    fn work_report_id_check(reporter: &T::AccountId, wr_pk: &PubKey) -> (bool, bool) {
+    fn work_report_id_check(reporter: &T::AccountId, wr_pk: &SworkerPubKey) -> (bool, bool) {
         let (maybe_eid, maybe_cid): (Option<Identity>, Option<Identity>) = Self::identities(reporter);
         if let Some(cid) = maybe_cid {
-            let code: TeeCode = Self::code();
+            let code: SworkerCode = Self::code();
             let current_bn = <system::Module<T>>::block_number();
             let not_expired = Self::ab_expire().is_some() && current_bn < Self::ab_expire().unwrap();
 
@@ -721,12 +721,12 @@ impl<T: Trait> Module<T> {
     }
 
     fn work_report_sig_check(
-        pub_key: &PubKey,
+        pub_key: &SworkerPubKey,
         block_number: u64,
         block_hash: &Vec<u8>,
         reserved: u64,
         files: &Vec<(MerkleRoot, u64)>,
-        sig: &TeeSignature
+        sig: &SworkerSignature
     ) -> bool {
         api::crypto::verify_work_report_sig(
             pub_key,

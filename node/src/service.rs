@@ -18,7 +18,7 @@ native_executor_instance!(
     pub Executor,
     crust_runtime::api::dispatch,
     crust_runtime::native_version,
-    cstrml_tee::api::crypto::HostFunctions
+    cstrml_swork::api::crypto::HostFunctions
 );
 
 /// Starts a `ServiceBuilder` for a full service.

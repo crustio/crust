@@ -56,7 +56,7 @@ sp-version = { default-features = false, version = '2.0.0-rc4' }
 sp-runtime-interface = { default-features = false, version = '2.0.0-rc4' }
 
 # crust runtime modules
-tee = { package = 'cstrml-tee', path = '../cstrml/tee', default-features = false }
+swork = { package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
 market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
 payment = { package = 'cstrml-payment', path = '../cstrml/payment', default-features = false }
@@ -102,7 +102,7 @@ std = [
     'scheduler/std',
     'offences/std',
     'sp-runtime-interface/std',
-    'tee/std',
+    'swork/std',
     'staking/std',
     'market/std',
     'payment/std',

@@ -11,7 +11,7 @@ on:
       - feature/*
 jobs:
   build:
-    name: Build & Test
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
@@ -43,30 +43,50 @@ jobs:
         with:
           use-cross: false
           command: build
+  test-staking:
+    name: Test Staking Module
+    needs: build
+    steps:
       - name: Cargo test staking
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
           args: --package cstrml-staking --lib tests
-      - name: Cargo test tee
+  test-swork:
+    name: Test sWork Module  
+    needs: build
+    steps:
+      - name: Cargo test swork
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
-          args: --package cstrml-tee --lib tests
+          args: --package cstrml-swork --lib tests
+  test-market:
+    name: Test Markst Module
+    needs: build
+    steps:
       - name: Cargo test storage order
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
           args: --package cstrml-market --lib tests
+  test-payment:
+    name: Test Payment Module
+    needs: build
+    steps:
       - name: Cargo test payment
         uses: actions-rs/cargo@v1
         with:
           use-cross: false
           command: test
           args: --package cstrml-payment --lib tests
+  test-balances:
+    name: Test Balances Module
+    needs: build
+    steps:
       - name: Cargo test balances
         uses: actions-rs/cargo@v1
         with:

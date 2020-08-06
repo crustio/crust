@@ -67,8 +67,8 @@ impl<AId> Works<AId> for () {
 /// Implement market's order inspector, bonding with work report
 /// and return if the order is legality
 impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
-    fn check_works(provider: &T::AccountId, file_size: u64) -> bool {
-        if let Some(wr) = Self::work_reports(provider) {
+    fn check_works(merchant: &T::AccountId, file_size: u64) -> bool {
+        if let Some(wr) = Self::work_reports(merchant) {
               wr.reserved > file_size
         } else {
             false
@@ -240,13 +240,13 @@ decl_module! {
         ///
         /// # <weight>
 		/// - Independent of the arguments. Moderate complexity.
-		/// - TC depends on identities' size and market.Provider.file_map size
-		/// - DB try depends on identities and market.Provider.file_map
+		/// - TC depends on identities' size and market.Merchant.file_map size
+		/// - DB try depends on identities and market.Merchant.file_map
 		///
 		/// ------------------
 		/// Base Weight: 212 µs
 		/// DB Weight:
-		/// - Read: Identities, ReportedInSlot, Code, market.Provider, market.SOrder
+		/// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
 		/// - Write: WorkReport, ReportedInSlot, market.SOrder
 		/// # </weight>
         #[weight = (212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7), DispatchClass::Operational)]
@@ -331,8 +331,8 @@ impl<T: Trait> Module<T> {
             let mut success_sorder_files: Vec<(MerkleRoot, T::Hash)> = vec![];
             let mut ongoing_sorder_ids: Vec<T::Hash> = vec![];
             let mut overdue_sorder_ids: Vec<T::Hash> = vec![];
-            if let Some(provision) = T::MarketInterface::providers(&controller) {
-                for (f_id, order_ids) in provision.file_map.iter() {
+            if let Some(minfo) = T::MarketInterface::merchants(&controller) {
+                for (f_id, order_ids) in minfo.file_map.iter() {
                     for order_id in order_ids {
                         // Get order status(should exist) and (maybe) change the status
                         let sorder =
@@ -350,7 +350,7 @@ impl<T: Trait> Module<T> {
             }
             // do punishment
             for order_id in ongoing_sorder_ids {
-                T::MarketInterface::maybe_punish_provider(&order_id);
+                T::MarketInterface::maybe_punish_merchant(&order_id);
             }
             // close overdue storage order
             for order_id in overdue_sorder_ids {
@@ -446,7 +446,7 @@ impl<T: Trait> Module<T> {
         // TC = O(M*logN), N is file_map's key number, M is same file's orders number
         // 2M DB try
         let mut updated_wr = wr.clone();
-        let file_map = T::MarketInterface::providers(who).unwrap_or_default().file_map;
+        let file_map = T::MarketInterface::merchants(who).unwrap_or_default().file_map;
         updated_wr.used = wr.files.iter().fold(0, |used, (f_id, f_size)| {
             // TODO: Abstract and make this logic be a separated function
             if let Some(order_ids) = file_map.get(f_id) {

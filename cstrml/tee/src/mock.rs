@@ -12,7 +12,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup, Zero},
     Perbill,
 };
-use market::{Provision, StorageOrder, ProviderPunishment};
+use market::{MerchantInfo, StorageOrder, MerchantPunishment};
 use primitives::{MerkleRoot, Hash};
 use balances::AccountData;
 use std::{cell::RefCell};
@@ -185,7 +185,7 @@ pub fn run_to_block(n: u64, maybe_bh: Option<Vec<u8>>) {
 }
 
 pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
-    let mut file_map = Market::providers(who).unwrap_or_default().file_map;
+    let mut file_map = Market::merchants(who).unwrap_or_default().file_map;
     let sorder_id: Hash = Hash::repeat_byte(rd);
     let sorder = StorageOrder {
         file_identifier: f_id.clone(),
@@ -193,7 +193,7 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, exp
         created_on: 0,
         completed_on: 0,
         expired_on,
-        provider: who.clone(),
+        merchant: who.clone(),
         client: who.clone(),
         amount: 10,
         status: os
@@ -204,19 +204,19 @@ pub fn upsert_sorder_to_provider(who: &AccountId, f_id: &MerkleRoot, rd: u8, exp
         file_map.insert(f_id.clone(), vec![sorder_id.clone()]);
     }
 
-    let provision = Provision {
+    let provision = MerchantInfo {
         address_info: vec![],
         storage_price: 1,
         file_map
     };
-    <market::Providers<Test>>::insert(who, provision);
+    <market::Merchants<Test>>::insert(who, provision);
     <market::StorageOrders<Test>>::insert(sorder_id.clone(), sorder);
-    let punishment = ProviderPunishment {
+    let punishment = MerchantPunishment {
         success: 0,
         failed: 0,
         value: Zero::zero()
     };
-    <market::ProviderPunishments<Test>>::insert(sorder_id, punishment);
+    <market::MerchantPunishments<Test>>::insert(sorder_id, punishment);
 }
 
 pub fn remove_work_report(who: &AccountId) {

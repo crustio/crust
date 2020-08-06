@@ -112,7 +112,7 @@ impl system::Trait for Test {
 pub struct TestOrderInspector;
 
 impl market::OrderInspector<AccountId> for TestOrderInspector {
-    // file size should smaller than provider's num
+    // file size should smaller than merchant's num
     fn check_works(_provider: &AccountId, _file_size: u64) -> bool {
         true
     }

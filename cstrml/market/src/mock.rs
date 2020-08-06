@@ -102,9 +102,9 @@ impl system::Trait for Test {
 pub struct TestOrderInspector;
 
 impl OrderInspector<AccountId> for TestOrderInspector {
-    // file size should smaller than provider's num
-    fn check_works(provider: &AccountId, file_size: u64) -> bool {
-        if let Some(wr) = Tee::work_reports(provider) {
+    // file size should smaller than merchant's num
+    fn check_works(merchant: &AccountId, file_size: u64) -> bool {
+        if let Some(wr) = Tee::work_reports(merchant) {
             wr.reserved > file_size
         } else {
             false

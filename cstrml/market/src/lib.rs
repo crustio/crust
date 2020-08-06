@@ -45,7 +45,7 @@ pub struct StorageOrder<AccountId, Balance> {
     pub created_on: BlockNumber,
     pub completed_on: BlockNumber,
     pub expired_on: BlockNumber,
-    pub provider: AccountId,
+    pub merchant: AccountId,
     pub client: AccountId,
     pub amount: Balance,
     pub status: OrderStatus
@@ -61,7 +61,7 @@ pub enum OrderStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct ProviderPunishment<Balance> {
+pub struct MerchantPunishment<Balance> {
     pub success: EraIndex,
     pub failed: EraIndex,
     pub value: Balance
@@ -85,10 +85,10 @@ impl Default for OrderStatus {
 /// Preference of what happens regarding validation.
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Provision<Hash, Balance> {
-    /// Provider's address
+pub struct MerchantInfo<Hash, Balance> {
+    /// Merchant's address
     pub address_info: AddressInfo,
-    /// Provider's storage order's price, unit is CRUs/byte/minute
+    /// Merchant's storage order's price, unit is CRUs/byte/minute
     pub storage_price: Balance,
     /// Mapping from `file_id` to `sorder_id`s
     /// this mapping only be added when client place a sorder
@@ -111,30 +111,30 @@ pub trait Payment<AccountId, Hash, Balance> {
 /// A trait for checking order's legality
 /// This wanyi is an outer inspector to judge if s/r order can be accepted 😵
 pub trait OrderInspector<AccountId> {
-    /// Check if the provider can take storage order
-    fn check_works(provider: &AccountId, file_size: u64) -> bool;
+    /// Check if the merchant can take storage order
+    fn check_works(merchant: &AccountId, file_size: u64) -> bool;
 }
 
 /// Means for interacting with a specialized version of the `market` trait.
 ///
 /// This is needed because `Tee`
-/// 1. updates the `Providers` of the `market::Trait`
-/// 2. use `Providers` to judge work report
+/// 1. updates the `Merchants` of the `market::Trait`
+/// 2. use `Merchants` to judge work report
 pub trait MarketInterface<AccountId, Hash, Balance> {
-    /// Provision{files} will be used for tee module.
-    fn providers(account_id: &AccountId) -> Option<Provision<Hash, Balance>>;
+    /// MerchantInfo{files} will be used for tee module.
+    fn merchants(account_id: &AccountId) -> Option<MerchantInfo<Hash, Balance>>;
     /// Get storage order
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
     /// (Maybe) set storage order's status
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>);
-    /// Upsert slash record and (Maybe) do slash
-    fn maybe_punish_provider(order_id: &Hash);
+    /// Upsert punish record and (maybe) punish merchant
+    fn maybe_punish_merchant(order_id: &Hash);
     /// close storage order
     fn close_sorder(order_id: &Hash);
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
-    fn providers(_: &AId) -> Option<Provision<Hash, Balance>> {
+    fn merchants(_: &AId) -> Option<MerchantInfo<Hash, Balance>> {
         None
     }
 
@@ -146,7 +146,7 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
 
     }
 
-    fn maybe_punish_provider(_: &Hash) {
+    fn maybe_punish_merchant(_: &Hash) {
 
     }
 
@@ -158,9 +158,9 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
 {
-    fn providers(account_id: &<T as system::Trait>::AccountId)
-        -> Option<Provision<<T as system::Trait>::Hash, BalanceOf<T>>> {
-        Self::providers(account_id)
+    fn merchants(account_id: &<T as system::Trait>::AccountId)
+                 -> Option<MerchantInfo<<T as system::Trait>::Hash, BalanceOf<T>>> {
+        Self::merchants(account_id)
     }
 
     fn maybe_get_sorder(order_id: &<T as system::Trait>::Hash)
@@ -173,8 +173,8 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
         Self::maybe_set_sorder(order_id, so);
     }
 
-    fn maybe_punish_provider(order_id: &<T as system::Trait>::Hash) {
-        Self::maybe_punish_provider(order_id);
+    fn maybe_punish_merchant(order_id: &<T as system::Trait>::Hash) {
+        Self::maybe_punish_merchant(order_id);
     }
 
     fn close_sorder(order_id: &<T as system::Trait>::Hash) {
@@ -215,9 +215,9 @@ pub trait Trait: system::Trait {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Market {
-        /// A mapping from storage provider to order id
-        pub Providers get(fn providers):
-        map hasher(twox_64_concat) T::AccountId => Option<Provision<T::Hash, BalanceOf<T>>>;
+        /// A mapping from storage merchant to order id
+        pub Merchants get(fn merchants):
+        map hasher(twox_64_concat) T::AccountId => Option<MerchantInfo<T::Hash, BalanceOf<T>>>;
 
         /// A mapping from clients to order id
         pub Clients get(fn clients):
@@ -228,10 +228,10 @@ decl_storage! {
         map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
 
         /// Order status counts used for punishment
-        pub ProviderPunishments get(fn provider_punishments):
-        map hasher(twox_64_concat) T::Hash => Option<ProviderPunishment<BalanceOf<T>>>;
+        pub MerchantPunishments get(fn merchant_punishments):
+        map hasher(twox_64_concat) T::Hash => Option<MerchantPunishment<BalanceOf<T>>>;
 
-        /// Pledge details iterated by provider id
+        /// Pledge details iterated by merchant id
         pub Pledges get(fn pledges):
         map hasher(twox_64_concat) T::AccountId => Pledge<BalanceOf<T>>;
     }
@@ -244,8 +244,8 @@ decl_error! {
         GenerateOrderIdFailed,
         /// No workload
         NoWorkload,
-        /// Not provider
-        NotProvider,
+        /// Target is not merchant
+        NotMerchant,
         /// File duration is too short
         DurationTooShort,
         /// Don't have enough currency
@@ -273,14 +273,14 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        /// Register to be a provider, you should provide your storage layer's address info,
+        /// Register to be a merchant, you should provide your storage layer's address info,
         /// this will require you to pledge first, complexity depends on `Pledges`(P) and `tee.WorkReports`(W).
         ///
         /// # <weight>
 		/// Complexity: O(logP)
 		/// - Base: 30.26 µs
 		/// - Read: Pledge
-		/// - Write: WorkReports, Providers
+		/// - Write: WorkReports, Merchants
 		/// # </weight>
 		#[weight = 30 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 3)]
         pub fn register(
@@ -293,21 +293,21 @@ decl_module! {
             // 1. Make sure you have works
             ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
 
-            // 2. Check if provider has pledged before
+            // 2. Check if the register already pledged before
             ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Make sure the storage price
             ensure!(storage_price >= T::MinimumStoragePrice::get(), Error::<T>::LowStoragePrice);
 
-            // 4. Upsert provision
-            <Providers<T>>::mutate(&who, |maybe_provision| {
-                if let Some(provision) = maybe_provision {
-                    // Update provider
-                    provision.address_info = address_info;
-                    provision.storage_price = storage_price;
+            // 4. Upsert merchant info
+            <Merchants<T>>::mutate(&who, |maybe_minfo| {
+                if let Some(minfo) = maybe_minfo {
+                    // Update merchant
+                    minfo.address_info = address_info;
+                    minfo.storage_price = storage_price;
                 } else {
-                    // New provider
-                    *maybe_provision = Some(Provision {
+                    // New merchant
+                    *maybe_minfo = Some(MerchantInfo {
                         address_info,
                         storage_price,
                         file_map: BTreeMap::new()
@@ -321,7 +321,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Register to be a provider, you should provide your storage layer's address info
+        /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to pledge first, complexity depends on `Pledges`(P).
         ///
         /// # <weight>
@@ -340,10 +340,10 @@ decl_module! {
             // 1. Reject a pledge which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Ensure provider has enough currency.
+            // 2. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 3. Check if provider has not pledged before
+            // 3. Check if merchant has not pledged before
             ensure!(!<Pledges<T>>::contains_key(&who), Error::<T>::AlreadyPledged);
 
             // 4. Prepare new pledge
@@ -376,10 +376,10 @@ decl_module! {
             // 1. Reject a pledge which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Check if provider has pledged before
+            // 2. Check if merchant has pledged before
             ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
 
-            // 3. Ensure provider has enough currency.
+            // 3. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             let mut pledge = Self::pledges(&who);
@@ -410,7 +410,7 @@ decl_module! {
             // 1. Reject a pledge which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Check if provider has pledged before
+            // 2. Check if merchant has pledged before
             ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
 
             // 3. Ensure value is smaller than unused.
@@ -440,36 +440,36 @@ decl_module! {
         #[weight = 1_000_000]
         pub fn place_storage_order(
             origin,
-            provider: <T::Lookup as StaticLookup>::Source,
+            target: <T::Lookup as StaticLookup>::Source,
             file_identifier: MerkleRoot,
             file_size: u64,
             duration: u32
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
-            let provider = T::Lookup::lookup(provider)?;
+            let merchant = T::Lookup::lookup(target)?;
 
             // 1. Cannot place storage order to himself.
-            ensure!(who != provider, Error::<T>::PlaceSelfOrder);
+            ensure!(who != merchant, Error::<T>::PlaceSelfOrder);
 
             // 2. Expired should be greater than created
             ensure!(duration > T::MinimumSorderDuration::get(), Error::<T>::DurationTooShort);
 
-            // 3. Check if provider is registered
-            ensure!(<Providers<T>>::contains_key(&provider), Error::<T>::NotProvider);
+            // 3. Check if merchant is registered
+            ensure!(<Merchants<T>>::contains_key(&merchant), Error::<T>::NotMerchant);
 
-            // 4. Check provider has capacity to store file
-            ensure!(T::OrderInspector::check_works(&provider, file_size), Error::<T>::NoWorkload);
+            // 4. Check merchant has capacity to store file
+            ensure!(T::OrderInspector::check_works(&merchant, file_size), Error::<T>::NoWorkload);
 
-            // 5. Check if provider pledged and has enough unused pledge
-            ensure!(<Pledges<T>>::contains_key(&provider), Error::<T>::InsufficientPledge);
+            // 5. Check if merchant pledged and has enough unused pledge
+            ensure!(<Pledges<T>>::contains_key(&merchant), Error::<T>::InsufficientPledge);
 
-            let pledge = Self::pledges(&provider);
-            let provision = Self::providers(&provider).unwrap();
+            let pledge = Self::pledges(&merchant);
+            let minfo = Self::merchants(&merchant).unwrap();
 
             // 6. Get amount
-            let amount = Self::get_sorder_amount(&provision.storage_price, file_size, duration).unwrap();
+            let amount = Self::get_sorder_amount(&minfo.storage_price, file_size, duration).unwrap();
 
-            // 7. Judge if provider's pledge is enough
+            // 7. Judge if merchant's pledge is enough
             ensure!(amount <= pledge.total - pledge.used, Error::<T>::InsufficientPledge);
 
             // 8. Check client can afford the sorder
@@ -482,18 +482,18 @@ decl_module! {
                 file_identifier,
                 file_size,
                 created_on,
-                completed_on: created_on,
-                expired_on, // this will be changed, when `status` become `Success`
-                provider: provider.clone(),
+                completed_on: created_on, // Not fixed, this will be changed, when `status` become `Success`
+                expired_on, // Not fixed, this will be changed, when `status` become `Success`
+                merchant: merchant.clone(),
                 client: who.clone(),
                 amount,
                 status: OrderStatus::Pending
             };
 
             // 10. Pay the order and (maybe) add storage order
-            if Self::maybe_insert_sorder(&who, &provider, amount.clone(), &storage_order) {
+            if Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &storage_order) {
                 // a. update pledge
-                <Pledges<T>>::mutate(&provider, |pledge| {
+                <Pledges<T>>::mutate(&merchant, |pledge| {
                         pledge.used += amount;
                 });
                 // b. emit storage order success event
@@ -526,10 +526,10 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    pub fn maybe_punish_provider(order_id: &<T as system::Trait>::Hash) {
+    pub fn maybe_punish_merchant(order_id: &<T as system::Trait>::Hash) {
         if let Some(so) = Self::storage_orders(order_id) {
-            if let Some(mut punishment) = Self::provider_punishments(order_id) {
-                // 1. Update Provider Punishment
+            if let Some(mut punishment) = Self::merchant_punishments(order_id) {
+                // 1. Update Merchant Punishment
                 let punish_duration = T::PunishDuration::get();
                 if so.status == OrderStatus::Success {
                     punishment.success += 1;
@@ -540,15 +540,15 @@ impl<T: Trait> Module<T> {
                 }
                 if punishment.success + punishment.failed >= punish_duration && punishment.value < so.amount {
                     // 2. Do slash
-                    let real_punish_value = Self::punish_provider(&so, &punishment, &punish_duration);
+                    let real_punish_value = Self::punish_merchant(&so, &punishment, &punish_duration);
                     punishment.value += real_punish_value;
-                    // 3. Reset Provider Punishment
+                    // 3. Reset Merchant Punishment
                     punishment.success = 0;
                     punishment.failed = 0;
                 } else {
         
                 }
-                <ProviderPunishments<T>>::insert(&order_id, punishment.clone());
+                <MerchantPunishments<T>>::insert(&order_id, punishment.clone());
                 if punishment.value >= so.amount {
                     Self::close_sorder(&order_id);
                 }
@@ -556,9 +556,9 @@ impl<T: Trait> Module<T> {
         }   
     }
 
-    pub fn punish_provider(
+    pub fn punish_merchant(
         so: &StorageOrder<T::AccountId, BalanceOf<T>>,
-        punishment: &ProviderPunishment<BalanceOf<T>>,
+        punishment: &MerchantPunishment<BalanceOf<T>>,
         punish_duration: &EraIndex
     ) -> BalanceOf<T> {
         // Calculate real punish value
@@ -575,12 +575,12 @@ impl<T: Trait> Module<T> {
         // Do slash
         if !real_punish_value.is_zero() {
             real_punish_value = real_punish_value.min(so.amount - punishment.value);
-            T::Currency::slash(&so.provider, real_punish_value);
+            T::Currency::slash(&so.merchant, real_punish_value);
             // Update ledger
-            let mut pledge = Self::pledges(&so.provider);
+            let mut pledge = Self::pledges(&so.merchant);
             pledge.total -= real_punish_value;
             pledge.used -= real_punish_value;
-            Self::upsert_pledge(&so.provider, &pledge);
+            Self::upsert_pledge(&so.merchant, &pledge);
         }
         real_punish_value
     }
@@ -589,10 +589,10 @@ impl<T: Trait> Module<T> {
     // Create a new order
     // `sorder` is equal to storage order
     fn maybe_insert_sorder(client: &T::AccountId,
-                           provider: &T::AccountId,
+                           merchant: &T::AccountId,
                            amount: BalanceOf<T>,
                            so: &StorageOrder<T::AccountId, BalanceOf<T>>) -> bool {
-        let order_id = Self::generate_sorder_id(client, provider);
+        let order_id = Self::generate_sorder_id(client, merchant);
 
         // This should be false, cause we don't allow duplicated `order_id`
         if <StorageOrders<T>>::contains_key(&order_id) {
@@ -616,27 +616,27 @@ impl<T: Trait> Module<T> {
                 }
             });
 
-            // 3. Add `file_identifier` -> `order_id`s to provider's file_map
-            <Providers<T>>::mutate(provider, |maybe_provision| {
-                // `provision` cannot be None
-                if let Some(provision) = maybe_provision {
+            // 3. Add `file_identifier` -> `order_id`s to merchant's file_map
+            <Merchants<T>>::mutate(merchant, |maybe_minfo| {
+                // `minfo` cannot be None
+                if let Some(minfo) = maybe_minfo {
                     let mut order_ids: Vec::<T::Hash> = vec![];
-                    if let Some(o_ids) = provision.file_map.get(&so.file_identifier) {
+                    if let Some(o_ids) = minfo.file_map.get(&so.file_identifier) {
                         order_ids = o_ids.clone();
                     }
 
                     order_ids.push(order_id);
-                    provision.file_map.insert(so.file_identifier.clone(), order_ids.clone());
+                    minfo.file_map.insert(so.file_identifier.clone(), order_ids.clone());
                 }
             });
 
             // 4. Add OrderSlashRecord
-            let provider_punishment = ProviderPunishment {
+            let merchant_punishment = MerchantPunishment {
                 success: 0,
                 failed: 0,
                 value: Zero::zero()
             };
-            <ProviderPunishments<T>>::insert(&order_id, provider_punishment);
+            <MerchantPunishments<T>>::insert(&order_id, merchant_punishment);
 
             true
         }
@@ -645,15 +645,15 @@ impl<T: Trait> Module<T> {
     // Remove a sorder
     fn close_sorder(order_id: &<T as system::Trait>::Hash) {
         if let Some(so) = Self::storage_orders(order_id) {
-            if let Some(punishment) = Self::provider_punishments(order_id) {
+            if let Some(punishment) = Self::merchant_punishments(order_id) {
                 // 1. Remove sorder's payment info
                 T::Payment::close_sorder(order_id, &so.client, &so.completed_on);
 
-                // 2. Remove `file_identifier` -> `order_id`s from provider's file_map
-                <Providers<T>>::mutate(&so.provider, |maybe_provision| {
-                    // `provision` cannot be None
-                    if let Some(provision) = maybe_provision {
-                        let mut sorder_ids: Vec<T::Hash> = provision
+                // 2. Remove `file_identifier` -> `order_id`s from merchant's file_map
+                <Merchants<T>>::mutate(&so.merchant, |maybe_minfo| {
+                    // `minfo` cannot be None
+                    if let Some(minfo) = maybe_minfo {
+                        let mut sorder_ids: Vec<T::Hash> = minfo
                             .file_map
                             .get(&so.file_identifier)
                             .unwrap_or(&vec![])
@@ -661,26 +661,26 @@ impl<T: Trait> Module<T> {
                         sorder_ids.retain(|&id| {&id != order_id});
 
                         if sorder_ids.is_empty() {
-                            provision.file_map.remove(&so.file_identifier);
+                            minfo.file_map.remove(&so.file_identifier);
                         } else {
-                            provision.file_map.insert(so.file_identifier.clone(), sorder_ids.clone());
+                            minfo.file_map.insert(so.file_identifier.clone(), sorder_ids.clone());
                         }
                     }
                 });
 
-                // 3. Update `Pledge` for provider
+                // 3. Update `Pledge` for merchant
                 let real_used_value = so.amount.min(so.amount - punishment.value);
-                let mut pledge = Self::pledges(&so.provider);
+                let mut pledge = Self::pledges(&so.merchant);
                 // `checked_sub`, prevent overflow
                 if real_used_value >= pledge.used {
                     pledge.used = Zero::zero();
                 } else {
                     pledge.used -= real_used_value;
                 }
-                Self::upsert_pledge(&so.provider, &pledge);
+                Self::upsert_pledge(&so.merchant, &pledge);
 
-                // 4. Remove Provider Punishment
-                <ProviderPunishments<T>>::remove(order_id);
+                // 4. Remove Merchant Punishment
+                <MerchantPunishments<T>>::remove(order_id);
 
                 // 5. Remove storage order
                 <StorageOrders<T>>::remove(order_id);
@@ -689,31 +689,31 @@ impl<T: Trait> Module<T> {
     }
 
     fn upsert_pledge(
-        provider: &T::AccountId,
+        merchant: &T::AccountId,
         pledge: &Pledge<BalanceOf<T>>
     ) {
         // 1. Set lock
         T::Currency::set_lock(
             MARKET_ID,
-            &provider,
+            &merchant,
             pledge.total,
             WithdrawReasons::all(),
         );
         // 2. Update Pledge
-        <Pledges<T>>::insert(&provider, pledge);
+        <Pledges<T>>::insert(&merchant, pledge);
     }
 
     // IMMUTABLE PRIVATE
     // Generate the storage order id by using the on-chain randomness
-    fn generate_sorder_id(client: &T::AccountId, provider: &T::AccountId) -> T::Hash {
+    fn generate_sorder_id(client: &T::AccountId, merchant: &T::AccountId) -> T::Hash {
         // 1. Construct random seed, 👼 bless the randomness
-        // seed = [ block_hash, client_account, provider_account ]
+        // seed = [ block_hash, client_account, merchant_account ]
         let bn = <system::Module<T>>::block_number();
         let bh: T::Hash = <system::Module<T>>::block_hash(bn);
         let seed = [
             &bh.as_ref()[..],
             &client.encode()[..],
-            &provider.encode()[..],
+            &merchant.encode()[..],
         ].concat();
 
         // 2. It can cover most cases, for the "real" random

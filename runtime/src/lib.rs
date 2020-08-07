@@ -168,6 +168,7 @@ impl system::Trait for Runtime {
     type OnNewAccount = ();
     /// What to do if an account is fully reaped from the system.
     type OnKilledAccount = ();
+    type SystemWeightInfo = ();
 }
 
 parameter_types! {
@@ -181,6 +182,20 @@ impl babe::Trait for Runtime {
 
     // session module is the trigger
     type EpochChangeTrigger = babe::ExternalTrigger;
+
+    type KeyOwnerProof = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+        KeyTypeId,
+        babe::AuthorityId,
+    )>>::Proof;
+
+    type KeyOwnerIdentification = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+        KeyTypeId,
+        babe::AuthorityId,
+    )>>::IdentificationTuple;
+
+    type KeyOwnerProofSystem = Historical;
+
+    type HandleEquivocation = babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
 }
 
 parameter_types! {
@@ -192,6 +207,7 @@ impl indices::Trait for Runtime {
     type Currency = Balances;
     type Deposit = IndexDeposit;
     type Event = Event;
+    type WeightInfo = ();
 }
 
 impl authority_discovery::Trait for Runtime {}
@@ -218,6 +234,7 @@ impl im_online::Trait for Runtime {
     type SessionDuration = SessionDuration;
     type ReportUnresponsiveness = Offences;
     type UnsignedPriority = ImOnlineUnsignedPriority;
+    type WeightInfo = ();
 }
 
 parameter_types! {
@@ -227,8 +244,11 @@ parameter_types! {
 impl scheduler::Trait for Runtime {
     type Event = Event;
     type Origin = Origin;
+    type PalletsOrigin = OriginCaller;
     type Call = Call;
     type MaximumWeight = MaximumWeight;
+    type ScheduleOrigin = EnsureRoot<AccountId>;
+    type WeightInfo = ();
 }
 
 impl grandpa::Trait for Runtime {
@@ -268,6 +288,7 @@ impl timestamp::Trait for Runtime {
     type Moment = u64;
     type OnTimestampSet = Babe;
     type MinimumPeriod = MinimumPeriod;
+    type WeightInfo = ();
 }
 
 parameter_types! {
@@ -295,6 +316,7 @@ impl session::Trait for Runtime {
     type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+    type WeightInfo = ();
 }
 
 impl session::historical::Trait for Runtime {
@@ -342,6 +364,7 @@ impl offences::Trait for Runtime {
 	type IdentificationTuple = session::historical::IdentificationTuple<Self>;
 	type OnOffenceHandler = Staking;
 	type WeightSoftLimit = OffencesWeightSoftLimit;
+    type WeightInfo = ();
 }
 
 parameter_types! {
@@ -362,6 +385,7 @@ impl balances::Trait for Runtime {
     type Event = Event;
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
+    type WeightInfo = weights::pallet_balances::WeightInfo;
 }
 
 // TODO: better way to deal with fee(s)
@@ -451,6 +475,8 @@ construct_runtime! {
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: authority_discovery::{Module, Call, Config},
         Offences: offences::{Module, Call, Storage, Event},
+
+        // System scheduler
         Scheduler: scheduler::{Module, Call, Storage, Event<T>},
 
         // Crust modules

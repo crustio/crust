@@ -1,3 +1,20 @@
+// This file is part of Substrate.
+
+// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Macro for creating the tests for the module.
 
 #![cfg(test)]
@@ -158,7 +175,7 @@ macro_rules! decl_tests {
 					);
 					assert_noop!(
 						<Balances as ReservableCurrency<_>>::reserve(&1, 1),
-						Error::<$test, _>::LiquidityRestrictions
+						Error::<$test, _>::LiquidityRestrictions,
 					);
 					assert!(<ChargeTransactionPayment<$test> as SignedExtension>::pre_dispatch(
 						ChargeTransactionPayment::from(1),
@@ -676,37 +693,6 @@ macro_rules! decl_tests {
 		}
 
 		#[test]
-		fn account_transfer_balance_should_work() {
-			<$ext_builder>::default().existential_deposit(100).build().execute_with(|| {
-				assert_eq!(<TotalIssuance<$test>>::get(), 0);
-
-				// Setup two accounts with free balance above the existential threshold.
-				let _ = Balances::deposit_creating(&1, 300);
-
-				assert_eq!(Balances::transfer_balance(&1), 300);
-				Balances::set_lock(ID_1, &1, 50, WithdrawReasons::all());
-				assert_eq!(Balances::transfer_balance(&1), 250);
-				Balances::set_lock(ID_1, &1, 100, WithdrawReasons::all());
-				assert_eq!(Balances::transfer_balance(&1), 200);
-				Balances::set_lock(ID_2, &1, 50, WithdrawReasons::all());
-				assert_eq!(Balances::transfer_balance(&1), 150);
-				Balances::set_lock(ID_2, &1, 100, WithdrawReasons::all());
-				assert_eq!(Balances::transfer_balance(&1), 100);
-				// exceed the amount of freee balance.
-				Balances::set_lock(ID_2, &1, 300, WithdrawReasons::all());
-				assert_eq!(Balances::transfer_balance(&1), 0);
-				Balances::set_lock(ID_2, &1, 250, WithdrawReasons::all());
-				assert_eq!(Balances::transfer_balance(&1), 0);
-				
-				Balances::set_lock(ID_2, &1, 150, WithdrawReasons::all());
-				assert_eq!(Balances::transfer_balance(&1), 50);
-				Balances::remove_lock(ID_1, &1);
-				assert_eq!(Balances::transfer_balance(&1), 150);
-			});
-		}
-
-
-		#[test]
 		fn emit_events_with_reserve_and_unreserve() {
 			<$ext_builder>::default()
 				.build()
@@ -800,6 +786,36 @@ macro_rules! decl_tests {
 						]
 					);
 				});
+		}
+
+		#[test]
+		fn account_transfer_balance_should_work() {
+			<$ext_builder>::default().existential_deposit(100).build().execute_with(|| {
+				assert_eq!(<TotalIssuance<$test>>::get(), 0);
+
+				// Setup two accounts with free balance above the existential threshold.
+				let _ = Balances::deposit_creating(&1, 300);
+
+				assert_eq!(Balances::transfer_balance(&1), 300);
+				Balances::set_lock(ID_1, &1, 50, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 250);
+				Balances::set_lock(ID_1, &1, 100, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 200);
+				Balances::set_lock(ID_2, &1, 50, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 150);
+				Balances::set_lock(ID_2, &1, 100, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 100);
+				// exceed the amount of freee balance.
+				Balances::set_lock(ID_2, &1, 300, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 0);
+				Balances::set_lock(ID_2, &1, 250, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 0);
+
+				Balances::set_lock(ID_2, &1, 150, WithdrawReasons::all());
+				assert_eq!(Balances::transfer_balance(&1), 50);
+				Balances::remove_lock(ID_1, &1);
+				assert_eq!(Balances::transfer_balance(&1), 150);
+			});
 		}
 	}
 }

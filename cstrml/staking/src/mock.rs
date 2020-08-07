@@ -141,6 +141,7 @@ impl frame_system::Trait for Test {
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
+    type SystemWeightInfo = ();
 }
 parameter_types! {
     pub const TransferFee: Balance = 0;
@@ -152,6 +153,7 @@ impl balances::Trait for Test {
     type Event = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
+    type WeightInfo = ();
 }
 parameter_types! {
     pub const Period: BlockNumber = 1;
@@ -169,6 +171,7 @@ impl pallet_session::Trait for Test {
     type SessionHandler = TestSessionHandler;
     type Keys = UintAuthorityId;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+    type WeightInfo = ();
 }
 
 impl pallet_session::historical::Trait for Test {
@@ -188,6 +191,7 @@ impl pallet_timestamp::Trait for Test {
     type Moment = u64;
     type OnTimestampSet = ();
     type MinimumPeriod = MinimumPeriod;
+    type WeightInfo = ();
 }
 pub struct TestStaking;
 impl swork::Works<AccountId> for TestStaking {

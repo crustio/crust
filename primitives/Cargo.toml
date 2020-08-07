@@ -10,13 +10,13 @@ repository = "https://github.com/crustio/crust/"
 [dependencies]
 # third party dependencies
 serde = { version = "1.0.106", optional = true, features = ["derive"] }
-parity-scale-codec = { version = "1.3.1", default-features = false, features = ["bit-vec", "derive"] }
+parity-scale-codec = { version = "1.3.4", default-features = false, features = ["bit-vec", "derive"] }
 
 # substrate primitives
-sp-runtime = { version = '2.0.0-rc4', default-features = false }
-sp-core = { version = '2.0.0-rc4', default-features = false }
-sp-std = { version = '2.0.0-rc4', default-features = false }
-frame-support = { default-features = false, version = '2.0.0-rc4' }
+sp-runtime = { version = '2.0.0-rc5', default-features = false }
+sp-core = { version = '2.0.0-rc5', default-features = false }
+sp-std = { version = '2.0.0-rc5', default-features = false }
+frame-support = { default-features = false, version = '2.0.0-rc5' }
 
 [features]
 default = ["std"]

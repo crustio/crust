@@ -11,7 +11,7 @@ use frame_support::{
     weights::constants::WEIGHT_PER_MICROS
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
-use system::ensure_signed;
+use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
     Perbill,
     traits::{StaticLookup, Zero, CheckedMul, Convert}

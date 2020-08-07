@@ -19,27 +19,27 @@ structopt = "0.3.8"
 hex-literal = "0.2.1"
 
 # substrate client dependencies
-babe = { version = '0.8.0-rc4', package = 'sc-consensus-babe' }
-grandpa = { version = "0.8.0-rc4", package = "sc-finality-grandpa" }
-sc-basic-authorship = '0.8.0-rc4'
-authority-discovery = { version = '0.8.0-rc4', package= 'sc-authority-discovery' }
-sc-client-api = '2.0.0-rc4'
-sc-cli = { version = '0.8.0-rc4', features = ["wasmtime"] }
-sc-consensus = '0.8.0-rc4'
-sc-executor = { version = '0.8.0-rc4', features = ["wasmtime"] }
-sc-network = '0.8.0-rc4'
-sc-service = { version = '0.8.0-rc4', features = ["wasmtime"] }
-sc-transaction-pool = '2.0.0-rc4'
+babe = { version = '0.8.0-rc5', package = 'sc-consensus-babe' }
+grandpa = { version = "0.8.0-rc5", package = "sc-finality-grandpa" }
+sc-basic-authorship = '0.8.0-rc5'
+authority-discovery = { version = '0.8.0-rc5', package= 'sc-authority-discovery' }
+sc-client-api = '2.0.0-rc5'
+sc-cli = { version = '0.8.0-rc5', features = ["wasmtime"] }
+sc-consensus = '0.8.0-rc5'
+sc-executor = { version = '0.8.0-rc5', features = ["wasmtime"] }
+sc-network = '0.8.0-rc5'
+sc-service = { version = '0.8.0-rc5', features = ["wasmtime"] }
+sc-transaction-pool = '2.0.0-rc5'
 
 # substrate primitives
-sp-transaction-pool = '2.0.0-rc4'
-sp-core = '2.0.0-rc4'
-sp-consensus = '0.8.0-rc4'
-sp-consensus-babe = '0.8.0-rc4'
-sp-inherents = '2.0.0-rc4'
-sp-io = '2.0.0-rc4'
-sp-runtime = '2.0.0-rc4'
-grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc4' }
+sp-transaction-pool = '2.0.0-rc5'
+sp-core = '2.0.0-rc5'
+sp-consensus = '0.8.0-rc5'
+sp-consensus-babe = '0.8.0-rc5'
+sp-inherents = '2.0.0-rc5'
+sp-io = '2.0.0-rc5'
+sp-runtime = '2.0.0-rc5'
+grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc5' }
 
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.7.1' }
@@ -48,4 +48,4 @@ cstrml-swork = { path = '../cstrml/swork', version = '0.7.1' }
 primitives = { package = 'cst-primitives', path = '../primitives', version = '0.7.1' }
 
 [build-dependencies]
-build-script-utils = { version = "2.0.0-rc4",  package = "substrate-build-script-utils" }
+build-script-utils = { version = "2.0.0-rc5",  package = "substrate-build-script-utils" }

@@ -30,6 +30,7 @@ indices = { package = "pallet-indices", version = '2.0.0-rc5', default-features 
 im-online = { default-features = false, package = 'pallet-im-online', version = '2.0.0-rc5' }
 randomness-collective-flip = { default-features = false, package = 'pallet-randomness-collective-flip', version = '2.0.0-rc5' }
 system = { default-features = false, package = 'frame-system', version = '2.0.0-rc5' }
+frame-system-rpc-runtime-api = { default-features = false, version = '2.0.0-rc5' }
 session = { default-features = false, package = 'pallet-session', version = '2.0.0-rc5' }
 pallet-staking-reward-curve = { default-features = false, version = '2.0.0-rc5' }
 timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-rc5' }
@@ -37,6 +38,7 @@ transaction-payment = { default-features = false, package = 'pallet-transaction-
 scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc5' }
 sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc5' }
 offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc5' }
+pallet-transaction-payment-rpc-runtime-api = { default-features = false, version = '2.0.0-rc5' }
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc5' }
@@ -97,6 +99,7 @@ std = [
     'sudo/std',
     'session/std',
     'system/std',
+    'frame-system-rpc-runtime-api/std',
     'timestamp/std',
     'transaction-payment/std',
     'scheduler/std',
@@ -106,5 +109,6 @@ std = [
     'staking/std',
     'market/std',
     'payment/std',
-    'primitives/std'
+    'primitives/std',
+    'pallet-transaction-payment-rpc-runtime-api/std'
 ]

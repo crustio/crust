@@ -17,7 +17,8 @@ use frame_support::{
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
         Time, EnsureOrigin
-    }
+    },
+    dispatch::DispatchResult
 };
 use pallet_session::historical;
 use sp_runtime::{
@@ -135,6 +136,25 @@ impl<AccountId, Balance: HasCompact + Zero> Default for Validations<AccountId, B
     }
 }
 
+
+/// Preference of what happens regarding validation.
+#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
+pub struct ValidatorPrefs {
+	/// Reward that validator takes up-front; only the rest is split between themselves and
+	/// nominators.
+	#[codec(compact)]
+	pub guarantee_fee: Perbill,
+}
+
+impl Default for ValidatorPrefs {
+	fn default() -> Self {
+		ValidatorPrefs {
+			guarantee_fee: Default::default(),
+		}
+	}
+}
+
+
 /// A record of the nominations made by a specific account.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Nominations<AccountId, Balance: HasCompact> {
@@ -180,6 +200,9 @@ pub struct StakingLedger<AccountId, Balance: HasCompact> {
     /// Any balance that is becoming free, which may eventually be transferred out
     /// of the stash (assuming it doesn't get slashed first).
     pub unlocking: Vec<UnlockChunk<Balance>>,
+    /// List of eras for which the stakers behind a validator have claimed rewards. Only updated
+	/// for validators.
+	pub claimed_rewards: Vec<EraIndex>,
 }
 
 impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId, Balance> {
@@ -205,6 +228,7 @@ impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId
             stash: self.stash,
             valid: self.valid,
             unlocking,
+            claimed_rewards: self.claimed_rewards
         }
     }
 }
@@ -429,6 +453,38 @@ impl Default for Forcing {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Staking {
+		/// Number of eras to keep in history.
+		///
+		/// Information is kept for eras in `[current_era - history_depth; current_era]`.
+        HistoryDepth get(fn history_depth) config(): u32 = 84;
+
+		/// Exposure of validator at era.
+		///
+		/// This is keyed first by the era index to allow bulk deletion and then the stash account.
+		///
+		/// Is it removed after `HISTORY_DEPTH` eras.
+		/// If stakers hasn't been set or has been removed then empty exposure is returned.
+		pub ErasStakers get(fn eras_stakers):
+			double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+            => Exposure<T::AccountId, BalanceOf<T>>;
+            
+		/// Similar to `ErasStakers`, this holds the preferences of validators.
+		///
+		/// This is keyed first by the era index to allow bulk deletion and then the stash account.
+		///
+		/// Is it removed after `HISTORY_DEPTH` eras.
+		// If prefs hasn't been set or has been removed then 0 commission is returned.
+		pub ErasValidatorPrefs get(fn eras_validator_prefs):
+			double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+            => ValidatorPrefs;
+            
+        pub ErasStakingPayout get(fn eras_staking_payout):
+            map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
+
+        pub ErasAuthoringPayout get(fn eras_authoring_payout):
+            double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+            => Option<BalanceOf<T>>;
+
         /// The ideal number of staking participants.
         pub ValidatorCount get(fn validator_count) config(): u32;
 
@@ -500,9 +556,8 @@ decl_storage! {
         /// The amount of balance actively at stake for each validator slot, currently.
         ///
         /// This is used to derive rewards and punishments.
-        pub TotalStakes get(fn total_stakes) build(|config: &GenesisConfig<T>| {
-            config.stakers.iter().fold(Zero::zero(), |acc, &(_, _, value, _)| acc + value.clone())
-        }): BalanceOf<T>;
+        pub ErasTotalStakes get(fn eras_total_stakes):
+            map hasher(twox_64_concat) EraIndex => BalanceOf<T>;
 
         /// True if the next session change will be a new era regardless of index.
         pub ForceEra get(fn force_era) config(): Forcing;
@@ -553,6 +608,7 @@ decl_storage! {
         config(stakers):
             Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId, BalanceOf<T>>)>;
         build(|config: &GenesisConfig<T>| {
+            let mut total_stakes: BalanceOf<T> = Zero::zero();
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
                     T::Currency::transfer_balance(&stash) >= balance,
@@ -564,6 +620,8 @@ decl_storage! {
                     balance,
                     RewardDestination::Staked,
                 );
+
+                total_stakes += balance;
 
                 // TODO: make genesis validator's limitation more reasonable
                 <Module<T>>::upsert_stake_limit(stash, balance+balance);
@@ -585,6 +643,7 @@ decl_storage! {
                     }, _ => Ok(())
                 };
             }
+            <ErasTotalStakes<T>>::insert(0, total_stakes);
         });
     }
 }
@@ -633,7 +692,11 @@ decl_error! {
         /// Can not validate without workloads
         NoWorkloads,
         /// Attempting to target a stash that still has funds.
-		FundedTarget,
+        FundedTarget,
+        /// Invalid era to reward.
+        InvalidEraToReward,
+        /// Claimed reward twice.
+        AlreadyClaimed,
     }
 }
 
@@ -706,6 +769,10 @@ decl_module! {
             <Bonded<T>>::insert(&stash, &controller);
             <Payee<T>>::insert(&stash, payee);
 
+            let current_era = CurrentEra::get().unwrap_or(0);
+            let history_depth = Self::history_depth();
+            let last_reward_era = current_era.saturating_sub(history_depth);
+
             let stash_balance = T::Currency::transfer_balance(&stash);
             let value = value.min(stash_balance);
             let item = StakingLedger {
@@ -713,7 +780,8 @@ decl_module! {
                 total: value,
                 active: value,
                 valid: Zero::zero(),
-                unlocking: vec![]
+                unlocking: vec![],
+                claimed_rewards: (last_reward_era..current_era).collect(),
             };
             Self::update_ledger(&controller, &item);
         }
@@ -1294,6 +1362,15 @@ decl_module! {
             Self::kill_stash(&stash);
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
+
+        #[weight = 120 * WEIGHT_PER_MICROS]
+        fn payout_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
+            ensure_signed(origin)?;
+            if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
+                Self::make_payout(&validator_stash, value);
+            }
+            Self::do_payout_stakers(validator_stash, era)
+        }
     }
 }
 
@@ -1580,6 +1657,50 @@ impl<T: Trait> Module<T> {
         imbalance
     }
 
+    fn do_payout_stakers(
+		validator_stash: T::AccountId,
+		era: EraIndex,
+	) -> DispatchResult {
+		// Validate input data
+		let current_era = CurrentEra::get().ok_or(Error::<T>::InvalidEraToReward)?;
+		ensure!(era <= current_era, Error::<T>::InvalidEraToReward);
+		let history_depth = Self::history_depth();
+		ensure!(era >= current_era.saturating_sub(history_depth), Error::<T>::InvalidEraToReward);
+
+		// Note: if era has no reward to be claimed, era may be future. better not to update
+		// `ledger.claimed_rewards` in this case.
+		let era_staking_payout = <ErasStakingPayout<T>>::get(&era)
+			.ok_or_else(|| Error::<T>::InvalidEraToReward)?;
+
+		let controller = Self::bonded(&validator_stash).ok_or(Error::<T>::NotStash)?;
+		let mut ledger = <Ledger<T>>::get(&controller).ok_or_else(|| Error::<T>::NotController)?;
+
+		ledger.claimed_rewards.retain(|&x| x >= current_era.saturating_sub(history_depth));
+		match ledger.claimed_rewards.binary_search(&era) {
+			Ok(_) => Err(Error::<T>::AlreadyClaimed)?,
+			Err(pos) => ledger.claimed_rewards.insert(pos, era),
+		}
+
+        let exposure = <ErasStakers<T>>::get(&era, &ledger.stash);
+        let to_num =
+        |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
+
+		/* Input data seems good, no errors allowed after this point */
+        let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
+        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
+        let total = exposure.total.max(One::one());
+        let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).guarantee_fee * staking_reward;
+        let mut guarantee_rewards = Zero::zero();
+        for i in &exposure.others {
+            let per_u64 = Perbill::from_rational_approximation(i.value, total);
+            // Reward guarantors
+            guarantee_rewards += per_u64 * total_rewards;
+            Self::make_payout(&i.who, per_u64 * total_rewards);
+        }
+        Self::make_payout(&ledger.stash, total_rewards - guarantee_rewards);
+		Ok(())
+	}
+
     /// Session has just ended. Provide the validator set for the next session if it's an era-end, along
     /// with the exposure of the prior validator set.
     fn new_session(
@@ -1634,6 +1755,11 @@ impl<T: Trait> Module<T> {
         });
         let bonding_duration = T::BondingDuration::get();
 
+        // Clean old era information.
+		if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 3) {
+			Self::clear_era_information(old_era);
+		}
+
         // Slashing
         // TODO: put slashing into start_era(judging at start_session) like Kusama does?
         BondedEras::mutate(|bonded| {
@@ -1660,7 +1786,7 @@ impl<T: Trait> Module<T> {
         });
 
         // Reassign all stakers.
-        let maybe_new_validators = Self::select_validators();
+        let maybe_new_validators = Self::select_validators(current_era);
         Self::apply_unapplied_slashes(current_era);
 
         maybe_new_validators
@@ -1676,36 +1802,37 @@ impl<T: Trait> Module<T> {
             let points = CurrentEraPointsEarned::take();
             let validators = Self::current_elected();
             let total_authoring_payout = Self::authoring_rewards_in_era();
-            let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
-            let to_num =
-                |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
-
+            // let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+            let current_era = Self::current_era().unwrap_or(0);
             // 1. Block authoring payout
             for (v, p) in validators.iter().zip(points.individual.into_iter()) {
                 if p != 0 {
                     let authoring_reward =
                         Perbill::from_rational_approximation(p, points.total) * total_authoring_payout;
-                    total_imbalance.subsume(Self::reward_author(v, authoring_reward));
+                    <ErasAuthoringPayout<T>>::insert(&current_era, v, authoring_reward);
                 }
             }
 
             // 2. Staking payout
-            let current_era = Self::current_era().unwrap_or(0);
             let total_staking_payout = Self::staking_rewards_in_era(current_era);
-            let total_stakes = Self::total_stakes();
-            <Stakers<T>>::iter().for_each(|(v, e)| {
-                let staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
-                total_imbalance.subsume(Self::reward_validator(&v, staking_reward));
-            });
+            <ErasStakingPayout<T>>::insert(&current_era, total_staking_payout);
 
             // 3. Deposit reward event
             Self::deposit_event(RawEvent::Reward(total_authoring_payout, total_staking_payout));
 
-            T::Reward::on_unbalanced(total_imbalance);
+            // T::Reward::on_unbalanced(total_imbalance);
             // This is not been used
             //T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
         }
     }
+
+    	/// Clear all era information for given era.
+	fn clear_era_information(era_index: EraIndex) {
+		<ErasStakers<T>>::remove_prefix(era_index);
+		<ErasValidatorPrefs<T>>::remove_prefix(era_index);
+		<ErasStakingPayout<T>>::remove(era_index);
+		<ErasTotalStakes<T>>::remove(era_index);
+	}
 
     /// Block authoring rewards per era, this won't be changed in every era
     fn authoring_rewards_in_era() -> BalanceOf<T> {
@@ -1770,7 +1897,7 @@ impl<T: Trait> Module<T> {
     /// Returns the new `TotalStakes` value and a set of newly selected _stash_ IDs.
     ///
     /// Assumes storage is coherent with the declaration.
-    fn select_validators() -> Option<Vec<T::AccountId>> {
+    fn select_validators(current_era: EraIndex) -> Option<Vec<T::AccountId>> {
         // Update all swork identities work report and clear stakers
         T::SworkInterface::update_identities();
         Self::clear_stakers();
@@ -1954,6 +2081,11 @@ impl<T: Trait> Module<T> {
                 } else {
                     total_stakes = to_balance(u64::max_value() as u128);
                 }
+                let guarantee_fee = ValidatorPrefs {
+                    guarantee_fee: Self::validators(&stash).guarantee_fee
+                };
+                <ErasValidatorPrefs<T>>::insert(&current_era, &stash, guarantee_fee);
+                <ErasStakers<T>>::insert(&current_era, &stash, exposure.clone());
                 (stash, to_votes(exposure.total))
             })
             .collect::<Vec<(T::AccountId, u128)>>();
@@ -1977,7 +2109,7 @@ impl<T: Trait> Module<T> {
         <CurrentElected<T>>::put(&elected_stashes);
 
         // Update slot stake.
-        <TotalStakes<T>>::put(total_stakes);
+        <ErasTotalStakes<T>>::insert(&current_era, total_stakes);
 
         // In order to keep the property required by `n_session_ending`
         // that we must return the new validator set even if it's the same as the old,

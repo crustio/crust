@@ -12,25 +12,25 @@ on:
 jobs:
   build_and_test:
     name: Build & Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      # - name: Cache cargo registry
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: ~/.cargo/registry
-      #     key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
-      # - name: Cache cargo index
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: ~/.cargo/git
-      #     key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.toml') }}
-      # - name: Cache target directory
-      #   id: cache-target
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: target
-      #     key: ${{ runner.os }}-cargo-build-target2-${{ hashFiles('**/Cargo.toml') }}
+      - name: Cache cargo registry
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
+      - name: Cache cargo index
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.toml') }}
+      - name: Cache target directory
+        id: cache-target
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target2-${{ hashFiles('**/Cargo.toml') }}
       - run: sudo apt-get remove -y clang-6.0 libclang-common-6.0-dev libclang1-6.0 libllvm6.0
       - run: sudo apt update && sudo apt install -y cmake pkg-config libssl-dev git gcc build-essential clang libclang-dev
       - uses: actions-rs/toolchain@v1

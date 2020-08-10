@@ -30,7 +30,7 @@ use sp_version::RuntimeVersion;
 
 // A few exports that help ease life for downstream crates.
 pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
-use pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
+// use pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
 pub use balances::Call as BalancesCall;
 pub use frame_support::{
     construct_runtime, parameter_types,
@@ -41,7 +41,9 @@ pub use frame_support::{
     },
     StorageValue,
 };
+use system::EnsureRoot;
 pub use im_online::sr25519::AuthorityId as ImOnlineId;
+
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use session::{historical as session_historical};
@@ -264,9 +266,9 @@ impl grandpa::Trait for Runtime {
         GrandpaId,
     )>>::IdentificationTuple;
 
-    type KeyOwnerProofSystem = ();
+    type KeyOwnerProofSystem = Historical;
 
-    type HandleEquivocation = ();
+    type HandleEquivocation = grandpa::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
 }
 
 parameter_types! {
@@ -386,7 +388,7 @@ impl balances::Trait for Runtime {
     type Event = Event;
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
-    type WeightInfo = weights::pallet_balances::WeightInfo;
+    type WeightInfo = ();
 }
 
 // TODO: better way to deal with fee(s)
@@ -459,7 +461,7 @@ construct_runtime! {
         RandomnessCollectiveFlip: randomness_collective_flip::{Module, Storage},
 
         // Must be before session.
-        Babe: babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
+        Babe: babe::{Module, Call, Storage, Config, Inherent, ValidateUnsigned},
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
         Indices: indices::{Module, Call, Storage, Config<T>, Event<T>},
@@ -472,7 +474,7 @@ construct_runtime! {
         Historical: session_historical::{Module},
         Session: session::{Module, Call, Storage, Event, Config<T>},
         FinalityTracker: finality_tracker::{Module, Call, Inherent},
-        Grandpa: grandpa::{Module, Call, Storage, Config, Event},
+        Grandpa: grandpa::{Module, Call, Storage, Config, Event, ValidateUnsigned},
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: authority_discovery::{Module, Call, Config},
         Offences: offences::{Module, Call, Storage, Event},
@@ -513,10 +515,15 @@ pub type SignedExtra = (
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 /// Extrinsic type that has already been checked.
-pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>;
+pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, SignedExtra>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive =
-    frame_executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Runtime, AllModules>;
+pub type Executive = frame_executive::Executive<
+    Runtime,
+    Block,
+    system::ChainContext<Runtime>,
+    Runtime,
+    AllModules
+>;
 
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {
@@ -629,19 +636,19 @@ impl_runtime_apis! {
         }
 
         fn submit_report_equivocation_unsigned_extrinsic(
-			equivocation_proof: fg_primitives::EquivocationProof<
-				<Block as BlockT>::Hash,
-				sp_runtime::traits::NumberFor<Block>,
-			>,
-			key_owner_proof: fg_primitives::OpaqueKeyOwnershipProof,
+            equivocation_proof: fg_primitives::EquivocationProof<
+                <Block as BlockT>::Hash,
+                sp_runtime::traits::NumberFor<Block>
+            >,
+            key_owner_proof: fg_primitives::OpaqueKeyOwnershipProof,
 		) -> Option<()> {
 			let key_owner_proof = key_owner_proof.decode()?;
 
-			Grandpa::submit_report_equivocation_extrinsic(
+			Grandpa::submit_unsigned_equivocation_report(
 				equivocation_proof,
-				key_owner_proof,
-			)
-		}
+				key_owner_proof
+            )
+        }
 
 		fn generate_key_ownership_proof(
 			_set_id: fg_primitives::SetId,
@@ -673,18 +680,22 @@ impl_runtime_apis! {
 		}
     }
 
-    impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce> for Runtime {
-		fn account_nonce(account: AccountId) -> Nonce {
+    impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
+		fn account_nonce(account: AccountId) -> Index {
 			System::account_nonce(account)
 		}
 	}
 
-	impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<
-		Block,
-		Balance,
+    // FIXME: 3rd type argument failed, bump it next version: https://github.com/paritytech/substrate/pull/6792/files
+	/*impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<
+	    Block,
+	    Balance,
 	> for Runtime {
-		fn query_info(uxt: <Block as BlockT>::Extrinsic, len: u32) -> RuntimeDispatchInfo<Balance> {
+		fn query_info(
+            uxt: <Block as BlockT>::Extrinsic,
+            len: u32
+        ) -> RuntimeDispatchInfo<Balance> {
 			TransactionPayment::query_info(uxt, len)
 		}
-	}
+	}*/
 }

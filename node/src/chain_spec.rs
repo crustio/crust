@@ -11,7 +11,7 @@ use cstrml_swork::WorkReport;
 use grandpa_primitives::AuthorityId as GrandpaId;
 use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
-use sc_service::ChainType;
+use service::ChainType;
 use sp_runtime::{traits::{Verify, IdentifyAccount}, Perbill};
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
@@ -67,16 +67,19 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (
 }
 
 /// The `ChainSpec parametrised for crust runtime`.
-pub type CrustChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
+pub type CrustChainSpec = service::GenericChainSpec<GenesisConfig>;
 type AccountPublic = <Signature as Verify>::Signer;
 
 /// Crust development config (single validator Alice)
-pub fn development_config() -> CrustChainSpec {
-    CrustChainSpec::from_genesis(
+pub fn development_config() -> Result<CrustChainSpec, String> {
+    let wasm_binary = WASM_BINARY.ok_or("Local test wasm not available")?;
+
+    Ok(CrustChainSpec::from_genesis(
         "Development",
         "dev",
         ChainType::Development,
-        || testnet_genesis(
+        move || testnet_genesis(
+            wasm_binary,
             vec![
                 get_authority_keys_from_seed("Alice")
             ],
@@ -96,16 +99,19 @@ pub fn development_config() -> CrustChainSpec {
         Some(DEFAULT_PROTOCOL_ID),
         None,
         Default::default()
-    )
+    ))
 }
 
 /// Crust local testnet config (multi-validator Alice + Bob)
-pub fn local_testnet_config() -> CrustChainSpec {
-    CrustChainSpec::from_genesis(
+pub fn local_testnet_config() -> Result<CrustChainSpec, String> {
+    let wasm_binary = WASM_BINARY.ok_or("Local test wasm not available")?;
+
+    Ok(CrustChainSpec::from_genesis(
         "Local Testnet",
         "local_testnet",
         ChainType::Local,
-        || testnet_genesis(
+        move || testnet_genesis(
+            wasm_binary,
             vec![
                 get_authority_keys_from_seed("Alice"),
                 get_authority_keys_from_seed("Bob"),
@@ -132,7 +138,7 @@ pub fn local_testnet_config() -> CrustChainSpec {
         Some(DEFAULT_PROTOCOL_ID),
         None,
         Default::default()
-    )
+    ))
 }
 
 /// Crust rocky(aka. internal testnet) config
@@ -146,37 +152,42 @@ pub fn maxwell_config() -> Result<CrustChainSpec, String> {
 }
 
 /// Crust rocky staging config
-pub fn rocky_staging_config() -> CrustChainSpec {
-    CrustChainSpec::from_genesis(
+pub fn rocky_staging_config() -> Result<CrustChainSpec, String> {
+    let wasm_binary = WASM_BINARY.ok_or("Rocky wasm not available")?;
+
+    Ok(CrustChainSpec::from_genesis(
         "Crust Rocky",
         "crust_rocky",
         ChainType::Live,
-        rocky_staging_testnet_config_genesis,
+        move || rocky_staging_testnet_config_genesis(wasm_binary),
         vec![],
         None,
         Some(DEFAULT_PROTOCOL_ID),
         None,
         Default::default()
-    )
+    ))
 }
 
 /// Crust maxwell staging config
-pub fn maxwell_staging_config() -> CrustChainSpec {
-    CrustChainSpec::from_genesis(
+pub fn maxwell_staging_config() -> Result<CrustChainSpec, String> {
+    let wasm_binary = WASM_BINARY.ok_or("Maxwell wasm not available")?;
+
+    Ok(CrustChainSpec::from_genesis(
         "Crust Maxwell",
         "crust_maxwell",
         ChainType::Live,
-        maxwell_staging_testnet_config_genesis,
+        move || maxwell_staging_testnet_config_genesis(wasm_binary),
         vec![],
         None,
         Some(DEFAULT_PROTOCOL_ID),
         None,
         Default::default()
-    )
+    ))
 }
 
 /// The genesis spec of crust dev/local test network
 fn testnet_genesis(
+    wasm_binary: &[u8],
     initial_authorities: Vec<(
         AccountId,
         AccountId,
@@ -197,7 +208,7 @@ fn testnet_genesis(
             key: endowed_accounts[0].clone(),
         }),
         system: Some(SystemConfig {
-            code: WASM_BINARY.to_vec(),
+            code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
         balances: Some(BalancesConfig {
@@ -261,7 +272,7 @@ fn testnet_genesis(
 }
 
 /// The genesis spec of crust rocky test network
-fn rocky_staging_testnet_config_genesis() -> GenesisConfig {
+fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     // subkey inspect "$SECRET"
     let endowed_accounts: Vec<AccountId> = vec![
         // 5Ctacdhp72PDbXs4h2Qdmc5d6J9uwg1zPu5Z2aFPUBaUKGwH
@@ -315,7 +326,7 @@ fn rocky_staging_testnet_config_genesis() -> GenesisConfig {
             key: endowed_accounts[0].clone(),
         }),
         system: Some(SystemConfig {
-            code: WASM_BINARY.to_vec(),
+            code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
         balances: Some(BalancesConfig {
@@ -378,7 +389,7 @@ fn rocky_staging_testnet_config_genesis() -> GenesisConfig {
 }
 
 /// The genesis spec of crust maxwell test network
-fn maxwell_staging_testnet_config_genesis() -> GenesisConfig {
+fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     // subkey inspect "$SECRET"
     let endowed_accounts: Vec<AccountId> = vec![
         // 5Dhss1MkoP1dwPgQABGJEabTcSb6wacD1zQBuJCa6FJdQupX
@@ -436,7 +447,7 @@ fn maxwell_staging_testnet_config_genesis() -> GenesisConfig {
             key: endowed_accounts[0].clone(),
         }),
         system: Some(SystemConfig {
-            code: WASM_BINARY.to_vec(),
+            code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
         balances: Some(BalancesConfig {

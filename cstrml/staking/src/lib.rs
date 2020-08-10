@@ -2197,6 +2197,7 @@ impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::Ident
             let eras = BondedEras::get();
 
             // reverse because it's more likely to find reports from recent eras.
+
             match eras
                 .iter()
                 .rev()

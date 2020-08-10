@@ -608,7 +608,7 @@ decl_storage! {
         config(stakers):
             Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId, BalanceOf<T>>)>;
         build(|config: &GenesisConfig<T>| {
-            let mut total_stakes: BalanceOf<T> = Zero::zero();
+            let mut gensis_total_stakes: BalanceOf<T> = Zero::zero();
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
                     T::Currency::transfer_balance(&stash) >= balance,
@@ -621,7 +621,7 @@ decl_storage! {
                     RewardDestination::Staked,
                 );
 
-                total_stakes += balance;
+                gensis_total_stakes += balance;
 
                 // TODO: make genesis validator's limitation more reasonable
                 <Module<T>>::upsert_stake_limit(stash, balance+balance);
@@ -643,7 +643,7 @@ decl_storage! {
                     }, _ => Ok(())
                 };
             }
-            <ErasTotalStakes<T>>::insert(0, total_stakes);
+            <ErasTotalStakes<T>>::insert(0, gensis_total_stakes);
         });
     }
 }
@@ -1697,7 +1697,7 @@ impl<T: Trait> Module<T> {
             guarantee_rewards += per_u64 * total_rewards;
             Self::make_payout(&i.who, per_u64 * total_rewards);
         }
-        Self::make_payout(&ledger.stash, total_rewards - guarantee_rewards);
+        Self::make_payout(&ledger.stash, staking_reward - guarantee_rewards);
 		Ok(())
 	}
 

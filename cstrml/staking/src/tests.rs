@@ -61,7 +61,8 @@ fn basic_setup_works() {
                 total: 1000,
                 active: 1000,
                 valid: 1000,
-                unlocking: vec![]
+                unlocking: vec![],
+                claimed_rewards:vec![],
             })
         );
         // Account 20 controls the stash from account 21, which is 200 * balance_factor units
@@ -72,7 +73,8 @@ fn basic_setup_works() {
                 total: 1000,
                 active: 1000,
                 valid: 1000,
-                unlocking: vec![]
+                unlocking: vec![],
+                claimed_rewards:vec![],
             })
         );
         // Account 1 does not control any stash
@@ -109,7 +111,8 @@ fn basic_setup_works() {
                 total: 500,
                 active: 500,
                 valid: 500,
-                unlocking: vec![]
+                unlocking: vec![],
+                claimed_rewards:vec![],
             })
         );
         assert_eq!(Staking::guarantors(101).unwrap().targets, vec![11, 21]);
@@ -140,7 +143,7 @@ fn basic_setup_works() {
                 }
             );
             // initial total_stakes = 1250+1250+1
-            assert_eq!(Staking::total_stakes(), 2501);
+            assert_eq!(Staking::eras_total_stakes(0), 2501);
         } else {
             assert_eq!(
                 Staking::stakers(11),
@@ -165,7 +168,7 @@ fn basic_setup_works() {
                 }
             );
             // initial total_stakes = 1125+1375+1
-            assert_eq!(Staking::total_stakes(), 2501);
+            assert_eq!(Staking::eras_total_stakes(0), 2501);
         }
 
         // The number of validators required.
@@ -247,7 +250,8 @@ fn rewards_should_work() {
             //
             // Equal division indicates that the reward will be equally divided among validator and
             // guarantor.
-            <Stakers<Test>>::insert(
+            <ErasStakers<Test>>::insert(
+                0,
                 &11,
                 Exposure {
                     own: 500,
@@ -276,7 +280,7 @@ fn rewards_should_work() {
             // Compute total payout now for whole duration as other parameter won't change
             let staking_reward = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             let authoring_reward = Staking::authoring_rewards_in_era();
-            assert_eq!(Staking::total_stakes(), 2001);
+            assert_eq!(Staking::eras_total_stakes(0), 2001);
             assert_eq!(Balances::total_balance(&2), init_balance_2);
             assert_eq!(Balances::total_balance(&10), init_balance_10);
             assert_eq!(Balances::total_balance(&11), init_balance_11);
@@ -294,7 +298,7 @@ fn rewards_should_work() {
             Session::on_initialize(System::block_number());
             assert_eq!(Staking::current_era().unwrap_or(0), 1);
             assert_eq!(Session::current_index(), 3);
-
+            Staking::payout_stakers(Origin::signed(10), 11, 0).unwrap();
             // 11 validator has 2/3 of the total rewards and half half for it and its guarantor
             assert_eq_error_rate!(
                 Balances::total_balance(&2) / 1000000,
@@ -333,15 +337,17 @@ fn multi_era_reward_should_work() {
             let total_authoring_payout = Staking::authoring_rewards_in_era();
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
-            assert_eq!(Staking::total_stakes(), 2001);
+            assert_eq!(Staking::eras_total_stakes(0), 2001);
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
             start_session(0, true);
             start_session(1, true);
             start_session(2, true);
             start_session(3, true);
+            payout_all_stakers(0);
 
             assert_eq!(Staking::current_era().unwrap_or(0), 1);
+            assert_eq!(Staking::eras_total_stakes(1), 2001);
             // rewards may round to 0.000001
             assert_eq!(
                 Balances::total_balance(&10) / 1000000,
@@ -353,26 +359,26 @@ fn multi_era_reward_should_work() {
                 stakes_21 / 1000000,
                 (init_balance_21 + total_staking_payout_0 * 1000 / 2001) / 1000000
             );
-            assert_eq!(Staking::total_stakes(), 142667657428421);
 
             start_session(4, true);
 
-            let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-            assert!(total_staking_payout_1 > 10); // Test is meaningful if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 101)]); // meaningless points
-
+            let total_authoring_payout_1 = Staking::authoring_rewards_in_era();
             // new era is triggered here.
             start_session(5, true);
-
+            let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_1 > 10); // Test is meaningful if reward something
+            payout_all_stakers(1);
+            assert_eq!(Staking::eras_total_stakes(2), 142667657428421);
             // pay time
             assert_eq!(
                 Balances::total_balance(&10) / 1000000,
                 (init_balance_10 + total_authoring_payout + total_staking_payout_0 * 1000 / 2001
-                    + 0/*small fraction on staking rewards is 0(total_staking_payout_1 * 1000 / 142667657428421)*/) / 1000000
+                    + total_authoring_payout_1 + (total_staking_payout_1 * 1000 / 2001)) / 1000000
             );
             assert_eq!(
                 Balances::total_balance(&21) / 1000000,
-                (stakes_21 + Perbill::from_rational_approximation(stakes_21, 142667657428421) * total_staking_payout_1) / 1000000
+                (stakes_21 + (total_staking_payout_1 * 1000 / 2001)) / 1000000
             );
         });
 }
@@ -449,7 +455,8 @@ fn staking_should_work() {
                     total: 2500,
                     active: 2500,
                     valid: 2500,
-                    unlocking: vec![]
+                    unlocking: vec![],
+                    claimed_rewards: vec![],
                 })
             );
             // e.g. it cannot spend more than 500 that it has free from the total 2000
@@ -610,8 +617,10 @@ fn guaranteeing_and_rewards_should_work() {
 
             // 10 and 20 have more votes, they will be chosen by top-down.
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
-            assert_eq!(Staking::total_stakes(), 5998);
+            assert_eq!(Staking::eras_total_stakes(1), 5998);
 
+            payout_all_stakers(0);
+            Staking::payout_stakers(Origin::signed(10), 41, 0).unwrap();
             // OLD validators must have already received some rewards.
             assert_eq!(Balances::total_balance(&40), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
             assert_eq!(Balances::total_balance(&30), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
@@ -929,6 +938,7 @@ fn double_staking_should_fail() {
                 active: arbitrary_value,
                 valid: 750,
                 unlocking: vec![],
+                claimed_rewards: vec![]
             })
         );
     });
@@ -1302,12 +1312,20 @@ fn validator_payment_prefs_work() {
         let _ = Balances::make_free_balance_be(&2, 500);
 
         // add a dummy guarantor.
-        <Stakers<Test>>::insert(
+        <ErasStakers<Test>>::insert(
+            0,
             &11,
             Exposure {
                 own: 500, // equal division indicates that the reward will be equally divided among validator and guarantor.
                 total: 1000,
                 others: vec![IndividualExposure { who: 2, value: 500 }],
+            },
+        );
+        <ErasValidatorPrefs<Test>>::insert(
+            0,
+            &11,
+            ValidatorPrefs {
+                guarantee_fee: Perbill::from_percent(50)
             },
         );
         <Payee<Test>>::insert(&2, RewardDestination::Stash);
@@ -1323,11 +1341,12 @@ fn validator_payment_prefs_work() {
         // Compute total payout now for whole duration as other parameter won't change
         let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
         let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-        assert_eq!(Staking::total_stakes(), 2001); // Test is meaningfull if reward something
+        assert_eq!(Staking::eras_total_stakes(0), 2001); // Test is meaningfull if reward something
         <Module<Test>>::reward_by_ids(vec![(11, 1)]);
 
 
         start_era(1, true);
+        Staking::payout_stakers(Origin::signed(10), 11, 0).unwrap();
 
         let shared_cut = total_staking_payout_0 * 500 / 2001;
         // Validator's payee is Staked account, 11, reward will be paid here.
@@ -1365,6 +1384,7 @@ fn bond_extra_works() {
                 active: 1000,
                 valid: 1000,
                 unlocking: vec![],
+                claimed_rewards: vec![]
             })
         );
 
@@ -1382,6 +1402,7 @@ fn bond_extra_works() {
                 active: 1000 + 100,
                 valid: 1000,
                 unlocking: vec![],
+                claimed_rewards: vec![]
             })
         );
 
@@ -1396,6 +1417,7 @@ fn bond_extra_works() {
                 active: 1500,
                 valid: 1000,
                 unlocking: vec![],
+                claimed_rewards: vec![]
             })
         );
 
@@ -1414,6 +1436,7 @@ fn bond_extra_works() {
                 active: 2000,
                 valid: 1000,
                 unlocking: vec![],
+                claimed_rewards: vec![]
             })
         );
 
@@ -1428,6 +1451,7 @@ fn bond_extra_works() {
                 active: 2000,
                 valid: 2000,
                 unlocking: vec![],
+                claimed_rewards: vec![]
             })
         );
     });
@@ -1472,6 +1496,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     active: 1000,
                     valid: 1000,
                     unlocking: vec![],
+                    claimed_rewards: vec![]
                 })
             );
             assert_eq!(
@@ -1494,6 +1519,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     active: 1000 + 100,
                     valid: 1000,
                     unlocking: vec![],
+                    claimed_rewards: vec![]
                 })
             );
             // Exposure is a snapshot! only updated after the next era update.
@@ -1520,6 +1546,7 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     active: 1000 + 100,
                     valid: 1000 + 100, // stake limit is 3000 right now
                     unlocking: vec![],
+                    claimed_rewards: vec![]
                 })
             );
             // Exposure is now updated.
@@ -1544,7 +1571,8 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     unlocking: vec![UnlockChunk {
                         value: 1000,
                         era: 2 + 3
-                    }]
+                    }],
+                    claimed_rewards: vec![]
                 })
             );
 
@@ -1560,7 +1588,8 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     unlocking: vec![UnlockChunk {
                         value: 1000,
                         era: 2 + 3
-                    }]
+                    }],
+                    claimed_rewards: vec![]
                 })
             );
 
@@ -1579,7 +1608,8 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     unlocking: vec![UnlockChunk {
                         value: 1000,
                         era: 2 + 3
-                    }]
+                    }],
+                    claimed_rewards: vec![]
                 })
             );
 
@@ -1595,7 +1625,8 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     total: 100,
                     active: 100,
                     valid: 100,
-                    unlocking: vec![]
+                    unlocking: vec![],
+                    claimed_rewards: vec![]
                 })
             );
         })
@@ -2035,7 +2066,8 @@ fn bond_with_no_staked_value() {
                     active: 0,
                     total: 5,
                     valid: 0,
-                    unlocking: vec![UnlockChunk { value: 5, era: 3 }]
+                    unlocking: vec![UnlockChunk { value: 5, era: 3 }],
+                    claimed_rewards: vec![]
                 })
             );
 
@@ -2096,8 +2128,9 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             // 2 is elected.
             // and fucks up the slot stake.
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
-            assert_eq!(Staking::total_stakes(), 144426417598396);
-
+            assert_eq!(Staking::eras_total_stakes(1), 2002);
+            payout_all_stakers(0);
+            Staking::payout_stakers(Origin::signed(10), 1, 0).unwrap();
             // Old ones are rewarded, round to 0.000001 CRU
             assert_eq!(
                 Balances::free_balance(&10) / 1000000,
@@ -2113,18 +2146,19 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
 
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
             // Stake limit strategy effecting
-            assert_eq!(Staking::total_stakes(), /*291396645848756*/ 431520493191596);
-
+            assert_eq!(Staking::eras_total_stakes(2), /*291396645848756*/ 144426417598396);
+            payout_all_stakers(1);
+            Staking::payout_stakers(Origin::signed(10), 1, 1).unwrap();
             // round to 0.000001 CRU
             assert_eq!(
                 Balances::free_balance(&2) / 1000000,
-                (init_balance_2 + total_authoring_payout / 3 + total_staking_payout_1 * 2 / 144426417598397) / 1000000
+                (init_balance_2 + total_authoring_payout / 3 + total_staking_payout_1 * 2 / 2002) / 1000000 - 1,
             );
             // round to 0.000001 CRU
             assert_eq!(
                 Balances::free_balance(&10) / 1000000,
                 (init_balance_10 + total_authoring_payout / 3 * 2 +
-                    total_staking_payout_0 * 1000 / 2001 + total_staking_payout_1 * 1000 / 144426417598397) / 1000000 - 1,
+                    total_staking_payout_0 * 1000 / 2001 + total_staking_payout_1 * 1000 / 2002) / 1000000 - 1,
             );
             check_exposure_all();
             check_guarantor_all();
@@ -3272,7 +3306,8 @@ fn guarantee_limit_should_work() {
                     total: 2000,
                     active: 2000,
                     valid: 500,
-                    unlocking: vec![]
+                    unlocking: vec![],
+                    claimed_rewards: vec![]
                 })
             );
 
@@ -3312,7 +3347,8 @@ fn guarantee_limit_should_work() {
                     total: 2000,
                     active: 2000,
                     valid: 2000,
-                    unlocking: vec![]
+                    unlocking: vec![],
+                    claimed_rewards: vec![]
                 })
             );
         });
@@ -3597,7 +3633,8 @@ fn multi_guarantees_with_stake_limit_should_work() {
                     total: 1000,
                     active: 1000,
                     valid: 1000,
-                    unlocking: vec![]
+                    unlocking: vec![],
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
 
@@ -3608,7 +3645,8 @@ fn multi_guarantees_with_stake_limit_should_work() {
                     total: 2000,
                     active: 2000,
                     valid: 500,
-                    unlocking: vec![]
+                    unlocking: vec![],
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
             
@@ -3712,7 +3750,8 @@ fn new_era_with_stake_limit_should_work() {
                     total: 2000,
                     active: 2000,
                     valid: 0,
-                    unlocking: vec![] // in time. no lock for such scenario.
+                    unlocking: vec![], // in time. no lock for such scenario.
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
             start_era_with_new_workloads(6, false, 1, 200000000);
@@ -3747,7 +3786,8 @@ fn new_era_with_stake_limit_should_work() {
                     total: 2000,
                     active: 2000,
                     valid: 0,
-                    unlocking: vec![] // in time. no lock for such scenario.
+                    unlocking: vec![], // in time. no lock for such scenario.
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
         });
@@ -3949,7 +3989,8 @@ fn new_era_with_stake_limit_for_nominations_should_work() {
                     total: 4000,
                     active: 4000,
                     valid: 500,
-                    unlocking: vec![] // in time. no lock for such scenario.
+                    unlocking: vec![], // in time. no lock for such scenario.
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
 
@@ -3960,7 +4001,8 @@ fn new_era_with_stake_limit_for_nominations_should_work() {
                     total: 4000,
                     active: 4000,
                     valid: 2500,
-                    unlocking: vec![] // in time. no lock for such scenario.
+                    unlocking: vec![], // in time. no lock for such scenario.
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
 
@@ -4047,7 +4089,8 @@ fn new_era_with_stake_limit_for_nominations_should_work() {
                     total: 4000,
                     active: 4000,
                     valid: 500,
-                    unlocking: vec![] // in time. no lock for such scenario.
+                    unlocking: vec![], // in time. no lock for such scenario.
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
 
@@ -4058,7 +4101,8 @@ fn new_era_with_stake_limit_for_nominations_should_work() {
                     total: 4000,
                     active: 4000,
                     valid: 2500,
-                    unlocking: vec![] // in time. no lock for such scenario.
+                    unlocking: vec![], // in time. no lock for such scenario.
+                    claimed_rewards: vec![0, 1, 2, 3]
                 })
             );
 

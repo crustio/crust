@@ -33,7 +33,7 @@ use sp_staking::{
 };
 use sp_std::{convert::TryInto, prelude::*, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 
-use frame_system::{self as system, ensure_root, ensure_signed};
+use frame_system::{ensure_root, ensure_signed};
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
 
@@ -2197,6 +2197,7 @@ impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::Ident
             let eras = BondedEras::get();
 
             // reverse because it's more likely to find reports from recent eras.
+
             match eras
                 .iter()
                 .rev()
@@ -2281,4 +2282,8 @@ for FilterHistoricalOffences<Module<T>, R> where
             Ok(())
         }
     }
+
+    fn is_known_offence(offenders: &[Offender], time_slot: &O::TimeSlot) -> bool {
+		R::is_known_offence(offenders, time_slot)
+	}
 }

@@ -1,3 +1,20 @@
+// This file is part of Substrate.
+
+// Copyright (C) 2017-2020 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! # Balances Module
 //!
 //! The Balances module provides functionality for handling accounts and balances.
@@ -137,12 +154,14 @@ mod tests;
 mod tests_local;
 mod tests_composite;
 mod benchmarking;
+mod default_weight;
 
 use sp_std::prelude::*;
 use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr, convert::Infallible};
 use codec::{Codec, Encode, Decode};
 use frame_support::{
 	StorageValue, Parameter, decl_event, decl_storage, decl_module, decl_error, ensure,
+	weights::Weight,
 	traits::{
 		Currency, OnKilledAccount, OnUnbalanced, TryDrop, StoredMap,
 		WithdrawReason, WithdrawReasons, LockIdentifier, LockableCurrency, ExistenceRequirement,
@@ -163,6 +182,14 @@ use primitives::traits::TransferrableCurrency;
 
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 
+pub trait WeightInfo {
+	fn transfer() -> Weight;
+	fn transfer_keep_alive() -> Weight;
+	fn set_balance_creating() -> Weight;
+	fn set_balance_killing() -> Weight;
+	fn force_transfer() -> Weight;
+}
+
 pub trait Subtrait<I: Instance = DefaultInstance>: frame_system::Trait {
 	/// The balance of an account.
 	type Balance: Parameter + Member + AtLeast32BitUnsigned + Codec + Default + Copy +
@@ -173,6 +200,9 @@ pub trait Subtrait<I: Instance = DefaultInstance>: frame_system::Trait {
 
 	/// The means of storing the balances of an account.
 	type AccountStore: StoredMap<Self::AccountId, AccountData<Self::Balance>>;
+
+	/// Weight information for the extrinsics in this pallet.
+	type WeightInfo: WeightInfo;
 }
 
 pub trait Trait<I: Instance = DefaultInstance>: frame_system::Trait {
@@ -191,12 +221,16 @@ pub trait Trait<I: Instance = DefaultInstance>: frame_system::Trait {
 
 	/// The means of storing the balances of an account.
 	type AccountStore: StoredMap<Self::AccountId, AccountData<Self::Balance>>;
+
+	/// Weight information for extrinsics in this pallet.
+	type WeightInfo: WeightInfo;
 }
 
 impl<T: Trait<I>, I: Instance> Subtrait<I> for T {
 	type Balance = T::Balance;
 	type ExistentialDeposit = T::ExistentialDeposit;
 	type AccountStore = T::AccountStore;
+	type WeightInfo = <T as Trait<I>>::WeightInfo;
 }
 
 decl_event!(
@@ -204,23 +238,24 @@ decl_event!(
 		<T as frame_system::Trait>::AccountId,
 		<T as Trait<I>>::Balance
 	{
-		/// An account was created with some free balance.
+		/// An account was created with some free balance. [account, free_balance]
 		Endowed(AccountId, Balance),
 		/// An account was removed whose balance was non-zero but below ExistentialDeposit,
-		/// resulting in an outright loss.
+		/// resulting in an outright loss. [account, balance]
 		DustLost(AccountId, Balance),
-		/// Transfer succeeded (from, to, value).
+		/// Transfer succeeded. [from, to, value]
 		Transfer(AccountId, AccountId, Balance),
-		/// A balance was set by root (who, free, reserved).
+		/// A balance was set by root. [who, free, reserved]
 		BalanceSet(AccountId, Balance, Balance),
-		/// Some amount was deposited (e.g. for transaction fees).
+		/// Some amount was deposited (e.g. for transaction fees). [who, deposit]
 		Deposit(AccountId, Balance),
-		/// Some balance was reserved (moved from free to reserved).
+		/// Some balance was reserved (moved from free to reserved). [who, value]
 		Reserved(AccountId, Balance),
-		/// Some balance was unreserved (moved from reserved to free).
+		/// Some balance was unreserved (moved from reserved to free). [who, value]
 		Unreserved(AccountId, Balance),
 		/// Some balance was moved from the reserve of the first account to the second account.
 		/// Final argument indicates the destination balance type.
+		/// [from, to, balance, destination_status]
 		ReserveRepatriated(AccountId, AccountId, Balance, Status),
 	}
 );
@@ -422,7 +457,7 @@ decl_module! {
 		/// - DB Weight: 1 Read and 1 Write to destination account
 		/// - Origin account is already in memory, so no DB operations for them.
 		/// # </weight>
-		#[weight = T::DbWeight::get().reads_writes(1, 1) + 70_000_000]
+		#[weight = T::WeightInfo::transfer()]
 		pub fn transfer(
 			origin,
 			dest: <T::Lookup as StaticLookup>::Source,
@@ -451,7 +486,9 @@ decl_module! {
 		///     - Killing: 35.11 µs
 		/// - DB Weight: 1 Read, 1 Write to `who`
 		/// # </weight>
-		#[weight = T::DbWeight::get().reads_writes(1, 1) + 35_000_000]
+		#[weight = T::WeightInfo::set_balance_creating() // Creates a new account.
+			.max(T::WeightInfo::set_balance_killing()) // Kills an existing account.
+		]
 		fn set_balance(
 			origin,
 			who: <T::Lookup as StaticLookup>::Source,
@@ -493,7 +530,7 @@ decl_module! {
 		/// - Same as transfer, but additional read and write because the source account is
 		///   not assumed to be in the overlay.
 		/// # </weight>
-		#[weight = T::DbWeight::get().reads_writes(2, 2) + 70_000_000]
+		#[weight = T::WeightInfo::force_transfer()]
 		pub fn force_transfer(
 			origin,
 			source: <T::Lookup as StaticLookup>::Source,
@@ -517,7 +554,7 @@ decl_module! {
 		/// - Base Weight: 51.4 µs
 		/// - DB Weight: 1 Read and 1 Write to dest (sender is in overlay already)
 		/// #</weight>
-		#[weight = T::DbWeight::get().reads_writes(1, 1) + 50_000_000]
+		#[weight = T::WeightInfo::transfer_keep_alive()]
 		pub fn transfer_keep_alive(
 			origin,
 			dest: <T::Lookup as StaticLookup>::Source,
@@ -854,16 +891,18 @@ impl<T: Subtrait<I>, I: Instance> frame_system::Trait for ElevatedTrait<T, I> {
 	type AvailableBlockRatio = T::AvailableBlockRatio;
 	type Version = T::Version;
 	type ModuleToIndex = T::ModuleToIndex;
-	type AccountData = T::AccountData;
 	type OnNewAccount = T::OnNewAccount;
 	type OnKilledAccount = T::OnKilledAccount;
+	type AccountData = T::AccountData;
+	type SystemWeightInfo = T::SystemWeightInfo;
 }
 impl<T: Subtrait<I>, I: Instance> Trait<I> for ElevatedTrait<T, I> {
 	type Balance = T::Balance;
-	type DustRemoval = ();
 	type Event = ();
+	type DustRemoval = ();
 	type ExistentialDeposit = T::ExistentialDeposit;
 	type AccountStore = T::AccountStore;
+	type WeightInfo = <T as Subtrait<I>>::WeightInfo;
 }
 
 impl<T: Trait<I>, I: Instance> Currency<T::AccountId> for Module<T, I> where
@@ -1050,7 +1089,7 @@ impl<T: Trait<I>, I: Instance> Currency<T::AccountId> for Module<T, I> where
 
 			// defensive only: overflow should never happen, however in case it does, then this
 			// operation is a no-op.
-			account.free = account.free.checked_add(&value).ok_or(Self::PositiveImbalance::zero())?;
+			account.free = account.free.checked_add(&value).ok_or_else(|| Self::PositiveImbalance::zero())?;
 
 			Ok(PositiveImbalance::new(value))
 		}).unwrap_or_else(|x| x)
@@ -1111,7 +1150,7 @@ impl<T: Trait<I>, I: Instance> Currency<T::AccountId> for Module<T, I> where
 			};
 			account.free = value;
 			Ok(imbalance)
-		}).unwrap_or(SignedImbalance::Positive(Self::PositiveImbalance::zero()))
+		}).unwrap_or_else(|_| SignedImbalance::Positive(Self::PositiveImbalance::zero()))
 	}
 }
 
@@ -1307,11 +1346,8 @@ where
 }
 
 impl<T: Trait<I>, I: Instance> TransferrableCurrency<T::AccountId> for Module<T, I>
-where
-	T::Balance: MaybeSerializeDeserialize + Debug
-{
-	fn transfer_balance(who: &T::AccountId) -> Self::Balance
-	{
+	where T::Balance: MaybeSerializeDeserialize + Debug {
+	fn transfer_balance(who: &T::AccountId) -> Self::Balance {
 		let sum_of_locks = Self::locks(who).iter().fold(Zero::zero(), |acc: Self::Balance, value| {acc + value.amount});
 		Self::account(who).free.saturating_sub(sum_of_locks)
 	}

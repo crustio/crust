@@ -74,6 +74,7 @@ impl system::Trait for Test {
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
+    type SystemWeightInfo = ();
 }
 
 impl balances::Trait for Test {
@@ -82,6 +83,7 @@ impl balances::Trait for Test {
     type Event = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = system::Module<Test>;
+    type WeightInfo = ();
 }
 
 impl market::Payment<<Test as system::Trait>::AccountId,

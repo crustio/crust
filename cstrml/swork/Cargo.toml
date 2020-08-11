@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-swork"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -9,32 +9,32 @@ repository = "https://github.com/crustio/crust/"
 
 [dependencies]
 # third party dependencies
-codec = { default-features = false, package = 'parity-scale-codec', version = '1.3.1' }
+codec = { default-features = false, package = 'parity-scale-codec', version = '1.3.4' }
 serde = { optional = true, version = '1.0.106' }
 serde_json = "1.0.55"
-signatory = "0.18.0"
-signatory-ring = "0.18.0"
+signatory = "0.20.0"
+signatory-ring = "0.20.0"
 hex = '0.4.2'
 base64 = "0.12.2"
 openssl = { optional = true, version = "0.10.29" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = '2.0.0-rc4' }
-system = { package = 'frame-system', default-features = false, version = '2.0.0-rc4' }
+frame-support = { default-features = false, version = '2.0.0-rc5' }
+frame-system = { default-features = false, version = '2.0.0-rc5' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-rc4' }
-sp-io = { default-features = false, version = '2.0.0-rc4' }
-sp-runtime = { default-features = false, version = '2.0.0-rc4' }
-sp-runtime-interface = { default-features = false, version = '2.0.0-rc4' }
-sp-std = { default-features = false, version = '2.0.0-rc4' }
+sp-core = { default-features = false, version = '2.0.0-rc5' }
+sp-io = { default-features = false, version = '2.0.0-rc5' }
+sp-runtime = { default-features = false, version = '2.0.0-rc5' }
+sp-runtime-interface = { default-features = false, version = '2.0.0-rc5' }
+sp-std = { default-features = false, version = '2.0.0-rc5' }
 
 # crust runtime modules
 market = { package = 'cstrml-market', path = '../market', default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-keyring = { package = "sp-keyring", version = '2.0.0-rc4' }
+keyring = { package = "sp-keyring", version = '2.0.0-rc5' }
 balances = { package = 'cstrml-balances', path = '../balances' }
 
 [features]
@@ -48,7 +48,7 @@ std = [
     'sp-io/std',
     'sp-runtime/std',
     'sp-std/std',
-    'system/std',
+    'frame-system/std',
     'sp-runtime-interface/std',
     'market/std',
     'primitives/std'

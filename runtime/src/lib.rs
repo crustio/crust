@@ -30,6 +30,7 @@ use sp_version::RuntimeVersion;
 
 // A few exports that help ease life for downstream crates.
 pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
+// use pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
 pub use balances::Call as BalancesCall;
 pub use frame_support::{
     construct_runtime, parameter_types,
@@ -40,7 +41,9 @@ pub use frame_support::{
     },
     StorageValue,
 };
+use system::EnsureRoot;
 pub use im_online::sr25519::AuthorityId as ImOnlineId;
+
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use session::{historical as session_historical};
@@ -168,6 +171,7 @@ impl system::Trait for Runtime {
     type OnNewAccount = ();
     /// What to do if an account is fully reaped from the system.
     type OnKilledAccount = ();
+    type SystemWeightInfo = ();
 }
 
 parameter_types! {
@@ -181,6 +185,20 @@ impl babe::Trait for Runtime {
 
     // session module is the trigger
     type EpochChangeTrigger = babe::ExternalTrigger;
+
+    type KeyOwnerProof = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+        KeyTypeId,
+        babe::AuthorityId,
+    )>>::Proof;
+
+    type KeyOwnerIdentification = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
+        KeyTypeId,
+        babe::AuthorityId,
+    )>>::IdentificationTuple;
+
+    type KeyOwnerProofSystem = Historical;
+
+    type HandleEquivocation = babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
 }
 
 parameter_types! {
@@ -192,6 +210,7 @@ impl indices::Trait for Runtime {
     type Currency = Balances;
     type Deposit = IndexDeposit;
     type Event = Event;
+    type WeightInfo = ();
 }
 
 impl authority_discovery::Trait for Runtime {}
@@ -218,6 +237,7 @@ impl im_online::Trait for Runtime {
     type SessionDuration = SessionDuration;
     type ReportUnresponsiveness = Offences;
     type UnsignedPriority = ImOnlineUnsignedPriority;
+    type WeightInfo = ();
 }
 
 parameter_types! {
@@ -227,8 +247,11 @@ parameter_types! {
 impl scheduler::Trait for Runtime {
     type Event = Event;
     type Origin = Origin;
+    type PalletsOrigin = OriginCaller;
     type Call = Call;
     type MaximumWeight = MaximumWeight;
+    type ScheduleOrigin = EnsureRoot<AccountId>;
+    type WeightInfo = ();
 }
 
 impl grandpa::Trait for Runtime {
@@ -243,9 +266,9 @@ impl grandpa::Trait for Runtime {
         GrandpaId,
     )>>::IdentificationTuple;
 
-    type KeyOwnerProofSystem = ();
+    type KeyOwnerProofSystem = Historical;
 
-    type HandleEquivocation = ();
+    type HandleEquivocation = grandpa::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
 }
 
 parameter_types! {
@@ -268,6 +291,7 @@ impl timestamp::Trait for Runtime {
     type Moment = u64;
     type OnTimestampSet = Babe;
     type MinimumPeriod = MinimumPeriod;
+    type WeightInfo = ();
 }
 
 parameter_types! {
@@ -295,6 +319,7 @@ impl session::Trait for Runtime {
     type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+    type WeightInfo = ();
 }
 
 impl session::historical::Trait for Runtime {
@@ -342,6 +367,7 @@ impl offences::Trait for Runtime {
 	type IdentificationTuple = session::historical::IdentificationTuple<Self>;
 	type OnOffenceHandler = Staking;
 	type WeightSoftLimit = OffencesWeightSoftLimit;
+    type WeightInfo = ();
 }
 
 parameter_types! {
@@ -362,6 +388,7 @@ impl balances::Trait for Runtime {
     type Event = Event;
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
+    type WeightInfo = ();
 }
 
 // TODO: better way to deal with fee(s)
@@ -434,7 +461,7 @@ construct_runtime! {
         RandomnessCollectiveFlip: randomness_collective_flip::{Module, Storage},
 
         // Must be before session.
-        Babe: babe::{Module, Call, Storage, Config, Inherent(Timestamp)},
+        Babe: babe::{Module, Call, Storage, Config, Inherent, ValidateUnsigned},
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
         Indices: indices::{Module, Call, Storage, Config<T>, Event<T>},
@@ -447,10 +474,12 @@ construct_runtime! {
         Historical: session_historical::{Module},
         Session: session::{Module, Call, Storage, Event, Config<T>},
         FinalityTracker: finality_tracker::{Module, Call, Inherent},
-        Grandpa: grandpa::{Module, Call, Storage, Config, Event},
+        Grandpa: grandpa::{Module, Call, Storage, Config, Event, ValidateUnsigned},
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: authority_discovery::{Module, Call, Config},
         Offences: offences::{Module, Call, Storage, Event},
+
+        // System scheduler
         Scheduler: scheduler::{Module, Call, Storage, Event<T>},
 
         // Crust modules
@@ -486,10 +515,15 @@ pub type SignedExtra = (
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 /// Extrinsic type that has already been checked.
-pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>;
+pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, SignedExtra>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive =
-    frame_executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Runtime, AllModules>;
+pub type Executive = frame_executive::Executive<
+    Runtime,
+    Block,
+    system::ChainContext<Runtime>,
+    Runtime,
+    AllModules
+>;
 
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {
@@ -567,8 +601,32 @@ impl_runtime_apis! {
 				allowed_slots: babe_primitives::AllowedSlots::PrimaryAndSecondaryPlainSlots
             }
         }
+
         fn current_epoch_start() -> babe_primitives::SlotNumber {
 			Babe::current_epoch_start()
+		}
+
+		fn generate_key_ownership_proof(
+			_slot_number: babe_primitives::SlotNumber,
+			authority_id: babe_primitives::AuthorityId,
+		) -> Option<babe_primitives::OpaqueKeyOwnershipProof> {
+			use codec::Encode;
+
+			Historical::prove((babe_primitives::KEY_TYPE, authority_id))
+				.map(|p| p.encode())
+				.map(babe_primitives::OpaqueKeyOwnershipProof::new)
+		}
+
+		fn submit_report_equivocation_unsigned_extrinsic(
+			equivocation_proof: babe_primitives::EquivocationProof<<Block as BlockT>::Header>,
+			key_owner_proof: babe_primitives::OpaqueKeyOwnershipProof,
+		) -> Option<()> {
+			let key_owner_proof = key_owner_proof.decode()?;
+
+			Babe::submit_unsigned_equivocation_report(
+				equivocation_proof,
+				key_owner_proof,
+			)
 		}
     }
 
@@ -577,20 +635,20 @@ impl_runtime_apis! {
             Grandpa::grandpa_authorities()
         }
 
-        fn submit_report_equivocation_extrinsic(
-			equivocation_proof: fg_primitives::EquivocationProof<
-				<Block as BlockT>::Hash,
-				sp_runtime::traits::NumberFor<Block>,
-			>,
-			key_owner_proof: fg_primitives::OpaqueKeyOwnershipProof,
+        fn submit_report_equivocation_unsigned_extrinsic(
+            equivocation_proof: fg_primitives::EquivocationProof<
+                <Block as BlockT>::Hash,
+                sp_runtime::traits::NumberFor<Block>
+            >,
+            key_owner_proof: fg_primitives::OpaqueKeyOwnershipProof,
 		) -> Option<()> {
 			let key_owner_proof = key_owner_proof.decode()?;
 
-			Grandpa::submit_report_equivocation_extrinsic(
+			Grandpa::submit_unsigned_equivocation_report(
 				equivocation_proof,
-				key_owner_proof,
-			)
-		}
+				key_owner_proof
+            )
+        }
 
 		fn generate_key_ownership_proof(
 			_set_id: fg_primitives::SetId,
@@ -622,5 +680,22 @@ impl_runtime_apis! {
 		}
     }
 
-    // TODO:  enable `system_rpc_runtime_api` and `transaction_payment_rpc_runtime_api`?
+    impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
+		fn account_nonce(account: AccountId) -> Index {
+			System::account_nonce(account)
+		}
+	}
+
+    // FIXME: 3rd type argument failed, bump it next version: https://github.com/paritytech/substrate/pull/6792/files
+	/*impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<
+	    Block,
+	    Balance,
+	> for Runtime {
+		fn query_info(
+            uxt: <Block as BlockT>::Extrinsic,
+            len: u32
+        ) -> RuntimeDispatchInfo<Balance> {
+			TransactionPayment::query_info(uxt, len)
+		}
+	}*/
 }

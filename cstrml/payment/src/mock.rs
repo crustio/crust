@@ -107,6 +107,7 @@ impl system::Trait for Test {
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
+    type SystemWeightInfo = ();
 }
 
 pub struct TestOrderInspector;
@@ -130,6 +131,7 @@ impl balances::Trait for Test {
     type Event = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
+    type WeightInfo = ();
 }
 
 impl swork::Trait for Test {

@@ -12,7 +12,7 @@ use frame_support::{
     }
 };
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
-use system::{ensure_root, ensure_signed};
+use frame_system::{self as system, ensure_root, ensure_signed};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};

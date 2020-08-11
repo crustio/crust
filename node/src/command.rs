@@ -5,36 +5,42 @@
 
 use crate::chain_spec;
 use crate::cli::Cli;
-use crate::service;
-use sc_cli::SubstrateCli;
+use crate::service as crust_service;
+use crate::service::new_full_params;
+use service::ServiceParams;
+use sc_cli::{SubstrateCli, RuntimeVersion, Role, ChainSpec};
 
 impl SubstrateCli for Cli {
-	fn impl_name() -> &'static str { "Crust Node" }
+	fn impl_name() -> String { "Crust Node".into() }
 
-	fn impl_version() -> &'static str { env!("SUBSTRATE_CLI_IMPL_VERSION") }
+	fn impl_version() -> String { env!("SUBSTRATE_CLI_IMPL_VERSION").into() }
 
-	fn executable_name() -> &'static str { "crust" }
+	fn executable_name() -> String { "crust".into() }
 
-	fn description() -> &'static str { env!("CARGO_PKG_DESCRIPTION") }
+	fn description() -> String { env!("CARGO_PKG_DESCRIPTION").into() }
 
-	fn author() -> &'static str { env!("CARGO_PKG_AUTHORS") }
+	fn author() -> String { env!("CARGO_PKG_AUTHORS").into() }
 
-	fn support_url() -> &'static str { "https://github.com/crustio/crust/issues/new" }
+	fn support_url() -> String { "https://github.com/crustio/crust/issues/new".into() }
 
 	fn copyright_start_year() -> i32 { 2019 }
 
-	fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+	fn load_spec(&self, id: &str) -> Result<Box<dyn service::ChainSpec>, String> {
 		Ok(match id {
 			"rocky" => Box::new(chain_spec::rocky_config()?),
 			"maxwell" => Box::new(chain_spec::maxwell_config()?),
-			"rocky-staging" => Box::new(chain_spec::rocky_staging_config()),
-			"maxwell-staging" => Box::new(chain_spec::maxwell_staging_config()),
-			"dev" => Box::new(chain_spec::development_config()),
-			"" | "local" => Box::new(chain_spec::local_testnet_config()),
+			"rocky-staging" => Box::new(chain_spec::rocky_staging_config()?),
+			"maxwell-staging" => Box::new(chain_spec::maxwell_staging_config()?),
+			"dev" => Box::new(chain_spec::development_config()?),
+			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
 			path => Box::new(chain_spec::CrustChainSpec::from_json_file(
 				std::path::PathBuf::from(path),
 			)?),
 		})
+	}
+
+	fn native_runtime_version(_chain_spec: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
+		&crust_runtime::VERSION
 	}
 }
 
@@ -45,15 +51,18 @@ pub fn run() -> sc_cli::Result<()> {
 	match &cli.subcommand {
 		Some(subcommand) => {
 			let runner = cli.create_runner(subcommand)?;
-			runner.run_subcommand(subcommand, |config| Ok(new_full_start!(config).0))
+			runner.run_subcommand(subcommand, |config| {
+				let (ServiceParams { client, backend, task_manager, import_queue, .. }, ..)
+					= new_full_params(config)?;
+				Ok((client, backend, import_queue, task_manager))
+			})
 		}
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
-			runner.run_node(
-				service::new_light,
-				service::new_full,
-				crust_runtime::VERSION
-			)
+			runner.run_node_until_exit( |config| match config.role {
+				Role::Light => crust_service::new_light(config),
+				_ => crust_service::new_full(config),
+			})
 		}
 	}
 }

@@ -2258,7 +2258,8 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
 
         // Set staker
         let _ = Balances::make_free_balance_be(&11, stake);
-        <Stakers<Test>>::insert(
+        <ErasStakers<Test>>::insert(
+            0,
             &11,
             Exposure {
                 total: stake,
@@ -2267,8 +2268,13 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
             },
         );
 
+        <ErasStakingPayout<Test>>::insert(
+            0,
+            reward_slash
+        );
+
         // Check reward
-        let _ = Staking::reward_validator(&11, reward_slash);
+        let _ = Staking::payout_stakers(Origin::signed(10), 11, 0);
         assert_eq!(Balances::total_balance(&11), stake * 2);
 
         // Set staker
@@ -2284,7 +2290,8 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
             RewardDestination::default(),
         )
         .unwrap();
-        <Stakers<Test>>::insert(
+        <ErasStakers<Test>>::insert(
+            0,
             &11,
             Exposure {
                 total: stake,
@@ -2299,7 +2306,7 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
         // Check slashing
         on_offence_now(
             &[OffenceDetails {
-                offender: (11, Staking::stakers(&11)),
+                offender: (11, Staking::eras_stakers(0, &11)),
                 reporters: vec![],
             }],
             &[Perbill::from_percent(100)],
@@ -4428,4 +4435,70 @@ fn chill_stash_should_work() {
 
         assert!(!<Validators<Test>>::contains_key(&5));
     });
+}
+
+#[test]
+fn double_claim_rewards_should_fail() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .own_workload(u128::max_value())
+        .build()
+        .execute_with(|| {
+            let init_balance_10 = Balances::total_balance(&10);
+            let init_balance_21 = Balances::total_balance(&21);
+
+            // Set payee to controller
+            assert_ok!(Staking::set_payee(
+                Origin::signed(10),
+                RewardDestination::Controller
+            ));
+
+            // Compute now as other parameter won't change
+            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
+            assert_eq!(Staking::eras_total_stakes(0), 2001);
+            <Module<Test>>::reward_by_ids(vec![(11, 1)]);
+
+            start_era(1, true);
+            payout_all_stakers(0);
+
+            assert_eq!(Staking::current_era().unwrap_or(0), 1);
+            assert_eq!(Staking::eras_total_stakes(1), 2001);
+            // rewards may round to 0.000001
+            assert_eq!(
+                Balances::total_balance(&10) / 1000000,
+                (init_balance_10 + total_authoring_payout + total_staking_payout_0 * 1000 / 2001) / 1000000
+            );
+            let stakes_21 = Balances::total_balance(&21);
+            // candidates should have rewards
+            assert_eq!(
+                stakes_21 / 1000000,
+                (init_balance_21 + total_staking_payout_0 * 1000 / 2001) / 1000000
+            );
+            assert_noop!(
+                Staking::payout_stakers(Origin::signed(10), 11, 0),
+                DispatchError::Module {
+                    index: 0,
+                    error: 14,
+                    message: Some("AlreadyClaimed"),
+                }
+            );
+            assert_noop!(
+                Staking::payout_stakers(Origin::signed(10), 21, 0),
+                DispatchError::Module {
+                    index: 0,
+                    error: 14,
+                    message: Some("AlreadyClaimed"),
+                }
+            );
+            assert_noop!(
+                Staking::payout_stakers(Origin::signed(10), 31, 0),
+                DispatchError::Module {
+                    index: 0,
+                    error: 14,
+                    message: Some("AlreadyClaimed"),
+                }
+            );
+        });
 }

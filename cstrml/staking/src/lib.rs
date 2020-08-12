@@ -15,7 +15,7 @@ use frame_support::{
     storage::IterableStorageMap,
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
-        Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
+        Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Get,
         Time, EnsureOrigin
     },
     dispatch::DispatchResult
@@ -1366,9 +1366,6 @@ decl_module! {
         #[weight = 120 * WEIGHT_PER_MICROS]
         fn payout_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
             ensure_signed(origin)?;
-            if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
-                Self::make_payout(&validator_stash, value);
-            }
             Self::do_payout_stakers(validator_stash, era)
         }
     }
@@ -1622,41 +1619,6 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// Reward a given block author by a specific amount. Add reward to the block author's
-    fn reward_author(stash: &T::AccountId, reward: BalanceOf<T>) -> PositiveImbalanceOf<T> {
-          Self::make_payout(stash, reward).unwrap_or(<PositiveImbalanceOf<T>>::zero())
-    }
-
-    /// Reward a given (maybe)validator by a specific amount. Add the reward to the validator's, and its
-    /// guarantors' balance, pro-rata based on their exposure, after having removed the validator's
-    /// pre-payout cut.
-    fn reward_validator(stash: &T::AccountId, reward: BalanceOf<T>) -> PositiveImbalanceOf<T> {
-        // let reward = reward.saturating_sub(off_the_table);
-        let mut imbalance = <PositiveImbalanceOf<T>>::zero();
-        let validator_cut = if reward.is_zero() {
-            Zero::zero()
-        } else {
-            let exposure = Self::stakers(stash);
-            let total = exposure.total.max(One::one());
-            let total_rewards = Self::validators(stash).guarantee_fee * reward;
-            let mut guarantee_rewards = Zero::zero();
-
-            for i in &exposure.others {
-                let per_u64 = Perbill::from_rational_approximation(i.value, total);
-                // Reward guarantors
-                guarantee_rewards += per_u64 * total_rewards;
-                imbalance.maybe_subsume(Self::make_payout(&i.who, per_u64 * total_rewards));
-            }
-
-            guarantee_rewards
-        };
-
-        // assert!(reward == imbalance)
-        imbalance.maybe_subsume(Self::make_payout(stash, reward - validator_cut));
-
-        imbalance
-    }
-
     fn do_payout_stakers(
 		validator_stash: T::AccountId,
 		era: EraIndex,
@@ -1679,13 +1641,21 @@ impl<T: Trait> Module<T> {
 		match ledger.claimed_rewards.binary_search(&era) {
 			Ok(_) => Err(Error::<T>::AlreadyClaimed)?,
 			Err(pos) => ledger.claimed_rewards.insert(pos, era),
-		}
-
+        }
+        /* Input data seems good, no errors allowed after this point */
         let exposure = <ErasStakers<T>>::get(&era, &ledger.stash);
+        <Ledger<T>>::insert(&controller, &ledger);
+
+        // 1. Pay authoring reward
+        if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
+            Self::make_payout(&validator_stash, value);
+        }
+
+        // 2. Pay staking reward
         let to_num =
         |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
 
-		/* Input data seems good, no errors allowed after this point */
+
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
         let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
         let total = exposure.total.max(One::one());

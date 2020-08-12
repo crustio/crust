@@ -2926,7 +2926,7 @@ fn slashing_guarantors_by_span_max() {
 fn slashes_are_summed_across_spans() {
     ExtBuilder::default().build().execute_with(|| {
         start_era(1, false);
-        start_era(2, false);	
+        start_era(2, false);
         start_era(3, false);
 
         assert_eq!(Balances::free_balance(&21), 2000);

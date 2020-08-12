@@ -4502,3 +4502,29 @@ fn double_claim_rewards_should_fail() {
             );
         });
 }
+
+#[test]
+fn era_clean_should_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .own_workload(u128::max_value())
+        .build()
+        .execute_with(|| {
+            // Set payee to controller
+            assert_ok!(Staking::set_payee(
+                Origin::signed(10),
+                RewardDestination::Controller
+            ));
+            // We left 3 buffer here even we set it to 84
+            start_era(86, true);
+            assert!(<ErasStakingPayout<Test>>::contains_key(0));
+            assert!(<ErasTotalStakes<Test>>::contains_key(0));
+            assert!(<ErasStakers<Test>>::contains_key(0, 11));
+            assert!(<ErasValidatorPrefs<Test>>::contains_key(0, 11));
+            start_era(87, true);
+            assert!(!<ErasStakingPayout<Test>>::contains_key(0));
+            assert!(!<ErasTotalStakes<Test>>::contains_key(0));
+            assert!(!<ErasStakers<Test>>::contains_key(0, 11));
+            assert!(!<ErasValidatorPrefs<Test>>::contains_key(0, 11));
+        });
+}

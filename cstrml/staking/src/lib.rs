@@ -15,7 +15,7 @@ use frame_support::{
     storage::IterableStorageMap,
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
-        Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Get,
+        Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
         Time, EnsureOrigin
     },
     dispatch::DispatchResult
@@ -477,10 +477,12 @@ decl_storage! {
         pub ErasValidatorPrefs get(fn eras_validator_prefs):
             double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
             => ValidatorPrefs;
-            
+        
+        /// Total staking payout at era.
         pub ErasStakingPayout get(fn eras_staking_payout):
             map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
 
+        /// Authoring payout of validator at era.
         pub ErasAuthoringPayout get(fn eras_authoring_payout):
             double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
             => Option<BalanceOf<T>>;
@@ -653,13 +655,14 @@ decl_event!(
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
         // TODO: show reward link to account_id
-        Reward(Balance, Balance),
+        Reward(AccountId, Balance),
         /// One validator (and its guarantors) has been slashed by the given amount.
         Slash(AccountId, Balance),
         /// An old slashing report from a prior era was discarded because it could
         /// not be processed.
         OldSlashingReportDiscarded(SessionIndex),
-
+        /// Total reward at each era
+        EraReward(EraIndex, Balance, Balance),
         // TODO: add stake limitation change event
     }
 );
@@ -1363,10 +1366,19 @@ decl_module! {
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
 
+        /// Pay out all the stakers behind a single validator for a single era.
+        ///
+        /// - `validator_stash` is the stash account of the validator. Their nominators, up to
+        ///   `T::MaxNominatorRewardedPerValidator`, will also receive their rewards.
+        /// - `era` may be any era between `[current_era - history_depth; current_era]`.
+        ///
+        /// The origin of this call must be _Signed_. Any account can call this function, even if
+        /// it is not one of the stakers.
+        /// TODO: Add weight for this one
         #[weight = 120 * WEIGHT_PER_MICROS]
-        fn payout_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
+        fn reward_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
             ensure_signed(origin)?;
-            Self::do_payout_stakers(validator_stash, era)
+            Self::do_reward_stakers(validator_stash, era)
         }
     }
 }
@@ -1619,7 +1631,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn do_payout_stakers(
+    fn do_reward_stakers(
         validator_stash: T::AccountId,
         era: EraIndex,
     ) -> DispatchResult {
@@ -1648,7 +1660,12 @@ impl<T: Trait> Module<T> {
 
         // 1. Pay authoring reward
         if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
-            Self::make_payout(&validator_stash, value);
+            if let Some(imbalance) = Self::make_payout(
+                &validator_stash,
+                value
+            ) {
+                Self::deposit_event(RawEvent::Reward(validator_stash, imbalance.peek()));
+            };
         }
 
         // 2. Pay staking reward
@@ -1665,9 +1682,19 @@ impl<T: Trait> Module<T> {
             let per_u64 = Perbill::from_rational_approximation(i.value, total);
             // Reward guarantors
             guarantee_rewards += per_u64 * total_rewards;
-            Self::make_payout(&i.who, per_u64 * total_rewards);
+            if let Some(imbalance) = Self::make_payout(
+                &i.who,
+                per_u64 * total_rewards
+            ) {
+                Self::deposit_event(RawEvent::Reward(i.who.clone(), imbalance.peek()));
+            };
         }
-        Self::make_payout(&ledger.stash, staking_reward - guarantee_rewards);
+        if let Some(imbalance) = Self::make_payout(
+            &ledger.stash,
+            staking_reward - guarantee_rewards
+        ) {
+            Self::deposit_event(RawEvent::Reward(ledger.stash, imbalance.peek()));
+        };
         Ok(())
     }
 
@@ -1787,12 +1814,13 @@ impl<T: Trait> Module<T> {
             let total_staking_payout = Self::staking_rewards_in_era(current_era);
             <ErasStakingPayout<T>>::insert(&current_era, total_staking_payout);
 
-            // 3. Deposit reward event
-            Self::deposit_event(RawEvent::Reward(total_authoring_payout, total_staking_payout));
+            // 3. Deposit era reward event
+            Self::deposit_event(RawEvent::EraReward(current_era, total_authoring_payout, total_staking_payout));
 
+            // TODO: enable treasury and might bring this back
             // T::Reward::on_unbalanced(total_imbalance);
             // This is not been used
-            //T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+            // T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
         }
     }
 

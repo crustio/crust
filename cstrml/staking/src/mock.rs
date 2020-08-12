@@ -645,7 +645,7 @@ pub fn start_era_with_new_workloads(era_index: EraIndex, with_reward: bool, own_
 }
 
 pub fn payout_all_stakers(era_index: EraIndex) {
-    Staking::payout_stakers(Origin::signed(10), 11, era_index).unwrap();
-    Staking::payout_stakers(Origin::signed(10), 21, era_index).unwrap();
-    Staking::payout_stakers(Origin::signed(10), 31, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap();
 }

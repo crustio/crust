@@ -298,7 +298,7 @@ fn rewards_should_work() {
             Session::on_initialize(System::block_number());
             assert_eq!(Staking::current_era().unwrap_or(0), 1);
             assert_eq!(Session::current_index(), 3);
-            Staking::payout_stakers(Origin::signed(10), 11, 0).unwrap();
+            Staking::reward_stakers(Origin::signed(10), 11, 0).unwrap();
             // 11 validator has 2/3 of the total rewards and half half for it and its guarantor
             assert_eq_error_rate!(
                 Balances::total_balance(&2) / 1000000,
@@ -620,7 +620,7 @@ fn guaranteeing_and_rewards_should_work() {
             assert_eq!(Staking::eras_total_stakes(1), 5998);
 
             payout_all_stakers(0);
-            Staking::payout_stakers(Origin::signed(10), 41, 0).unwrap();
+            Staking::reward_stakers(Origin::signed(10), 41, 0).unwrap();
             // OLD validators must have already received some rewards.
             assert_eq!(Balances::total_balance(&40), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
             assert_eq!(Balances::total_balance(&30), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
@@ -1346,7 +1346,7 @@ fn validator_payment_prefs_work() {
 
 
         start_era(1, true);
-        Staking::payout_stakers(Origin::signed(10), 11, 0).unwrap();
+        Staking::reward_stakers(Origin::signed(10), 11, 0).unwrap();
 
         let shared_cut = total_staking_payout_0 * 500 / 2001;
         // Validator's payee is Staked account, 11, reward will be paid here.
@@ -2130,7 +2130,7 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
             assert_eq!(Staking::eras_total_stakes(1), 2002);
             payout_all_stakers(0);
-            Staking::payout_stakers(Origin::signed(10), 1, 0).unwrap();
+            Staking::reward_stakers(Origin::signed(10), 1, 0).unwrap();
             // Old ones are rewarded, round to 0.000001 CRU
             assert_eq!(
                 Balances::free_balance(&10) / 1000000,
@@ -2148,7 +2148,7 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             // Stake limit strategy effecting
             assert_eq!(Staking::eras_total_stakes(2), /*291396645848756*/ 144426417598396);
             payout_all_stakers(1);
-            Staking::payout_stakers(Origin::signed(10), 1, 1).unwrap();
+            Staking::reward_stakers(Origin::signed(10), 1, 1).unwrap();
             // round to 0.000001 CRU
             assert_eq!(
                 Balances::free_balance(&2) / 1000000,
@@ -2274,7 +2274,7 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
         );
 
         // Check reward
-        let _ = Staking::payout_stakers(Origin::signed(10), 11, 0);
+        let _ = Staking::reward_stakers(Origin::signed(10), 11, 0);
         assert_eq!(Balances::total_balance(&11), stake * 2);
 
         // Set staker
@@ -4477,7 +4477,7 @@ fn double_claim_rewards_should_fail() {
                 (init_balance_21 + total_staking_payout_0 * 1000 / 2001) / 1000000
             );
             assert_noop!(
-                Staking::payout_stakers(Origin::signed(10), 11, 0),
+                Staking::reward_stakers(Origin::signed(10), 11, 0),
                 DispatchError::Module {
                     index: 0,
                     error: 14,
@@ -4485,7 +4485,7 @@ fn double_claim_rewards_should_fail() {
                 }
             );
             assert_noop!(
-                Staking::payout_stakers(Origin::signed(10), 21, 0),
+                Staking::reward_stakers(Origin::signed(10), 21, 0),
                 DispatchError::Module {
                     index: 0,
                     error: 14,
@@ -4493,7 +4493,7 @@ fn double_claim_rewards_should_fail() {
                 }
             );
             assert_noop!(
-                Staking::payout_stakers(Origin::signed(10), 31, 0),
+                Staking::reward_stakers(Origin::signed(10), 31, 0),
                 DispatchError::Module {
                     index: 0,
                     error: 14,

@@ -4515,14 +4515,17 @@ fn era_clean_should_work() {
                 Origin::signed(10),
                 RewardDestination::Controller
             ));
+            <Module<Test>>::reward_by_ids(vec![(11, 1)]);
             // We left 3 buffer here even we set it to 84
             start_era(84, true);
+            assert!(<ErasAuthoringPayout<Test>>::contains_key(0, 11));
             assert!(<ErasStakingPayout<Test>>::contains_key(0));
             assert!(<ErasTotalStakes<Test>>::contains_key(0));
             assert!(<ErasStakers<Test>>::contains_key(0, 11));
             assert!(<ErasValidatorPrefs<Test>>::contains_key(0, 11));
             start_era(85, true);
             assert!(!<ErasStakingPayout<Test>>::contains_key(0));
+            assert!(!<ErasAuthoringPayout<Test>>::contains_key(0, 11));
             assert!(!<ErasTotalStakes<Test>>::contains_key(0));
             assert!(!<ErasStakers<Test>>::contains_key(0, 11));
             assert!(!<ErasValidatorPrefs<Test>>::contains_key(0, 11));

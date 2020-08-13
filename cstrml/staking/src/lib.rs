@@ -109,6 +109,7 @@ impl Default for RewardDestination {
 }
 
 /// Preference of what happens regarding validation.
+/// TODO: remove this class in V-G refinement since it's duplicated with ValidatorPrefs
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Validations<AccountId, Balance: HasCompact + Zero> {
     /// The total votes of Validations.
@@ -533,6 +534,7 @@ decl_storage! {
         /// through candidates here, but you can find them using Validators.
         ///
         /// This is keyed by the stash account.
+        /// TODO: remove this storage since it's duplicated with ErasStakers
         pub Stakers get(fn stakers):
             map hasher(twox_64_concat) T::AccountId => Exposure<T::AccountId, BalanceOf<T>>;
 
@@ -1750,6 +1752,7 @@ impl<T: Trait> Module<T> {
         let bonding_duration = T::BondingDuration::get();
 
         // Clean old era information.
+        // TODO: double check the economic mechanism.
         if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 1) {
             Self::clear_era_information(old_era);
         }
@@ -1827,6 +1830,7 @@ impl<T: Trait> Module<T> {
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
         <ErasStakingPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
+        <ErasAuthoringPayout<T>>::remove_prefix(era_index);
     }
 
     /// Block authoring rewards per era, this won't be changed in every era

@@ -643,3 +643,9 @@ pub fn start_era_with_new_workloads(era_index: EraIndex, with_reward: bool, own_
     start_session((era_index * 3).into(), with_reward);
     assert_eq!(Staking::current_era().unwrap_or(0), era_index);
 }
+
+pub fn payout_all_stakers(era_index: EraIndex) {
+    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap();
+}

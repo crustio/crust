@@ -17,7 +17,8 @@ use frame_support::{
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
         Time, EnsureOrigin
-    }
+    },
+    dispatch::DispatchResult
 };
 use pallet_session::historical;
 use sp_runtime::{
@@ -108,6 +109,7 @@ impl Default for RewardDestination {
 }
 
 /// Preference of what happens regarding validation.
+/// TODO: remove this class in V-G refinement since it's duplicated with ValidatorPrefs
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Validations<AccountId, Balance: HasCompact + Zero> {
     /// The total votes of Validations.
@@ -135,7 +137,27 @@ impl<AccountId, Balance: HasCompact + Zero> Default for Validations<AccountId, B
     }
 }
 
+
+/// Preference of what happens regarding validation.
+#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
+pub struct ValidatorPrefs {
+    /// Reward that validator takes up-front; only the rest is split between themselves and
+    /// nominators.
+    #[codec(compact)]
+    pub guarantee_fee: Perbill,
+}
+
+impl Default for ValidatorPrefs {
+    fn default() -> Self {
+        ValidatorPrefs {
+            guarantee_fee: Default::default(),
+        }
+    }
+}
+
+
 /// A record of the nominations made by a specific account.
+/// TODO: Rename it to Gurantors
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Nominations<AccountId, Balance: HasCompact> {
     /// The targets of nomination, this vector's element is unique.
@@ -180,6 +202,9 @@ pub struct StakingLedger<AccountId, Balance: HasCompact> {
     /// Any balance that is becoming free, which may eventually be transferred out
     /// of the stash (assuming it doesn't get slashed first).
     pub unlocking: Vec<UnlockChunk<Balance>>,
+    /// List of eras for which the stakers behind a validator and guarantor have claimed rewards.
+    /// Only updated for validators.
+    pub claimed_rewards: Vec<EraIndex>,
 }
 
 impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId, Balance> {
@@ -205,6 +230,7 @@ impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId
             stash: self.stash,
             valid: self.valid,
             unlocking,
+            claimed_rewards: self.claimed_rewards
         }
     }
 }
@@ -429,6 +455,40 @@ impl Default for Forcing {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Staking {
+        /// Number of eras to keep in history.
+        ///
+        /// Information is kept for eras in `[current_era - history_depth; current_era]`.
+        HistoryDepth get(fn history_depth) config(): u32 = 84;
+
+        /// Exposure of validator at era.
+        ///
+        /// This is keyed first by the era index to allow bulk deletion and then the stash account.
+        ///
+        /// Is it removed after `HISTORY_DEPTH` eras.
+        /// If stakers hasn't been set or has been removed then empty exposure is returned.
+        pub ErasStakers get(fn eras_stakers):
+            double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+            => Exposure<T::AccountId, BalanceOf<T>>;
+            
+        /// Similar to `ErasStakers`, this holds the preferences of validators.
+        ///
+        /// This is keyed first by the era index to allow bulk deletion and then the stash account.
+        ///
+        /// Is it removed after `HISTORY_DEPTH` eras.
+        // If prefs hasn't been set or has been removed then 0 commission is returned.
+        pub ErasValidatorPrefs get(fn eras_validator_prefs):
+            double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+            => ValidatorPrefs;
+        
+        /// Total staking payout at era.
+        pub ErasStakingPayout get(fn eras_staking_payout):
+            map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
+
+        /// Authoring payout of validator at era.
+        pub ErasAuthoringPayout get(fn eras_authoring_payout):
+            double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+            => Option<BalanceOf<T>>;
+
         /// The ideal number of staking participants.
         pub ValidatorCount get(fn validator_count) config(): u32;
 
@@ -474,6 +534,7 @@ decl_storage! {
         /// through candidates here, but you can find them using Validators.
         ///
         /// This is keyed by the stash account.
+        /// TODO: remove this storage since it's duplicated with ErasStakers
         pub Stakers get(fn stakers):
             map hasher(twox_64_concat) T::AccountId => Exposure<T::AccountId, BalanceOf<T>>;
 
@@ -500,9 +561,8 @@ decl_storage! {
         /// The amount of balance actively at stake for each validator slot, currently.
         ///
         /// This is used to derive rewards and punishments.
-        pub TotalStakes get(fn total_stakes) build(|config: &GenesisConfig<T>| {
-            config.stakers.iter().fold(Zero::zero(), |acc, &(_, _, value, _)| acc + value.clone())
-        }): BalanceOf<T>;
+        pub ErasTotalStakes get(fn eras_total_stakes):
+            map hasher(twox_64_concat) EraIndex => BalanceOf<T>;
 
         /// True if the next session change will be a new era regardless of index.
         pub ForceEra get(fn force_era) config(): Forcing;
@@ -553,6 +613,7 @@ decl_storage! {
         config(stakers):
             Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId, BalanceOf<T>>)>;
         build(|config: &GenesisConfig<T>| {
+            let mut gensis_total_stakes: BalanceOf<T> = Zero::zero();
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
                     T::Currency::transfer_balance(&stash) >= balance,
@@ -564,6 +625,8 @@ decl_storage! {
                     balance,
                     RewardDestination::Staked,
                 );
+
+                gensis_total_stakes += balance;
 
                 // TODO: make genesis validator's limitation more reasonable
                 <Module<T>>::upsert_stake_limit(stash, balance+balance);
@@ -585,6 +648,7 @@ decl_storage! {
                     }, _ => Ok(())
                 };
             }
+            <ErasTotalStakes<T>>::insert(0, gensis_total_stakes);
         });
     }
 }
@@ -593,14 +657,14 @@ decl_event!(
     pub enum Event<T> where Balance = BalanceOf<T>, <T as frame_system::Trait>::AccountId {
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
-        // TODO: show reward link to account_id
-        Reward(Balance, Balance),
+        Reward(AccountId, Balance),
         /// One validator (and its guarantors) has been slashed by the given amount.
         Slash(AccountId, Balance),
         /// An old slashing report from a prior era was discarded because it could
         /// not be processed.
         OldSlashingReportDiscarded(SessionIndex),
-
+        /// Total reward at each era
+        EraReward(EraIndex, Balance, Balance),
         // TODO: add stake limitation change event
     }
 );
@@ -633,7 +697,11 @@ decl_error! {
         /// Can not validate without workloads
         NoWorkloads,
         /// Attempting to target a stash that still has funds.
-		FundedTarget,
+        FundedTarget,
+        /// Invalid era to reward.
+        InvalidEraToReward,
+        /// Claimed reward twice.
+        AlreadyClaimed,
     }
 }
 
@@ -657,28 +725,28 @@ decl_module! {
         }
 
         /// Take the origin account as a stash and lock up `value` of its balance. `controller` will
-		/// be the account that controls it.
-		///
-		/// `value` must be more than the `minimum_balance` specified by `T::Currency`.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the stash account.
-		///
-		/// Emits `Bonded`.
-		///
-		/// # <weight>
-		/// - Independent of the arguments. Moderate complexity.
-		/// - O(1).
-		/// - Three extra DB entries.
-		///
-		/// NOTE: Two of the storage writes (`Self::bonded`, `Self::payee`) are _never_ cleaned
-		/// unless the `origin` falls below _existential deposit_ and gets removed as dust.
-		/// ------------------
-		/// Base Weight: 67.87 µs
-		/// DB Weight:
-		/// - Read: Bonded, Ledger, [Origin Account], Current Era, Locks
-		/// - Write: Bonded, Payee, [Origin Account], Ledger, Locks
-		/// # </weight>
-		#[weight = 67 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(4, 5)]
+        /// be the account that controls it.
+        ///
+        /// `value` must be more than the `minimum_balance` specified by `T::Currency`.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the stash account.
+        ///
+        /// Emits `Bonded`.
+        ///
+        /// # <weight>
+        /// - Independent of the arguments. Moderate complexity.
+        /// - O(1).
+        /// - Three extra DB entries.
+        ///
+        /// NOTE: Two of the storage writes (`Self::bonded`, `Self::payee`) are _never_ cleaned
+        /// unless the `origin` falls below _existential deposit_ and gets removed as dust.
+        /// ------------------
+        /// Base Weight: 67.87 µs
+        /// DB Weight:
+        /// - Read: Bonded, Ledger, [Origin Account], Current Era, Locks
+        /// - Write: Bonded, Payee, [Origin Account], Ledger, Locks
+        /// # </weight>
+        #[weight = 67 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(4, 5)]
         fn bond(origin,
             controller: <T::Lookup as StaticLookup>::Source,
             #[compact] value: BalanceOf<T>,
@@ -706,6 +774,10 @@ decl_module! {
             <Bonded<T>>::insert(&stash, &controller);
             <Payee<T>>::insert(&stash, payee);
 
+            let current_era = CurrentEra::get().unwrap_or(0);
+            let history_depth = Self::history_depth();
+            let last_reward_era = current_era.saturating_sub(history_depth);
+
             let stash_balance = T::Currency::transfer_balance(&stash);
             let value = value.min(stash_balance);
             let item = StakingLedger {
@@ -713,34 +785,35 @@ decl_module! {
                 total: value,
                 active: value,
                 valid: Zero::zero(),
-                unlocking: vec![]
+                unlocking: vec![],
+                claimed_rewards: (last_reward_era..current_era).collect(),
             };
             Self::update_ledger(&controller, &item);
         }
 
-		/// Add some extra amount that have appeared in the stash `free_balance` into the balance up
-		/// for staking.
-		///
-		/// Use this if there are additional funds in your stash account that you wish to bond.
-		/// Unlike [`bond`] or [`unbond`] this function does not impose any limitation on the amount
-		/// that can be added.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the stash, not the controller and
-		/// it can be only called when [`EraElectionStatus`] is `Closed`.
-		///
-		/// Emits `Bonded`.
-		///
-		/// # <weight>
-		/// - Independent of the arguments. Insignificant complexity.
-		/// - O(1).
-		/// - One DB entry.
-		/// ------------
-		/// Base Weight: 77 µs
-		/// DB Weight:
-		/// - Read: Bonded, Ledger, [Origin Account], Locks
-		/// - Write: [Origin Account], Locks, Ledger
-		/// # </weight>
-		#[weight = 77 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(6, 3)]
+        /// Add some extra amount that have appeared in the stash `free_balance` into the balance up
+        /// for staking.
+        ///
+        /// Use this if there are additional funds in your stash account that you wish to bond.
+        /// Unlike [`bond`] or [`unbond`] this function does not impose any limitation on the amount
+        /// that can be added.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the stash, not the controller and
+        /// it can be only called when [`EraElectionStatus`] is `Closed`.
+        ///
+        /// Emits `Bonded`.
+        ///
+        /// # <weight>
+        /// - Independent of the arguments. Insignificant complexity.
+        /// - O(1).
+        /// - One DB entry.
+        /// ------------
+        /// Base Weight: 77 µs
+        /// DB Weight:
+        /// - Read: Bonded, Ledger, [Origin Account], Locks
+        /// - Write: [Origin Account], Locks, Ledger
+        /// # </weight>
+        #[weight = 77 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(6, 3)]
         fn bond_extra(origin, #[compact] max_additional: BalanceOf<T>) {
             let stash = ensure_signed(origin)?;
 
@@ -767,38 +840,38 @@ decl_module! {
         }
 
         /// Schedule a portion of the stash to be unlocked ready for transfer out after the bond
-		/// period ends. If this leaves an amount actively bonded less than
-		/// T::Currency::minimum_balance(), then it is increased to the full amount.
-		///
-		/// Once the unlock period is done, you can call `withdraw_unbonded` to actually move
-		/// the funds out of management ready for transfer.
-		///
-		/// No more than a limited number of unlocking chunks (see `MAX_UNLOCKING_CHUNKS`)
-		/// can co-exists at the same time. In that case, [`Call::withdraw_unbonded`] need
-		/// to be called first to remove some of the chunks (if possible).
-		///
-		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-		/// And, it can be only called when [`EraElectionStatus`] is `Closed`.
-		///
-		/// Emits `Unbonded`.
-		///
-		/// See also [`Call::withdraw_unbonded`].
-		///
-		/// # <weight>
-		/// - Independent of the arguments. Limited but potentially exploitable complexity.
-		/// - Contains a limited number of reads.
-		/// - Each call (requires the remainder of the bonded balance to be above `minimum_balance`)
-		///   will cause a new entry to be inserted into a vector (`Ledger.unlocking`) kept in storage.
-		///   The only way to clean the aforementioned storage item is also user-controlled via
-		///   `withdraw_unbonded`.
-		/// - One DB entry.
-		/// ----------
-		/// Base Weight: 50.66 µs
-		/// DB Weight:
-		/// - Read: Ledger, Current Era, Locks, [Origin Account]
-		/// - Write: [Origin Account], Locks, Ledger
-		/// </weight>
-		#[weight = 50 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 3)]
+        /// period ends. If this leaves an amount actively bonded less than
+        /// T::Currency::minimum_balance(), then it is increased to the full amount.
+        ///
+        /// Once the unlock period is done, you can call `withdraw_unbonded` to actually move
+        /// the funds out of management ready for transfer.
+        ///
+        /// No more than a limited number of unlocking chunks (see `MAX_UNLOCKING_CHUNKS`)
+        /// can co-exists at the same time. In that case, [`Call::withdraw_unbonded`] need
+        /// to be called first to remove some of the chunks (if possible).
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
+        /// And, it can be only called when [`EraElectionStatus`] is `Closed`.
+        ///
+        /// Emits `Unbonded`.
+        ///
+        /// See also [`Call::withdraw_unbonded`].
+        ///
+        /// # <weight>
+        /// - Independent of the arguments. Limited but potentially exploitable complexity.
+        /// - Contains a limited number of reads.
+        /// - Each call (requires the remainder of the bonded balance to be above `minimum_balance`)
+        ///   will cause a new entry to be inserted into a vector (`Ledger.unlocking`) kept in storage.
+        ///   The only way to clean the aforementioned storage item is also user-controlled via
+        ///   `withdraw_unbonded`.
+        /// - One DB entry.
+        /// ----------
+        /// Base Weight: 50.66 µs
+        /// DB Weight:
+        /// - Read: Ledger, Current Era, Locks, [Origin Account]
+        /// - Write: [Origin Account], Locks, Ledger
+        /// </weight>
+        #[weight = 50 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 3)]
         fn unbond(origin, #[compact] value: BalanceOf<T>) {
             let controller = ensure_signed(origin)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -829,76 +902,76 @@ decl_module! {
         }
 
         /// Remove any unlocked chunks from the `unlocking` queue from our management.
-		///
-		/// This essentially frees up that balance to be used by the stash account to do
-		/// whatever it wants.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-		/// And, it can be only called when [`EraElectionStatus`] is `Closed`.
-		///
-		/// Emits `Withdrawn`.
-		///
-		/// See also [`Call::unbond`].
-		///
-		/// # <weight>
-		/// - Could be dependent on the `origin` argument and how much `unlocking` chunks exist.
-		///  It implies `consolidate_unlocked` which loops over `Ledger.unlocking`, which is
-		///  indirectly user-controlled. See [`unbond`] for more detail.
-		/// - Contains a limited number of reads, yet the size of which could be large based on `ledger`.
-		/// - Writes are limited to the `origin` account key.
-		/// ---------------
-		/// Complexity O(S) where S is the number of slashing spans to remove
-		/// Base Weight:
-		/// Update: 50.52 + .028 * S µs
-		/// - Reads: EraElectionStatus, Ledger, Current Era, Locks, [Origin Account]
-		/// - Writes: [Origin Account], Locks, Ledger
-		/// Kill: 79.41 + 2.366 * S µs
-		/// - Reads: EraElectionStatus, Ledger, Current Era, Bonded, [Origin Account], Locks
-		/// - Writes: Bonded, Slashing Spans (if S > 0), Ledger, Payee, Validators, Guarantors, [Origin Account], Locks
-		/// - Writes Each: SpanSlash * S
-		/// NOTE: Weight annotation is the kill scenario, we refund otherwise.
-		/// # </weight>
-		#[weight = T::DbWeight::get().reads_writes(6, 6)
-			.saturating_add(80 * WEIGHT_PER_MICROS)
-		]
+        ///
+        /// This essentially frees up that balance to be used by the stash account to do
+        /// whatever it wants.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
+        /// And, it can be only called when [`EraElectionStatus`] is `Closed`.
+        ///
+        /// Emits `Withdrawn`.
+        ///
+        /// See also [`Call::unbond`].
+        ///
+        /// # <weight>
+        /// - Could be dependent on the `origin` argument and how much `unlocking` chunks exist.
+        ///  It implies `consolidate_unlocked` which loops over `Ledger.unlocking`, which is
+        ///  indirectly user-controlled. See [`unbond`] for more detail.
+        /// - Contains a limited number of reads, yet the size of which could be large based on `ledger`.
+        /// - Writes are limited to the `origin` account key.
+        /// ---------------
+        /// Complexity O(S) where S is the number of slashing spans to remove
+        /// Base Weight:
+        /// Update: 50.52 + .028 * S µs
+        /// - Reads: EraElectionStatus, Ledger, Current Era, Locks, [Origin Account]
+        /// - Writes: [Origin Account], Locks, Ledger
+        /// Kill: 79.41 + 2.366 * S µs
+        /// - Reads: EraElectionStatus, Ledger, Current Era, Bonded, [Origin Account], Locks
+        /// - Writes: Bonded, Slashing Spans (if S > 0), Ledger, Payee, Validators, Guarantors, [Origin Account], Locks
+        /// - Writes Each: SpanSlash * S
+        /// NOTE: Weight annotation is the kill scenario, we refund otherwise.
+        /// # </weight>
+        #[weight = T::DbWeight::get().reads_writes(6, 6)
+            .saturating_add(80 * WEIGHT_PER_MICROS)
+        ]
         fn withdraw_unbonded(origin) {
             let controller = ensure_signed(origin)?;
-			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-			let stash = ledger.stash.clone();
-			if let Some(current_era) = Self::current_era() {
-				ledger = ledger.consolidate_unlocked(current_era)
-			}
+            let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+            let stash = ledger.stash.clone();
+            if let Some(current_era) = Self::current_era() {
+                ledger = ledger.consolidate_unlocked(current_era)
+            }
 
-			if ledger.unlocking.is_empty() && ledger.active.is_zero() {
-				// This account must have called `unbond()` with some value that caused the active
-				// portion to fall below existential deposit + will have no more unlocking chunks
-				// left. We can now safely remove all staking-related information.
-				Self::kill_stash(&stash);
-				// remove the lock.
-				T::Currency::remove_lock(STAKING_ID, &stash);
-			} else {
-				// This was the consequence of a partial unbond. just update the ledger and move on.
-				Self::update_ledger(&controller, &ledger);
-			}
+            if ledger.unlocking.is_empty() && ledger.active.is_zero() {
+                // This account must have called `unbond()` with some value that caused the active
+                // portion to fall below existential deposit + will have no more unlocking chunks
+                // left. We can now safely remove all staking-related information.
+                Self::kill_stash(&stash);
+                // remove the lock.
+                T::Currency::remove_lock(STAKING_ID, &stash);
+            } else {
+                // This was the consequence of a partial unbond. just update the ledger and move on.
+                Self::update_ledger(&controller, &ledger);
+            }
         }
 
-		/// Declare the desire to validate for the origin controller.
-		///
-		/// Effects will be felt at the beginning of the next era.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-		///
-		/// # <weight>
-		/// - Independent of the arguments. Insignificant complexity.
-		/// - Contains a limited number of reads.
-		/// - Writes are limited to the `origin` account key.
-		/// -----------
-		/// Base Weight: 27.8 µs
-		/// DB Weight:
-		/// - Read: Ledger, StakeLimit
-		/// - Write: Guarantors, Validators
-		/// # </weight>
-		#[weight = 27 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(4, 1)]
+        /// Declare the desire to validate for the origin controller.
+        ///
+        /// Effects will be felt at the beginning of the next era.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
+        ///
+        /// # <weight>
+        /// - Independent of the arguments. Insignificant complexity.
+        /// - Contains a limited number of reads.
+        /// - Writes are limited to the `origin` account key.
+        /// -----------
+        /// Base Weight: 27.8 µs
+        /// DB Weight:
+        /// - Read: Ledger, StakeLimit
+        /// - Write: Guarantors, Validators
+        /// # </weight>
+        #[weight = 27 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(4, 1)]
         fn validate(origin, prefs: Perbill) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -927,21 +1000,21 @@ decl_module! {
         }
 
         /// Declare the desire to nominate `targets` for the origin controller.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-		///
-		/// # <weight>
-		/// - The transaction's complexity is proportional to the size of `validators` (N),
-		/// `guarantors`, `guarantee_rel`
-		/// - Both the reads and writes follow a similar pattern.
-		/// ---------
-		/// Base Weight: 1260 µs (For 100 validators and for each contains 10 guarantors)
-		/// DB Weight:
-		/// - Reads: Guarantors, Ledger, Current Era, GuaranteeRel
-		/// - Writes: Validators, Guarantors, GuaranteeRel
-		/// # </weight>
-		// TODO: reconsider this weight value for the V_G Graph
-		// TODO: improve the performance of the voting algorithm
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
+        ///
+        /// # <weight>
+        /// - The transaction's complexity is proportional to the size of `validators` (N),
+        /// `guarantors`, `guarantee_rel`
+        /// - Both the reads and writes follow a similar pattern.
+        /// ---------
+        /// Base Weight: 1260 µs (For 100 validators and for each contains 10 guarantors)
+        /// DB Weight:
+        /// - Reads: Guarantors, Ledger, Current Era, GuaranteeRel
+        /// - Writes: Validators, Guarantors, GuaranteeRel
+        /// # </weight>
+        // TODO: reconsider this weight value for the V_G Graph
+        // TODO: improve the performance of the voting algorithm
         #[weight = 1260 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(8, 4)]
         fn guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
             let controller = ensure_signed(origin)?;
@@ -995,17 +1068,17 @@ decl_module! {
         /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
         ///
         /// # <weight>
-		/// - The transaction's complexity is proportional to the size of `validators` (N),
-		/// `guarantors`, `guarantee_rel`
-		/// - Both the reads and writes follow a similar pattern.
-		/// ---------
-		/// Base Weight: 1324 µs (For 100 validators and for each contains 10 guarantors)
-		/// DB Weight:
-		/// - Reads: Guarantors, Ledger, Current Era, GuaranteeRel
-		/// - Writes: Validators, Guarantors, GuaranteeRel
-		/// # </weight>
+        /// - The transaction's complexity is proportional to the size of `validators` (N),
+        /// `guarantors`, `guarantee_rel`
+        /// - Both the reads and writes follow a similar pattern.
+        /// ---------
+        /// Base Weight: 1324 µs (For 100 validators and for each contains 10 guarantors)
+        /// DB Weight:
+        /// - Reads: Guarantors, Ledger, Current Era, GuaranteeRel
+        /// - Writes: Validators, Guarantors, GuaranteeRel
+        /// # </weight>
         // TODO: reconsider this weight value for the V_G Graph
-		// TODO: improve the performance of the voting algorithm
+        // TODO: improve the performance of the voting algorithm
         #[weight = 1324 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 4)]
         fn cut_guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
             let controller = ensure_signed(origin)?;
@@ -1049,46 +1122,46 @@ decl_module! {
             <Guarantors<T>>::insert(g_stash, nominations);
         }
 
-		/// Declare no desire to either validate or nominate.
-		///
-		/// Effects will be felt at the beginning of the next era.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-		///
-		/// # <weight>
-		/// - Independent of the arguments. Insignificant complexity.
-		/// - Contains one read.
-		/// - Writes are limited to the `origin` account key.
-		/// --------
-		/// Base Weight: 22.12 µs
-		/// DB Weight:
-		/// - Read: Ledger
-		/// - Write: Validators, Guarantors, GuaranteeRel
-		/// # </weight>
-		#[weight = 22 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(3, 1)]
+        /// Declare no desire to either validate or nominate.
+        ///
+        /// Effects will be felt at the beginning of the next era.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
+        ///
+        /// # <weight>
+        /// - Independent of the arguments. Insignificant complexity.
+        /// - Contains one read.
+        /// - Writes are limited to the `origin` account key.
+        /// --------
+        /// Base Weight: 22.12 µs
+        /// DB Weight:
+        /// - Read: Ledger
+        /// - Write: Validators, Guarantors, GuaranteeRel
+        /// # </weight>
+        #[weight = 22 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(3, 1)]
         fn chill(origin) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             Self::chill_stash(&ledger.stash);
         }
 
-		/// (Re-)set the payment target for a controller.
-		///
-		/// Effects will be felt at the beginning of the next era.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-		///
-		/// # <weight>
-		/// - Independent of the arguments. Insignificant complexity.
-		/// - Contains a limited number of reads.
-		/// - Writes are limited to the `origin` account key.
-		/// ---------
-		/// - Base Weight: 11.33 µs
-		/// - DB Weight:
-		///     - Read: Ledger
-		///     - Write: Payee
-		/// # </weight>
-		#[weight = 11 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(1, 1)]
+        /// (Re-)set the payment target for a controller.
+        ///
+        /// Effects will be felt at the beginning of the next era.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
+        ///
+        /// # <weight>
+        /// - Independent of the arguments. Insignificant complexity.
+        /// - Contains a limited number of reads.
+        /// - Writes are limited to the `origin` account key.
+        /// ---------
+        /// - Base Weight: 11.33 µs
+        /// - DB Weight:
+        ///     - Read: Ledger
+        ///     - Write: Payee
+        /// # </weight>
+        #[weight = 11 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(1, 1)]
         fn set_payee(origin, payee: RewardDestination) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -1096,23 +1169,23 @@ decl_module! {
             <Payee<T>>::insert(stash, payee);
         }
 
-		/// (Re-)set the controller of a stash.
-		///
-		/// Effects will be felt at the beginning of the next era.
-		///
-		/// The dispatch origin for this call must be _Signed_ by the stash, not the controller.
-		///
-		/// # <weight>
-		/// - Independent of the arguments. Insignificant complexity.
-		/// - Contains a limited number of reads.
-		/// - Writes are limited to the `origin` account key.
-		/// ----------
-		/// Base Weight: 36.2 µs
-		/// DB Weight:
-		/// - Read: Bonded, Ledger New Controller, Ledger Old Controller
-		/// - Write: Bonded, Ledger New Controller, Ledger Old Controller
-		/// # </weight>
-		#[weight = 36 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(3, 3)]
+        /// (Re-)set the controller of a stash.
+        ///
+        /// Effects will be felt at the beginning of the next era.
+        ///
+        /// The dispatch origin for this call must be _Signed_ by the stash, not the controller.
+        ///
+        /// # <weight>
+        /// - Independent of the arguments. Insignificant complexity.
+        /// - Contains a limited number of reads.
+        /// - Writes are limited to the `origin` account key.
+        /// ----------
+        /// Base Weight: 36.2 µs
+        /// DB Weight:
+        /// - Read: Bonded, Ledger New Controller, Ledger Old Controller
+        /// - Write: Bonded, Ledger New Controller, Ledger Old Controller
+        /// # </weight>
+        #[weight = 36 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(3, 3)]
         fn set_controller(origin, controller: <T::Lookup as StaticLookup>::Source) {
             let stash = ensure_signed(origin)?;
             let old_controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
@@ -1131,80 +1204,80 @@ decl_module! {
         // ----- Root Calls ------
 
         /// Sets the ideal number of validators.
-		///
-		/// The dispatch origin must be Root.
-		///
-		/// # <weight>
-		/// Base Weight: 1.717 µs
-		/// Write: Validator Count
-		/// # </weight>
-		#[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
+        ///
+        /// The dispatch origin must be Root.
+        ///
+        /// # <weight>
+        /// Base Weight: 1.717 µs
+        /// Write: Validator Count
+        /// # </weight>
+        #[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
         fn set_validator_count(origin, #[compact] new: u32) {
             ensure_root(origin)?;
             ValidatorCount::put(new);
         }
 
         /// Force there to be no new eras indefinitely.
-		///
-		/// The dispatch origin must be Root.
-		///
-		/// # <weight>
-		/// - No arguments.
-		/// - Base Weight: 1.857 µs
-		/// - Write: ForceEra
-		/// # </weight>
-		#[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
+        ///
+        /// The dispatch origin must be Root.
+        ///
+        /// # <weight>
+        /// - No arguments.
+        /// - Base Weight: 1.857 µs
+        /// - Write: ForceEra
+        /// # </weight>
+        #[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
         fn force_no_eras(origin) {
             ensure_root(origin)?;
             ForceEra::put(Forcing::ForceNone);
         }
 
         /// Force there to be a new era at the end of the next session. After this, it will be
-		/// reset to normal (non-forced) behaviour.
-		///
-		/// The dispatch origin must be Root.
-		///
-		/// # <weight>
-		/// - No arguments.
-		/// - Base Weight: 1.959 µs
-		/// - Write ForceEra
-		/// # </weight>
-		#[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
+        /// reset to normal (non-forced) behaviour.
+        ///
+        /// The dispatch origin must be Root.
+        ///
+        /// # <weight>
+        /// - No arguments.
+        /// - Base Weight: 1.959 µs
+        /// - Write ForceEra
+        /// # </weight>
+        #[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
         fn force_new_era(origin) {
             ensure_root(origin)?;
             ForceEra::put(Forcing::ForceNew);
         }
 
-		/// Set the validators who cannot be slashed (if any).
-		///
-		/// The dispatch origin must be Root.
-		///
-		/// # <weight>
-		/// - O(V)
-		/// - Base Weight: 2.208 + .006 * V µs
-		/// - Write: Invulnerables
-		/// # </weight>
-		#[weight = T::DbWeight::get().writes(1)
-			.saturating_add(2 * WEIGHT_PER_MICROS)
-			.saturating_add((6 * WEIGHT_PER_NANOS).saturating_mul(validators.len() as Weight))
-		]
+        /// Set the validators who cannot be slashed (if any).
+        ///
+        /// The dispatch origin must be Root.
+        ///
+        /// # <weight>
+        /// - O(V)
+        /// - Base Weight: 2.208 + .006 * V µs
+        /// - Write: Invulnerables
+        /// # </weight>
+        #[weight = T::DbWeight::get().writes(1)
+            .saturating_add(2 * WEIGHT_PER_MICROS)
+            .saturating_add((6 * WEIGHT_PER_NANOS).saturating_mul(validators.len() as Weight))
+        ]
         fn set_invulnerables(origin, validators: Vec<T::AccountId>) {
             ensure_root(origin)?;
             <Invulnerables<T>>::put(validators);
         }
 
-		/// Force a current staker to become completely unstaked, immediately.
-		///
-		/// The dispatch origin must be Root.
-		///
-		/// # <weight>
-		/// O(S) where S is the number of slashing spans to be removed
-		/// Base Weight: 53.07 µs
-		/// Reads: Bonded, Account, Locks
-		/// Writes: Bonded, Ledger, Payee, Validators, Guarantors, Account, Locks
-		/// # </weight>
-		#[weight = T::DbWeight::get().reads_writes(4, 7)
-			.saturating_add(53 * WEIGHT_PER_MICROS)]
+        /// Force a current staker to become completely unstaked, immediately.
+        ///
+        /// The dispatch origin must be Root.
+        ///
+        /// # <weight>
+        /// O(S) where S is the number of slashing spans to be removed
+        /// Base Weight: 53.07 µs
+        /// Reads: Bonded, Account, Locks
+        /// Writes: Bonded, Ledger, Payee, Validators, Guarantors, Account, Locks
+        /// # </weight>
+        #[weight = T::DbWeight::get().reads_writes(4, 7)
+            .saturating_add(53 * WEIGHT_PER_MICROS)]
         fn force_unstake(origin, stash: T::AccountId) {
             ensure_root(origin)?;
 
@@ -1214,38 +1287,38 @@ decl_module! {
             Self::kill_stash(&stash);
         }
 
-		/// Force there to be a new era at the end of sessions indefinitely.
-		///
-		/// The dispatch origin must be Root.
-		///
-		/// # <weight>
-		/// - Base Weight: 2.05 µs
-		/// - Write: ForceEra
-		/// # </weight>
-		#[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
+        /// Force there to be a new era at the end of sessions indefinitely.
+        ///
+        /// The dispatch origin must be Root.
+        ///
+        /// # <weight>
+        /// - Base Weight: 2.05 µs
+        /// - Write: ForceEra
+        /// # </weight>
+        #[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1)]
         fn force_new_era_always(origin) {
             ensure_root(origin)?;
             ForceEra::put(Forcing::ForceAlways);
         }
 
-		/// Cancel enactment of a deferred slash.
-		///
-		/// Can be called by the `T::SlashCancelOrigin`.
-		///
-		/// Parameters: era and indices of the slashes for that era to kill.
-		///
-		/// # <weight>
-		/// Complexity: O(U + S)
-		/// with U unapplied slashes weighted with U=1000
-		/// and S is the number of slash indices to be canceled.
-		/// - Base: 5870 + 34.61 * S µs
-		/// - Read: Unapplied Slashes
-		/// - Write: Unapplied Slashes
-		/// # </weight>
-		#[weight = T::DbWeight::get().reads_writes(1, 1)
-			.saturating_add(5_870 * WEIGHT_PER_MICROS)
-			.saturating_add((35 * WEIGHT_PER_MICROS).saturating_mul(slash_indices.len() as Weight))
-		]
+        /// Cancel enactment of a deferred slash.
+        ///
+        /// Can be called by the `T::SlashCancelOrigin`.
+        ///
+        /// Parameters: era and indices of the slashes for that era to kill.
+        ///
+        /// # <weight>
+        /// Complexity: O(U + S)
+        /// with U unapplied slashes weighted with U=1000
+        /// and S is the number of slash indices to be canceled.
+        /// - Base: 5870 + 34.61 * S µs
+        /// - Read: Unapplied Slashes
+        /// - Write: Unapplied Slashes
+        /// # </weight>
+        #[weight = T::DbWeight::get().reads_writes(1, 1)
+            .saturating_add(5_870 * WEIGHT_PER_MICROS)
+            .saturating_add((35 * WEIGHT_PER_MICROS).saturating_mul(slash_indices.len() as Weight))
+        ]
         fn cancel_deferred_slash(origin, era: EraIndex, slash_indices: Vec<u32>) {
             T::SlashCancelOrigin::try_origin(origin)
                 .map(|_| ())
@@ -1272,27 +1345,42 @@ decl_module! {
             <Self as Store>::UnappliedSlashes::insert(&era, &unapplied);
         }
 
-		/// Remove all data structure concerning a staker/stash once its balance is zero.
-		/// This is essentially equivalent to `withdraw_unbonded` except it can be called by anyone
-		/// and the target `stash` must have no funds left.
-		///
-		/// This can be called from any origin.
-		///
-		/// - `stash`: The stash account to reap. Its balance must be zero.
-		///
-		/// # <weight>
-		/// Complexity: O(S) where S is the number of slashing spans on the account.
-		/// Base Weight: 75.94 µs
-		/// DB Weight:
-		/// - Reads: Stash Account, Bonded, Slashing Spans, Locks
-		/// - Writes: Bonded, Ledger, Payee, Validators, Nominators, Stash Account, Locks
-		/// # </weight>
-		#[weight = T::DbWeight::get().reads_writes(4, 7)
-			.saturating_add(76 * WEIGHT_PER_MICROS)]
+        /// Remove all data structure concerning a staker/stash once its balance is zero.
+        /// This is essentially equivalent to `withdraw_unbonded` except it can be called by anyone
+        /// and the target `stash` must have no funds left.
+        ///
+        /// This can be called from any origin.
+        ///
+        /// - `stash`: The stash account to reap. Its balance must be zero.
+        ///
+        /// # <weight>
+        /// Complexity: O(S) where S is the number of slashing spans on the account.
+        /// Base Weight: 75.94 µs
+        /// DB Weight:
+        /// - Reads: Stash Account, Bonded, Slashing Spans, Locks
+        /// - Writes: Bonded, Ledger, Payee, Validators, Nominators, Stash Account, Locks
+        /// # </weight>
+        #[weight = T::DbWeight::get().reads_writes(4, 7)
+            .saturating_add(76 * WEIGHT_PER_MICROS)]
         fn reap_stash(_origin, stash: T::AccountId) {
             ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
             Self::kill_stash(&stash);
             T::Currency::remove_lock(STAKING_ID, &stash);
+        }
+
+        /// Pay out all the stakers behind a single validator for a single era.
+        ///
+        /// - `validator_stash` is the stash account of the validator. Their nominators, up to
+        ///   `T::MaxNominatorRewardedPerValidator`, will also receive their rewards.
+        /// - `era` may be any era between `[current_era - history_depth; current_era]`.
+        ///
+        /// The origin of this call must be _Signed_. Any account can call this function, even if
+        /// it is not one of the stakers.
+        /// TODO: Add weight for this one
+        #[weight = 120 * WEIGHT_PER_MICROS]
+        fn reward_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
+            ensure_signed(origin)?;
+            Self::do_reward_stakers(validator_stash, era)
         }
     }
 }
@@ -1545,39 +1633,68 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// Reward a given block author by a specific amount. Add reward to the block author's
-    fn reward_author(stash: &T::AccountId, reward: BalanceOf<T>) -> PositiveImbalanceOf<T> {
-          Self::make_payout(stash, reward).unwrap_or(<PositiveImbalanceOf<T>>::zero())
-    }
+    /// Pay reward to stakers. Two kinds of reward.
+    /// One is authoring reward which is paid to validator who are elected.
+    /// Another one is staking reward.
+    fn do_reward_stakers(
+        validator_stash: T::AccountId,
+        era: EraIndex,
+    ) -> DispatchResult {
+        // 1. Validate input data
+        let current_era = CurrentEra::get().ok_or(Error::<T>::InvalidEraToReward)?;
+        ensure!(era <= current_era, Error::<T>::InvalidEraToReward);
+        let history_depth = Self::history_depth();
+        ensure!(era >= current_era.saturating_sub(history_depth), Error::<T>::InvalidEraToReward);
 
-    /// Reward a given (maybe)validator by a specific amount. Add the reward to the validator's, and its
-    /// guarantors' balance, pro-rata based on their exposure, after having removed the validator's
-    /// pre-payout cut.
-    fn reward_validator(stash: &T::AccountId, reward: BalanceOf<T>) -> PositiveImbalanceOf<T> {
-        // let reward = reward.saturating_sub(off_the_table);
-        let mut imbalance = <PositiveImbalanceOf<T>>::zero();
-        let validator_cut = if reward.is_zero() {
-            Zero::zero()
-        } else {
-            let exposure = Self::stakers(stash);
-            let total = exposure.total.max(One::one());
-            let total_rewards = Self::validators(stash).guarantee_fee * reward;
-            let mut guarantee_rewards = Zero::zero();
+        // Note: if era has no reward to be claimed, era may be future. better not to update
+        // `ledger.claimed_rewards` in this case.
+        let era_staking_payout = <ErasStakingPayout<T>>::get(&era)
+            .ok_or_else(|| Error::<T>::InvalidEraToReward)?;
 
-            for i in &exposure.others {
-                let per_u64 = Perbill::from_rational_approximation(i.value, total);
-                // Reward guarantors
-                guarantee_rewards += per_u64 * total_rewards;
-                imbalance.maybe_subsume(Self::make_payout(&i.who, per_u64 * total_rewards));
-            }
+        let controller = Self::bonded(&validator_stash).ok_or(Error::<T>::NotStash)?;
+        let mut ledger = <Ledger<T>>::get(&controller).ok_or_else(|| Error::<T>::NotController)?;
 
-            guarantee_rewards
-        };
+        ledger.claimed_rewards.retain(|&x| x >= current_era.saturating_sub(history_depth));
+        match ledger.claimed_rewards.binary_search(&era) {
+            Ok(_) => Err(Error::<T>::AlreadyClaimed)?,
+            Err(pos) => ledger.claimed_rewards.insert(pos, era),
+        }
+        /* Input data seems good, no errors allowed after this point */
+        let exposure = <ErasStakers<T>>::get(&era, &ledger.stash);
+        <Ledger<T>>::insert(&controller, &ledger);
 
-        // assert!(reward == imbalance)
-        imbalance.maybe_subsume(Self::make_payout(stash, reward - validator_cut));
+        // 2. Pay authoring reward
+        let mut validator_imbalance = <PositiveImbalanceOf<T>>::zero();
+        if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
+            validator_imbalance.maybe_subsume(Self::make_payout(&validator_stash, value));
+        }
 
-        imbalance
+        let to_num =
+        |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
+
+        // 3. Retrieve total stakes and total staking reward
+        let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
+        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
+        let total = exposure.total.max(One::one());
+        // 4. Calculate total rewards for staking
+        let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).guarantee_fee * staking_reward;
+        let mut guarantee_rewards = Zero::zero();
+        // 5. Pay staking reward to gurantors 
+        for i in &exposure.others {
+            let reward_ratio = Perbill::from_rational_approximation(i.value, total);
+            // Reward guarantors
+            guarantee_rewards += reward_ratio * total_rewards;
+            if let Some(imbalance) = Self::make_payout(
+                &i.who,
+                reward_ratio * total_rewards
+            ) {
+                Self::deposit_event(RawEvent::Reward(i.who.clone(), imbalance.peek()));
+            };
+        }
+        // 6. Pay staking reward to validator
+        validator_imbalance.maybe_subsume(Self::make_payout(&ledger.stash, staking_reward - guarantee_rewards));
+        Self::deposit_event(RawEvent::Reward(ledger.stash, validator_imbalance.peek()));
+        Ok(())
     }
 
     /// Session has just ended. Provide the validator set for the next session if it's an era-end, along
@@ -1634,6 +1751,12 @@ impl<T: Trait> Module<T> {
         });
         let bonding_duration = T::BondingDuration::get();
 
+        // Clean old era information.
+        // TODO: double check the economic mechanism.
+        if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 1) {
+            Self::clear_era_information(old_era);
+        }
+
         // Slashing
         // TODO: put slashing into start_era(judging at start_session) like Kusama does?
         BondedEras::mutate(|bonded| {
@@ -1660,7 +1783,7 @@ impl<T: Trait> Module<T> {
         });
 
         // Reassign all stakers.
-        let maybe_new_validators = Self::select_validators();
+        let maybe_new_validators = Self::select_validators(current_era);
         Self::apply_unapplied_slashes(current_era);
 
         maybe_new_validators
@@ -1676,35 +1799,38 @@ impl<T: Trait> Module<T> {
             let points = CurrentEraPointsEarned::take();
             let validators = Self::current_elected();
             let total_authoring_payout = Self::authoring_rewards_in_era();
-            let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
-            let to_num =
-                |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
-
+            // let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+            let current_era = Self::current_era().unwrap_or(0);
             // 1. Block authoring payout
             for (v, p) in validators.iter().zip(points.individual.into_iter()) {
                 if p != 0 {
                     let authoring_reward =
                         Perbill::from_rational_approximation(p, points.total) * total_authoring_payout;
-                    total_imbalance.subsume(Self::reward_author(v, authoring_reward));
+                    <ErasAuthoringPayout<T>>::insert(&current_era, v, authoring_reward);
                 }
             }
 
             // 2. Staking payout
-            let current_era = Self::current_era().unwrap_or(0);
             let total_staking_payout = Self::staking_rewards_in_era(current_era);
-            let total_stakes = Self::total_stakes();
-            <Stakers<T>>::iter().for_each(|(v, e)| {
-                let staking_reward = Perbill::from_rational_approximation(to_num(e.total), to_num(total_stakes)) * total_staking_payout;
-                total_imbalance.subsume(Self::reward_validator(&v, staking_reward));
-            });
+            <ErasStakingPayout<T>>::insert(&current_era, total_staking_payout);
 
-            // 3. Deposit reward event
-            Self::deposit_event(RawEvent::Reward(total_authoring_payout, total_staking_payout));
+            // 3. Deposit era reward event
+            Self::deposit_event(RawEvent::EraReward(current_era, total_authoring_payout, total_staking_payout));
 
-            T::Reward::on_unbalanced(total_imbalance);
+            // TODO: enable treasury and might bring this back
+            // T::Reward::on_unbalanced(total_imbalance);
             // This is not been used
-            //T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+            // T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
         }
+    }
+
+        /// Clear all era information for given era.
+    fn clear_era_information(era_index: EraIndex) {
+        <ErasStakers<T>>::remove_prefix(era_index);
+        <ErasValidatorPrefs<T>>::remove_prefix(era_index);
+        <ErasStakingPayout<T>>::remove(era_index);
+        <ErasTotalStakes<T>>::remove(era_index);
+        <ErasAuthoringPayout<T>>::remove_prefix(era_index);
     }
 
     /// Block authoring rewards per era, this won't be changed in every era
@@ -1770,7 +1896,7 @@ impl<T: Trait> Module<T> {
     /// Returns the new `TotalStakes` value and a set of newly selected _stash_ IDs.
     ///
     /// Assumes storage is coherent with the declaration.
-    fn select_validators() -> Option<Vec<T::AccountId>> {
+    fn select_validators(current_era: EraIndex) -> Option<Vec<T::AccountId>> {
         // Update all swork identities work report and clear stakers
         T::SworkInterface::update_identities();
         Self::clear_stakers();
@@ -1922,14 +2048,14 @@ impl<T: Trait> Module<T> {
                 suppressed: _,
             } = nominations;
 
-			// Filter out nomination targets which were guaranteed before the most recent
-			// slashing span.
-			targets.retain(|stash| {
-				<Self as Store>::SlashingSpans::get(&stash).map_or(
-					true,
-					|spans| submitted_in >= spans.last_nonzero_slash(),
-				)
-			});
+            // Filter out nomination targets which were guaranteed before the most recent
+            // slashing span.
+            targets.retain(|stash| {
+                <Self as Store>::SlashingSpans::get(&stash).map_or(
+                    true,
+                    |spans| submitted_in >= spans.last_nonzero_slash(),
+                )
+            });
 
             // 1. Init all guarantor's valid stakes
             let g_controller = Self::bonded(&g_stash).unwrap();
@@ -1954,6 +2080,11 @@ impl<T: Trait> Module<T> {
                 } else {
                     total_stakes = to_balance(u64::max_value() as u128);
                 }
+                let guarantee_fee = ValidatorPrefs {
+                    guarantee_fee: Self::validators(&stash).guarantee_fee
+                };
+                <ErasValidatorPrefs<T>>::insert(&current_era, &stash, guarantee_fee);
+                <ErasStakers<T>>::insert(&current_era, &stash, exposure.clone());
                 (stash, to_votes(exposure.total))
             })
             .collect::<Vec<(T::AccountId, u128)>>();
@@ -1977,7 +2108,7 @@ impl<T: Trait> Module<T> {
         <CurrentElected<T>>::put(&elected_stashes);
 
         // Update slot stake.
-        <TotalStakes<T>>::put(total_stakes);
+        <ErasTotalStakes<T>>::insert(&current_era, total_stakes);
 
         // In order to keep the property required by `n_session_ending`
         // that we must return the new validator set even if it's the same as the old,
@@ -2284,6 +2415,6 @@ for FilterHistoricalOffences<Module<T>, R> where
     }
 
     fn is_known_offence(offenders: &[Offender], time_slot: &O::TimeSlot) -> bool {
-		R::is_known_offence(offenders, time_slot)
-	}
+        R::is_known_offence(offenders, time_slot)
+    }
 }

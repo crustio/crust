@@ -156,6 +156,7 @@ impl Default for ValidatorPrefs {
 
 
 /// A record of the nominations made by a specific account.
+/// TODO: Rename it to Gurantors
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Nominations<AccountId, Balance: HasCompact> {
     /// The targets of nomination, this vector's element is unique.
@@ -200,8 +201,8 @@ pub struct StakingLedger<AccountId, Balance: HasCompact> {
     /// Any balance that is becoming free, which may eventually be transferred out
     /// of the stash (assuming it doesn't get slashed first).
     pub unlocking: Vec<UnlockChunk<Balance>>,
-    /// List of eras for which the stakers behind a validator have claimed rewards. Only updated
-    /// for validators.
+    /// List of eras for which the stakers behind a validator and guarantor have claimed rewards.
+    /// Only updated for validators.
     pub claimed_rewards: Vec<EraIndex>,
 }
 
@@ -654,7 +655,6 @@ decl_event!(
     pub enum Event<T> where Balance = BalanceOf<T>, <T as frame_system::Trait>::AccountId {
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
-        // TODO: show reward link to account_id
         Reward(AccountId, Balance),
         /// One validator (and its guarantors) has been slashed by the given amount.
         Slash(AccountId, Balance),
@@ -1631,11 +1631,14 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    /// Pay reward to stakers. Two kinds of reward.
+    /// One is authoring reward which is paid to validator who are elected.
+    /// Another one is staking reward.
     fn do_reward_stakers(
         validator_stash: T::AccountId,
         era: EraIndex,
     ) -> DispatchResult {
-        // Validate input data
+        // 1. Validate input data
         let current_era = CurrentEra::get().ok_or(Error::<T>::InvalidEraToReward)?;
         ensure!(era <= current_era, Error::<T>::InvalidEraToReward);
         let history_depth = Self::history_depth();
@@ -1658,43 +1661,37 @@ impl<T: Trait> Module<T> {
         let exposure = <ErasStakers<T>>::get(&era, &ledger.stash);
         <Ledger<T>>::insert(&controller, &ledger);
 
-        // 1. Pay authoring reward
+        // 2. Pay authoring reward
+        let mut validator_imbalance = <PositiveImbalanceOf<T>>::zero();
         if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
-            if let Some(imbalance) = Self::make_payout(
-                &validator_stash,
-                value
-            ) {
-                Self::deposit_event(RawEvent::Reward(validator_stash, imbalance.peek()));
-            };
+            validator_imbalance.maybe_subsume(Self::make_payout(&validator_stash, value));
         }
 
-        // 2. Pay staking reward
         let to_num =
         |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
 
-
+        // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
         let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
         let total = exposure.total.max(One::one());
+        // 4. Calculate total rewards for staking
         let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).guarantee_fee * staking_reward;
         let mut guarantee_rewards = Zero::zero();
+        // 5. Pay staking reward to gurantors 
         for i in &exposure.others {
-            let per_u64 = Perbill::from_rational_approximation(i.value, total);
+            let reward_ratio = Perbill::from_rational_approximation(i.value, total);
             // Reward guarantors
-            guarantee_rewards += per_u64 * total_rewards;
+            guarantee_rewards += reward_ratio * total_rewards;
             if let Some(imbalance) = Self::make_payout(
                 &i.who,
-                per_u64 * total_rewards
+                reward_ratio * total_rewards
             ) {
                 Self::deposit_event(RawEvent::Reward(i.who.clone(), imbalance.peek()));
             };
         }
-        if let Some(imbalance) = Self::make_payout(
-            &ledger.stash,
-            staking_reward - guarantee_rewards
-        ) {
-            Self::deposit_event(RawEvent::Reward(ledger.stash, imbalance.peek()));
-        };
+        // 6. Pay staking reward to validator
+        validator_imbalance.maybe_subsume(Self::make_payout(&ledger.stash, staking_reward - guarantee_rewards));
+        Self::deposit_event(RawEvent::Reward(ledger.stash, validator_imbalance.peek()));
         Ok(())
     }
 
@@ -1753,7 +1750,7 @@ impl<T: Trait> Module<T> {
         let bonding_duration = T::BondingDuration::get();
 
         // Clean old era information.
-        if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 3) {
+        if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 1) {
             Self::clear_era_information(old_era);
         }
 

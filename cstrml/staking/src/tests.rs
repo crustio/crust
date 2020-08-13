@@ -4516,12 +4516,12 @@ fn era_clean_should_work() {
                 RewardDestination::Controller
             ));
             // We left 3 buffer here even we set it to 84
-            start_era(86, true);
+            start_era(84, true);
             assert!(<ErasStakingPayout<Test>>::contains_key(0));
             assert!(<ErasTotalStakes<Test>>::contains_key(0));
             assert!(<ErasStakers<Test>>::contains_key(0, 11));
             assert!(<ErasValidatorPrefs<Test>>::contains_key(0, 11));
-            start_era(87, true);
+            start_era(85, true);
             assert!(!<ErasStakingPayout<Test>>::contains_key(0));
             assert!(!<ErasTotalStakes<Test>>::contains_key(0));
             assert!(!<ErasStakers<Test>>::contains_key(0, 11));

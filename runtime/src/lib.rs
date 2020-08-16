@@ -10,7 +10,10 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 mod impls;
 
-use sp_core::OpaqueMetadata;
+use sp_core::{
+    OpaqueMetadata,
+    u32_trait::{_1, _2, _3, _4},
+};
 use sp_runtime::traits::{
     BlakeTwo256, Block as BlockT, OpaqueKeys, IdentityLookup, Saturating
 };
@@ -41,7 +44,7 @@ pub use frame_support::{
     },
     StorageValue,
 };
-use system::EnsureRoot;
+use system::{EnsureRoot, EnsureOneOf};
 pub use im_online::sr25519::AuthorityId as ImOnlineId;
 
 #[cfg(any(feature = "std", test))]
@@ -107,13 +110,13 @@ pub fn native_version() -> NativeVersion {
 }
 
 parameter_types! {
-	pub const BlockHashCount: BlockNumber = 2400;
-	pub const MaximumBlockWeight: Weight = 2 * WEIGHT_PER_SECOND;
-	pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
-	pub const MaximumBlockLength: u32 = 5 * 1024 * 1024;
-	pub const Version: RuntimeVersion = VERSION;
-	pub MaximumExtrinsicWeight: Weight = AvailableBlockRatio::get()
-		.saturating_sub(Perbill::from_percent(10)) * MaximumBlockWeight::get();
+    pub const BlockHashCount: BlockNumber = 2400;
+    pub const MaximumBlockWeight: Weight = 2 * WEIGHT_PER_SECOND;
+    pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
+    pub const MaximumBlockLength: u32 = 5 * 1024 * 1024;
+    pub const Version: RuntimeVersion = VERSION;
+    pub MaximumExtrinsicWeight: Weight = AvailableBlockRatio::get()
+        .saturating_sub(Perbill::from_percent(10)) * MaximumBlockWeight::get();
 }
 
 impl system::Trait for Runtime {
@@ -202,7 +205,7 @@ impl babe::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const IndexDeposit: Balance = 1 * DOLLARS;
+    pub const IndexDeposit: Balance = 1 * DOLLARS;
 }
 
 impl indices::Trait for Runtime {
@@ -227,8 +230,8 @@ parameter_types! {
 }
 
 parameter_types! {
-	pub const StakingUnsignedPriority: TransactionPriority = TransactionPriority::max_value() / 2;
-	pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
+    pub const StakingUnsignedPriority: TransactionPriority = TransactionPriority::max_value() / 2;
+    pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
 }
 
 impl im_online::Trait for Runtime {
@@ -241,7 +244,7 @@ impl im_online::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const MaximumWeight: Weight = 2_000_000;
+    pub const MaximumWeight: Weight = 2_000_000;
 }
 
 impl scheduler::Trait for Runtime {
@@ -295,7 +298,103 @@ impl timestamp::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const UncleGenerations: BlockNumber = 0;
+    pub const LaunchPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+    pub const VotingPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+    pub const FastTrackVotingPeriod: BlockNumber = 3 * 24 * 60 * MINUTES;
+    pub const InstantAllowed: bool = true;
+    pub const MinimumDeposit: Balance = 100 * DOLLARS;
+    pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
+    pub const CooloffPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+    // One cent: $10,000 / MB
+    pub const PreimageByteDeposit: Balance = 1 * CENTS;
+    pub const MaxVotes: u32 = 100;
+}
+
+impl democracy::Trait for Runtime {
+    type Proposal = Call;
+    type Event = Event;
+    type Currency = Balances;
+    type EnactmentPeriod = EnactmentPeriod;
+    type LaunchPeriod = LaunchPeriod;
+    type VotingPeriod = VotingPeriod;
+    type MinimumDeposit = MinimumDeposit;
+    /// A straight majority of the council can decide what their next motion is.
+    type ExternalOrigin = collective::EnsureProportionAtLeast<_1, _2, AccountId, CouncilCollective>;
+    /// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
+    type ExternalMajorityOrigin = collective::EnsureProportionAtLeast<_3, _4, AccountId, CouncilCollective>;
+    /// A unanimous council can have the next scheduled referendum be a straight default-carries
+    /// (NTB) vote.
+    type ExternalDefaultOrigin = collective::EnsureProportionAtLeast<_1, _1, AccountId, CouncilCollective>;
+    /// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
+    /// be tabled immediately and with a shorter voting/enactment period.
+    type FastTrackOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, TechnicalCollective>;
+    type InstantOrigin = collective::EnsureProportionAtLeast<_1, _1, AccountId, TechnicalCollective>;
+    type InstantAllowed = InstantAllowed;
+    type FastTrackVotingPeriod = FastTrackVotingPeriod;
+    // To cancel a proposal which has been passed, 2/3 of the council must agree to it.
+    type CancellationOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, CouncilCollective>;
+    // Any single technical committee member may veto a coming council proposal, however they can
+    // only do it once and it lasts only for the cooloff period.
+    type VetoOrigin = collective::EnsureMember<AccountId, TechnicalCollective>;
+    type CooloffPeriod = CooloffPeriod;
+    type PreimageByteDeposit = PreimageByteDeposit;
+    type OperationalPreimageOrigin = collective::EnsureMember<AccountId, CouncilCollective>;
+    type Slash = ();
+    type Scheduler = Scheduler;
+    type PalletsOrigin = OriginCaller;
+    type MaxVotes = MaxVotes;
+    type WeightInfo = ();
+}
+
+parameter_types! {
+    pub const CouncilMotionDuration: BlockNumber = 5 * DAYS;
+    pub const CouncilMaxProposals: u32 = 100;
+}
+
+type CouncilCollective = collective::Instance1;
+impl collective::Trait<CouncilCollective> for Runtime {
+    type Origin = Origin;
+    type Proposal = Call;
+    type Event = Event;
+    type MotionDuration = CouncilMotionDuration;
+    type MaxProposals = CouncilMaxProposals;
+    type WeightInfo = ();
+}
+
+parameter_types! {
+    pub const TechnicalMotionDuration: BlockNumber = 5 * DAYS;
+    pub const TechnicalMaxProposals: u32 = 100;
+}
+
+type TechnicalCollective = collective::Instance2;
+impl collective::Trait<TechnicalCollective> for Runtime {
+    type Origin = Origin;
+    type Proposal = Call;
+    type Event = Event;
+    type MotionDuration = TechnicalMotionDuration;
+    type MaxProposals = TechnicalMaxProposals;
+    type WeightInfo = ();
+}
+
+
+type EnsureRootOrHalfCouncil = EnsureOneOf<
+    AccountId,
+    EnsureRoot<AccountId>,
+    collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>
+>;
+impl membership::Trait<membership::Instance1> for Runtime {
+    type Event = Event;
+    type AddOrigin = EnsureRootOrHalfCouncil;
+    type RemoveOrigin = EnsureRootOrHalfCouncil;
+    type SwapOrigin = EnsureRootOrHalfCouncil;
+    type ResetOrigin = EnsureRootOrHalfCouncil;
+    type PrimeOrigin = EnsureRootOrHalfCouncil;
+    type MembershipInitialized = TechnicalCommittee;
+    type MembershipChanged = TechnicalCommittee;
+}
+
+parameter_types! {
+    pub const UncleGenerations: BlockNumber = 0;
 }
 
 impl authorship::Trait for Runtime {
@@ -306,7 +405,7 @@ impl authorship::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
+    pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
 }
 
 impl session::Trait for Runtime {
@@ -359,14 +458,14 @@ impl staking::Trait for Runtime {
 }
 
 parameter_types! {
-	pub OffencesWeightSoftLimit: Weight = Perbill::from_percent(60) * MaximumBlockWeight::get();
+    pub OffencesWeightSoftLimit: Weight = Perbill::from_percent(60) * MaximumBlockWeight::get();
 }
 
 impl offences::Trait for Runtime {
-	type Event = Event;
-	type IdentificationTuple = session::historical::IdentificationTuple<Self>;
-	type OnOffenceHandler = Staking;
-	type WeightSoftLimit = OffencesWeightSoftLimit;
+    type Event = Event;
+    type IdentificationTuple = session::historical::IdentificationTuple<Self>;
+    type OnOffenceHandler = Staking;
+    type WeightSoftLimit = OffencesWeightSoftLimit;
     type WeightInfo = ();
 }
 
@@ -393,8 +492,8 @@ impl balances::Trait for Runtime {
 
 // TODO: better way to deal with fee(s)
 parameter_types! {
-	pub const TransactionBaseFee: Balance = 1 * CENTS;
-	pub const TransactionByteFee: Balance = 10 * MILLICENTS;
+    pub const TransactionBaseFee: Balance = 1 * CENTS;
+    pub const TransactionByteFee: Balance = 10 * MILLICENTS;
 }
 
 impl transaction_payment::Trait for Runtime {
@@ -465,7 +564,7 @@ construct_runtime! {
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
         Indices: indices::{Module, Call, Storage, Config<T>, Event<T>},
-		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+        Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
 
         // Consensus support
@@ -473,6 +572,10 @@ construct_runtime! {
         Staking: staking::{Module, Call, Storage, Config<T>, Event<T>},
         Historical: session_historical::{Module},
         Session: session::{Module, Call, Storage, Event, Config<T>},
+        Democracy: democracy::{Module, Call, Storage, Event<T>},
+        Council: collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>},
+        TechnicalCommittee: collective::<Instance2>::{Module, Call, Storage, Origin<T>, Event<T>},
+        TechnicalMembership: membership::<Instance1>::{Module, Call, Storage, Event<T>},
         FinalityTracker: finality_tracker::{Module, Call, Inherent},
         Grandpa: grandpa::{Module, Call, Storage, Config, Event, ValidateUnsigned},
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
@@ -572,18 +675,18 @@ impl_runtime_apis! {
     }
 
     impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
-		fn validate_transaction(
-		    source: TransactionSource,
-		    tx: <Block as BlockT>::Extrinsic) -> TransactionValidity {
-			Executive::validate_transaction(source, tx)
-		}
+        fn validate_transaction(
+            source: TransactionSource,
+            tx: <Block as BlockT>::Extrinsic) -> TransactionValidity {
+            Executive::validate_transaction(source, tx)
+        }
     }
     
     impl sp_offchain::OffchainWorkerApi<Block> for Runtime {
-		fn offchain_worker(header: &<Block as BlockT>::Header) {
-			Executive::offchain_worker(header)
-		}
-	}
+        fn offchain_worker(header: &<Block as BlockT>::Header) {
+            Executive::offchain_worker(header)
+        }
+    }
 
     impl babe_primitives::BabeApi<Block> for Runtime {
         fn configuration() -> babe_primitives::BabeGenesisConfiguration {
@@ -594,40 +697,40 @@ impl_runtime_apis! {
             // <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
             babe_primitives::BabeGenesisConfiguration {
                 slot_duration: Babe::slot_duration(),
-				epoch_length: EpochDuration::get(),
-				c: PRIMARY_PROBABILITY,
-				genesis_authorities: Babe::authorities(),
-				randomness: Babe::randomness(),
-				allowed_slots: babe_primitives::AllowedSlots::PrimaryAndSecondaryPlainSlots
+                epoch_length: EpochDuration::get(),
+                c: PRIMARY_PROBABILITY,
+                genesis_authorities: Babe::authorities(),
+                randomness: Babe::randomness(),
+                allowed_slots: babe_primitives::AllowedSlots::PrimaryAndSecondaryPlainSlots
             }
         }
 
         fn current_epoch_start() -> babe_primitives::SlotNumber {
-			Babe::current_epoch_start()
-		}
+            Babe::current_epoch_start()
+        }
 
-		fn generate_key_ownership_proof(
-			_slot_number: babe_primitives::SlotNumber,
-			authority_id: babe_primitives::AuthorityId,
-		) -> Option<babe_primitives::OpaqueKeyOwnershipProof> {
-			use codec::Encode;
+        fn generate_key_ownership_proof(
+            _slot_number: babe_primitives::SlotNumber,
+            authority_id: babe_primitives::AuthorityId,
+        ) -> Option<babe_primitives::OpaqueKeyOwnershipProof> {
+            use codec::Encode;
 
-			Historical::prove((babe_primitives::KEY_TYPE, authority_id))
-				.map(|p| p.encode())
-				.map(babe_primitives::OpaqueKeyOwnershipProof::new)
-		}
+            Historical::prove((babe_primitives::KEY_TYPE, authority_id))
+                .map(|p| p.encode())
+                .map(babe_primitives::OpaqueKeyOwnershipProof::new)
+        }
 
-		fn submit_report_equivocation_unsigned_extrinsic(
-			equivocation_proof: babe_primitives::EquivocationProof<<Block as BlockT>::Header>,
-			key_owner_proof: babe_primitives::OpaqueKeyOwnershipProof,
-		) -> Option<()> {
-			let key_owner_proof = key_owner_proof.decode()?;
+        fn submit_report_equivocation_unsigned_extrinsic(
+            equivocation_proof: babe_primitives::EquivocationProof<<Block as BlockT>::Header>,
+            key_owner_proof: babe_primitives::OpaqueKeyOwnershipProof,
+        ) -> Option<()> {
+            let key_owner_proof = key_owner_proof.decode()?;
 
-			Babe::submit_unsigned_equivocation_report(
-				equivocation_proof,
-				key_owner_proof,
-			)
-		}
+            Babe::submit_unsigned_equivocation_report(
+                equivocation_proof,
+                key_owner_proof,
+            )
+        }
     }
 
     impl fg_primitives::GrandpaApi<Block> for Runtime {
@@ -641,25 +744,25 @@ impl_runtime_apis! {
                 sp_runtime::traits::NumberFor<Block>
             >,
             key_owner_proof: fg_primitives::OpaqueKeyOwnershipProof,
-		) -> Option<()> {
-			let key_owner_proof = key_owner_proof.decode()?;
+        ) -> Option<()> {
+            let key_owner_proof = key_owner_proof.decode()?;
 
-			Grandpa::submit_unsigned_equivocation_report(
-				equivocation_proof,
-				key_owner_proof
+            Grandpa::submit_unsigned_equivocation_report(
+                equivocation_proof,
+                key_owner_proof
             )
         }
 
-		fn generate_key_ownership_proof(
-			_set_id: fg_primitives::SetId,
-			authority_id: fg_primitives::AuthorityId,
-		) -> Option<fg_primitives::OpaqueKeyOwnershipProof> {
-			use codec::Encode;
+        fn generate_key_ownership_proof(
+            _set_id: fg_primitives::SetId,
+            authority_id: fg_primitives::AuthorityId,
+        ) -> Option<fg_primitives::OpaqueKeyOwnershipProof> {
+            use codec::Encode;
 
-			Historical::prove((fg_primitives::KEY_TYPE, authority_id))
-				.map(|p| p.encode())
-				.map(fg_primitives::OpaqueKeyOwnershipProof::new)
-		}
+            Historical::prove((fg_primitives::KEY_TYPE, authority_id))
+                .map(|p| p.encode())
+                .map(fg_primitives::OpaqueKeyOwnershipProof::new)
+        }
     }
 
     impl authority_discovery_primitives::AuthorityDiscoveryApi<Block> for Runtime {
@@ -670,32 +773,32 @@ impl_runtime_apis! {
 
     impl sp_session::SessionKeys<Block> for Runtime {
         fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-			SessionKeys::generate(seed)
-		}
+            SessionKeys::generate(seed)
+        }
 
-		fn decode_session_keys(
-			encoded: Vec<u8>,
-		) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
-			SessionKeys::decode_into_raw_public_keys(&encoded)
-		}
+        fn decode_session_keys(
+            encoded: Vec<u8>,
+        ) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
+            SessionKeys::decode_into_raw_public_keys(&encoded)
+        }
     }
 
     impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Index> for Runtime {
-		fn account_nonce(account: AccountId) -> Index {
-			System::account_nonce(account)
-		}
-	}
+        fn account_nonce(account: AccountId) -> Index {
+            System::account_nonce(account)
+        }
+    }
 
     // FIXME: 3rd type argument failed, bump it next version: https://github.com/paritytech/substrate/pull/6792/files
-	/*impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<
-	    Block,
-	    Balance,
-	> for Runtime {
-		fn query_info(
+    /*impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<
+        Block,
+        Balance,
+    > for Runtime {
+        fn query_info(
             uxt: <Block as BlockT>::Extrinsic,
             len: u32
         ) -> RuntimeDispatchInfo<Balance> {
-			TransactionPayment::query_info(uxt, len)
-		}
-	}*/
+            TransactionPayment::query_info(uxt, len)
+        }
+    }*/
 }

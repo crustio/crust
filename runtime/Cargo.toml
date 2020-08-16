@@ -37,6 +37,8 @@ transaction-payment = { default-features = false, package = 'pallet-transaction-
 scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc5' }
 sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc5' }
 offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc5' }
+democracy = { default-features = false, package = 'pallet-democracy', version = '2.0.0-rc5' }
+membership = { default-features = false, package = 'pallet-membership', version = '2.0.0-rc5' }
 
 # Used for the crust's RPCs
 frame-system-rpc-runtime-api = { default-features = false, version = '2.0.0-rc5' }
@@ -106,6 +108,8 @@ std = [
     'transaction-payment/std',
     'scheduler/std',
     'offences/std',
+    'membership/std',
+    'democracy/std',
     'sp-runtime-interface/std',
     'swork/std',
     'staking/std',

@@ -129,4 +129,7 @@ runtime-benchmarks = [
     "collective/runtime-benchmarks",
     "balances/runtime-benchmarks",
     "frame-system-benchmarking",
+    "staking/runtime-benchmarks",
+    "market/runtime-benchmarks",
+    "swork/runtime-benchmarks",
 ]

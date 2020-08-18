@@ -40,6 +40,8 @@ sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc5
 offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc5' }
 treasury = { default-features = false, package = 'pallet-treasury', version = '2.0.0-rc5' }
 elections-phragmen = { default-features = false, package = 'pallet-elections-phragmen', version = '2.0.0-rc5' }
+frame-benchmarking = { default-features = false, version = '2.0.0-rc5', optional = true }
+frame-system-benchmarking = { default-features = false, version = '2.0.0-rc5', optional = true }
 
 # Used for the crust's RPCs
 frame-system-rpc-runtime-api = { default-features = false, version = '2.0.0-rc5' }
@@ -118,4 +120,13 @@ std = [
     'payment/std',
     'primitives/std',
     'pallet-transaction-payment-rpc-runtime-api/std'
+]
+runtime-benchmarks = [
+    "frame-benchmarking",
+    "frame-support/runtime-benchmarks",
+    "system/runtime-benchmarks",
+    "sp-runtime/runtime-benchmarks",
+    "collective/runtime-benchmarks",
+    "balances/runtime-benchmarks",
+    "frame-system-benchmarking",
 ]

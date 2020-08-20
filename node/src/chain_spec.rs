@@ -4,7 +4,7 @@ use crust_runtime::{
     AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
     AuthorityDiscoveryConfig, SessionConfig, SessionKeys, StakerStatus,
     StakingConfig, IndicesConfig, SystemConfig, SworkConfig, SudoConfig,
-    WASM_BINARY
+    ElectionsConfig, CouncilConfig, WASM_BINARY
 };
 use cstrml_staking::Forcing;
 use cstrml_swork::WorkReport;
@@ -202,7 +202,7 @@ fn testnet_genesis(
 ) -> GenesisConfig {
     const ENDOWMENT: u128 = 1_000_000 * CRUS;
     const STASH: u128 = 20_000 * CRUS;
-
+	let num_endowed_accounts = endowed_accounts.len();
     GenesisConfig {
         sudo: Some(SudoConfig {
             key: endowed_accounts[0].clone(),
@@ -267,7 +267,16 @@ fn testnet_genesis(
                     )
                 })
                 .collect(),
-        })
+        }),
+        collective_Instance1: Some(CouncilConfig::default()),
+        treasury: Some(Default::default()),
+        elections_phragmen: Some(ElectionsConfig {
+			members: endowed_accounts.iter()
+						.take((num_endowed_accounts + 1) / 2)
+						.cloned()
+						.map(|member| (member, STASH))
+						.collect(),
+		}),
     }
 }
 
@@ -288,6 +297,7 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
         // 5HY4tsWDtD9jHersn3vBRyW9gFQSTSFy9Z6SehaxuxJ6qC7r
         hex!["f20b9d0389123001035961e7d0a8430745fcf6af9be082d713d07048e9bbf439"].into()
     ];
+    let num_endowed_accounts = endowed_accounts.len();
 
     // for i in 1; do for j in {stash, controller}; do subkey inspect "$SECRET//$i//$j"; done; done
     // for i in 1; do for j in grandpa; do subkey --ed25519 inspect "$SECRET//$i//$j"; done; done
@@ -385,6 +395,15 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 ))
                 .collect(),
         }),
+        collective_Instance1: Some(CouncilConfig::default()),
+        treasury: Some(Default::default()),
+        elections_phragmen: Some(ElectionsConfig {
+			members: endowed_accounts.iter()
+						.take((num_endowed_accounts + 1) / 2)
+						.cloned()
+						.map(|member| (member, STASH))
+						.collect(),
+		}),
     }
 }
 
@@ -409,6 +428,7 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
         // 5E9Tsxb8Cg8hf4NryCNiph5rjRAhExVLj8iP8EwMaabaEpqU
         hex!["5c19a40010e0e65db4c96ea3131b7aeb151fe571bfc6230fe06001645c76b756"].into()
     ];
+    let num_endowed_accounts = endowed_accounts.len();
 
     // for i in 1; do for j in {stash, controller}; do subkey inspect "$SECRET//$i//$j"; done; done
     // for i in 1; do for j in grandpa; do subkey --ed25519 inspect "$SECRET//$i//$j"; done; done
@@ -506,5 +526,14 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 ))
                 .collect(),
         }),
+        collective_Instance1: Some(CouncilConfig::default()),
+        treasury: Some(Default::default()),
+        elections_phragmen: Some(ElectionsConfig {
+			members: endowed_accounts.iter()
+						.take((num_endowed_accounts + 1) / 2)
+						.cloned()
+						.map(|member| (member, STASH))
+						.collect(),
+		}),
     }
 }

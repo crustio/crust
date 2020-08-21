@@ -127,7 +127,6 @@ impl Default for ValidatorPrefs {
     }
 }
 
-
 /// A record of the nominations made by a specific account.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct Guarantee<AccountId, Balance: HasCompact> {

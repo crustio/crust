@@ -1936,7 +1936,7 @@ fn wrong_vote_is_null() {
         .validator_pool(true)
         .build()
         .execute_with(|| {
-            assert_eq_uvec!(validator_controllers(), vec![40, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![10, 20]);
 
             // put some money in account that we'll use.
             for i in 1..3 {
@@ -1952,14 +1952,14 @@ fn wrong_vote_is_null() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
-                (11, 500)
+                (31, 500)
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
-                (21, 500)
+                (41, 500)
             ));
             assert_noop!(
-                Staking::guarantee(Origin::signed(2), (1, 50)), // 1 is not validtor
+                Staking::guarantee(Origin::signed(2), (1, 50)), // 1 is not validator
                 DispatchError::Module {
                     index: 0,
                     error: 6,
@@ -1967,7 +1967,7 @@ fn wrong_vote_is_null() {
                 }
             );
             assert_noop!(
-                Staking::guarantee(Origin::signed(2), (2, 50)), // 2 cannot gurantee itself
+                Staking::guarantee(Origin::signed(2), (2, 50)), // 2 self is not validator neither
                 DispatchError::Module {
                     index: 0,
                     error: 6,
@@ -1986,7 +1986,7 @@ fn wrong_vote_is_null() {
             // new block
             start_era(1, false);
 
-            assert_eq_uvec!(validator_controllers(), vec![20, 10]);
+            assert_eq_uvec!(validator_controllers(), vec![30, 40]);
         });
 }
 

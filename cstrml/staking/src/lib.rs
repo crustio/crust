@@ -25,14 +25,15 @@ use sp_runtime::{
     Perbill, RuntimeDebug,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd
+        CheckedAdd, CheckedSub
     },
 };
 use sp_staking::{
     SessionIndex,
     offence::{OnOffenceHandler, OffenceDetails, Offence, ReportOffence, OffenceError},
 };
-use sp_std::{convert::TryInto, prelude::*, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
+
+use sp_std::{convert::TryInto, prelude::*, collections::btree_map::BTreeMap};
 
 use frame_system::{ensure_root, ensure_signed};
 #[cfg(feature = "std")]
@@ -47,6 +48,7 @@ use primitives::{
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
+const MAX_GUARANTEE: usize = 16;
 const STAKING_ID: LockIdentifier = *b"staking ";
 
 /// Counter for the number of eras that have passed.
@@ -109,60 +111,29 @@ impl Default for RewardDestination {
 }
 
 /// Preference of what happens regarding validation.
-/// TODO: remove this class in V-G refinement since it's duplicated with ValidatorPrefs
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
-pub struct Validations<AccountId, Balance: HasCompact + Zero> {
-    /// The total votes of Validations.
-    #[codec(compact)]
-    pub total: Balance, 
-    /// Reward that validator takes up-front; only the rest is split between themselves and
-    /// guarantors.
-    #[codec(compact)]
-    pub guarantee_fee: Perbill,
-
-    // TODO: add reversal fee, let validator can give more reward to guarantors
-    /// Record who vote me, this is used for guarantors to change their voting behaviour,
-    /// `guarantors` represents the voting sequence, allow duplicate vote.
-    pub guarantors: Vec<AccountId>,
-}
-
-impl<AccountId, Balance: HasCompact + Zero> Default for Validations<AccountId, Balance> {
-    fn default() -> Self {
-        Validations {
-            total: Zero::zero(),
-            // The default guarantee fee is 100%
-            guarantee_fee: Perbill::one(),
-            guarantors: vec![],
-        }
-    }
-}
-
-
-/// Preference of what happens regarding validation.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct ValidatorPrefs {
     /// Reward that validator takes up-front; only the rest is split between themselves and
     /// nominators.
     #[codec(compact)]
-    pub guarantee_fee: Perbill,
+    pub fee: Perbill,
 }
 
 impl Default for ValidatorPrefs {
     fn default() -> Self {
         ValidatorPrefs {
-            guarantee_fee: Default::default(),
+            fee: Perbill::one(),
         }
     }
 }
 
 
 /// A record of the nominations made by a specific account.
-/// TODO: Rename it to Gurantors
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
-pub struct Nominations<AccountId, Balance: HasCompact> {
-    /// The targets of nomination, this vector's element is unique.
-    pub targets: Vec<AccountId>,
-    /// The total votes of nomination.
+pub struct Guarantee<AccountId, Balance: HasCompact> {
+    /// The targets(validators), this vector's element is unique.
+    pub targets: Vec<IndividualExposure<AccountId, Balance>>,
+    /// The total votes of guarantee.
     #[codec(compact)]
     pub total: Balance,
     /// The era the nominations were submitted.
@@ -195,10 +166,6 @@ pub struct StakingLedger<AccountId, Balance: HasCompact> {
     /// rounds.
     #[codec(compact)]
     pub active: Balance,
-    /// The valid amount of the stash's balance that will be used for calculate rewards
-    /// by limitation
-    #[codec(compact)]
-    pub valid: Balance,
     /// Any balance that is becoming free, which may eventually be transferred out
     /// of the stash (assuming it doesn't get slashed first).
     pub unlocking: Vec<UnlockChunk<Balance>>,
@@ -228,7 +195,6 @@ impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId
             total,
             active: self.active,
             stash: self.stash,
-            valid: self.valid,
             unlocking,
             claimed_rewards: self.claimed_rewards
         }
@@ -289,7 +255,7 @@ impl<AccountId, Balance> StakingLedger<AccountId, Balance> where
 /// The amount of exposure (to slashing) than an individual guarantor has.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, Decode, RuntimeDebug)]
 pub struct IndividualExposure<AccountId, Balance: HasCompact> {
-    /// The stash account of the guarantor in question.
+    /// The stash account of the guarantor/validator in question.
     pub who: AccountId,
     /// Amount of funds exposed.
     #[codec(compact)]
@@ -460,6 +426,30 @@ decl_storage! {
         /// Information is kept for eras in `[current_era - history_depth; current_era]`.
         HistoryDepth get(fn history_depth) config(): u32 = 84;
 
+        /// Map from all locked "stash" accounts to the controller account.
+        pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
+
+        /// Map from all (unlocked) "controller" accounts to the info regarding the staking.
+        pub Ledger get(fn ledger):
+            map hasher(blake2_128_concat) T::AccountId
+            => Option<StakingLedger<T::AccountId, BalanceOf<T>>>;
+
+        /// Where the reward payment should be made. Keyed by stash.
+        pub Payee get(fn payee): map hasher(twox_64_concat) T::AccountId => RewardDestination;
+
+		/// The map from (wannabe) validator stash key to the preferences of that validator.
+        pub Validators get(fn validators):
+            map hasher(twox_64_concat) T::AccountId => ValidatorPrefs;
+
+        /// The map from guarantor stash key to the set of stash keys of all validators to guarantee.
+        Guarantors get(fn guarantors):
+            map hasher(twox_64_concat) T::AccountId => Option<Guarantee<T::AccountId, BalanceOf<T>>>;
+
+        /// The stake limit, determined all the staking operations
+        /// This is keyed by the stash account.
+        pub StakeLimit get(fn stake_limit):
+            map hasher(twox_64_concat) T::AccountId => Option<BalanceOf<T>>;
+
         /// Exposure of validator at era.
         ///
         /// This is keyed first by the era index to allow bulk deletion and then the stash account.
@@ -475,7 +465,7 @@ decl_storage! {
         /// This is keyed first by the era index to allow bulk deletion and then the stash account.
         ///
         /// Is it removed after `HISTORY_DEPTH` eras.
-        // If prefs hasn't been set or has been removed then 0 commission is returned.
+        // If prefs hasn't been set or has been removed then 0 fee is returned.
         pub ErasValidatorPrefs get(fn eras_validator_prefs):
             double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
             => ValidatorPrefs;
@@ -489,6 +479,12 @@ decl_storage! {
             double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
             => Option<BalanceOf<T>>;
 
+        /// The amount of balance actively at stake for each validator slot, currently.
+        ///
+        /// This is used to derive rewards and punishments.
+        pub ErasTotalStakes get(fn eras_total_stakes):
+            map hasher(twox_64_concat) EraIndex => BalanceOf<T>;
+
         /// The ideal number of staking participants.
         pub ValidatorCount get(fn validator_count) config(): u32;
 
@@ -500,48 +496,6 @@ decl_storage! {
         /// easy to initialize and the performance hit is minimal (we expect no more than four
         /// invulnerables) and restricted to testnets.
         pub Invulnerables get(fn invulnerables) config(): Vec<T::AccountId>;
-
-        /// Map from all locked "stash" accounts to the controller account.
-        pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
-
-        /// Map from all (unlocked) "controller" accounts to the info regarding the staking.
-        pub Ledger get(fn ledger):
-            map hasher(blake2_128_concat) T::AccountId
-            => Option<StakingLedger<T::AccountId, BalanceOf<T>>>;
-
-        /// Where the reward payment should be made. Keyed by stash.
-        pub Payee get(fn payee): map hasher(twox_64_concat) T::AccountId => RewardDestination;
-
-        /// The map from {(wannabe) validator}/{candidate} stash key to the validation
-        /// relationship of that validator.
-        pub Validators get(fn validators):
-            map hasher(twox_64_concat) T::AccountId => Validations<T::AccountId, BalanceOf<T>>;
-
-        /// The map from guarantor stash key to the set of stash keys of all
-        /// validators to guarantee.
-        ///
-        /// NOTE: is private so that we can ensure upgraded before all typical accesses.
-        /// Direct storage APIs can still bypass this protection.
-        Guarantors get(fn guarantors):
-            map hasher(twox_64_concat) T::AccountId => Option<Nominations<T::AccountId, BalanceOf<T>>>;
-
-        /// The map from {guarantor, candidate} edge to vote stakes of all guarantors.
-        GuaranteeRel get(fn guarantee_rel):
-            double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) T::AccountId
-            => BTreeMap<u32, BalanceOf<T>>;
-
-        /// Guarantors for a particular account that is in action right now. You can't iterate
-        /// through candidates here, but you can find them using Validators.
-        ///
-        /// This is keyed by the stash account.
-        /// TODO: remove this storage since it's duplicated with ErasStakers
-        pub Stakers get(fn stakers):
-            map hasher(twox_64_concat) T::AccountId => Exposure<T::AccountId, BalanceOf<T>>;
-
-        /// The stake limit
-        /// This is keyed by the stash account.
-        pub StakeLimit get(fn stake_limit):
-            map hasher(twox_64_concat) T::AccountId => Option<BalanceOf<T>>;
 
         /// The currently elected validator set keyed by stash account ID.
         pub CurrentElected get(fn current_elected): Vec<T::AccountId>;
@@ -557,12 +511,6 @@ decl_storage! {
 
         /// Rewards for the current era. Using indices of current elected set.
         CurrentEraPointsEarned get(fn current_era_reward): EraPoints;
-
-        /// The amount of balance actively at stake for each validator slot, currently.
-        ///
-        /// This is used to derive rewards and punishments.
-        pub ErasTotalStakes get(fn eras_total_stakes):
-            map hasher(twox_64_concat) EraIndex => BalanceOf<T>;
 
         /// True if the next session change will be a new era regardless of index.
         pub ForceEra get(fn force_era) config(): Forcing;
@@ -634,7 +582,7 @@ decl_storage! {
                     StakerStatus::Validator => {
                         <Module<T>>::validate(
                             T::Origin::from(Some(controller.clone()).into()),
-                            Perbill::one(),
+                            Default::default(),
                         )
                     },
                     StakerStatus::Guarantor(votes) => {
@@ -665,6 +613,16 @@ decl_event!(
         OldSlashingReportDiscarded(SessionIndex),
         /// Total reward at each era
         EraReward(EraIndex, Balance, Balance),
+        /// An account has bonded this amount. [stash, amount]
+		///
+		/// NOTE: This event is only emitted when funds are bonded via a dispatchable. Notably,
+		/// it will not be emitted for staking rewards when they are added to stake.
+		Bonded(AccountId, Balance),
+		/// An account has unbonded this amount. [stash, amount]
+		Unbonded(AccountId, Balance),
+		/// An account has called `withdraw_unbonded` and removed unbonding chunks worth `Balance`
+		/// from the unlocking queue. [stash, amount]
+		Withdrawn(AccountId, Balance),
         // TODO: add stake limitation change event
     }
 );
@@ -688,12 +646,10 @@ decl_error! {
         InvalidTarget,
         /// Can not bond with value less than minimum balance.
         InsufficientValue,
-        /// Left votes of a guarantor is not sufficient.
-        InsufficientVotes,
         /// Can not schedule more unlock chunks.
         NoMoreChunks,
         /// Can not bond with more than limit
-        ExceedLimit,
+        ExceedGuaranteeLimit,
         /// Can not validate without workloads
         NoWorkloads,
         /// Attempting to target a stash that still has funds.
@@ -780,11 +736,11 @@ decl_module! {
 
             let stash_balance = T::Currency::transfer_balance(&stash);
             let value = value.min(stash_balance);
+            Self::deposit_event(RawEvent::Bonded(stash.clone(), value));
             let item = StakingLedger {
                 stash,
                 total: value,
                 active: value,
-                valid: Zero::zero(),
                 unlocking: vec![],
                 claimed_rewards: (last_reward_era..current_era).collect(),
             };
@@ -817,26 +773,18 @@ decl_module! {
         fn bond_extra(origin, #[compact] max_additional: BalanceOf<T>) {
             let stash = ensure_signed(origin)?;
 
-            let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
-            let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+			let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
+			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-            let mut extra = T::Currency::transfer_balance(&stash);
-            extra = extra.min(max_additional);
-            // [LIMIT ACTIVE CHECK] 1:
-            // Candidates should judge its stake limit, this promise candidates' bonded stake
-            // won't exceed.
-            if <Validators<T>>::contains_key(&stash) {
-                let limit = Self::stake_limit(&stash).unwrap_or_default();
-                if ledger.active >= limit {
-                    Err(Error::<T>::NoWorkloads)?
-                } else {
-                    extra = extra.min(limit - ledger.active);
-                }
-            }
+			let stash_balance = T::Currency::transfer_balance(&stash);
 
-            ledger.total += extra;
-            ledger.active += extra;
-            Self::update_ledger(&controller, &ledger);
+			if let Some(extra) = stash_balance.checked_sub(&ledger.total) {
+				let extra = extra.min(max_additional);
+				ledger.total += extra;
+				ledger.active += extra;
+				Self::deposit_event(RawEvent::Bonded(stash, extra));
+				Self::update_ledger(&controller, &ledger);
+			}
         }
 
         /// Schedule a portion of the stash to be unlocked ready for transfer out after the bond
@@ -873,32 +821,30 @@ decl_module! {
         /// </weight>
         #[weight = 50 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 3)]
         fn unbond(origin, #[compact] value: BalanceOf<T>) {
-            let controller = ensure_signed(origin)?;
-            let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-            ensure!(
-                ledger.unlocking.len() < MAX_UNLOCKING_CHUNKS,
-                Error::<T>::NoMoreChunks,
-            );
+			let controller = ensure_signed(origin)?;
+			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+			ensure!(
+				ledger.unlocking.len() < MAX_UNLOCKING_CHUNKS,
+				Error::<T>::NoMoreChunks,
+			);
 
-            let mut value = value.min(ledger.active);
+			let mut value = value.min(ledger.active);
 
-            if !value.is_zero() {
-                ledger.active -= value;
+			if !value.is_zero() {
+				ledger.active -= value;
 
-                // Avoid there being a dust balance left in the staking system.
-                if ledger.active < T::Currency::minimum_balance() {
-                    value += ledger.active;
-                    ledger.active = Zero::zero();
-                }
+				// Avoid there being a dust balance left in the staking system.
+				if ledger.active < T::Currency::minimum_balance() {
+					value += ledger.active;
+					ledger.active = Zero::zero();
+				}
 
-                let era = Self::current_era().unwrap_or(0) + T::BondingDuration::get();
-                let stake_limit = Self::stake_limit(&ledger.stash).unwrap_or_default();
-
-                ledger.unlocking.push(UnlockChunk { value, era });
-                ledger.valid = ledger.active.min(stake_limit);
-
-                Self::update_ledger(&controller, &ledger);
-            }
+				// Note: in case there is no current era it is fine to bond one era more.
+				let era = Self::current_era().unwrap_or(0) + T::BondingDuration::get();
+				ledger.unlocking.push(UnlockChunk { value, era });
+				Self::update_ledger(&controller, &ledger);
+				Self::deposit_event(RawEvent::Unbonded(ledger.stash, value));
+			}
         }
 
         /// Remove any unlocked chunks from the `unlocking` queue from our management.
@@ -937,7 +883,7 @@ decl_module! {
         fn withdraw_unbonded(origin) {
             let controller = ensure_signed(origin)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-            let stash = ledger.stash.clone();
+			let (stash, old_total) = (ledger.stash.clone(), ledger.total);
             if let Some(current_era) = Self::current_era() {
                 ledger = ledger.consolidate_unlocked(current_era)
             }
@@ -946,13 +892,21 @@ decl_module! {
                 // This account must have called `unbond()` with some value that caused the active
                 // portion to fall below existential deposit + will have no more unlocking chunks
                 // left. We can now safely remove all staking-related information.
-                Self::kill_stash(&stash);
+                Self::kill_stash(&stash)?;
                 // remove the lock.
                 T::Currency::remove_lock(STAKING_ID, &stash);
             } else {
                 // This was the consequence of a partial unbond. just update the ledger and move on.
                 Self::update_ledger(&controller, &ledger);
             }
+
+            // `old_total` should never be less than the new total because
+			// `consolidate_unlocked` strictly subtracts balance.
+			if ledger.total < old_total {
+				// Already checked that this won't overflow by entry condition.
+				let value = old_total - ledger.total;
+				Self::deposit_event(RawEvent::Withdrawn(stash, value));
+			}
         }
 
         /// Declare the desire to validate for the origin controller.
@@ -972,34 +926,24 @@ decl_module! {
         /// - Write: Guarantors, Validators
         /// # </weight>
         #[weight = 27 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(4, 1)]
-        fn validate(origin, prefs: Perbill) {
+        fn validate(origin, prefs: ValidatorPrefs) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-            let stash = &ledger.stash;
+            let v_stash = &ledger.stash;
 
-            // [LIMIT ACTIVE CHECK] 2:
-            // Only limit is 0, GPoS emit error.
-            let limit = Self::stake_limit(&stash).unwrap_or_default();
+            // [ACTIVE CHECK] 1:
+            // Limit should greater than zero
+            let limit = Self::stake_limit(&v_stash).unwrap_or_default();
 
             if limit == Zero::zero() {
                 Err(Error::<T>::NoWorkloads)?
             }
 
-            let mut validations = Validations {
-                total: Zero::zero(),
-                guarantee_fee: prefs,
-                guarantors: vec![]
-            };
-
-            if <Validators<T>>::contains_key(&stash) {
-                validations.guarantors = Self::validators(&stash).guarantors;
-            }
-
-            Self::chill_guarantor(stash);
-            <Validators<T>>::insert(stash, validations);
+            <Guarantors<T>>::remove(v_stash);
+			<Validators<T>>::insert(v_stash, prefs);
         }
 
-        /// Declare the desire to nominate `targets` for the origin controller.
+        /// Declare the desire to guarantee `targets` for the origin controller.
         ///
         /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
         ///
@@ -1010,55 +954,34 @@ decl_module! {
         /// ---------
         /// Base Weight: 1260 µs (For 100 validators and for each contains 10 guarantors)
         /// DB Weight:
-        /// - Reads: Guarantors, Ledger, Current Era, GuaranteeRel
-        /// - Writes: Validators, Guarantors, GuaranteeRel
+        /// - Reads: Guarantors, Ledger, Current Era
+        /// - Writes: Guarantors
         /// # </weight>
         // TODO: reconsider this weight value for the V_G Graph
-        // TODO: improve the performance of the voting algorithm
         #[weight = 1260 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(8, 4)]
         fn guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
+            // 1. Get ledger
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let g_stash = &ledger.stash;
-            let remain_stake = ledger.active;
-
-            let mut new_targets: Vec<T::AccountId> = vec![];
-            let mut new_total: BalanceOf<T> = Zero::zero();
-            if let Some(old_nominations) = Self::guarantors(g_stash) {
-                new_targets = old_nominations.targets;
-                new_total = old_nominations.total;
-            }
-
             let (target, votes) = target;
-            // 1. Inserting a new edge
-            if let Ok(v_stash) = T::Lookup::lookup(target) {
-                // v_stash is not validator
-                ensure!(<Validators<T>>::contains_key(&v_stash), Error::<T>::InvalidTarget);
-                // you want to vote your self
-                ensure!(g_stash != &v_stash, Error::<T>::InvalidTarget);
-                // still have active votes to vote
-                ensure!(remain_stake > new_total, Error::<T>::InsufficientVotes);
-                let g_votes = votes.min(remain_stake - new_total);
 
-                let (upserted, real_votes) =
-                Self::increase_guarantee_votes(&v_stash, &g_stash, g_votes);
+            // 2. Target should be legal
+            let v_stash = T::Lookup::lookup(target)?;
+            ensure!(<Validators<T>>::contains_key(&v_stash), Error::<T>::InvalidTarget);
 
-                ensure!(upserted, Error::<T>::ExceedLimit);
-                // Update the total votes of a nomination
-                new_total += real_votes;
-                if !new_targets.contains(&v_stash) {
-                    new_targets.push(v_stash.clone());
-                }
-            }
-            let nominations = Nominations {
-                targets: new_targets,
-                total: new_total,
-                submitted_in: Self::current_era().unwrap_or(0),
-                suppressed: false,
-            };
+            // 3. Votes value should greater than the dust
+            ensure!(votes > T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+
+            // 4. Upsert (increased) guarantee
+            let guarantee = Self::increase_guarantee(&v_stash, g_stash, ledger.active.clone(), votes.clone());
+
+            // 5. `None` means exceed the guarantee limit(`MAX_GUARANTEE`)
+            ensure!(guarantee.is_some(), Error::<T>::ExceedGuaranteeLimit);
+            let guarantee = guarantee.unwrap();
 
             <Validators<T>>::remove(g_stash);
-            <Guarantors<T>>::insert(g_stash, nominations);
+            <Guarantors<T>>::insert(g_stash, guarantee);
         }
 
         /// Declare the desire to cut guarantee for the origin controller.
@@ -1074,55 +997,35 @@ decl_module! {
         /// ---------
         /// Base Weight: 1324 µs (For 100 validators and for each contains 10 guarantors)
         /// DB Weight:
-        /// - Reads: Guarantors, Ledger, Current Era, GuaranteeRel
-        /// - Writes: Validators, Guarantors, GuaranteeRel
+        /// - Reads: Guarantors, Ledger, Current Era
+        /// - Writes: Validators, Guarantors
         /// # </weight>
-        // TODO: reconsider this weight value for the V_G Graph
-        // TODO: improve the performance of the voting algorithm
         #[weight = 1324 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 4)]
         fn cut_guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
+            // 1. Get ledger
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let g_stash = &ledger.stash;
-
-            let mut new_targets: Vec<T::AccountId> = vec![];
-            let mut new_total: BalanceOf<T> = Zero::zero();
-            if let Some(old_nominations) = Self::guarantors(g_stash) {
-                new_targets = old_nominations.targets;
-                new_total = old_nominations.total;
-            }
             let (target, votes) = target;
-            if let Ok(v_stash) = T::Lookup::lookup(target) {
-                // v_stash is not validator
-                ensure!(<Validators<T>>::contains_key(&v_stash), Error::<T>::InvalidTarget);
-                // you want to vote your self
-                ensure!(g_stash != &v_stash, Error::<T>::InvalidTarget);
-                // g_stash has voted to v_stash before
-                ensure!(<GuaranteeRel<T>>::contains_key(&g_stash, &v_stash), Error::<T>::InvalidTarget);
-                // total votes from one g_stash to one v_stash
 
-                let (removed, removed_votes) =
-                Self::decrease_guarantee_votes(&v_stash, &g_stash, votes);
+            // 2. Target should be legal
+            let v_stash = T::Lookup::lookup(target)?;
+            ensure!(<Validators<T>>::contains_key(&v_stash), Error::<T>::InvalidTarget);
 
-                new_total -= removed_votes;
-                if removed {
-                    // Update targets
-                    new_targets.retain(|target| *target != v_stash.clone());
-                }
-            }
+            // 3. Votes value should greater than the dust
+            ensure!(votes > T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            let nominations = Nominations {
-                targets: new_targets,
-                total: new_total,
-                submitted_in: Self::current_era().unwrap_or(0),
-                suppressed: false,
-            };
+            // 4. Upsert (decreased) guarantee
+            let guarantee = Self::decrease_guarantee(&v_stash, &g_stash, votes.clone());
 
-            <Validators<T>>::remove(g_stash);
-            <Guarantors<T>>::insert(g_stash, nominations);
+            // 5. `None` means the target is invalid(cut a void)
+            ensure!(guarantee.is_some(), Error::<T>::InvalidTarget);
+            let guarantee = guarantee.unwrap();
+
+            <Guarantors<T>>::insert(g_stash, guarantee);
         }
 
-        /// Declare no desire to either validate or nominate.
+        /// Declare no desire to either validate or guarantee.
         ///
         /// Effects will be felt at the beginning of the next era.
         ///
@@ -1136,7 +1039,7 @@ decl_module! {
         /// Base Weight: 22.12 µs
         /// DB Weight:
         /// - Read: Ledger
-        /// - Write: Validators, Guarantors, GuaranteeRel
+        /// - Write: Validators, Guarantors
         /// # </weight>
         #[weight = 22 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(3, 1)]
         fn chill(origin) {
@@ -1284,7 +1187,7 @@ decl_module! {
             // remove the lock.
             T::Currency::remove_lock(STAKING_ID, &stash);
             // remove all staking-related information.
-            Self::kill_stash(&stash);
+            Self::kill_stash(&stash)?;
         }
 
         /// Force there to be a new era at the end of sessions indefinitely.
@@ -1364,7 +1267,7 @@ decl_module! {
             .saturating_add(76 * WEIGHT_PER_MICROS)]
         fn reap_stash(_origin, stash: T::AccountId) {
             ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
-            Self::kill_stash(&stash);
+            Self::kill_stash(&stash)?;
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
 
@@ -1396,8 +1299,17 @@ impl<T: Trait> Module<T> {
             .unwrap_or_default()
     }
 
+    // PRIVATE IMMUTABLES
+
+    /// Calculate the stake limit by storage workloads, returns the stake limit value
+    ///
+    /// # <weight>
+    /// - Independent of the arguments. Insignificant complexity.
+    /// - O(1).
+    /// - 0 DB entry.
+    /// # </weight>
     fn stake_limit_of(own_workloads: u128, _: u128) -> BalanceOf<T> {
-        // TODO: Stake limit calculation, this should be enable in different phase.
+        // TODO: Stake limit calculation, this should be enable and adjust in olympus phase.
         /*let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
             .ok()
             .unwrap();
@@ -1423,168 +1335,142 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    // MUTABLES (DANGEROUS)
-
-    /// Remove validator, should remove all edges
-    fn chill_validator(v_stash: &T::AccountId) {
-        let validations = Self::validators(v_stash);
-
-        for g_stash in validations.guarantors {
-            <Guarantors<T>>::mutate(&g_stash, |nominations| {
-                if let Some(n) = nominations {
-                    n.targets.retain(|stash| {
-                        stash != v_stash
-                    });
-                    n.total -= Self::guarantee_rel(&g_stash, &v_stash).iter()
-                    .fold(Zero::zero(), |acc, (_, value)| acc + value.clone());
-                }
-            });
-            <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
-        }
-
-        <Validators<T>>::remove(v_stash);
-    }
-
-    /// Remove guarantor, should remove all edges
-    fn chill_guarantor(g_stash: &T::AccountId) {
-        if let Some(nominations) = Self::guarantors(g_stash) {
-            for target in nominations.targets {
-                <GuaranteeRel<T>>::remove(&g_stash, &target);
-                let mut validations = Self::validators(&target);
-                let mut new_guarantors = validations.guarantors;
-                new_guarantors.retain(|value| value != g_stash);
-                validations.guarantors = new_guarantors;
-                <Validators<T>>::insert(&target, validations);
-            }
-
-            <Guarantors<T>>::remove(g_stash);
-        }
-    }
-
-    /// Update an edge from {validator <-> candidate}
-    /// basically, this update the UWG(Undirected Weighted Graph) with weight-limitation per node
+    /// Get the updated (increased) guarantee relationship
+    /// Basically, this function construct an updated edge or insert a new edge,
+    /// then returns the updated `Guarantee`
     ///
-    /// NOTE: this should handle the update of `Validators` and `GuaranteeRel` and return upsert
-    /// successful or not
     /// # <weight>
     /// - Independent of the arguments. Insignificant complexity.
-    /// - O(n).
-    /// - 2n+7 DB entry.
+    /// - O(1).
+    /// - 1 DB entry.
     /// # </weight>
-    fn decrease_guarantee_votes(
+    fn increase_guarantee(
+        v_stash: &T::AccountId,
+        g_stash: &T::AccountId,
+        bonded: BalanceOf<T>,
+        votes: BalanceOf<T>
+    ) -> Option<Guarantee<T::AccountId, BalanceOf<T>>> {
+        // 1. Already guaranteed
+        if let Some(guarantee) = Self::guarantors(g_stash) {
+            let remains = bonded.saturating_sub(guarantee.total);
+            let real_votes = remains.min(votes);
+            let new_total = guarantee.total.saturating_add(real_votes);
+            let mut new_targets: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
+            let mut update = false;
+
+            // Fill in `new_targets`, always LOOP the `targets`
+            // However, the TC is O(1) due to the `MAX_GUARANTEE` restriction 🤪
+            for mut target in guarantee.targets {
+                // a. Update an edge
+                if &target.who == v_stash {
+                    target.value += real_votes;
+                    update = true;
+                }
+                new_targets.push(target.clone());
+            }
+
+            if !update {
+                if new_targets.len() >= MAX_GUARANTEE {
+                    return None
+                } else {
+                    // b. New an edge
+                    new_targets.push(IndividualExposure {
+                        who: v_stash.clone(),
+                        value: real_votes
+                    });
+                }
+            }
+
+            Some(Guarantee {
+                targets: new_targets.clone(),
+                total: new_total,
+                submitted_in: Self::current_era().unwrap_or(0),
+                suppressed: false,
+            })
+
+        // 2. New guarantee
+        } else {
+            let real_votes = bonded.min(votes);
+            let new_total = real_votes;
+            let mut new_targets: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
+            new_targets.push(IndividualExposure {
+                who: v_stash.clone(),
+                value: real_votes
+            });
+
+            Some(Guarantee {
+                targets: new_targets.clone(),
+                total: new_total,
+                submitted_in: Self::current_era().unwrap_or(0),
+                suppressed: false,
+            })
+        }
+    }
+
+    /// Get the updated (decreased) guarantee relationship
+    /// Basically, this function construct an updated edge,
+    /// then returns the updated `Guarantee`
+    ///
+    /// # <weight>
+    /// - Independent of the arguments. Insignificant complexity.
+    /// - O(1).
+    /// - 1 DB entry.
+    /// # </weight>
+    fn decrease_guarantee(
         v_stash: &T::AccountId,
         g_stash: &T::AccountId,
         votes: BalanceOf<T>,
-    ) -> (bool, BalanceOf<T>) {
-        let individual_total = Self::guarantee_rel(&g_stash, &v_stash).iter()
-        .fold(Zero::zero(), |acc, (_, value)| acc + value.clone());
-        let mut g_votes = votes.min(individual_total);
-        let mut new_guarantors = Self::validators(v_stash).guarantors;
-        let mut removed_votes = Zero::zero();
+    ) -> Option<Guarantee<T::AccountId, BalanceOf<T>>> {
+        if let Some(guarantee) = Self::guarantors(g_stash) {
+            // `decreased_votes` = min(votes, target.value)
+            // `new_targets` means the targets after decreased
+            // `exists` means the targets contains `v_stash`
+            let mut decreased_votes = Zero::zero();
+            let mut new_targets: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
+            let mut exists = false;
 
-        // Traverse from the end of the records
-        for (idx, edge_votes) in Self::guarantee_rel(&g_stash, &v_stash).iter().rev() {
-            if g_votes == Zero::zero() { break }
-            // Update votes
-            let real_votes = g_votes.min(*edge_votes);
-            g_votes -= real_votes;
-            removed_votes += real_votes;
+            // Always LOOP the targets
+            // However, the TC is O(1), due to the `MAX_GUARANTEE` restriction 🤪
+            for target in guarantee.targets {
+                if &target.who == v_stash {
+                    // 1. Mark it really exists (BRAVO), and update the decreased votes
+                    exists = true;
+                    decreased_votes = target.value.min(votes);
 
-            // Still have votes at this index
-            if *edge_votes > real_votes {
-                // Just change `guarantee_rel`(use mutate) and `g_votes` should be zero
-                <GuaranteeRel<T>>::mutate(&g_stash, &v_stash, |records| {
-                    records.insert(*idx, *edge_votes - real_votes); // upsert real votes
-                });
-            } else {
-                // Remove edge(`guarantee_rel` and `new_guarantors`)
-                <GuaranteeRel<T>>::mutate(&g_stash, &v_stash, |records| {
-                    records.remove(idx);
-                });
-                let index = new_guarantors.iter().rposition(|x| x == g_stash).unwrap();
-                new_guarantors.remove(index);
+                    if target.value <= votes{
+                        // 2. Remove this target
+                    } else {
+                        // 3. Decrease the value
+                        let new_target = IndividualExposure {
+                            who: v_stash.clone(),
+                            value: target.value - votes
+                        };
+                        new_targets.push(new_target);
+                    }
+                } else {
+                    // 4. Push target with no change
+                    new_targets.push(target.clone());
+                }
+            }
+
+            if exists  {
+                // 5. Update `new_total` with saturating sub the decreased_votes
+                let new_total = guarantee.total.saturating_sub(decreased_votes);
+
+                // TODO: `submitted_in` and `suppressed` should not be change?
+                return Some(Guarantee {
+                    targets: new_targets.clone(),
+                    total: new_total,
+                    submitted_in: guarantee.submitted_in,
+                    suppressed: guarantee.suppressed
+                })
             }
         }
 
-        // Update GuaranteeRel
-        if Self::guarantee_rel(&g_stash, &v_stash).len() == 0 {
-            <GuaranteeRel<T>>::remove(&g_stash, &v_stash);
-        }
-
-        // c. Update validator
-        <Validators<T>>::mutate(&v_stash,
-            |validations| {
-                validations.total -= removed_votes;
-                validations.guarantors = new_guarantors;
-            });
-        let removed = !<GuaranteeRel<T>>::contains_key(&g_stash, &v_stash);
-        return (removed, removed_votes);
+        None
     }
 
-
-    /// Insert an edge from {validator <-> candidate}
-    /// basically, this update the UWG(Undirected Weighted Graph) with weight-limitation per node
-    ///
-    /// NOTE: this should handle the update of `Validators` and `GuaranteeRel` and return upsert
-    /// successful or not
-    /// # <weight>
-    /// - Independent of the arguments. Insignificant complexity.
-    /// - O(n).
-    /// - 2n+6 DB entry.
-    /// # </weight>
-    fn increase_guarantee_votes(
-        v_stash: &T::AccountId,
-        g_stash: &T::AccountId,
-        g_votes: BalanceOf<T>,
-    ) -> (bool, BalanceOf<T>) {
-        let v_own_stakes = Self::slashable_balance_of(v_stash);
-
-        // Sum all current edge weight
-        let v_total_stakes = v_own_stakes + Self::validators(v_stash).total;
-        let v_limit = Self::stake_limit(&v_stash).unwrap_or_default();
-
-        // Insert new node and new edge
-        if v_total_stakes < v_limit {
-            // a. prepare real extra votes
-            let real_extra_votes = (v_limit - v_total_stakes).min(g_votes);
-
-            // b. New record. Maybe new edge.
-            <GuaranteeRel<T>>::mutate(&g_stash, &v_stash,
-                |records| {
-                    let rel_index = records.len() as u32; // default index is 0
-                    records.insert(rel_index, real_extra_votes.clone());
-                });
-
-            // c. New validator
-            <Validators<T>>::mutate(&v_stash,
-                |validations| {
-                    validations.total += real_extra_votes;
-                    validations.guarantors.push(g_stash.clone());
-                });
-            return (true, real_extra_votes);
-        }
-
-        // Or insert failed, cause there has no credit
-        return (false, Zero::zero());
-    }
-
-    /// Calculate relative index for each guarantor in the `guarantors` vec
-    fn calculate_relative_index(guarantors: &Vec<T::AccountId>) -> Vec<(T::AccountId, u32)> {
-        let mut rel_indexes: BTreeMap<T::AccountId, u32> = BTreeMap::new(); // used to calculate index in edge.records
-        let guarantors_with_index = guarantors.iter()
-        .map(|g_stash|{
-            if !rel_indexes.contains_key(&g_stash) {
-                let init_index: u32 = 0;
-                rel_indexes.insert(g_stash.clone(), init_index);
-            }
-            let mut rel_index = rel_indexes.get(&g_stash).unwrap().clone();
-            rel_index += 1;
-            rel_indexes.insert(g_stash.clone(), rel_index);
-            (g_stash.clone(), rel_index - 1)
-        })
-        .collect::<Vec<(T::AccountId, u32)>>();
-        guarantors_with_index
-    }
+    // PRIVATE MUTABLE (DANGEROUS)
 
     /// Insert new or update old stake limit
     fn upsert_stake_limit(account_id: &T::AccountId, limit: BalanceOf<T>) {
@@ -1608,8 +1494,8 @@ impl<T: Trait> Module<T> {
 
     /// Chill a stash account.
     fn chill_stash(stash: &T::AccountId) {
-        Self::chill_validator(stash);
-        Self::chill_guarantor(stash);
+        <Validators<T>>::remove(stash);
+        <Guarantors<T>>::remove(stash);
     }
 
     /// Actually make a payment to a staker. This uses the currency's reward function
@@ -1677,9 +1563,9 @@ impl<T: Trait> Module<T> {
         let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
         let total = exposure.total.max(One::one());
         // 4. Calculate total rewards for staking
-        let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).guarantee_fee * staking_reward;
+        let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * staking_reward;
         let mut guarantee_rewards = Zero::zero();
-        // 5. Pay staking reward to gurantors 
+        // 5. Pay staking reward to guarantors
         for i in &exposure.others {
             let reward_ratio = Perbill::from_rational_approximation(i.value, total);
             // Reward guarantors
@@ -1783,7 +1669,7 @@ impl<T: Trait> Module<T> {
         });
 
         // Reassign all stakers.
-        let maybe_new_validators = Self::select_validators(current_era);
+        let maybe_new_validators = Self::select_and_update_validators(current_era);
         Self::apply_unapplied_slashes(current_era);
 
         maybe_new_validators
@@ -1891,204 +1777,116 @@ impl<T: Trait> Module<T> {
         })
     }
 
-    /// Select a new validator set from the assembled stakers and their role preferences.
+    /// Select the new validator set at the end of the era.
     ///
-    /// Returns the new `TotalStakes` value and a set of newly selected _stash_ IDs.
+    /// Returns the a set of newly selected _stash_ IDs.
     ///
-    /// Assumes storage is coherent with the declaration.
-    fn select_validators(current_era: EraIndex) -> Option<Vec<T::AccountId>> {
-        // Update all swork identities work report and clear stakers
+    /// This should only be called at the end of an era.
+    fn select_and_update_validators(current_era: EraIndex) -> Option<Vec<T::AccountId>> {
+        // I. Update all swork identities work report and clear stakers
+        // TODO: this actually should already be prepared in the swork module
         T::SworkInterface::update_identities();
-        Self::clear_stakers();
 
-        let validators: Vec<(T::AccountId, Validations<T::AccountId, BalanceOf<T>>)> =
-            <Validators<T>>::iter().collect();
-        let validator_count = validators.len();
+        // II. Ensure minimum validator count
+        let validator_count = <Validators<T>>::iter().count();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
         if validator_count < minimum_validator_count {
             // There were not enough validators for even our minimal level of functionality.
-            // This is bad.
+            // This is bad🥺.
             // We should probably disable all functionality except for block production
             // and let the chain keep producing blocks until we can decide on a sufficiently
             // substantial set.
             // TODO: [Substrate]substrate#2494
-            return None;
+            return None
         }
 
         let to_votes =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
         let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
-        // I. Traverse validators, get `IndividualExposure` and update guarantors
-        for (v_stash, validations) in &validators {
-            let v_controller = Self::bonded(v_stash).unwrap();
+        // III. Construct and fill in the V/G graph
+        // TC is O(V + G*1), V means validator's number, G means guarantor's number
+        // DB try is 2
+        let mut vg_graph: BTreeMap<T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>> =
+            <Validators<T>>::iter().map(|(v_stash, _)|
+                (v_stash, Vec::<IndividualExposure<T::AccountId, BalanceOf<T>>>::new())
+            ).collect();
+        for (guarantor, guarantee) in <Guarantors<T>>::iter() {
+            let Guarantee { total: _, submitted_in, mut targets, suppressed: _ } = guarantee;
 
-            let mut v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
-                Self::ledger(&v_controller).unwrap();
-            let v_limit_stakes = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
-            let v_own_stakes = v_ledger.active.min(v_limit_stakes);
-            let mut others: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
-            let mut v_guarantors_votes = 0;
-            let mut new_guarantors: Vec<T::AccountId> = vec![];
-
-            // TODO: move a separated function
-            let mut remains = to_votes(v_limit_stakes - v_own_stakes);
-            let guarantors_with_indexes = Self::calculate_relative_index(&validations.guarantors);
-            // 1. Update GuaranteeRel
-            for (guarantor, index) in guarantors_with_indexes {
-                let votes = to_votes(*Self::guarantee_rel(&guarantor, &v_stash).get(&index).unwrap());
-
-                // There still has credit for guarantors
-                // we should using `FILO` rule to calculate others
-                if remains > 0 {
-                    let g_real_votes = remains.min(votes);
-                    let g_vote_stakes = to_balance(g_real_votes);
-
-                    // a. preparing new_guarantors for `Validators`
-                    new_guarantors.push(guarantor.clone());
-                    // b. update remains and guarantors votes
-                    remains -= g_real_votes;
-                    v_guarantors_votes += g_real_votes;
-                    
-                    // c. UPDATE EDGE: (maybe) update GuaranteeRel and Nominations.total
-                    if g_real_votes < votes {
-                        // update Guarantors
-                        <Guarantors<T>>::mutate(&guarantor, |nominations| {
-                            if let Some(n) = nominations {
-                                n.total -= to_balance(votes - g_real_votes);
-                            }
-                        });
-
-                        // update GuaranteeRel
-                        <GuaranteeRel<T>>::mutate(&guarantor, &v_stash, |records| {
-                            records.insert(index, g_vote_stakes);
-                        });
-                    }
-
-                // There has no credit for later guarantors
-                } else {
-                    // Update GuaranteeRel
-                    <GuaranteeRel<T>>::mutate(&guarantor, &v_stash, |records| {
-                        records.remove(&index);
-                    });
-
-                    let is_empty = Self::guarantee_rel(&guarantor, &v_stash).len() == 0; // used to remove GuaranteeRel and targets in Nominations
-                    // Remove guarantee relationship
-                    if is_empty {
-                        <GuaranteeRel<T>>::remove(&guarantor, &v_stash);
-                    }
-                    // Update Nominations
-                    <Guarantors<T>>::mutate(&guarantor, |nominations| {
-                        if let Some(n) = nominations {
-                            n.total -= to_balance(votes);
-                            if is_empty {
-                                n.targets.retain(|target| *target != v_stash.clone());
-                            }
-                        }
-                    });
-                }
-            }
-            // 2. Update Validators
-            <Validators<T>>::mutate(&v_stash,
-                |validations| {
-                    validations.total = to_balance(v_guarantors_votes);
-                    validations.guarantors = new_guarantors;
-                });
-
-            // 3. Update validator's ledger
-            v_ledger.valid = v_own_stakes;
-            Self::update_ledger(&v_controller, &v_ledger);
-
-            // 4. (Maybe)Insert new validator and update staker
-            if v_ledger.valid == Zero::zero() {
-                Self::chill_validator(&v_stash);
-                <Stakers<T>>::remove(v_stash);
-            } else {
-                let v_own_votes = to_votes(v_own_stakes);
-                // a. total_votes should less than balance max value
-                let v_total_votes =
-                    (v_own_votes + v_guarantors_votes).min(u64::max_value() as u128);
-
-                let set_of_guarantors: BTreeSet<T::AccountId> = Self::validators(v_stash).guarantors.drain(..).collect();
-
-                for guarantor in set_of_guarantors {
-                    others.push(IndividualExposure {
-                        who: guarantor.clone(),
-                        value: Self::guarantee_rel(&guarantor, &v_stash)
-                        .iter()
-                        .fold(Zero::zero(), |acc, (_, value)| acc + value.clone()),
-                    });
-                }
-
-                // b. build struct `Exposure`
-                let exposure = Exposure {
-                    own: v_own_stakes,
-                    // This might reasonably saturate and we cannot do much about it. The sum of
-                    // someone's stake might exceed the balance type if they have the maximum amount
-                    // of balance and receive some support. This is super unlikely to happen, yet
-                    // we simulate it in some tests.
-                    total: to_balance(v_total_votes),
-                    others,
-                };
-
-                // c. update snapshot
-                <Stakers<T>>::insert(v_stash, exposure);
-
-                // d. UPDATE NODE: `Validator`
-            }
-        }
-
-        // II. Traverse guarantors, update guarantor's ledger
-        <Guarantors<T>>::iter().for_each(|(g_stash, nominations)| {
-            let Nominations {
-                submitted_in,
-                total,
-                mut targets,
-                suppressed: _,
-            } = nominations;
-
-            // Filter out nomination targets which were guaranteed before the most recent
+            // Filter out guarantee targets which were guaranteed before the most recent
             // slashing span.
-            targets.retain(|stash| {
-                <Self as Store>::SlashingSpans::get(&stash).map_or(
+            targets.retain(|ie| {
+                <Self as Store>::SlashingSpans::get(&ie.who).map_or(
                     true,
                     |spans| submitted_in >= spans.last_nonzero_slash(),
                 )
             });
-
-            // 1. Init all guarantor's valid stakes
-            let g_controller = Self::bonded(&g_stash).unwrap();
-            let mut g_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
-                Self::ledger(&g_controller).unwrap();
-
-            // 3. Update guarantor's ledger
-            g_ledger.valid = total;
-            Self::update_ledger(&g_controller, &g_ledger);
-        });
-
-        // III. TopDown Election Algorithm
-        // Select new validators by top-down their `valid` stakes
-        // - time complex is O(2n)
-        // - DB try is n
-        // 1. Populate elections and figure out the minimum stake behind a slot.
-        let mut total_stakes: BalanceOf<T> = Zero::zero();
-        let mut validators_stakes = <Stakers<T>>::iter()
-            .map(|(stash, exposure)| {
-                if let Some(maybe_total_stakes) = total_stakes.checked_add(&exposure.total) {
-                    total_stakes = maybe_total_stakes;
-                } else {
-                    total_stakes = to_balance(u64::max_value() as u128);
+            
+            for target in targets {
+                if let Some(g) = vg_graph.get_mut(&target.who) {
+                     g.push(IndividualExposure {
+                         who: guarantor.clone(),
+                         value: target.value
+                     });
                 }
-                let guarantee_fee = ValidatorPrefs {
-                    guarantee_fee: Self::validators(&stash).guarantee_fee
-                };
-                <ErasValidatorPrefs<T>>::insert(&current_era, &stash, guarantee_fee);
-                <ErasStakers<T>>::insert(&current_era, &stash, exposure.clone());
-                (stash, to_votes(exposure.total))
-            })
-            .collect::<Vec<(T::AccountId, u128)>>();
+            }
+        }
 
+        // IV. This part will cover
+        // 1. Get `ErasStakers` with `stake_limit` and `vg_graph`
+        // 2. Get `ErasValidatorPrefs`
+        // 3. Get `total_valid_stakes`
+        // 4. Fill in `validator_stakes`
+        let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
+        let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
+        for (v_stash, voters) in vg_graph.iter() {
+            let v_controller = Self::bonded(v_stash).unwrap();
+            let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
+                Self::ledger(&v_controller).unwrap();
+
+            // 1. Calculate the ratio
+            let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
+            let total_stakes = v_ledger.active + voters.iter().fold(Zero::zero(), |acc, ie| acc + ie.value);
+            let valid_votes_ratio = Perbill::from_rational_approximation(stake_limit, total_stakes).min(Perbill::one());
+
+            // 2. Calculate validator valid stake
+            let own_stake = valid_votes_ratio * v_ledger.active;
+
+            // 3. Construct exposure
+            let mut new_exposure = Exposure {
+                total: own_stake,
+                own: own_stake,
+                others: vec![]
+            };
+            for voter in voters {
+                let g_valid_stake = valid_votes_ratio * voter.value;
+                new_exposure.total += g_valid_stake;
+                new_exposure.others.push(IndividualExposure {
+                    who: voter.who.clone(),
+                    value: g_valid_stake
+                });
+            }
+
+            // 4. Update snapshots
+            <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
+            <ErasValidatorPrefs<T>>::insert(&current_era, &v_stash, Self::validators(&v_stash).clone());
+            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&new_exposure.total) {
+                eras_total_stakes = maybe_total_stakes;
+            } else {
+                eras_total_stakes = to_balance(u64::max_value() as u128);
+            }
+
+            // 5. Push validator stakes
+            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
+        }
+
+        // V. TopDown Election Algorithm
+        // Select new validators by top-down their total `valid` stakes
+        // - time complex is O(2n)
+        // - DB try is 1
+        // 1. Populate elections and figure out the minimum stake behind a slot.
         validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
 
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
@@ -2103,29 +1901,18 @@ impl<T: Trait> Module<T> {
             .map(|(who, _stakes)| who.clone())
             .collect::<Vec<T::AccountId>>();
 
-        // IV. Update general staking storage
+        // VI. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
 
         // Update slot stake.
-        <ErasTotalStakes<T>>::insert(&current_era, total_stakes);
+        <ErasTotalStakes<T>>::insert(&current_era, eras_total_stakes);
 
         // In order to keep the property required by `n_session_ending`
         // that we must return the new validator set even if it's the same as the old,
         // as long as any underlying economic conditions have changed, we don't attempt
         // to do any optimization where we compare against the prior set.
         Some(elected_stashes)
-    }
-
-    /// Remove all old stakers, this function only be used in `select_validators`
-    fn clear_stakers() {
-        let old_vs: Vec<T::AccountId> = <Stakers<T>>::iter().map(|(v_stash, _)| v_stash).collect();
-        for v in old_vs {
-            // Only remove those who aren't be V
-            if !<Validators<T>>::contains_key(&v) {
-                <Stakers<T>>::remove(&v);
-            }
-        }
     }
 
     /// Remove all associated data of a stash account from the staking system.
@@ -2135,18 +1922,23 @@ impl<T: Trait> Module<T> {
     /// This is called :
     /// - Immediately when an account's balance falls below existential deposit.
     /// - after a `withdraw_unbond()` call that frees all of a stash's bonded balance.
-    fn kill_stash(stash: &T::AccountId) {
-        if let Some(controller) = <Bonded<T>>::take(stash) {
-            <Ledger<T>>::remove(&controller);
-        }
-        <Payee<T>>::remove(stash);
-        Self::chill_validator(stash);
-        Self::chill_guarantor(stash);
+    fn kill_stash(stash: &T::AccountId) -> DispatchResult {
+        let controller = <Bonded<T>>::get(stash).ok_or(Error::<T>::NotStash)?;
 
+        <Bonded<T>>::remove(stash);
+        <Ledger<T>>::remove(&controller);
+
+        <Payee<T>>::remove(stash);
+        <Validators<T>>::remove(stash);
+        <Guarantors<T>>::remove(stash);
+
+        // TODO: this may update with `num_slashing_spans`?
         slashing::clear_stash_metadata::<T>(stash);
+
+        Ok(())
     }
 
-    /// This function will update the controller's stake limit
+    /// This function will update the stash's stake limit
     fn update_stake_limit(controller: &T::AccountId, own_workloads: u128, total_workloads: u128) {
         if let Some(ledger) = Self::ledger(&controller) {
             Self::upsert_stake_limit(
@@ -2234,8 +2026,12 @@ impl<T: Trait> historical::SessionManager<T::AccountId, Exposure<T::AccountId, B
                    -> Option<Vec<(T::AccountId, Exposure<T::AccountId, BalanceOf<T>>)>>
     {
         <Self as pallet_session::SessionManager<_>>::new_session(new_index).map(|validators| {
+            let current_era = Self::current_era()
+                // Must be some as a new era has been created.
+                .unwrap_or(0);
+
             validators.into_iter().map(|v| {
-                let exposure = Self::stakers(&v);
+                let exposure = Self::eras_stakers(current_era, &v);
                 (v, exposure)
             }).collect()
         })
@@ -2290,7 +2086,11 @@ impl<T: Trait> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>
     for ExposureOf<T>
 {
     fn convert(validator: T::AccountId) -> Option<Exposure<T::AccountId, BalanceOf<T>>> {
-        Some(<Module<T>>::stakers(&validator))
+        if let Some(current_era) = <Module<T>>::current_era() {
+            Some(<Module<T>>::eras_stakers(current_era, &validator))
+        } else {
+            None
+        }
     }
 }
 

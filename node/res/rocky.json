@@ -6,7 +6,8 @@
   "telemetryEndpoints": null,
   "protocolId": "rky8",
   "properties": {
-    "tokenSymbol": "CRU"
+    "tokenSymbol": "CRU",
+    "tokenDecimals": 12
   },
   "consensusEngine": null,
   "genesis": {

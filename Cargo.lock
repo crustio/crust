@@ -898,6 +898,7 @@ dependencies = [
  "pallet-authorship",
  "pallet-babe",
  "pallet-collective",
+ "pallet-elections-phragmen",
  "pallet-finality-tracker",
  "pallet-grandpa",
  "pallet-im-online",
@@ -911,6 +912,7 @@ dependencies = [
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
+ "pallet-treasury",
  "parity-scale-codec",
  "serde",
  "sp-api",
@@ -928,6 +930,7 @@ dependencies = [
  "sp-std",
  "sp-transaction-pool",
  "sp-version",
+ "static_assertions",
  "substrate-wasm-builder-runner",
 ]
 
@@ -3513,6 +3516,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-elections-phragmen"
+version = "2.0.0-rc5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9be904529e457f126bf9c0003c81f6e79e98d0e49287d6fc73deaaaac5b7b4bf"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-npos-elections",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-finality-tracker"
 version = "2.0.0-rc5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3729,6 +3747,21 @@ dependencies = [
  "parity-scale-codec",
  "serde",
  "sp-api",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-treasury"
+version = "2.0.0-rc5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9ee3b95c3acf025fd47eaece3b8ff51fc50e3ea85fd38fa2188bc7aed5c477f"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "parity-scale-codec",
+ "serde",
  "sp-runtime",
  "sp-std",
 ]
@@ -6320,6 +6353,31 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "strum",
+]
+
+[[package]]
+name = "sp-npos-elections"
+version = "2.0.0-rc5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a21e99f4e92b477e661213a09c8d54230d5fd71c09cfef026fa073bf8e27b4f"
+dependencies = [
+ "parity-scale-codec",
+ "serde",
+ "sp-arithmetic",
+ "sp-npos-elections-compact",
+ "sp-std",
+]
+
+[[package]]
+name = "sp-npos-elections-compact"
+version = "2.0.0-rc5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd7fe0bdb7b2115bff331d5ff8267aa6646477977ae247ed70550cb3ec54c576"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote 1.0.7",
+ "syn 1.0.38",
 ]
 
 [[package]]

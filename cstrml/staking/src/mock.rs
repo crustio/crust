@@ -458,26 +458,19 @@ pub type Timestamp = pallet_timestamp::Module<Test>;
 pub type Staking = Module<Test>;
 
 pub fn check_exposure_all() {
-    Staking::current_elected()
-        .into_iter()
-        .for_each(|acc| check_exposure(acc));
+    // a check per validator to ensure the exposure struct is always sane.
+    let era = Staking::current_era().unwrap_or(0);
+    ErasStakers::<Test>::iter_prefix_values(era).for_each(|expo| {
+        assert_eq!(
+            expo.total as u128,
+            expo.own as u128 + expo.others.iter().map(|e| e.value as u128).sum::<u128>(),
+            "wrong total exposure.",
+        );
+    })
 }
 
 pub fn check_guarantor_all() {
     <Guarantors<Test>>::iter().for_each(|(acc, _)| check_guarantor_exposure(acc));
-}
-
-/// Check for each selected validator: expo.total = Sum(expo.other) + expo.own
-pub fn check_exposure(stash: u64) {
-    assert_is_stash(stash);
-    let expo = Staking::stakers(&stash);
-    assert_eq!(
-        expo.total as u128,
-        expo.own as u128 + expo.others.iter().map(|e| e.value as u128).sum::<u128>(),
-        "wrong total exposure for {:?}: {:?}",
-        stash,
-        expo,
-    );
 }
 
 /// Check that for each guarantor: slashable_balance > sum(used_balance)
@@ -485,9 +478,10 @@ pub fn check_exposure(stash: u64) {
 pub fn check_guarantor_exposure(stash: u64) {
     assert_is_stash(stash);
     let mut sum = 0;
+    let current_era = Staking::current_era().unwrap_or(0);
     Staking::current_elected()
         .iter()
-        .map(|v| Staking::stakers(v))
+        .map(|v| Staking::eras_stakers(current_era, v))
         .for_each(|e| {
             e.others
                 .iter()
@@ -531,7 +525,7 @@ pub fn bond_validator(acc: u64, val: u64) {
         RewardDestination::Controller
     ));
     Staking::upsert_stake_limit(&(acc + 1), u64::max_value());
-    assert_ok!(Staking::validate(Origin::signed(acc), Perbill::default()));
+    assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
 }
 
 pub fn bond_guarantor(acc: u64, val: u64, targets: Vec<(u64, u64)>) {

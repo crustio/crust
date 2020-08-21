@@ -11,7 +11,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 mod impls;
 
 use sp_core::{
-    u32_trait::{_1, _2, _3, _4},
+    u32_trait::{_2, _4},
     OpaqueMetadata,
 };
 use sp_runtime::traits::{

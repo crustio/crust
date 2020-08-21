@@ -25,7 +25,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, CheckedSub
+        CheckedAdd
     },
 };
 use sp_staking::{
@@ -776,10 +776,10 @@ decl_module! {
 			let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
 			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-			let stash_balance = T::Currency::transfer_balance(&stash);
+			let mut extra = T::Currency::transfer_balance(&stash);
 
-			if let Some(extra) = stash_balance.checked_sub(&ledger.total) {
-				let extra = extra.min(max_additional);
+			if extra > Zero::zero() {
+				extra = extra.min(max_additional);
 				ledger.total += extra;
 				ledger.active += extra;
 				Self::deposit_event(RawEvent::Bonded(stash, extra));
@@ -1846,9 +1846,19 @@ impl<T: Trait> Module<T> {
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
 
-            // 1. Calculate the ratio
+            // 0. Remove the validator if his stake limit goes to 0
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
-            let total_stakes = v_ledger.active + voters.iter().fold(Zero::zero(), |acc, ie| acc + ie.value);
+            if stake_limit == Zero::zero() {
+                <Validators<T>>::remove(v_stash);
+                continue;
+            }
+
+            // 1. Calculate the ratio
+            let total_stakes = v_ledger.active.saturating_add(
+                voters.iter().fold(
+                    Zero::zero(),
+                    |acc, ie| acc.saturating_add(ie.value)
+                ));
             let valid_votes_ratio = Perbill::from_rational_approximation(stake_limit, total_stakes).min(Perbill::one());
 
             // 2. Calculate validator valid stake
@@ -1862,7 +1872,7 @@ impl<T: Trait> Module<T> {
             };
             for voter in voters {
                 let g_valid_stake = valid_votes_ratio * voter.value;
-                new_exposure.total += g_valid_stake;
+                new_exposure.total = new_exposure.total.saturating_add(g_valid_stake);
                 new_exposure.others.push(IndividualExposure {
                     who: voter.who.clone(),
                     value: g_valid_stake

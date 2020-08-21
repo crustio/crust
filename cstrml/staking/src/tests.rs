@@ -524,7 +524,7 @@ fn guaranteeing_and_rewards_should_work() {
         .build()
         .execute_with(|| {
             // initial validators -- everyone is actually even.
-            assert_eq_uvec!(validator_controllers(), vec![40, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // Set payee to controller
             assert_ok!(Staking::set_payee(
@@ -546,7 +546,7 @@ fn guaranteeing_and_rewards_should_work() {
 
             // give the man some money
             let initial_balance = 1000;
-            for i in [1, 2, 3, 4, 5, 10, 11, 20, 21].iter() {
+            for i in [1, 2, 3, 4, 5, 30, 31, 40, 41].iter() {
                 let _ = Balances::make_free_balance_be(i, initial_balance);
             }
 
@@ -560,15 +560,15 @@ fn guaranteeing_and_rewards_should_work() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
-                (11, 333)
-            ));
-            assert_ok!(Staking::guarantee(
-                Origin::signed(2),
-                (21, 333)
-            ));
-            assert_ok!(Staking::guarantee(
-                Origin::signed(2),
                 (31, 333)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (41, 333)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(2),
+                (11, 333)
             ));
             // 4 will guarantee for 10, 20, 40
             assert_ok!(Staking::bond(
@@ -579,46 +579,45 @@ fn guaranteeing_and_rewards_should_work() {
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(4),
-                (11, 333)
-            ));
-            assert_ok!(Staking::guarantee(
-                Origin::signed(4),
-                (21, 333)
+                (31, 333)
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(4),
                 (41, 333)
+            ));
+            assert_ok!(Staking::guarantee(
+                Origin::signed(4),
+                (21, 333)
             ));
 
             // the total reward for era 0
             let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 100); // Test is meaningful if reward something
-            <Module<Test>>::reward_by_ids(vec![(41, 1)]);
-            <Module<Test>>::reward_by_ids(vec![(31, 1)]);
-            <Module<Test>>::reward_by_ids(vec![(21, 10)]); // must be no-op
-            <Module<Test>>::reward_by_ids(vec![(11, 10)]); // must be no-op
+            <Module<Test>>::reward_by_ids(vec![(21, 1)]);
+            <Module<Test>>::reward_by_ids(vec![(11, 1)]);
+            <Module<Test>>::reward_by_ids(vec![(41, 10)]); // must be no-op
+            <Module<Test>>::reward_by_ids(vec![(31, 10)]); // must be no-op
 
             start_era(1, true);
 
             // 10 and 20 have more votes, they will be chosen by top-down.
-            assert_eq_uvec!(validator_controllers(), vec![20, 10]);
+            assert_eq_uvec!(validator_controllers(), vec![40, 30]);
             assert_eq!(Staking::eras_total_stakes(1), 5998);
 
             payout_all_stakers(0);
-            Staking::reward_stakers(Origin::signed(10), 41, 0).unwrap();
             // OLD validators must have already received some rewards.
-            assert_eq!(Balances::total_balance(&40), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
-            assert_eq!(Balances::total_balance(&30), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
+            assert_eq!(Balances::total_balance(&20), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
+            assert_eq!(Balances::total_balance(&10), 1 + total_authoring_payout_0 / 2 + total_staking_payout_0 / 4);
 
             // ------ check the staked value of all parties.
             if cfg!(feature = "equalize") {
                 // TODO: tmp change for equalize strategy(with voting to candidates)
-                assert_eq!(Staking::eras_stakers(0, 11).own, 1000);
-                assert_eq_error_rate!(Staking::eras_stakers(0, 11).total, 1000 + 666, 2);
+                assert_eq!(Staking::eras_stakers(1, 31).own, 1000);
+                assert_eq_error_rate!(Staking::eras_stakers(1, 31).total, 1000 + 666, 2);
                 // 2 and 4 supported 10, each with stake 600, according to phragmen.
                 assert_eq!(
-                    Staking::eras_stakers(0, 11)
+                    Staking::eras_stakers(1, 31)
                         .others
                         .iter()
                         .map(|e| e.value)
@@ -626,49 +625,7 @@ fn guaranteeing_and_rewards_should_work() {
                     vec![333, 333]
                 );
                 assert_eq!(
-                    Staking::eras_stakers(0, 11)
-                        .others
-                        .iter()
-                        .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![1, 3]
-                );
-                // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
-                // TODO: tmp change for equalize strategy(with voting to candidates)
-                assert_eq!(Staking::eras_stakers(0, 21).own, 1000);
-                assert_eq_error_rate!(Staking::eras_stakers(0, 21).total, 1000 + 666, 2);
-                // 2 and 4 supported 20, each with stake 250, according to phragmen.
-                assert_eq!(
-                    Staking::eras_stakers(0, 21)
-                        .others
-                        .iter()
-                        .map(|e| e.value)
-                        .collect::<Vec<BalanceOf<Test>>>(),
-                    vec![333, 333]
-                );
-                assert_eq!(
-                    Staking::eras_stakers(0, 21)
-                        .others
-                        .iter()
-                        .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![1, 3]
-                );
-            } else {
-                // total expo of 10, with 1200 coming from guarantors (externals), according to phragmen.
-                assert_eq!(Staking::eras_stakers(0, 11).own, 1000);
-                assert_eq!(Staking::eras_stakers(0, 11).total, 1000 + 800);
-                // 2 and 4 supported 10, each with stake 600, according to phragmen.
-                assert_eq!(
-                    Staking::eras_stakers(0, 11)
-                        .others
-                        .iter()
-                        .map(|e| e.value)
-                        .collect::<Vec<BalanceOf<Test>>>(),
-                    vec![400, 400]
-                );
-                assert_eq!(
-                    Staking::eras_stakers(0, 11)
+                    Staking::eras_stakers(1, 31)
                         .others
                         .iter()
                         .map(|e| e.who)
@@ -676,11 +633,53 @@ fn guaranteeing_and_rewards_should_work() {
                     vec![3, 1]
                 );
                 // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
-                assert_eq!(Staking::eras_stakers(0, 21).own, 1000);
-                assert_eq_error_rate!(Staking::eras_stakers(0, 21).total, 1000 + 1200, 2);
+                // TODO: tmp change for equalize strategy(with voting to candidates)
+                assert_eq!(Staking::eras_stakers(1, 41).own, 1000);
+                assert_eq_error_rate!(Staking::eras_stakers(1, 41).total, 1000 + 666, 2);
                 // 2 and 4 supported 20, each with stake 250, according to phragmen.
                 assert_eq!(
-                    Staking::eras_stakers(0, 21)
+                    Staking::eras_stakers(1, 41)
+                        .others
+                        .iter()
+                        .map(|e| e.value)
+                        .collect::<Vec<BalanceOf<Test>>>(),
+                    vec![333, 333]
+                );
+                assert_eq!(
+                    Staking::eras_stakers(1, 41)
+                        .others
+                        .iter()
+                        .map(|e| e.who)
+                        .collect::<Vec<u64>>(),
+                    vec![3, 1]
+                );
+            } else {
+                // total expo of 10, with 1200 coming from guarantors (externals), according to phragmen.
+                assert_eq!(Staking::eras_stakers(0, 31).own, 1000);
+                assert_eq!(Staking::eras_stakers(0, 31).total, 1000 + 800);
+                // 2 and 4 supported 10, each with stake 600, according to phragmen.
+                assert_eq!(
+                    Staking::eras_stakers(0, 31)
+                        .others
+                        .iter()
+                        .map(|e| e.value)
+                        .collect::<Vec<BalanceOf<Test>>>(),
+                    vec![400, 400]
+                );
+                assert_eq!(
+                    Staking::eras_stakers(0, 31)
+                        .others
+                        .iter()
+                        .map(|e| e.who)
+                        .collect::<Vec<u64>>(),
+                    vec![3, 1]
+                );
+                // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
+                assert_eq!(Staking::eras_stakers(0, 41).own, 1000);
+                assert_eq_error_rate!(Staking::eras_stakers(0, 41).total, 1000 + 1200, 2);
+                // 2 and 4 supported 20, each with stake 250, according to phragmen.
+                assert_eq!(
+                    Staking::eras_stakers(0, 41)
                         .others
                         .iter()
                         .map(|e| e.value)
@@ -688,7 +687,7 @@ fn guaranteeing_and_rewards_should_work() {
                     vec![600, 600]
                 );
                 assert_eq!(
-                    Staking::eras_stakers(0, 21)
+                    Staking::eras_stakers(0, 41)
                         .others
                         .iter()
                         .map(|e| e.who)
@@ -699,8 +698,8 @@ fn guaranteeing_and_rewards_should_work() {
 
             // They are not chosen anymore
             // TODO: tmp change for equalize strategy(with voting to candidates)
-            assert_eq!(Staking::eras_stakers(0, 31).total, 1333);
-            assert_eq!(Staking::eras_stakers(0, 41).total, 1333);
+            assert_eq!(Staking::eras_stakers(1, 11).total, 1333);
+            assert_eq!(Staking::eras_stakers(1, 21).total, 1333);
 
             // the total reward for era 1
             // TODO: tmp change for equalize strategy(with voting to candidates)

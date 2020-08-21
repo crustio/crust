@@ -642,4 +642,5 @@ pub fn payout_all_stakers(era_index: EraIndex) {
     Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap();
     Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap();
     Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap();
 }

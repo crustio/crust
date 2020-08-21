@@ -2893,7 +2893,7 @@ fn slashes_are_summed_across_spans() {
 
         on_offence_now(
             &[OffenceDetails {
-                offender: (21, Staking::eras_stakers(0, &21)),
+                offender: (21, Staking::eras_stakers(3, &21)),
                 reporters: vec![],
             }],
             &[Perbill::from_percent(10)],
@@ -2924,7 +2924,7 @@ fn slashes_are_summed_across_spans() {
 
         on_offence_now(
             &[OffenceDetails {
-                offender: (21, Staking::eras_stakers(0, &21)),
+                offender: (21, Staking::eras_stakers(4, &21)),
                 reporters: vec![],
             }],
             &[Perbill::from_percent(10)],

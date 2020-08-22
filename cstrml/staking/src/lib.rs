@@ -1009,7 +1009,6 @@ decl_module! {
 
             // 2. Target should be legal
             let v_stash = T::Lookup::lookup(target)?;
-            ensure!(<Validators<T>>::contains_key(&v_stash), Error::<T>::InvalidTarget);
 
             // 3. Votes value should greater than the dust
             ensure!(votes > T::Currency::minimum_balance(), Error::<T>::InsufficientValue);

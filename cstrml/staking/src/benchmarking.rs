@@ -56,14 +56,14 @@ pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u3
     // Create v validators
     let (v_stash, v_controller) = create_stash_controller::<T>(0)?;
     Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into() * STAKE_LIMIT_RATIO.into());
-    Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Perbill::default())?;
+    Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Default::default())?;
     let stash_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(v_stash.clone());
     validators.push(stash_lookup.clone());
     let saved_v_lookup = stash_lookup;
     for i in 1 .. v {
         let (v_stash, v_controller) = create_stash_controller::<T>(i)?;
         Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into() * STAKE_LIMIT_RATIO.into());
-        Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Perbill::default())?;
+        Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Default::default())?;
         let stash_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(v_stash.clone());
         validators.push(stash_lookup.clone());
     }
@@ -76,7 +76,7 @@ pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u3
     for _ in 0 .. m {
         let selected = rng.next_u32() as usize % available_validators.len();
         let validator = available_validators.get(selected).unwrap();
-        Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance().into()))?;
+        Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance() * 10.into()))?;
     }
 
     let saved_n_controller = n_controller;
@@ -88,7 +88,7 @@ pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u3
         for _ in 0 .. m {
             let selected = rng.next_u32() as usize % available_validators.len();
             let validator = available_validators.get(selected).unwrap();
-            Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance().into()))?;
+            Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance() * 10.into()))?;
         }
     }
 
@@ -101,7 +101,7 @@ pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u3
 pub fn create_one_validator_with_one_nominator<T: Trait>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
     let (v_stash, v_controller) = create_stash_controller::<T>(n)?;
     Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
-    Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Perbill::default())?;
+    Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Default::default())?;
 
     let (_n_stash, n_controller) = create_stash_controller::<T>(u32::max_value() - n)?;
 
@@ -128,7 +128,7 @@ benchmarks! {
         let u in ...;
         let (stash, controller) = create_stash_controller::<T>(u)?;
         Staking::<T>::upsert_stake_limit(&stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
-        Staking::<T>::validate(RawOrigin::Signed(controller.clone()).into(), Perbill::default())?;
+        Staking::<T>::validate(RawOrigin::Signed(controller.clone()).into(), Default::default())?;
         let max_additional = T::Currency::minimum_balance() * 10.into();
     }: _(RawOrigin::Signed(stash), max_additional)
 
@@ -148,7 +148,7 @@ benchmarks! {
     validate {
         let u in ...;
         let (stash, controller) = create_stash_controller::<T>(u)?;
-        let prefs = Perbill::default();
+        let prefs = Default::default();
         Staking::<T>::upsert_stake_limit(&stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
     }: _(RawOrigin::Signed(controller), prefs)
 
@@ -156,43 +156,43 @@ benchmarks! {
     guarantee {
         let v in 1 .. 2;
         let n in 1 .. 2;
-        let m in 1 .. 2;
+        let m in 1 .. MAX_GUARANTEE.try_into().unwrap();
         MinimumValidatorCount::put(1);
-        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
-    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
+        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), m)?;
+    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10.into()))
 
 
     cut_guarantee {
         let v in 1 .. 2;
         let n in 1 .. 2;
-        let m in 1 .. 2;
+        let m in 1 .. MAX_GUARANTEE.try_into().unwrap();
         MinimumValidatorCount::put(1);
-        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
+        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), m)?;
         Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
-        (v_lookup.clone(), T::Currency::minimum_balance().into()))?;
-    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance().into()))
+        (v_lookup.clone(), T::Currency::minimum_balance() * 10.into()))?;
+    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10.into()))
 
 
     new_era {
         let v in 1 .. 2;
         let n in 1 .. 2;
-        let m in 1 .. 2;
+        let m in 1 .. MAX_GUARANTEE.try_into().unwrap();
         MinimumValidatorCount::put(1);
-        create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
+        create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), m)?;
         let session_index = SessionIndex::one();
     }: {
         let validators = Staking::<T>::new_era(session_index).ok_or("`new_era` failed")?;
     }
 
-    select_validators {
+    select_and_update_validators {
         let v in 1 .. 2;
         let n in 1 .. 2;
-        let m in 1 .. 2;
+        let m in 1 .. MAX_GUARANTEE.try_into().unwrap();
         MinimumValidatorCount::put(1);
-        create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), 10u32.pow(m))?;
+        create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), m)?;
         let session_index = SessionIndex::one();
     }: {
-        Staking::<T>::select_validators(0);
+        Staking::<T>::select_and_update_validators(0);
     }
 
     chill {
@@ -267,7 +267,7 @@ mod tests {
             assert_ok!(test_benchmark_guarantee::<Test>());
             assert_ok!(test_benchmark_cut_guarantee::<Test>());
             assert_ok!(test_benchmark_new_era::<Test>());
-            assert_ok!(test_benchmark_select_validators::<Test>());
+            assert_ok!(test_benchmark_select_and_update_validators::<Test>());
             assert_ok!(test_benchmark_chill::<Test>());
             assert_ok!(test_benchmark_set_payee::<Test>());
             assert_ok!(test_benchmark_set_controller::<Test>());

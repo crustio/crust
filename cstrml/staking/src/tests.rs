@@ -3312,7 +3312,7 @@ fn guarantee_should_work() {
                 }
             );
 
-            // Next era, wr should be outdated
+            // Next era
             start_era_with_new_workloads(2, false, 2, 200000000);
             assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 5000);
 
@@ -3411,6 +3411,21 @@ fn multi_guarantees_should_work() {
                         who: 1,
                         value: 500
                     }]
+                }
+            );
+
+            // MAX_GUARANTEE should work
+            for i in 100..115 {
+                <Validators<Test>>::insert(&i, ValidatorPrefs::default());
+                assert_ok!(Staking::guarantee(Origin::signed(4), (i, 10)));
+            }
+            <Validators<Test>>::insert(116, ValidatorPrefs::default());
+            assert_noop!(
+                Staking::guarantee(Origin::signed(4), (116, 10)),
+                DispatchError::Module {
+                    index: 0,
+                    error: 9,
+                    message: Some("ExceedGuaranteeLimit"),
                 }
             );
         });
@@ -3748,6 +3763,24 @@ fn chill_stash_should_work() {
                     value: 250
                 }],
                 total: 500,
+                submitted_in: 0,
+                suppressed: false
+            })
+        );
+
+        // Cut guarantee should work
+        assert_ok!(Staking::cut_guarantee(Origin::signed(2), (5, 300)));
+        assert_eq!(
+            Staking::guarantors(&1),
+            Some(Guarantee {
+                targets: vec![IndividualExposure {
+                    who: 5,
+                    value: 200
+                }, IndividualExposure {
+                    who: 7,
+                    value: 500
+                }],
+                total: 700,
                 submitted_in: 0,
                 suppressed: false
             })

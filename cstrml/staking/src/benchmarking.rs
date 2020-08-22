@@ -48,7 +48,7 @@ pub fn create_stash_controller<T: Trait>(n: u32) -> Result<(T::AccountId, T::Acc
     return Ok((stash, controller))
 }
 
-// This function generates v validators and n guarantor who are randomly nominating up to MAX_NOMINATIONS.
+// This function generates v validators and n guarantor who are randomly nominating up to MAX_GUARANTEE.
 pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u32) -> Result<(T::AccountId, <T::Lookup as StaticLookup>::Source), &'static str> {
     let mut validators: Vec<<T::Lookup as StaticLookup>::Source> = Vec::with_capacity(v as usize);
     let mut rng = ChaChaRng::from_seed(SEED.using_encoded(blake2_256));
@@ -98,7 +98,7 @@ pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u3
 }
 
 // This function generates one validator and one guarantor
-pub fn create_one_validator_with_one_nominator<T: Trait>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
+pub fn create_one_validator_with_one_guarantor<T: Trait>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
     let (v_stash, v_controller) = create_stash_controller::<T>(n)?;
     Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
     Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Default::default())?;

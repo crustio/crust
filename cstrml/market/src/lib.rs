@@ -526,9 +526,9 @@ decl_module! {
 
             ensure!(<Clients<T>>::contains_key(&who, &old_file_path), Error::<T>::InvalidFilePath);
             let order_id = Self::clients(&who, &old_file_path);
-            <Clients<T>>::insert(&who, new_file_path, order_id);
+            <Clients<T>>::insert(&who, &new_file_path, order_id);
             <Clients<T>>::remove(&who, &old_file_path);
-
+            Self::deposit_event(RawEvent::RenameSuccess(who, old_file_path, new_file_path));
             Ok(())
         }
     }
@@ -759,10 +759,11 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as system::Trait>::AccountId,
-        Balance = BalanceOf<T>
+        Balance = BalanceOf<T>,
     {
         StorageOrderSuccess(AccountId, StorageOrder<AccountId, Balance>),
         RegisterSuccess(AccountId),
         PledgeSuccess(AccountId),
+        RenameSuccess(AccountId, FilePath, FilePath),
     }
 );

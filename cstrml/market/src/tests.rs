@@ -73,7 +73,7 @@ fn test_for_storage_order_should_work() {
             storage_price: fee,
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
-        assert_eq!(Market::clients(&client, file_path), order_id.clone());
+        assert_eq!(Market::clients(&client, file_path).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
             file_identifier: file_identifier.clone(),
             file_size: 16,
@@ -404,7 +404,7 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
             storage_price: fee,
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
-        assert_eq!(Market::clients(&0, file_path), order_id.clone());
+        assert_eq!(Market::clients(&0, file_path).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
             file_identifier,
             file_size: 16,
@@ -718,7 +718,7 @@ fn test_scenario_for_file_path_should_work() {
             storage_price: fee,
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
-        assert_eq!(Market::clients(&client, &file_path), order_id.clone());
+        assert_eq!(Market::clients(&client, &file_path).unwrap(), vec![order_id.clone()]);
         assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
             file_identifier: file_identifier.clone(),
             file_size: 16,
@@ -739,23 +739,23 @@ fn test_scenario_for_file_path_should_work() {
             DispatchError::Module {
                 index: 0,
                 error: 11,
-                message: Some("DuplicateFilePath"),
+                message: Some("DuplicateFileAlias"),
             }
         );
 
         let new_file_path = "/test/file2".as_bytes().to_vec();
         assert_noop!(
-            Market::rename_file_path(
+            Market::rename_file_alias(
                 Origin::signed(source.clone()), new_file_path.clone(), file_path.clone()
             ),
             DispatchError::Module {
                 index: 0,
                 error: 12,
-                message: Some("InvalidFilePath"),
+                message: Some("InvalidFileAlias"),
             }
         );
-        Market::rename_file_path(Origin::signed(source.clone()), file_path.clone(), new_file_path.clone()).unwrap();
+        Market::rename_file_alias(Origin::signed(source.clone()), file_path.clone(), new_file_path.clone()).unwrap();
         assert!(!<Clients<Test>>::contains_key(&client, &file_path));
-        assert_eq!(Market::clients(&client, &new_file_path), order_id.clone());
+        assert_eq!(Market::clients(&client, &new_file_path).unwrap(), vec![order_id.clone()]);
     });
 }

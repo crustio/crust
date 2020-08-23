@@ -61,6 +61,9 @@ pub type SworkerCode = Vec<u8>;
 /// Work report empty workload/storage merkle root
 pub type MerkleRoot = Vec<u8>;
 
+/// File Alias for a file
+pub type FileAlias = Vec<u8>;
+
 /// Report index, always be a multiple of era number
 pub type ReportSlot = u64;
 

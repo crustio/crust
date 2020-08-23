@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 // Crust runtime modules
 use primitives::{
-    AddressInfo, MerkleRoot, BlockNumber,
+    AddressInfo, MerkleRoot, BlockNumber, FileAlias,
     traits::TransferrableCurrency
 };
 
@@ -36,7 +36,6 @@ const MARKET_ID: LockIdentifier = *b"market  ";
 
 /// Counter for the number of eras that have passed.
 pub type EraIndex = u32;
-type FilePath = Vec<u8>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -222,7 +221,7 @@ decl_storage! {
 
         /// A mapping from clients to order id
         pub Clients get(fn clients):
-        double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) FilePath => T::Hash;
+        double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) FileAlias => Option<Vec<T::Hash>>;
 
         /// Order details iterated by order id
         pub StorageOrders get(fn storage_orders):
@@ -264,9 +263,9 @@ decl_error! {
         /// Storage price is too low
         LowStoragePrice,
         /// Duplicate file path
-        DuplicateFilePath,
+        DuplicateFileAlias,
         /// Invalid file path
-        InvalidFilePath,
+        InvalidFileAlias,
     }
 }
 
@@ -449,7 +448,7 @@ decl_module! {
             file_identifier: MerkleRoot,
             file_size: u64,
             duration: u32,
-            file_path: FilePath
+            file_alias: FileAlias
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let merchant = T::Lookup::lookup(target)?;
@@ -482,7 +481,7 @@ decl_module! {
             ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
             // 9. Check the existence of the file path
-            ensure!(!<Clients<T>>::contains_key(&who, &file_path), Error::<T>::DuplicateFilePath);
+            ensure!(!<Clients<T>>::contains_key(&who, &file_alias), Error::<T>::DuplicateFileAlias);
 
             // 10. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
@@ -500,15 +499,23 @@ decl_module! {
             };
 
             // 11. Pay the order and (maybe) add storage order
-            if Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &storage_order, &file_path) {
+            if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &storage_order) {
                 // a. update pledge
                 <Pledges<T>>::mutate(&merchant, |pledge| {
                         pledge.used += amount;
                 });
-                // b. emit storage order success event
+                // b. Add `order_id` to client orders
+                <Clients<T>>::mutate(&who, file_alias, |maybe_client_orders| {
+                    if let Some(client_order) = maybe_client_orders {	
+                        client_order.push(order_id.clone());	
+                    } else {	
+                        *maybe_client_orders = Some(vec![order_id.clone()])	
+                    }	
+                });
+                // c. emit storage order success event
                 Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
             } else {
-                // c. emit error
+                // d. emit error
                 Err(Error::<T>::GenerateOrderIdFailed)?
             }
 
@@ -517,20 +524,34 @@ decl_module! {
 
         /// Rename the file path for a storage order
         #[weight = 1_000_000]
-        pub fn rename_file_path(
+        pub fn rename_file_alias(
             origin,
-            old_file_path: FilePath,
-            new_file_path: FilePath
+            old_file_alias: FileAlias,
+            new_file_alias: FileAlias
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            ensure!(<Clients<T>>::contains_key(&who, &old_file_path), Error::<T>::InvalidFilePath);
-            let order_id = Self::clients(&who, &old_file_path);
-            <Clients<T>>::insert(&who, &new_file_path, order_id);
-            <Clients<T>>::remove(&who, &old_file_path);
-            Self::deposit_event(RawEvent::RenameSuccess(who, old_file_path, new_file_path));
+            ensure!(<Clients<T>>::contains_key(&who, &old_file_alias), Error::<T>::InvalidFileAlias);
+            let order_ids = Self::clients(&who, &old_file_alias).unwrap();
+            <Clients<T>>::insert(&who, &new_file_alias, order_ids);
+            <Clients<T>>::remove(&who, &old_file_alias);
+            Self::deposit_event(RawEvent::SetAliasSuccess(who, old_file_alias, new_file_alias));
             Ok(())
         }
+
+
+        // 
+        // #[weight = 1_000_000]
+        // pub fn list_all_sorders(
+        //     origin
+        // ) -> DispatchResult {
+        //     let who = ensure_signed(origin)?;
+        //     let mut sorder_list: Vec<T::Hash> = vec![];
+        //     for order_ids in <Clients<T>>::iter_prefix_values(&who) {
+        //         sorder_list.extend(order_ids.iter());
+        //     }  
+        //     Ok(())
+        // }
     }
 }
 
@@ -617,27 +638,24 @@ impl<T: Trait> Module<T> {
     fn maybe_insert_sorder(client: &T::AccountId,
                            merchant: &T::AccountId,
                            amount: BalanceOf<T>,
-                           so: &StorageOrder<T::AccountId, BalanceOf<T>>,
-                           file_path: &FilePath) -> bool {
+                           so: &StorageOrder<T::AccountId, BalanceOf<T>>
+                        ) -> Option<T::Hash> {
         let order_id = Self::generate_sorder_id(client, merchant);
 
         // This should be false, cause we don't allow duplicated `order_id`
         if <StorageOrders<T>>::contains_key(&order_id) {
-            false
+            None
         } else {
             // 0. If reserve client's balance failed return error
             // TODO: return different error type
             if !T::Payment::reserve_sorder(&order_id, client, amount) {
-                return false
+                return None
             }
 
             // 1. Add new storage order
             <StorageOrders<T>>::insert(&order_id, so);
 
-            // 2. Add `order_id` to client orders
-            <Clients<T>>::insert(client, file_path, order_id.clone());
-
-            // 3. Add `file_identifier` -> `order_id`s to merchant's file_map
+            // 2. Add `file_identifier` -> `order_id`s to merchant's file_map
             <Merchants<T>>::mutate(merchant, |maybe_minfo| {
                 // `minfo` cannot be None
                 if let Some(minfo) = maybe_minfo {
@@ -651,7 +669,7 @@ impl<T: Trait> Module<T> {
                 }
             });
 
-            // 4. Add OrderSlashRecord
+            // 3. Add OrderSlashRecord
             let merchant_punishment = MerchantPunishment {
                 success: 0,
                 failed: 0,
@@ -659,7 +677,7 @@ impl<T: Trait> Module<T> {
             };
             <MerchantPunishments<T>>::insert(&order_id, merchant_punishment);
 
-            true
+            Some(order_id)
         }
     }
 
@@ -764,6 +782,6 @@ decl_event!(
         StorageOrderSuccess(AccountId, StorageOrder<AccountId, Balance>),
         RegisterSuccess(AccountId),
         PledgeSuccess(AccountId),
-        RenameSuccess(AccountId, FilePath, FilePath),
+        SetAliasSuccess(AccountId, FileAlias, FileAlias),
     }
 );

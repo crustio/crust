@@ -517,7 +517,7 @@ decl_module! {
 
         /// Rename the file path for a storage order
         #[weight = 1_000_000]
-        pub fn rename_storage_order(
+        pub fn rename_file_path(
             origin,
             old_file_path: FilePath,
             new_file_path: FilePath

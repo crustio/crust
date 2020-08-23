@@ -677,3 +677,85 @@ fn test_for_close_sorder() {
         assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
     });
 }
+
+#[test]
+fn test_scenario_for_file_path_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let merchant: u64 = 100;
+        let client: u64 = 0;
+        let file_size = 16; // should less than merchant
+        let duration = 10;
+        let fee: u64 = 1;
+        let amount: u64 = 10;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let file_path = "/test/file1".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 60);
+
+        // 1. Normal flow, aka happy pass 😃
+        let _ = Balances::make_free_balance_be(&merchant, 60);
+        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 60));
+        assert!(!<Pledges<Test>>::contains_key(merchant.clone()));
+        assert_eq!(Balances::locks(merchant.clone()).len(), 0);
+
+        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), merchant.clone(),
+            file_identifier.clone(), file_size, duration, file_path.clone()
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
+            address_info,
+            storage_price: fee,
+            file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
+        });
+        assert_eq!(Market::clients(&client, &file_path), order_id.clone());
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 50,
+            completed_on: 50,
+            expired_on: 50+10*10,
+            merchant,
+            client,
+            amount,
+            status: OrderStatus::Pending
+        });
+
+        assert_noop!(
+            Market::place_storage_order(
+                Origin::signed(source.clone()), merchant.clone(),
+                file_identifier.clone(), file_size, duration, file_path.clone()
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 11,
+                message: Some("DuplicateFilePath"),
+            }
+        );
+
+        let new_file_path = "/test/file2".as_bytes().to_vec();
+        assert_noop!(
+            Market::rename_file_path(
+                Origin::signed(source.clone()), new_file_path.clone(), file_path.clone()
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 12,
+                message: Some("InvalidFilePath"),
+            }
+        );
+        Market::rename_file_path(Origin::signed(source.clone()), file_path.clone(), new_file_path.clone()).unwrap();
+        assert!(!<Clients<Test>>::contains_key(&client, &file_path));
+        assert_eq!(Market::clients(&client, &new_file_path), order_id.clone());
+    });
+}

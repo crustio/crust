@@ -57,7 +57,7 @@ fn test_for_storage_order_and_payment_should_work() {
         let duration = 30;
         let fee = 2;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_path = "/test/file1".as_bytes().to_vec();
+        let file_alias = "/test/file1".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&client, 70);
         let _ = Balances::make_free_balance_be(&merchant, pledge_amount);
         assert_eq!(Balances::free_balance(client.clone()), 70);
@@ -67,7 +67,7 @@ fn test_for_storage_order_and_payment_should_work() {
         assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
         assert_ok!(Market::place_storage_order(
             Origin::signed(client.clone()), merchant.clone(),
-            file_identifier.clone(), file_size, duration, file_path
+            file_identifier.clone(), file_size, duration, file_alias
         ));
 
         let order_id = H256::default();
@@ -135,7 +135,7 @@ fn test_for_storage_order_and_payment_should_failed_by_insufficient_currency() {
         let duration = 60;
         let fee = 1;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_path = "/test/file1".as_bytes().to_vec();
+        let file_alias = "/test/file1".as_bytes().to_vec();
 
         Balances::make_free_balance_be(&source, 40);
         Balances::make_free_balance_be(&merchant, 60);
@@ -147,7 +147,7 @@ fn test_for_storage_order_and_payment_should_failed_by_insufficient_currency() {
         assert_noop!(
             Market::place_storage_order(
             Origin::signed(source.clone()), merchant.clone(),
-            file_identifier.clone(), file_size, duration, file_path),
+            file_identifier.clone(), file_size, duration, file_alias),
             DispatchError::Module {
                 index: 0,
                 error: 4,
@@ -172,7 +172,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
         let duration = 30;
         let fee = 2;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_path = "/test/file1".as_bytes().to_vec();
+        let file_alias = "/test/file1".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 70);
         let _ = Balances::make_free_balance_be(&merchant, pledge_amount);
         assert_eq!(Balances::free_balance(source.clone()), 70);
@@ -181,7 +181,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
         assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), merchant.clone(),
-            file_identifier.clone(), file_size, duration, file_path
+            file_identifier.clone(), file_size, duration, file_alias
         ));
 
         let order_id = H256::default();
@@ -286,7 +286,7 @@ fn test_for_close_storage_order_in_payment() {
         let duration = 30;
         let fee = 2;
         let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_path = "/test/file1".as_bytes().to_vec();
+        let file_alias = "/test/file1".as_bytes().to_vec();
         let _ = Balances::make_free_balance_be(&source, 70);
         let _ = Balances::make_free_balance_be(&merchant, pledge_amount);
         assert_eq!(Balances::free_balance(source.clone()), 70);
@@ -295,7 +295,7 @@ fn test_for_close_storage_order_in_payment() {
         assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), merchant.clone(),
-            file_identifier.clone(), file_size, duration, file_path
+            file_identifier.clone(), file_size, duration, file_alias
         ));
 
         let order_id = H256::default();

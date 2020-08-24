@@ -745,7 +745,7 @@ fn test_scenario_for_file_path_should_work() {
 
         let new_file_path = "/test/file2".as_bytes().to_vec();
         assert_noop!(
-            Market::rename_file_alias(
+            Market::set_file_alias(
                 Origin::signed(source.clone()), new_file_path.clone(), file_path.clone()
             ),
             DispatchError::Module {
@@ -754,7 +754,7 @@ fn test_scenario_for_file_path_should_work() {
                 message: Some("InvalidFileAlias"),
             }
         );
-        Market::rename_file_alias(Origin::signed(source.clone()), file_path.clone(), new_file_path.clone()).unwrap();
+        Market::set_file_alias(Origin::signed(source.clone()), file_path.clone(), new_file_path.clone()).unwrap();
         assert!(!<Clients<Test>>::contains_key(&client, &file_path));
         assert_eq!(Market::clients(&client, &new_file_path).unwrap(), vec![order_id.clone()]);
     });

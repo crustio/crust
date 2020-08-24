@@ -527,7 +527,7 @@ decl_module! {
 
         /// Rename the file path for a storage order
         #[weight = 1_000_000]
-        pub fn rename_file_alias(
+        pub fn set_file_alias(
             origin,
             old_file_alias: FileAlias,
             new_file_alias: FileAlias
@@ -541,20 +541,6 @@ decl_module! {
             Self::deposit_event(RawEvent::SetAliasSuccess(who, old_file_alias, new_file_alias));
             Ok(())
         }
-
-
-        // 
-        // #[weight = 1_000_000]
-        // pub fn list_all_sorders(
-        //     origin
-        // ) -> DispatchResult {
-        //     let who = ensure_signed(origin)?;
-        //     let mut sorder_list: Vec<T::Hash> = vec![];
-        //     for order_ids in <Clients<T>>::iter_prefix_values(&who) {
-        //         sorder_list.extend(order_ids.iter());
-        //     }  
-        //     Ok(())
-        // }
     }
 }
 

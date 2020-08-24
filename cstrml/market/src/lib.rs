@@ -265,7 +265,7 @@ decl_error! {
         PlaceSelfOrder,
         /// Storage price is too low
         LowStoragePrice,
-        /// Invalid file path
+        /// Invalid file alias
         InvalidFileAlias,
     }
 }
@@ -761,7 +761,7 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as system::Trait>::AccountId,
-        Balance = BalanceOf<T>,
+        Balance = BalanceOf<T>
     {
         StorageOrderSuccess(AccountId, StorageOrder<AccountId, Balance>),
         RegisterSuccess(AccountId),

@@ -578,7 +578,6 @@ decl_storage! {
 
                 gensis_total_stakes += balance;
 
-                // TODO: make genesis validator's limitation more reasonable
                 <Module<T>>::upsert_stake_limit(stash, balance+balance);
                 let _ = match status {
                     StakerStatus::Validator => {
@@ -932,15 +931,6 @@ decl_module! {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let v_stash = &ledger.stash;
-
-            // [ACTIVE CHECK] 1:
-            // Limit should greater than zero
-            let limit = Self::stake_limit(&v_stash).unwrap_or_default();
-
-            if limit == Zero::zero() {
-                Err(Error::<T>::NoWorkloads)?
-            }
-
             <Guarantors<T>>::remove(v_stash);
 			<Validators<T>>::insert(v_stash, prefs);
         }
@@ -1846,11 +1836,11 @@ impl<T: Trait> Module<T> {
             let v_controller = Self::bonded(v_stash).unwrap();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
-
-            // 0. Remove the validator if his stake limit goes to 0
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
+
+            // 0. Add to `validator_stakes` but skip adding to `eras_stakers` if stake limit goes 0
             if stake_limit == Zero::zero() {
-                <Validators<T>>::remove(v_stash);
+                validators_stakes.push((v_stash.clone(), 0));
                 continue;
             }
 

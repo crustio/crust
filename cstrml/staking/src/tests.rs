@@ -2144,6 +2144,65 @@ fn new_era_elects_correct_number_of_validators() {
 }
 
 #[test]
+fn reward_with_no_stake_limit() {
+    // Behavior when someone bonds with little staked value.
+    // Particularly when she votes and the candidate is elected.
+    ExtBuilder::default()
+        .validator_count(3)
+        .guarantee(false)
+        .minimum_validator_count(1)
+        .build()
+        .execute_with(|| {
+            // setup
+            assert_ok!(Staking::chill(Origin::signed(30)));
+            assert_ok!(Staking::set_payee(
+                Origin::signed(10),
+                RewardDestination::Controller
+            ));
+            let _ = Balances::make_free_balance_be(&7, 100);
+            let _ = Balances::make_free_balance_be(&8, 2);
+            let init_balance_8 = Balances::free_balance(&8);
+
+            // Stingy validator.
+            assert_ok!(Staking::bond(
+                Origin::signed(7),
+                8,
+                100,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
+
+            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            assert_eq!(total_authoring_payout, 5703855806525);
+            reward_all_elected();
+            start_era(1, true);
+
+            // 8 is elected.
+            // and fucks up the slot stake.
+            assert_eq_uvec!(validator_controllers(), vec![20, 10, 8]);
+            assert_eq!(Staking::eras_total_stakes(1), 2000);
+            payout_all_stakers(0);
+            Staking::reward_stakers(Origin::signed(10), 7, 0).unwrap();
+            assert_eq!(Balances::free_balance(&8), init_balance_8);
+
+            reward_all_elected();
+            start_era(2, true);
+
+            assert_eq_uvec!(validator_controllers(), vec![20, 10, 8]);
+            payout_all_stakers(1);
+            Staking::reward_stakers(Origin::signed(10), 7, 1).unwrap();
+
+            // 8 should get authoring reward
+            assert_eq!(
+                Balances::free_balance(&8) / 1000000,
+                (init_balance_8 + total_authoring_payout / 3) / 1000000,
+            );
+            check_exposure_all();
+            check_guarantor_all();
+        });
+}
+
+#[test]
 fn topdown_should_not_overflow_validators() {
     ExtBuilder::default()
         .guarantee(false)
@@ -3595,6 +3654,7 @@ fn new_era_with_stake_limit_should_work() {
         .guarantee(false)
         .own_workload(2)
         .total_workload(100000000)
+        .validator_count(8)
         .build()
         .execute_with(|| {
             // put some money in account that we'll use.
@@ -3625,8 +3685,20 @@ fn new_era_with_stake_limit_should_work() {
             ));
             assert_ok!(Staking::guarantee(Origin::signed(4), (11, 3000)));
 
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(7),
+                8,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
+
             start_era_with_new_workloads(5, false, 1, 200000000);
-            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 2500);
+            assert_eq!(Staking::stake_limit(&11), Some(2500));
+
+            // 5's stake limit should be None
+            assert_eq!(Staking::stake_limit(&7), None);
 
             // Valid ratio should work
             assert_eq!(
@@ -3643,6 +3715,16 @@ fn new_era_with_stake_limit_should_work() {
                     }]
                 }
             );
+            // 7 should  be elected but with 0 stakes
+            assert_eq!(
+                Staking::eras_stakers(5, 7),
+                Exposure {
+                    total: 0,
+                    own: 0,
+                    others: vec![]
+                }
+            );
+            assert_eq!(Staking::current_elected(), vec![11, 21, 31, 7]);
         });
 }
 

@@ -4,65 +4,78 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::chain_spec;
-use crate::cli::Cli;
+use crate::cli::{Cli, Subcommand};
 use crate::service as crust_service;
 use crate::service::new_full_params;
+use crate::executor::Executor;
 use service::ServiceParams;
 use sc_cli::{SubstrateCli, RuntimeVersion, Role, ChainSpec};
+use crust_runtime::Block;
 
 impl SubstrateCli for Cli {
-	fn impl_name() -> String { "Crust Node".into() }
+    fn impl_name() -> String { "Crust Node".into() }
 
-	fn impl_version() -> String { env!("SUBSTRATE_CLI_IMPL_VERSION").into() }
+    fn impl_version() -> String { env!("SUBSTRATE_CLI_IMPL_VERSION").into() }
 
-	fn executable_name() -> String { "crust".into() }
+    fn executable_name() -> String { "crust".into() }
 
-	fn description() -> String { env!("CARGO_PKG_DESCRIPTION").into() }
+    fn description() -> String { env!("CARGO_PKG_DESCRIPTION").into() }
 
-	fn author() -> String { env!("CARGO_PKG_AUTHORS").into() }
+    fn author() -> String { env!("CARGO_PKG_AUTHORS").into() }
 
-	fn support_url() -> String { "https://github.com/crustio/crust/issues/new".into() }
+    fn support_url() -> String { "https://github.com/crustio/crust/issues/new".into() }
 
-	fn copyright_start_year() -> i32 { 2019 }
+    fn copyright_start_year() -> i32 { 2019 }
 
-	fn load_spec(&self, id: &str) -> Result<Box<dyn service::ChainSpec>, String> {
-		Ok(match id {
-			"rocky" => Box::new(chain_spec::rocky_config()?),
-			"maxwell" => Box::new(chain_spec::maxwell_config()?),
-			"rocky-staging" => Box::new(chain_spec::rocky_staging_config()?),
-			"maxwell-staging" => Box::new(chain_spec::maxwell_staging_config()?),
-			"dev" => Box::new(chain_spec::development_config()?),
-			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
-			path => Box::new(chain_spec::CrustChainSpec::from_json_file(
-				std::path::PathBuf::from(path),
-			)?),
-		})
-	}
+    fn load_spec(&self, id: &str) -> Result<Box<dyn service::ChainSpec>, String> {
+        Ok(match id {
+            "rocky" => Box::new(chain_spec::rocky_config()?),
+            "maxwell" => Box::new(chain_spec::maxwell_config()?),
+            "rocky-staging" => Box::new(chain_spec::rocky_staging_config()?),
+            "maxwell-staging" => Box::new(chain_spec::maxwell_staging_config()?),
+            "dev" => Box::new(chain_spec::development_config()?),
+            "" | "local" => Box::new(chain_spec::local_testnet_config()?),
+            path => Box::new(chain_spec::CrustChainSpec::from_json_file(
+                std::path::PathBuf::from(path),
+            )?),
+        })
+    }
 
-	fn native_runtime_version(_chain_spec: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-		&crust_runtime::VERSION
-	}
+    fn native_runtime_version(_chain_spec: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
+        &crust_runtime::VERSION
+    }
 }
 
 /// Parse and run command line arguments
 pub fn run() -> sc_cli::Result<()> {
-	let cli = Cli::from_args();
+    let cli = Cli::from_args();
 
-	match &cli.subcommand {
-		Some(subcommand) => {
-			let runner = cli.create_runner(subcommand)?;
-			runner.run_subcommand(subcommand, |config| {
-				let (ServiceParams { client, backend, task_manager, import_queue, .. }, ..)
-					= new_full_params(config)?;
-				Ok((client, backend, import_queue, task_manager))
-			})
-		}
-		None => {
-			let runner = cli.create_runner(&cli.run)?;
-			runner.run_node_until_exit( |config| match config.role {
-				Role::Light => crust_service::new_light(config),
-				_ => crust_service::new_full(config),
-			})
-		}
-	}
+    match &cli.subcommand {
+        Some(Subcommand::Base(subcommand)) => {
+            let runner = cli.create_runner(subcommand)?;
+            runner.run_subcommand(subcommand, |config| {
+                let (ServiceParams { client, backend, task_manager, import_queue, .. }, ..)
+                    = new_full_params(config)?;
+                Ok((client, backend, import_queue, task_manager))
+            })
+        }
+        Some(Subcommand::Benchmark(subcommand)) => {
+            if cfg!(feature = "runtime-benchmarks") {
+                let runner = cli.create_runner(subcommand)?;
+
+                runner.sync_run(|config| subcommand.run::<Block, Executor>(config))
+            } else {
+                println!("Benchmarking wasn't enabled when building the node. \
+                You can enable it with `--features runtime-benchmarks`.");
+                Ok(())
+            }
+        }
+        None => {
+            let runner = cli.create_runner(&cli.run)?;
+            runner.run_node_until_exit( |config| match config.role {
+                Role::Light => crust_service::new_light(config),
+                _ => crust_service::new_full(config),
+            })
+        }
+    }
 }

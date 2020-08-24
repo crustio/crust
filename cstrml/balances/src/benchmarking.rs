@@ -56,26 +56,27 @@ benchmarks! {
 		assert_eq!(Balances::<T>::free_balance(&recipient), transfer_amount);
 	}
 
-	// Benchmark `transfer` with the best possible condition:
-	// * Both accounts exist and will continue to exist.
-	#[extra]
-	transfer_best_case {
-		let caller = account("caller", 0, SEED);
-		let recipient: T::AccountId = account("recipient", 0, SEED);
-		let recipient_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(recipient.clone());
+	// TODO: Bring this back in the future
+	// // Benchmark `transfer` with the best possible condition:
+	// // * Both accounts exist and will continue to exist.
+	// #[extra]
+	// transfer_best_case {
+	// 	let caller = account("caller", 0, SEED);
+	// 	let recipient: T::AccountId = account("recipient", 0, SEED);
+	// 	let recipient_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(recipient.clone());
 
-		// Give the sender account max funds for transfer (their account will never reasonably be killed).
-		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&caller, T::Balance::max_value());
+	// 	// Give the sender account max funds for transfer (their account will never reasonably be killed).
+	// 	let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&caller, T::Balance::max_value());
 
-		// Give the recipient account existential deposit (thus their account already exists).
-		let existential_deposit = T::ExistentialDeposit::get();
-		let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&recipient, existential_deposit);
-		let transfer_amount = existential_deposit.saturating_mul(ED_MULTIPLIER.into());
-	}: transfer(RawOrigin::Signed(caller.clone()), recipient_lookup, transfer_amount)
-	verify {
-		assert!(!Balances::<T>::free_balance(&caller).is_zero());
-		assert!(!Balances::<T>::free_balance(&recipient).is_zero());
-	}
+	// 	// Give the recipient account existential deposit (thus their account already exists).
+	// 	let existential_deposit = T::ExistentialDeposit::get();
+	// 	let _ = <Balances<T> as Currency<_>>::make_free_balance_be(&recipient, existential_deposit);
+	// 	let transfer_amount = existential_deposit.saturating_mul(ED_MULTIPLIER.into());
+	// }: transfer(RawOrigin::Signed(caller.clone()), recipient_lookup, transfer_amount)
+	// verify {
+	// 	assert!(!Balances::<T>::free_balance(&caller).is_zero());
+	// 	assert!(!Balances::<T>::free_balance(&recipient).is_zero());
+	// }
 
 	// Benchmark `transfer_keep_alive` with the worst possible condition:
 	// * The recipient account is created.

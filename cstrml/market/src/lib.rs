@@ -265,8 +265,6 @@ decl_error! {
         PlaceSelfOrder,
         /// Storage price is too low
         LowStoragePrice,
-        /// Duplicate file path
-        DuplicateFileAlias,
         /// Invalid file path
         InvalidFileAlias,
     }
@@ -483,10 +481,7 @@ decl_module! {
             // 8. Check client can afford the sorder
             ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
 
-            // 9. Check the existence of the file path
-            ensure!(!<Clients<T>>::contains_key(&who, &file_alias), Error::<T>::DuplicateFileAlias);
-
-            // 10. Construct storage order
+            // 9. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
             let expired_on = created_on + duration*10;
             let storage_order = StorageOrder::<T::AccountId, BalanceOf<T>> {
@@ -501,7 +496,7 @@ decl_module! {
                 status: OrderStatus::Pending
             };
 
-            // 11. Pay the order and (maybe) add storage order
+            // 10. Pay the order and (maybe) add storage order
             if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &storage_order) {
                 // a. update pledge
                 <Pledges<T>>::mutate(&merchant, |pledge| {

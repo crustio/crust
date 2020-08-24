@@ -731,17 +731,6 @@ fn test_scenario_for_file_path_should_work() {
             status: OrderStatus::Pending
         });
 
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(source.clone()), merchant.clone(),
-                file_identifier.clone(), file_size, duration, file_path.clone()
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 11,
-                message: Some("DuplicateFileAlias"),
-            }
-        );
 
         let new_file_path = "/test/file2".as_bytes().to_vec();
         assert_noop!(
@@ -750,7 +739,7 @@ fn test_scenario_for_file_path_should_work() {
             ),
             DispatchError::Module {
                 index: 0,
-                error: 12,
+                error: 11,
                 message: Some("InvalidFileAlias"),
             }
         );

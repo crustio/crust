@@ -35,6 +35,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
+
 pub type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
@@ -71,7 +74,11 @@ impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
         if let Some(wr) = Self::work_reports(merchant) {
               wr.reserved > file_size
         } else {
-            false
+            if cfg!(feature = "runtime-benchmarks"){
+                true
+            } else {
+                false
+            }
         }
     }
 }

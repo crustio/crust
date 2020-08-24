@@ -854,6 +854,8 @@ dependencies = [
  "cst-primitives",
  "cstrml-staking",
  "cstrml-swork",
+ "frame-benchmarking",
+ "frame-benchmarking-cli",
  "futures 0.3.5",
  "hex-literal",
  "log",
@@ -890,9 +892,11 @@ dependencies = [
  "cstrml-payment",
  "cstrml-staking",
  "cstrml-swork",
+ "frame-benchmarking",
  "frame-executive",
  "frame-support",
  "frame-system",
+ "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
  "pallet-authority-discovery",
  "pallet-authorship",
@@ -990,6 +994,7 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-swork",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex",
@@ -1030,12 +1035,14 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-swork",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-authorship",
  "pallet-session",
  "pallet-timestamp",
  "parity-scale-codec",
+ "rand_chacha 0.2.2",
  "safe-mix",
  "serde",
  "sp-core",
@@ -1055,6 +1062,7 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-market",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex",
@@ -1449,6 +1457,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "frame-benchmarking-cli"
+version = "2.0.0-rc5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6eff8b2e8086a95eb889c177eb837ff60de1cf16cfe47620552f0c9b06d6b767"
+dependencies = [
+ "Inflector",
+ "frame-benchmarking",
+ "parity-scale-codec",
+ "sc-cli",
+ "sc-client-db",
+ "sc-executor",
+ "sc-service",
+ "sp-core",
+ "sp-externalities",
+ "sp-runtime",
+ "sp-state-machine",
+ "structopt",
+]
+
+[[package]]
 name = "frame-executive"
 version = "2.0.0-rc5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1553,6 +1581,21 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "sp-version",
+]
+
+[[package]]
+name = "frame-system-benchmarking"
+version = "2.0.0-rc5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68b3d2645a9b90d7b28b58bdec65594f0f3ffa4709d5b3b4543be94414ee39af"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "sp-core",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]
@@ -3505,6 +3548,7 @@ version = "2.0.0-rc5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22b255b474d060c51f889b11433985978b985159137def7f9c9b564742d5f988"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7643,6 +7687,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf617d864d25af3587aa745529f7aaa541066c876d57e050c0d0c85c61c92aff"
 dependencies = [
+ "errno",
  "libc",
  "memory_units",
  "num-rational",

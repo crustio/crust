@@ -15,7 +15,7 @@ name = 'crust'
 # third parity dependencies
 futures = "0.3.4"
 log = "0.4.8"
-structopt = "0.3.8"
+structopt = { version = '0.3.8', optional = true }
 hex-literal = "0.2.1"
 
 # substrate client dependencies
@@ -24,7 +24,7 @@ grandpa = { version = "0.8.0-rc5", package = "sc-finality-grandpa" }
 sc-basic-authorship = '0.8.0-rc5'
 authority-discovery = { version = '0.8.0-rc5', package= 'sc-authority-discovery' }
 sc-client-api = '2.0.0-rc5'
-sc-cli = { version = '0.8.0-rc5', features = ["wasmtime"] }
+sc-cli = { version = '0.8.0-rc5', features = ["wasmtime"], optional = true }
 sc-consensus = '0.8.0-rc5'
 sc-executor = { version = '0.8.0-rc5', features = ["wasmtime"] }
 sc-network = '0.8.0-rc5'
@@ -40,6 +40,8 @@ sp-inherents = '2.0.0-rc5'
 sp-io = '2.0.0-rc5'
 sp-runtime = '2.0.0-rc5'
 grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc5' }
+frame-benchmarking-cli = { version = '2.0.0-rc5', optional = true }
+frame-benchmarking = '2.0.0-rc5'
 
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.7.1' }
@@ -48,4 +50,29 @@ cstrml-swork = { path = '../cstrml/swork', version = '0.7.1' }
 primitives = { package = 'cst-primitives', path = '../primitives', version = '0.7.1' }
 
 [build-dependencies]
-build-script-utils = { version = "2.0.0-rc5",  package = "substrate-build-script-utils" }
+build-script-utils = { version = "2.0.0-rc5",  package = "substrate-build-script-utils", optional = true }
+frame-benchmarking-cli = { version = '2.0.0-rc5', optional = true }
+
+[features]
+default = [ "cli" ]
+cli = [
+    "wasmi-errno",
+    "sc-cli",
+    "frame-benchmarking-cli",
+    "service/db",
+    "structopt",
+    "build-script-utils",
+]
+
+runtime-benchmarks = [
+    "crust-runtime/runtime-benchmarks",
+    "frame-benchmarking-cli",
+]
+
+wasmtime = [
+    "sc-executor/wasmtime",
+]
+
+wasmi-errno = [
+    "sc-executor/wasmi-errno",
+]

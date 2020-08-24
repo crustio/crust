@@ -32,6 +32,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
+
 const MARKET_ID: LockIdentifier = *b"market  ";
 
 /// Counter for the number of eras that have passed.

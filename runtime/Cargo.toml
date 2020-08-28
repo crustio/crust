@@ -2,7 +2,7 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-runtime'
-version = '0.7.1'
+version = '0.8.0'
 build = 'build.rs'
 license = "GPL-3.0"
 homepage = "https://crust.network"

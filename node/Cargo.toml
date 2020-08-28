@@ -1,6 +1,6 @@
 [package]
 name = 'crust'
-version = '0.7.1'
+version = '0.8.0'
 authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
@@ -44,10 +44,10 @@ frame-benchmarking-cli = { version = '2.0.0-rc5', optional = true }
 frame-benchmarking = '2.0.0-rc5'
 
 # crust runtime modules
-crust-runtime = { path = '../runtime', version = '0.7.1' }
-cstrml-staking = { path = '../cstrml/staking', version = '0.7.1' }
-cstrml-swork = { path = '../cstrml/swork', version = '0.7.1' }
-primitives = { package = 'cst-primitives', path = '../primitives', version = '0.7.1' }
+crust-runtime = { path = '../runtime', version = '0.8.0' }
+cstrml-staking = { path = '../cstrml/staking', version = '0.8.0' }
+cstrml-swork = { path = '../cstrml/swork', version = '0.8.0' }
+primitives = { package = 'cst-primitives', path = '../primitives', version = '0.8.0' }
 
 [build-dependencies]
 build-script-utils = { version = "2.0.0-rc5",  package = "substrate-build-script-utils", optional = true }

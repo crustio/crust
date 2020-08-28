@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-payment"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"

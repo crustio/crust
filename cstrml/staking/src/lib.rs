@@ -49,6 +49,10 @@ use primitives::{
     traits::TransferrableCurrency
 };
 
+use rand::{thread_rng, Rng};
+use rand::seq::SliceRandom;
+use rand::distributions::{Distribution, Uniform};
+
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
 const MAX_GUARANTEE: usize = 16;
@@ -1836,7 +1840,7 @@ impl<T: Trait> Module<T> {
         // 3. Get `total_valid_stakes`
         // 4. Fill in `validator_stakes`
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
-        let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
+        let mut validators_stakes: Vec<(T::AccountId, u128, bool)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
             let v_controller = Self::bonded(v_stash).unwrap();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
@@ -1846,7 +1850,7 @@ impl<T: Trait> Module<T> {
 
             // 0. Add to `validator_stakes` but skip adding to `eras_stakers` if stake limit goes 0
             if stake_limit == Zero::zero() {
-                validators_stakes.push((v_stash.clone(), 0));
+                validators_stakes.push((v_stash.clone(), 0, false));
                 continue;
             }
 
@@ -1886,15 +1890,10 @@ impl<T: Trait> Module<T> {
             }
 
             // 5. Push validator stakes
-            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
+            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total), false))
         }
 
         // V. TopDown Election Algorithm
-        // Select new validators by top-down their total `valid` stakes
-        // - time complex is O(2n)
-        // - DB try is 1
-        // 1. Populate elections and figure out the minimum stake behind a slot.
-        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
 
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
@@ -1902,12 +1901,7 @@ impl<T: Trait> Module<T> {
         if to_elect < minimum_validator_count {
             return None;
         }
-
-        let elected_stashes = validators_stakes[0..to_elect]
-            .iter()
-            .map(|(who, _stakes)| who.clone())
-            .collect::<Vec<T::AccountId>>();
-
+        let elected_stashes= Self::do_election(validators_stakes, to_elect);
         // VI. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
@@ -2003,6 +1997,25 @@ impl<T: Trait> Module<T> {
             Forcing::ForceAlways | Forcing::ForceNew => (),
             _ => ForceEra::put(Forcing::ForceNew),
         }
+    }
+
+    fn do_election(mut validators_stakes: Vec<(T::AccountId, u128, bool)>, to_elect: usize) -> Vec<T::AccountId> {
+
+        // Select new validators by top-down their total `valid` stakes
+        // - time complex is O(2n)
+        // - DB try is 1
+        // 1. Populate elections and figure out the minimum stake behind a slot.
+        // validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
+        let mut elected_stashes: Vec<T::AccountId> = vec![];
+        let mut rng = thread_rng();
+        while elected_stashes.len() < to_elect {
+            let mut validator = validators_stakes.choose_weighted_mut(&mut rng, |item| item.1).unwrap();
+            if !validator.2 {
+                validator.2 = true;
+                elected_stashes.push(validator.0.clone());
+            }
+        }
+        elected_stashes
     }
 }
 

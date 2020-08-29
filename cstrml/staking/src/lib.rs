@@ -651,8 +651,6 @@ decl_error! {
         NoMoreChunks,
         /// Can not bond with more than limit
         ExceedGuaranteeLimit,
-        /// Can not validate without workloads
-        NoWorkloads,
         /// Attempting to target a stash that still has funds.
         FundedTarget,
         /// Invalid era to reward.
@@ -1349,6 +1347,10 @@ impl<T: Trait> Module<T> {
             let mut new_targets: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             let mut update = false;
 
+            if real_votes <= Zero::zero() {
+                return None
+            }
+
             // Fill in `new_targets`, always LOOP the `targets`
             // However, the TC is O(1) due to the `MAX_GUARANTEE` restriction 🤪
             for mut target in guarantee.targets {
@@ -1383,6 +1385,9 @@ impl<T: Trait> Module<T> {
         } else {
             let real_votes = bonded.min(votes);
             let new_total = real_votes;
+
+            // No need check with this case, votes and bonded all greater than 0
+
             let mut new_targets: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             new_targets.push(IndividualExposure {
                 who: v_stash.clone(),
@@ -1836,6 +1841,7 @@ impl<T: Trait> Module<T> {
             let v_controller = Self::bonded(v_stash).unwrap();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
+
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
 
             // 0. Add to `validator_stakes` but skip adding to `eras_stakers` if stake limit goes 0

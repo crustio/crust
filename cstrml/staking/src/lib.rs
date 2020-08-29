@@ -1349,6 +1349,10 @@ impl<T: Trait> Module<T> {
             let mut new_targets: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             let mut update = false;
 
+            if real_votes <= Zero::zero() {
+                return None
+            }
+
             // Fill in `new_targets`, always LOOP the `targets`
             // However, the TC is O(1) due to the `MAX_GUARANTEE` restriction 🤪
             for mut target in guarantee.targets {
@@ -1383,6 +1387,9 @@ impl<T: Trait> Module<T> {
         } else {
             let real_votes = bonded.min(votes);
             let new_total = real_votes;
+
+            // No need check with this case, votes and bonded all greater than 0
+
             let mut new_targets: Vec<IndividualExposure<T::AccountId, BalanceOf<T>>> = vec![];
             new_targets.push(IndividualExposure {
                 who: v_stash.clone(),
@@ -1551,7 +1558,10 @@ impl<T: Trait> Module<T> {
 
         // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
-        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
+        let mut staking_reward = Zero::zero();
+        if era_total_stakes > Zero::zero() {
+            staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
+        }
         let total = exposure.total.max(One::one());
         // 4. Calculate total rewards for staking
         let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * staking_reward;
@@ -1833,9 +1843,13 @@ impl<T: Trait> Module<T> {
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
+            if Self::bonded(v_stash).is_none() { continue; }
             let v_controller = Self::bonded(v_stash).unwrap();
+
+            if Self::ledger(&v_controller).is_none() { continue; }
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
+
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
 
             // 0. Add to `validator_stakes` but skip adding to `eras_stakers` if stake limit goes 0

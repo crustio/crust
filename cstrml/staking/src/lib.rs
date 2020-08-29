@@ -1556,10 +1556,7 @@ impl<T: Trait> Module<T> {
 
         // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
-        let mut staking_reward = Zero::zero();
-        if era_total_stakes > Zero::zero() {
-            staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
-        }
+        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
         let total = exposure.total.max(One::one());
         // 4. Calculate total rewards for staking
         let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * staking_reward;

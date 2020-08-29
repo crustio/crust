@@ -386,11 +386,14 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 .map(|x| (
                     x.clone(),
                     WorkReport {
+                        code: vec![],
+                        pub_key: vec![],
                         block_number: 0,
                         files: vec![],
                         reserved: WORKLOAD,
                         used: 0,
-                        cached_reserved: 0
+                        reserved_root: vec![],
+                        files_root: vec![]
                     },
                 ))
                 .collect(),
@@ -517,11 +520,14 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 .map(|x| (
                     x.clone(),
                     WorkReport {
+                        code: vec![],
+                        pub_key: vec![],
                         block_number: 0,
                         files: vec![],
                         reserved: WORKLOAD,
                         used: 0,
-                        cached_reserved: 0
+                        reserved_root: vec![],
+                        files_root: vec![]
                     },
                 ))
                 .collect(),

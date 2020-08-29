@@ -289,7 +289,7 @@ decl_module! {
             );
 
             // 5. Check work report upgrade
-            let id = Self::identities(who).unwrap();
+            let id = Self::identities(&who).unwrap();
             let id_code = id.code;
             ensure!(
                 Self::wr_upgrade_check(&who, &id_code, &reserved_root, &files_root),
@@ -526,7 +526,7 @@ impl<T: Trait> Module<T> {
     // PRIVATE IMMUTABLES
 
     /// This function will merge SetA(`files_a`) and SetB(`files_b`)
-    /// TODO: Uncomment when master-slave mechanism enable
+    /// TODO: Uncomment when master-workers mechanism enable
     /*fn merged_files(files_a: &Vec<(MerkleRoot, u64)>,
                     files_b: &Vec<(MerkleRoot, u64)>) -> Vec<(MerkleRoot, u64)> {
 
@@ -549,18 +549,13 @@ impl<T: Trait> Module<T> {
     /// TC is O(n)
     /// DB try is O(1)
     fn id_is_unique(pk: &SworkerPubKey) -> bool {
-        let mut is_unique = true;
-
-        for (_, maybe_id) in <Identities<T>>::iter() {
-            if let Some(id) = maybe_id {
-                if &id.pub_key == pk {
-                    is_unique = false;
-                    break
-                }
+        for (_, id) in <Identities<T>>::iter() {
+            if pk == &id.pub_key {
+                return false
             }
         }
 
-        is_unique
+        true
     }
 
     fn check_and_get_pk(

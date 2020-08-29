@@ -651,8 +651,6 @@ decl_error! {
         NoMoreChunks,
         /// Can not bond with more than limit
         ExceedGuaranteeLimit,
-        /// Can not validate without workloads
-        NoWorkloads,
         /// Attempting to target a stash that still has funds.
         FundedTarget,
         /// Invalid era to reward.
@@ -1843,10 +1841,7 @@ impl<T: Trait> Module<T> {
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
-            if Self::bonded(v_stash).is_none() { continue; }
             let v_controller = Self::bonded(v_stash).unwrap();
-
-            if Self::ledger(&v_controller).is_none() { continue; }
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
 

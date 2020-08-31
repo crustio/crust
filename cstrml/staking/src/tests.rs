@@ -3981,3 +3981,33 @@ fn era_clean_should_work() {
             assert!(!<ErasValidatorPrefs<Test>>::contains_key(0, 11));
         });
 }
+
+#[test]
+fn randomly_select_validators_works() {
+    ExtBuilder::default()
+        .minimum_validator_count(1)
+        .validator_count(3)
+        .build()
+        .execute_with(|| {
+            assert_eq_uvec!(
+                Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400)], 3, 2),
+                vec![3, 4]
+            );
+
+            assert_eq_uvec!(
+                Staking::do_election(vec![(1,500), (2,200), (3, 100), (4, 400)], 3, 1),
+                vec![4]
+            );
+
+            assert_eq_uvec!(
+                Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400),(5, 500), (6, 600)], 6, 2),
+                vec![5, 4]
+            );
+
+            assert_eq_uvec!(
+                Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400),(5, 500), (6, 600), (7,700), (8, 800)], 8, 3),
+                vec![1, 5, 8]
+            );
+
+        });
+}

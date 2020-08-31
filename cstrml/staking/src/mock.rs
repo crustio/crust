@@ -221,6 +221,7 @@ impl Trait for Test {
     type Time = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
+    type Randomness = ();
     type Event = ();
     type Slash = ();
     type Reward = ();

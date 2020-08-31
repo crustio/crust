@@ -19,7 +19,7 @@ use frame_support::{
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
-        Time, EnsureOrigin
+        Time, EnsureOrigin, Randomness
     },
     dispatch::DispatchResult
 };
@@ -28,7 +28,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd
+        CheckedAdd, TrailingZeroInput
     },
 };
 use sp_staking::{
@@ -49,9 +49,7 @@ use primitives::{
     traits::TransferrableCurrency
 };
 
-use rand::{thread_rng, Rng};
-use rand::seq::SliceRandom;
-use rand::distributions::{Distribution, Uniform};
+use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
@@ -380,6 +378,9 @@ pub trait Trait: frame_system::Trait {
 
     /// Handler for the unbalanced increment when rewarding a staker.
     type Reward: OnUnbalanced<PositiveImbalanceOf<Self>>;
+
+    /// Something that provides randomness in the runtime.
+    type Randomness: Randomness<Self::Hash>;
 
     /// Number of sessions per era.
     type SessionsPerEra: Get<SessionIndex>;
@@ -1840,7 +1841,7 @@ impl<T: Trait> Module<T> {
         // 3. Get `total_valid_stakes`
         // 4. Fill in `validator_stakes`
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
-        let mut validators_stakes: Vec<(T::AccountId, u128, bool)> = vec![];
+        let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
             let v_controller = Self::bonded(v_stash).unwrap();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
@@ -1850,7 +1851,7 @@ impl<T: Trait> Module<T> {
 
             // 0. Add to `validator_stakes` but skip adding to `eras_stakers` if stake limit goes 0
             if stake_limit == Zero::zero() {
-                validators_stakes.push((v_stash.clone(), 0, false));
+                validators_stakes.push((v_stash.clone(), 0));
                 continue;
             }
 
@@ -1890,18 +1891,19 @@ impl<T: Trait> Module<T> {
             }
 
             // 5. Push validator stakes
-            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total), false))
+            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
         }
 
         // V. TopDown Election Algorithm
-
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
         // 2. If there's no validators, be as same as little validators
         if to_elect < minimum_validator_count {
             return None;
         }
-        let elected_stashes= Self::do_election(validators_stakes, to_elect);
+        let candidate_to_elect = validators_stakes.len().min(to_elect * 2);
+
+        let elected_stashes= Self::do_election(validators_stakes, candidate_to_elect, to_elect);
         // VI. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
@@ -1999,23 +2001,41 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn do_election(mut validators_stakes: Vec<(T::AccountId, u128, bool)>, to_elect: usize) -> Vec<T::AccountId> {
+    fn do_election(
+        mut validators_stakes: Vec<(T::AccountId, u128)>,
+        candidate_to_elect: usize,
+        to_elect: usize) -> Vec<T::AccountId> {
 
         // Select new validators by top-down their total `valid` stakes
         // - time complex is O(2n)
         // - DB try is 1
         // 1. Populate elections and figure out the minimum stake behind a slot.
-        // validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
-        let mut elected_stashes: Vec<T::AccountId> = vec![];
-        let mut rng = thread_rng();
-        while elected_stashes.len() < to_elect {
-            let mut validator = validators_stakes.choose_weighted_mut(&mut rng, |item| item.1).unwrap();
-            if !validator.2 {
-                validator.2 = true;
-                elected_stashes.push(validator.0.clone());
-            }
-        }
+        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
+        let mut candidate_stashes = validators_stakes[0..candidate_to_elect]
+        .iter()
+        .map(|(who, stakes)| (who.clone(), *stakes))
+        .collect::<Vec<(T::AccountId, u128)>>();
+
+        Self::shuffle_candidates(&mut candidate_stashes);
+        let elected_stashes = candidate_stashes[0..to_elect]
+        .iter()
+        .map(|(who, _stakes)| who.clone())
+        .collect::<Vec<T::AccountId>>();
         elected_stashes
+    }
+
+    fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {
+        let phrase = b"candidates_shuffle";
+        // we'll need a random seed here.
+        let seed = T::Randomness::random(phrase);
+        // seed needs to be guaranteed to be 32 bytes.
+        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))
+            .expect("input is padded with zeroes; qed");
+        let mut rng = ChaChaRng::from_seed(seed);
+        for i in (0..candidates_stakes.len()).rev() {
+            let random_index = (rng.next_u32() % (i as u32 + 1)) as usize;
+            candidates_stakes.swap(random_index, i);
+        }
     }
 }
 

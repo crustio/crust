@@ -531,9 +531,9 @@ parameter_types! {
     /// Unit is pico
     pub const MinimumStoragePrice: Balance = 40;
     /// Unit is minute
-    pub const MinimumSorderDuration: u32 = 30;
+    pub const MinimumSorderDuration: u32 = 60 * 24 * 5; // 120 hours
     pub const PunishDuration: market::EraIndex = 300;
-    pub const Frequency: BlockNumber = 10 * MINUTES;
+    pub const Frequency: BlockNumber = MINUTES * 60 * 6; // 6 hours
 }
 
 impl market::Trait for Runtime {

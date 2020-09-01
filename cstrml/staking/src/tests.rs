@@ -3473,6 +3473,22 @@ fn multi_guarantees_should_work() {
                 }
             );
 
+            // 0 vote should work, 4 wants to guarantee more, but the bonded stakes is not enough
+            assert_noop!(
+                Staking::guarantee(Origin::signed(4), (11, 10)),
+                DispatchError::Module {
+                    index: 0,
+                    error: 9,
+                    message: Some("ExceedGuaranteeLimit"),
+                }
+            );
+
+            // Bond more
+            assert_ok!(Staking::bond_extra(
+                Origin::signed(3),
+                2000
+            ));
+
             // MAX_GUARANTEE should work
             for i in 100..115 {
                 <Validators<Test>>::insert(&i, ValidatorPrefs::default());
@@ -3913,7 +3929,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 11, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 13,
+                    error: 12,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -3921,7 +3937,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 21, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 13,
+                    error: 12,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -3929,7 +3945,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 31, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 13,
+                    error: 12,
                     message: Some("AlreadyClaimed"),
                 }
             );

@@ -1894,7 +1894,7 @@ impl<T: Trait> Module<T> {
             validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
         }
 
-        // V. TopDown Election Algorithm
+        // V. TopDown Election Algorithm with Randomlization
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
         // 2. If there's no validators, be as same as little validators
@@ -2005,18 +2005,22 @@ impl<T: Trait> Module<T> {
         mut validators_stakes: Vec<(T::AccountId, u128)>,
         candidate_to_elect: usize,
         to_elect: usize) -> Vec<T::AccountId> {
-
         // Select new validators by top-down their total `valid` stakes
-        // - time complex is O(2n)
-        // - DB try is 1
-        // 1. Populate elections and figure out the minimum stake behind a slot.
+        // then randomly choose some of them from the top validators
+
+        // sort by 'valid' stakes
         validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // choose top candidate_to_elect number of validators
         let mut candidate_stashes = validators_stakes[0..candidate_to_elect]
         .iter()
         .map(|(who, stakes)| (who.clone(), *stakes))
         .collect::<Vec<(T::AccountId, u128)>>();
 
+        // shuffle it
         Self::shuffle_candidates(&mut candidate_stashes);
+
+        // choose elected_stashes number of validators
         let elected_stashes = candidate_stashes[0..to_elect]
         .iter()
         .map(|(who, _stakes)| who.clone())

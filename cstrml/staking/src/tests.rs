@@ -594,10 +594,10 @@ fn guaranteeing_and_rewards_should_work() {
             let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 100); // Test is meaningful if reward something
-            <Module<Test>>::reward_by_ids(vec![(21, 11)]); // must be no-op
+            <Module<Test>>::reward_by_ids(vec![(21, 10)]); // must be no-op
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
-            <Module<Test>>::reward_by_ids(vec![(41, 11)]); 
-            <Module<Test>>::reward_by_ids(vec![(31, 1)]); // must be no-op
+            <Module<Test>>::reward_by_ids(vec![(41, 10)]); // must be no-op
+            <Module<Test>>::reward_by_ids(vec![(31, 1)]);
 
             start_era(1, true);
 

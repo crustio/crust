@@ -1901,9 +1901,8 @@ impl<T: Trait> Module<T> {
         if to_elect < minimum_validator_count {
             return None;
         }
-        let candidate_to_elect = validators_stakes.len().min(to_elect * 2);
 
-        let elected_stashes= Self::do_election(validators_stakes, candidate_to_elect, to_elect);
+        let elected_stashes= Self::do_election(validators_stakes, to_elect);
         // VI. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
@@ -2003,11 +2002,11 @@ impl<T: Trait> Module<T> {
 
     fn do_election(
         mut validators_stakes: Vec<(T::AccountId, u128)>,
-        candidate_to_elect: usize,
         to_elect: usize) -> Vec<T::AccountId> {
         // Select new validators by top-down their total `valid` stakes
         // then randomly choose some of them from the top validators
 
+        let candidate_to_elect = validators_stakes.len().min(to_elect * 2);
         // sort by 'valid' stakes
         validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
 
@@ -2029,9 +2028,18 @@ impl<T: Trait> Module<T> {
     }
 
     fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {
+        // 1. Construct random seed, 👼 bless the randomness
+        // seed = [ block_hash, phrase ]
         let phrase = b"candidates_shuffle";
+        let bn = <frame_system::Module<T>>::block_number();
+        let bh: T::Hash = <frame_system::Module<T>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &phrase.encode()[..]
+        ].concat();
+
         // we'll need a random seed here.
-        let seed = T::Randomness::random(phrase);
+        let seed = T::Randomness::random(seed.as_slice());
         // seed needs to be guaranteed to be 32 bytes.
         let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))
             .expect("input is padded with zeroes; qed");

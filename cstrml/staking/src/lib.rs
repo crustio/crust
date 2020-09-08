@@ -521,9 +521,6 @@ decl_storage! {
 		pub ErasStartSessionIndex get(fn eras_start_session_index):
 			map hasher(twox_64_concat) EraIndex => Option<SessionIndex>;
 
-        /// The session index at which the current era started.
-        pub CurrentEraStartSessionIndex get(fn current_era_start_session_index): SessionIndex;
-
         /// Rewards for the last `HISTORY_DEPTH` eras.
 		/// If reward hasn't been set or has been removed then 0 reward is returned.
 		pub ErasRewardPoints get(fn eras_reward_points):

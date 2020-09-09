@@ -31,6 +31,7 @@ std = [
 	"serde",
 	"codec/std",
 	"sp-std/std",
+	"sp-io/std",
 	"sp-runtime/std",
 	"frame-benchmarking/std",
 	"frame-support/std",

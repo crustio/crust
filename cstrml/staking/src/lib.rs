@@ -67,10 +67,10 @@ pub type RewardPoint = u32;
 /// This points will be used to reward validators and their respective nominators.
 #[derive(PartialEq, Encode, Decode, Default, RuntimeDebug)]
 pub struct EraRewardPoints<AccountId: Ord> {
-	/// Total number of points. Equals the sum of reward points for each validator.
-	total: RewardPoint,
-	/// The reward points earned by a given validator.
-	individual: BTreeMap<AccountId, RewardPoint>,
+    /// Total number of points. Equals the sum of reward points for each validator.
+    total: RewardPoint,
+    /// The reward points earned by a given validator.
+    individual: BTreeMap<AccountId, RewardPoint>,
 }
 
 /// Indicates the initial status of the staker.
@@ -355,11 +355,11 @@ pub trait Trait: frame_system::Trait {
     /// The staking balance.
     type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
-	/// Time used for computing era duration.
-	///
-	/// It is guaranteed to start being called from the first `on_finalize`. Thus value at genesis
-	/// is not used.
-	type UnixTime: UnixTime;
+    /// Time used for computing era duration.
+    ///
+    /// It is guaranteed to start being called from the first `on_finalize`. Thus value at genesis
+    /// is not used.
+    type UnixTime: UnixTime;
 
     /// Convert a balance into a number used for election calculation.
     /// This must fit into a `u64` but is allowed to be sensibly lossy.
@@ -517,13 +517,13 @@ decl_storage! {
         /// Validator set of this era must be equal to `SessionInterface::validators`.
         pub ActiveEra get(fn active_era): Option<ActiveEraInfo>;
 
-		/// The session index at which the era start for the last `HISTORY_DEPTH` eras.
-		pub ErasStartSessionIndex get(fn eras_start_session_index):
-			map hasher(twox_64_concat) EraIndex => Option<SessionIndex>;
+        /// The session index at which the era start for the last `HISTORY_DEPTH` eras.
+        pub ErasStartSessionIndex get(fn eras_start_session_index):
+            map hasher(twox_64_concat) EraIndex => Option<SessionIndex>;
 
         /// Rewards for the last `HISTORY_DEPTH` eras.
-		/// If reward hasn't been set or has been removed then 0 reward is returned.
-		pub ErasRewardPoints get(fn eras_reward_points):
+        /// If reward hasn't been set or has been removed then 0 reward is returned.
+        pub ErasRewardPoints get(fn eras_reward_points):
         map hasher(twox_64_concat) EraIndex => EraRewardPoints<T::AccountId>;
 
         /// True if the next session change will be a new era regardless of index.
@@ -1603,15 +1603,15 @@ impl<T: Trait> Module<T> {
         session_index: SessionIndex,
     ) -> Option<Vec<T::AccountId>> {
         if let Some(current_era) = Self::current_era() {
-			// Initial era has been set.
-			let current_era_start_session_index = Self::eras_start_session_index(current_era)
-				.unwrap_or_else(|| {
-					frame_support::print("Error: start_session_index must be set for current_era");
-					0
-				});
+            // Initial era has been set.
+            let current_era_start_session_index = Self::eras_start_session_index(current_era)
+                .unwrap_or_else(|| {
+                    frame_support::print("Error: start_session_index must be set for current_era");
+                    0
+                });
 
-			let era_length = session_index.checked_sub(current_era_start_session_index)
-				.unwrap_or(0); // Must never happen.
+            let era_length = session_index.checked_sub(current_era_start_session_index)
+                .unwrap_or(0); // Must never happen.
             // TODO: remove ForceNew? cause this will make work report update invalid
             match ForceEra::get() {
                 Forcing::ForceNew => ForceEra::kill(),
@@ -1634,22 +1634,22 @@ impl<T: Trait> Module<T> {
     /// get a chance to set their session keys.
     /// This also checks stake limitation based on work reports
     fn new_era(start_session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
-		// Increment or set current era.
-		let current_era = CurrentEra::mutate(|s| {
-			*s = Some(s.map(|s| s + 1).unwrap_or(0));
-			s.unwrap()
-		});
-		ErasStartSessionIndex::insert(&current_era, &start_session_index);
+        // Increment or set current era.
+        let current_era = CurrentEra::mutate(|s| {
+            *s = Some(s.map(|s| s + 1).unwrap_or(0));
+            s.unwrap()
+        });
+        ErasStartSessionIndex::insert(&current_era, &start_session_index);
 
-		// Clean old era information.
-		if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 1) {
-			Self::clear_era_information(old_era);
-		}
+        // Clean old era information.
+        if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 1) {
+            Self::clear_era_information(old_era);
+        }
 
-		// Set staking information for new era.
-		let maybe_new_validators = Self::select_and_update_validators(current_era);
+        // Set staking information for new era.
+        let maybe_new_validators = Self::select_and_update_validators(current_era);
 
-		maybe_new_validators
+        maybe_new_validators
     }
 
     /// Start a session potentially starting an era.
@@ -1810,21 +1810,21 @@ impl<T: Trait> Module<T> {
         reward_this_era.try_into().ok().unwrap()
     }
 
-	/// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
-	fn apply_unapplied_slashes(active_era: EraIndex) {
-		let slash_defer_duration = T::SlashDeferDuration::get();
-		<Self as Store>::EarliestUnappliedSlash::mutate(|earliest| if let Some(ref mut earliest) = earliest {
-			let keep_from = active_era.saturating_sub(slash_defer_duration);
-			for era in (*earliest)..keep_from {
-				let era_slashes = <Self as Store>::UnappliedSlashes::take(&era);
-				for slash in era_slashes {
-					slashing::apply_slash::<T>(slash);
-				}
-			}
+    /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
+    fn apply_unapplied_slashes(active_era: EraIndex) {
+        let slash_defer_duration = T::SlashDeferDuration::get();
+        <Self as Store>::EarliestUnappliedSlash::mutate(|earliest| if let Some(ref mut earliest) = earliest {
+            let keep_from = active_era.saturating_sub(slash_defer_duration);
+            for era in (*earliest)..keep_from {
+                let era_slashes = <Self as Store>::UnappliedSlashes::take(&era);
+                for slash in era_slashes {
+                    slashing::apply_slash::<T>(slash);
+                }
+            }
 
-			*earliest = (*earliest).max(keep_from)
-		})
-	}
+            *earliest = (*earliest).max(keep_from)
+        })
+    }
 
     /// Select the new validator set at the end of the era.
     ///
@@ -1998,30 +1998,30 @@ impl<T: Trait> Module<T> {
         }
     }
 
-	/// Add reward points to validators using their stash account ID.
-	///
-	/// Validators are keyed by stash account ID and must be in the current elected set.
-	///
-	/// For each element in the iterator the given number of points in u32 is added to the
-	/// validator, thus duplicates are handled.
-	///
-	/// At the end of the era each the total payout will be distributed among validator
-	/// relatively to their points.
-	///
-	/// COMPLEXITY: Complexity is `number_of_validator_to_reward x current_elected_len`.
-	/// If you need to reward lots of validator consider using `reward_by_indices`.
-	pub fn reward_by_ids(
-		validators_points: impl IntoIterator<Item = (T::AccountId, u32)>
-	) {
-		if let Some(active_era) = Self::active_era() {
-			<ErasRewardPoints<T>>::mutate(active_era.index, |era_rewards| {
-				for (validator, points) in validators_points.into_iter() {
-					*era_rewards.individual.entry(validator).or_default() += points;
-					era_rewards.total += points;
-				}
-			});
-		}
-	}
+    /// Add reward points to validators using their stash account ID.
+    ///
+    /// Validators are keyed by stash account ID and must be in the current elected set.
+    ///
+    /// For each element in the iterator the given number of points in u32 is added to the
+    /// validator, thus duplicates are handled.
+    ///
+    /// At the end of the era each the total payout will be distributed among validator
+    /// relatively to their points.
+    ///
+    /// COMPLEXITY: Complexity is `number_of_validator_to_reward x current_elected_len`.
+    /// If you need to reward lots of validator consider using `reward_by_indices`.
+    pub fn reward_by_ids(
+        validators_points: impl IntoIterator<Item = (T::AccountId, u32)>
+    ) {
+        if let Some(active_era) = Self::active_era() {
+            <ErasRewardPoints<T>>::mutate(active_era.index, |era_rewards| {
+                for (validator, points) in validators_points.into_iter() {
+                    *era_rewards.individual.entry(validator).or_default() += points;
+                    era_rewards.total += points;
+                }
+            });
+        }
+    }
 
     /// Ensures that at the end of the current session there will be a new era.
     fn ensure_new_era() {
@@ -2162,152 +2162,152 @@ impl<T: Trait> Convert<T::AccountId, Option<T::AccountId>> for StashOf<T> {
 pub struct ExposureOf<T>(sp_std::marker::PhantomData<T>);
 
 impl<T: Trait> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>>>
-	for ExposureOf<T>
+    for ExposureOf<T>
 {
-	fn convert(validator: T::AccountId) -> Option<Exposure<T::AccountId, BalanceOf<T>>> {
-		if let Some(active_era) = <Module<T>>::active_era() {
-			Some(<Module<T>>::eras_stakers(active_era.index, &validator))
-		} else {
-			None
-		}
-	}
+    fn convert(validator: T::AccountId) -> Option<Exposure<T::AccountId, BalanceOf<T>>> {
+        if let Some(active_era) = <Module<T>>::active_era() {
+            Some(<Module<T>>::eras_stakers(active_era.index, &validator))
+        } else {
+            None
+        }
+    }
 }
 
 /// This is intended to be used with `FilterHistoricalOffences`.
 impl <T: Trait>
-	OnOffenceHandler<T::AccountId, pallet_session::historical::IdentificationTuple<T>, Weight>
+    OnOffenceHandler<T::AccountId, pallet_session::historical::IdentificationTuple<T>, Weight>
 for Module<T> where
-	T: pallet_session::Trait<ValidatorId = <T as frame_system::Trait>::AccountId>,
-	T: pallet_session::historical::Trait<
-		FullIdentification = Exposure<<T as frame_system::Trait>::AccountId, BalanceOf<T>>,
-		FullIdentificationOf = ExposureOf<T>,
-	>,
-	T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Trait>::AccountId>,
-	T::SessionManager: pallet_session::SessionManager<<T as frame_system::Trait>::AccountId>,
-	T::ValidatorIdOf: Convert<
-		<T as frame_system::Trait>::AccountId,
-		Option<<T as frame_system::Trait>::AccountId>,
-	>,
+    T: pallet_session::Trait<ValidatorId = <T as frame_system::Trait>::AccountId>,
+    T: pallet_session::historical::Trait<
+        FullIdentification = Exposure<<T as frame_system::Trait>::AccountId, BalanceOf<T>>,
+        FullIdentificationOf = ExposureOf<T>,
+    >,
+    T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Trait>::AccountId>,
+    T::SessionManager: pallet_session::SessionManager<<T as frame_system::Trait>::AccountId>,
+    T::ValidatorIdOf: Convert<
+        <T as frame_system::Trait>::AccountId,
+        Option<<T as frame_system::Trait>::AccountId>,
+    >,
 {
-	fn on_offence(
-		offenders: &[OffenceDetails<T::AccountId, pallet_session::historical::IdentificationTuple<T>>],
-		slash_fraction: &[Perbill],
-		slash_session: SessionIndex,
-	) -> Result<Weight, ()> {
-		if !Self::can_report() {
-			return Err(())
-		}
+    fn on_offence(
+        offenders: &[OffenceDetails<T::AccountId, pallet_session::historical::IdentificationTuple<T>>],
+        slash_fraction: &[Perbill],
+        slash_session: SessionIndex,
+    ) -> Result<Weight, ()> {
+        if !Self::can_report() {
+            return Err(())
+        }
 
-		let reward_proportion = SlashRewardFraction::get();
-		let mut consumed_weight: Weight = 0;
-		let mut add_db_reads_writes = |reads, writes| {
-			consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
-		};
+        let reward_proportion = SlashRewardFraction::get();
+        let mut consumed_weight: Weight = 0;
+        let mut add_db_reads_writes = |reads, writes| {
+            consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+        };
 
-		let active_era = {
-			let active_era = Self::active_era();
-			add_db_reads_writes(1, 0);
-			if active_era.is_none() {
-				// this offence need not be re-submitted.
-				return Ok(consumed_weight)
-			}
-			active_era.expect("value checked not to be `None`; qed").index
-		};
-		let active_era_start_session_index = Self::eras_start_session_index(active_era)
-			.unwrap_or_else(|| {
-				frame_support::print("Error: start_session_index must be set for current_era");
-				0
-			});
-		add_db_reads_writes(1, 0);
+        let active_era = {
+            let active_era = Self::active_era();
+            add_db_reads_writes(1, 0);
+            if active_era.is_none() {
+                // this offence need not be re-submitted.
+                return Ok(consumed_weight)
+            }
+            active_era.expect("value checked not to be `None`; qed").index
+        };
+        let active_era_start_session_index = Self::eras_start_session_index(active_era)
+            .unwrap_or_else(|| {
+                frame_support::print("Error: start_session_index must be set for current_era");
+                0
+            });
+        add_db_reads_writes(1, 0);
 
-		let window_start = active_era.saturating_sub(T::BondingDuration::get());
+        let window_start = active_era.saturating_sub(T::BondingDuration::get());
 
-		// fast path for active-era report - most likely.
-		// `slash_session` cannot be in a future active era. It must be in `active_era` or before.
-		let slash_era = if slash_session >= active_era_start_session_index {
-			active_era
-		} else {
-			let eras = BondedEras::get();
-			add_db_reads_writes(1, 0);
+        // fast path for active-era report - most likely.
+        // `slash_session` cannot be in a future active era. It must be in `active_era` or before.
+        let slash_era = if slash_session >= active_era_start_session_index {
+            active_era
+        } else {
+            let eras = BondedEras::get();
+            add_db_reads_writes(1, 0);
 
-			// reverse because it's more likely to find reports from recent eras.
-			match eras.iter().rev().filter(|&&(_, ref sesh)| sesh <= &slash_session).next() {
-				Some(&(ref slash_era, _)) => *slash_era,
-				// before bonding period. defensive - should be filtered out.
-				None => return Ok(consumed_weight),
-			}
-		};
+            // reverse because it's more likely to find reports from recent eras.
+            match eras.iter().rev().filter(|&&(_, ref sesh)| sesh <= &slash_session).next() {
+                Some(&(ref slash_era, _)) => *slash_era,
+                // before bonding period. defensive - should be filtered out.
+                None => return Ok(consumed_weight),
+            }
+        };
 
-		<Self as Store>::EarliestUnappliedSlash::mutate(|earliest| {
-			if earliest.is_none() {
-				*earliest = Some(active_era)
-			}
-		});
-		add_db_reads_writes(1, 1);
+        <Self as Store>::EarliestUnappliedSlash::mutate(|earliest| {
+            if earliest.is_none() {
+                *earliest = Some(active_era)
+            }
+        });
+        add_db_reads_writes(1, 1);
 
-		let slash_defer_duration = T::SlashDeferDuration::get();
+        let slash_defer_duration = T::SlashDeferDuration::get();
 
-		let invulnerables = Self::invulnerables();
-		add_db_reads_writes(1, 0);
+        let invulnerables = Self::invulnerables();
+        add_db_reads_writes(1, 0);
 
-		for (details, slash_fraction) in offenders.iter().zip(slash_fraction) {
-			let (stash, exposure) = &details.offender;
+        for (details, slash_fraction) in offenders.iter().zip(slash_fraction) {
+            let (stash, exposure) = &details.offender;
 
-			// Skip if the validator is invulnerable.
-			if invulnerables.contains(stash) {
-				continue
-			}
+            // Skip if the validator is invulnerable.
+            if invulnerables.contains(stash) {
+                continue
+            }
 
-			let unapplied = slashing::compute_slash::<T>(slashing::SlashParams {
-				stash,
-				slash: *slash_fraction,
-				exposure,
-				slash_era,
-				window_start,
-				now: active_era,
-				reward_proportion,
-			});
+            let unapplied = slashing::compute_slash::<T>(slashing::SlashParams {
+                stash,
+                slash: *slash_fraction,
+                exposure,
+                slash_era,
+                window_start,
+                now: active_era,
+                reward_proportion,
+            });
 
-			if let Some(mut unapplied) = unapplied {
-				let nominators_len = unapplied.others.len() as u64;
-				let reporters_len = details.reporters.len() as u64;
+            if let Some(mut unapplied) = unapplied {
+                let nominators_len = unapplied.others.len() as u64;
+                let reporters_len = details.reporters.len() as u64;
 
-				{
-					let upper_bound = 1 /* Validator/NominatorSlashInEra */ + 2 /* fetch_spans */;
-					let rw = upper_bound + nominators_len * upper_bound;
-					add_db_reads_writes(rw, rw);
-				}
-				unapplied.reporters = details.reporters.clone();
-				if slash_defer_duration == 0 {
-					// apply right away.
-					slashing::apply_slash::<T>(unapplied);
-					{
-						let slash_cost = (6, 5);
-						let reward_cost = (2, 2);
-						add_db_reads_writes(
-							(1 + nominators_len) * slash_cost.0 + reward_cost.0 * reporters_len,
-							(1 + nominators_len) * slash_cost.1 + reward_cost.1 * reporters_len
-						);
-					}
-				} else {
-					// defer to end of some `slash_defer_duration` from now.
-					<Self as Store>::UnappliedSlashes::mutate(
-						active_era,
-						move |for_later| for_later.push(unapplied),
-					);
-					add_db_reads_writes(1, 1);
-				}
-			} else {
-				add_db_reads_writes(4 /* fetch_spans */, 5 /* kick_out_if_recent */)
-			}
-		}
+                {
+                    let upper_bound = 1 /* Validator/NominatorSlashInEra */ + 2 /* fetch_spans */;
+                    let rw = upper_bound + nominators_len * upper_bound;
+                    add_db_reads_writes(rw, rw);
+                }
+                unapplied.reporters = details.reporters.clone();
+                if slash_defer_duration == 0 {
+                    // apply right away.
+                    slashing::apply_slash::<T>(unapplied);
+                    {
+                        let slash_cost = (6, 5);
+                        let reward_cost = (2, 2);
+                        add_db_reads_writes(
+                            (1 + nominators_len) * slash_cost.0 + reward_cost.0 * reporters_len,
+                            (1 + nominators_len) * slash_cost.1 + reward_cost.1 * reporters_len
+                        );
+                    }
+                } else {
+                    // defer to end of some `slash_defer_duration` from now.
+                    <Self as Store>::UnappliedSlashes::mutate(
+                        active_era,
+                        move |for_later| for_later.push(unapplied),
+                    );
+                    add_db_reads_writes(1, 1);
+                }
+            } else {
+                add_db_reads_writes(4 /* fetch_spans */, 5 /* kick_out_if_recent */)
+            }
+        }
 
-		Ok(consumed_weight)
-	}
+        Ok(consumed_weight)
+    }
 
-	fn can_report() -> bool {
-		true
-	}
+    fn can_report() -> bool {
+        true
+    }
 }
 
 /// Filter historical offences out and only allow those from the bonding period.

@@ -551,7 +551,6 @@ pub fn advance_session() {
 
 pub fn start_session(session_index: SessionIndex, with_reward: bool) {
     // Compensate for session delay
-    // let session_index = session_index + 1;
     for i in Session::current_index()..session_index {
         Staking::on_finalize(System::block_number());
         System::set_block_number(((i+1)*100).into());
@@ -567,7 +566,7 @@ pub fn start_session(session_index: SessionIndex, with_reward: bool) {
 pub fn start_era(era_index: EraIndex, with_reward: bool) {
     start_session((era_index * 3).into(), with_reward);
     assert_eq!(Staking::current_era().unwrap(), era_index);
-	assert_eq!(Staking::active_era().unwrap().index, era_index);
+    assert_eq!(Staking::active_era().unwrap().index, era_index);
 }
 
 pub fn reward_all_elected() {

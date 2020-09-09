@@ -977,37 +977,37 @@ fn double_controlling_should_fail() {
 fn session_and_eras_work() {
     ExtBuilder::default().build().execute_with(|| {
         assert_eq!(Staking::active_era().unwrap().index, 0);
-		assert_eq!(Session::current_index(), 0);
+        assert_eq!(Session::current_index(), 0);
 
-		// Session 1: No change.
-		start_session(1, false);
-		assert_eq!(Session::current_index(), 1);
-		assert_eq!(Staking::active_era().unwrap().index, 0);
+        // Session 1: No change.
+        start_session(1, false);
+        assert_eq!(Session::current_index(), 1);
+        assert_eq!(Staking::active_era().unwrap().index, 0);
 
-		// Session 2: No change.
-		start_session(2, false);
-		assert_eq!(Session::current_index(), 2);
-		assert_eq!(Staking::active_era().unwrap().index, 0);
+        // Session 2: No change.
+        start_session(2, false);
+        assert_eq!(Session::current_index(), 2);
+        assert_eq!(Staking::active_era().unwrap().index, 0);
 
-		// Session 3: Era increment.
-		start_session(3, false);
-		assert_eq!(Session::current_index(), 3);
-		assert_eq!(Staking::active_era().unwrap().index, 1);
+        // Session 3: Era increment.
+        start_session(3, false);
+        assert_eq!(Session::current_index(), 3);
+        assert_eq!(Staking::active_era().unwrap().index, 1);
 
-		// Session 4: No change.
-		start_session(4, false);
-		assert_eq!(Session::current_index(), 4);
-		assert_eq!(Staking::active_era().unwrap().index, 1);
+        // Session 4: No change.
+        start_session(4, false);
+        assert_eq!(Session::current_index(), 4);
+        assert_eq!(Staking::active_era().unwrap().index, 1);
 
-		// Session 5: No change.
-		start_session(5, false);
-		assert_eq!(Session::current_index(), 5);
-		assert_eq!(Staking::active_era().unwrap().index, 1);
+        // Session 5: No change.
+        start_session(5, false);
+        assert_eq!(Session::current_index(), 5);
+        assert_eq!(Staking::active_era().unwrap().index, 1);
 
-		// Session 6: Era increment.
-		start_session(6, false);
-		assert_eq!(Session::current_index(), 6);
-		assert_eq!(Staking::active_era().unwrap().index, 2);
+        // Session 6: Era increment.
+        start_session(6, false);
+        assert_eq!(Session::current_index(), 6);
+        assert_eq!(Staking::active_era().unwrap().index, 2);
     });
 }
 
@@ -2356,25 +2356,25 @@ fn reward_from_authorship_event_handler_works() {
     ExtBuilder::default().build().execute_with(|| {
         use pallet_authorship::EventHandler;
 
-		assert_eq!(<pallet_authorship::Module<Test>>::author(), 11);
+        assert_eq!(<pallet_authorship::Module<Test>>::author(), 11);
 
-		<Module<Test>>::note_author(11);
-		<Module<Test>>::note_uncle(21, 1);
-		// Rewarding the same two times works.
-		<Module<Test>>::note_uncle(11, 1);
+        <Module<Test>>::note_author(11);
+        <Module<Test>>::note_uncle(21, 1);
+        // Rewarding the same two times works.
+        <Module<Test>>::note_uncle(11, 1);
 
-		// Not mandatory but must be coherent with rewards
-		assert_eq_uvec!(Session::validators(), vec![31, 21]);
+        // Not mandatory but must be coherent with rewards
+        assert_eq_uvec!(Session::validators(), vec![31, 21]);
 
-		// 21 is rewarded as an uncle producer
-		// 11 is rewarded as a block producer and uncle referencer and uncle producer
-		assert_eq!(
-			ErasRewardPoints::<Test>::get(Staking::active_era().unwrap().index),
-			EraRewardPoints {
-				individual: vec![(11, 20 + 2 * 2 + 1), (21, 1)].into_iter().collect(),
-				total: 26,
-			},
-		);
+        // 21 is rewarded as an uncle producer
+        // 11 is rewarded as a block producer and uncle referencer and uncle producer
+        assert_eq!(
+            ErasRewardPoints::<Test>::get(Staking::active_era().unwrap().index),
+            EraRewardPoints {
+                individual: vec![(11, 20 + 2 * 2 + 1), (21, 1)].into_iter().collect(),
+                total: 26,
+            },
+        );
     })
 }
 
@@ -2382,27 +2382,27 @@ fn reward_from_authorship_event_handler_works() {
 fn add_reward_points_fns_works() {
     ExtBuilder::default().build().execute_with(|| {
         // Not mandatory but must be coherent with rewards
-		assert_eq!(Session::validators(), vec![31, 21]);
+        assert_eq!(Session::validators(), vec![31, 21]);
 
-		<Module<Test>>::reward_by_ids(vec![
-			(31, 1),
-			(21, 1),
-			(21, 1),
-		]);
+        <Module<Test>>::reward_by_ids(vec![
+            (31, 1),
+            (21, 1),
+            (21, 1),
+        ]);
 
-		<Module<Test>>::reward_by_ids(vec![
-			(31, 1),
-			(21, 1),
-			(21, 1),
-		]);
+        <Module<Test>>::reward_by_ids(vec![
+            (31, 1),
+            (21, 1),
+            (21, 1),
+        ]);
 
-		assert_eq!(
-			ErasRewardPoints::<Test>::get(Staking::active_era().unwrap().index),
-			EraRewardPoints {
-				individual: vec![(21, 4), (31, 2)].into_iter().collect(),
-				total: 6,
-			},
-		);
+        assert_eq!(
+            ErasRewardPoints::<Test>::get(Staking::active_era().unwrap().index),
+            EraRewardPoints {
+                individual: vec![(21, 4), (31, 2)].into_iter().collect(),
+                total: 6,
+            },
+        );
     })
 }
 
@@ -2421,27 +2421,27 @@ fn unbonded_balance_is_not_slashable() {
 
 #[test]
 fn era_is_always_same_length() {
-	// This ensures that the sessions is always of the same length if there is no forcing no
-	// session changes.
-	ExtBuilder::default().build().execute_with(|| {
-		let session_per_era = <SessionsPerEra as Get<SessionIndex>>::get();
+    // This ensures that the sessions is always of the same length if there is no forcing no
+    // session changes.
+    ExtBuilder::default().build().execute_with(|| {
+        let session_per_era = <SessionsPerEra as Get<SessionIndex>>::get();
 
-		start_era(1, false);
-		assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session_per_era);
+        start_era(1, false);
+        assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session_per_era);
 
-		start_era(2, false);
-		assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session_per_era * 2u32);
+        start_era(2, false);
+        assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session_per_era * 2u32);
 
-		let session = Session::current_index();
-		ForceEra::put(Forcing::ForceNew);
-		advance_session();
-		advance_session();
-		assert_eq!(Staking::current_era().unwrap(), 3);
-		assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session + 2);
+        let session = Session::current_index();
+        ForceEra::put(Forcing::ForceNew);
+        advance_session();
+        advance_session();
+        assert_eq!(Staking::current_era().unwrap(), 3);
+        assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session + 2);
 
-		start_era(4, false);
-		assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session + 2u32 + session_per_era);
-	});
+        start_era(4, false);
+        assert_eq!(Staking::eras_start_session_index(Staking::current_era().unwrap()).unwrap(), session + 2u32 + session_per_era);
+    });
 }
 
 #[test]

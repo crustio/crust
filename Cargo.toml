@@ -7,13 +7,18 @@ frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", bran
 frame-executive = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 frame-support = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 frame-system = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
+frame-system-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 frame-system-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
+pallet-authority-discovery = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-authorship = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-babe = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-collective = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
+pallet-elections-phragmen = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
+pallet-finality-tracker = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-grandpa = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-indices = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
+pallet-im-online = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-membership = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-multisig = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 pallet-offences = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
@@ -54,6 +59,7 @@ sc-transaction-pool = { git = "https://github.com/paritytech/substrate", branch 
 sp-api = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 sp-application-crypto = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 sp-arithmetic = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
+sp-authority-discovery = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 sp-block-builder = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 sp-blockchain = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }
 sp-consensus = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch" }

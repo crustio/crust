@@ -1114,7 +1114,7 @@ dependencies = [
  "sp-transaction-pool 2.0.0-rc6",
  "sp-version 2.0.0-rc6",
  "static_assertions",
- "substrate-wasm-builder-runner",
+ "substrate-wasm-builder-runner 1.0.6 (git+https://github.com/paritytech/substrate?branch=rococo-branch)",
 ]
 
 [[package]]
@@ -1291,7 +1291,7 @@ dependencies = [
 [[package]]
 name = "cumulus-message-broker"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "cumulus-primitives",
  "cumulus-upward-message",
@@ -1307,7 +1307,7 @@ dependencies = [
 [[package]]
 name = "cumulus-parachain-upgrade"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "cumulus-primitives",
  "cumulus-runtime",
@@ -1328,7 +1328,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -1343,7 +1343,7 @@ dependencies = [
 [[package]]
 name = "cumulus-runtime"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "cumulus-primitives",
  "frame-executive 2.0.0-rc5",
@@ -1362,7 +1362,7 @@ dependencies = [
 [[package]]
 name = "cumulus-token-dealer"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "cumulus-primitives",
  "cumulus-upward-message",
@@ -1375,7 +1375,7 @@ dependencies = [
 [[package]]
 name = "cumulus-upward-message"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "kusama-runtime",
  "polkadot-core-primitives",
@@ -2794,9 +2794,9 @@ checksum = "5b141fdc7836c525d4d594027d318c84161ca17aaf8113ab1f81ab93ae897485"
 
 [[package]]
 name = "integer-sqrt"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d3038ef3da477fd70e6161006ef37f919c24bfe7244062f67a69defe72c02aa"
+checksum = "276ec31bcb4a9ee45f58bec6f9ec700ae4cf4f4f8f2fa7e06cb406bd5ffdd770"
 dependencies = [
  "num-traits 0.2.12",
 ]
@@ -3015,7 +3015,7 @@ dependencies = [
 [[package]]
 name = "kusama-runtime"
 version = "0.8.22"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "bitvec",
  "frame-executive 2.0.0-rc5",
@@ -3075,7 +3075,7 @@ dependencies = [
  "sp-transaction-pool 2.0.0-rc5",
  "sp-version 2.0.0-rc5",
  "static_assertions",
- "substrate-wasm-builder-runner",
+ "substrate-wasm-builder-runner 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -5126,7 +5126,7 @@ dependencies = [
 [[package]]
 name = "parachain-info"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "cumulus-primitives",
  "frame-support 2.0.0-rc5",
@@ -5472,7 +5472,7 @@ checksum = "feb3b2b1033b8a60b4da6ee470325f887758c95d5320f52f9ce0df055a55940e"
 [[package]]
 name = "polkadot-core-primitives"
 version = "0.7.30"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "parity-scale-codec",
  "sp-core 2.0.0-rc5",
@@ -5483,7 +5483,7 @@ dependencies = [
 [[package]]
 name = "polkadot-parachain"
 version = "0.8.22"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "derive_more",
  "futures 0.3.5",
@@ -5504,7 +5504,7 @@ dependencies = [
 [[package]]
 name = "polkadot-primitives"
 version = "0.8.22"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "bitvec",
  "frame-system 2.0.0-rc5",
@@ -5527,7 +5527,7 @@ dependencies = [
 [[package]]
 name = "polkadot-runtime"
 version = "0.8.22"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "bitvec",
  "frame-executive 2.0.0-rc5",
@@ -5586,13 +5586,13 @@ dependencies = [
  "sp-transaction-pool 2.0.0-rc5",
  "sp-version 2.0.0-rc5",
  "static_assertions",
- "substrate-wasm-builder-runner",
+ "substrate-wasm-builder-runner 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "polkadot-runtime-common"
 version = "0.8.22"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "bitvec",
  "frame-support 2.0.0-rc5",
@@ -5626,7 +5626,7 @@ dependencies = [
 [[package]]
 name = "polkadot-runtime-parachains"
 version = "0.8.0"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "bitvec",
  "frame-support 2.0.0-rc5",
@@ -6279,7 +6279,7 @@ dependencies = [
 [[package]]
 name = "rococo-parachain-primitives"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/cumulus#f006b0e1705396107cc6f717251824fa9f5756f8"
+source = "git+https://github.com/paritytech/cumulus#3da343b926eeb189ec3a89a359d927a83f987127"
 dependencies = [
  "sp-core 2.0.0-rc5",
  "sp-runtime 2.0.0-rc5",
@@ -6288,7 +6288,7 @@ dependencies = [
 [[package]]
 name = "rococo-runtime"
 version = "0.8.22"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "bitvec",
  "frame-executive 2.0.0-rc5",
@@ -6351,7 +6351,7 @@ dependencies = [
  "sp-transaction-pool 2.0.0-rc5",
  "sp-version 2.0.0-rc5",
  "static_assertions",
- "substrate-wasm-builder-runner",
+ "substrate-wasm-builder-runner 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -6845,7 +6845,6 @@ dependencies = [
  "parking_lot 0.10.2",
  "sc-executor-common 0.8.0-rc5",
  "sc-executor-wasmi 0.8.0-rc5",
- "sc-executor-wasmtime 0.8.0-rc5",
  "sp-api 2.0.0-rc5",
  "sp-core 2.0.0-rc5",
  "sp-externalities 0.8.0-rc5",
@@ -6874,7 +6873,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "sc-executor-common 0.8.0-rc6",
  "sc-executor-wasmi 0.8.0-rc6",
- "sc-executor-wasmtime 0.8.0-rc6",
+ "sc-executor-wasmtime",
  "sp-api 2.0.0-rc6",
  "sp-core 2.0.0-rc6",
  "sp-externalities 0.8.0-rc6",
@@ -6952,27 +6951,6 @@ dependencies = [
  "sp-runtime-interface 2.0.0-rc6",
  "sp-wasm-interface 2.0.0-rc6",
  "wasmi",
-]
-
-[[package]]
-name = "sc-executor-wasmtime"
-version = "0.8.0-rc5"
-source = "git+https://github.com/paritytech/substrate?branch=rococo-branch#f397f246fd0a0c8c2ef2f0b7576ecbed133ed78d"
-dependencies = [
- "cranelift-codegen",
- "cranelift-wasm",
- "log 0.4.11",
- "parity-scale-codec",
- "parity-wasm",
- "sc-executor-common 0.8.0-rc5",
- "scoped-tls",
- "sp-allocator 2.0.0-rc5",
- "sp-core 2.0.0-rc5",
- "sp-runtime-interface 2.0.0-rc5",
- "sp-wasm-interface 2.0.0-rc5",
- "substrate-wasmtime",
- "wasmtime-environ",
- "wasmtime-runtime",
 ]
 
 [[package]]
@@ -9314,29 +9292,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2a965994514ab35d3893e9260245f2947fd1981cdd4fffd2c6e6d1a9ce02e6a"
 
 [[package]]
-name = "substrate-wasmtime"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d75a69f5b3afef86e3e372529bf3fb1f7219b20287c4490e4cb4b4e91970f4f5"
-dependencies = [
- "anyhow",
- "backtrace",
- "cfg-if",
- "lazy_static",
- "libc",
- "log 0.4.11",
- "region",
- "rustc-demangle",
- "smallvec 1.4.2",
- "target-lexicon",
- "wasmparser 0.59.0",
- "wasmtime-environ",
- "wasmtime-jit",
- "wasmtime-profiling",
- "wasmtime-runtime",
- "wat",
- "winapi 0.3.9",
-]
+name = "substrate-wasm-builder-runner"
+version = "1.0.6"
+source = "git+https://github.com/paritytech/substrate?branch=rococo-branch#f397f246fd0a0c8c2ef2f0b7576ecbed133ed78d"
 
 [[package]]
 name = "subtle"
@@ -10484,7 +10442,7 @@ dependencies = [
 [[package]]
 name = "westend-runtime"
 version = "0.8.22"
-source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#93f0029184a6c1749ce9420f4df1628a313a117d"
+source = "git+https://github.com/paritytech/polkadot?branch=rococo-branch#83209d4e6d8e8e3ebae5ccd270e1e3c85fbdd75f"
 dependencies = [
  "bitvec",
  "frame-executive 2.0.0-rc5",
@@ -10547,7 +10505,7 @@ dependencies = [
  "sp-transaction-pool 2.0.0-rc5",
  "sp-version 2.0.0-rc5",
  "static_assertions",
- "substrate-wasm-builder-runner",
+ "substrate-wasm-builder-runner 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -10709,6 +10667,11 @@ dependencies = [
 
 [[patch.unused]]
 name = "frame-benchmarking-cli"
+version = "2.0.0-rc5"
+source = "git+https://github.com/paritytech/substrate?branch=rococo-branch#f397f246fd0a0c8c2ef2f0b7576ecbed133ed78d"
+
+[[patch.unused]]
+name = "frame-system-benchmarking"
 version = "2.0.0-rc5"
 source = "git+https://github.com/paritytech/substrate?branch=rococo-branch#f397f246fd0a0c8c2ef2f0b7576ecbed133ed78d"
 

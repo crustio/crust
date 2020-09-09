@@ -72,6 +72,21 @@ payment = { package = 'cstrml-payment', path = '../cstrml/payment', default-feat
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
 balances = { default-features = false, package = 'cstrml-balances', path = '../cstrml/balances' }
 
+# cumulus modules
+cumulus-message-broker = { git = "https://github.com/paritytech/cumulus", default-features = false }
+cumulus-parachain-upgrade = { git = "https://github.com/paritytech/cumulus", default-features = false }
+cumulus-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false }
+cumulus-runtime = { git = "https://github.com/paritytech/cumulus", default-features = false }
+cumulus-upward-message = { git = "https://github.com/paritytech/cumulus", default-features = false }
+
+cumulus-token-dealer = { git = "https://github.com/paritytech/cumulus", default-features = false }
+parachain-info = { git = "https://github.com/paritytech/cumulus", default-features = false }
+rococo-parachain-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false }
+
+# polkadot dependencies
+rococo-runtime = { git = "https://github.com/paritytech/polkadot", branch = "rococo-branch", default-features = false }
+polkadot-parachain = { git = "https://github.com/paritytech/polkadot", branch = "rococo-branch", default-features = false }
+
 [features]
 default = ['std']
 std = [
@@ -119,7 +134,17 @@ std = [
     'market/std',
     'payment/std',
     'primitives/std',
-    'pallet-transaction-payment-rpc-runtime-api/std'
+    'pallet-transaction-payment-rpc-runtime-api/std',
+    "cumulus-message-broker/std",
+    "cumulus-parachain-upgrade/std",
+    "cumulus-primitives/std",
+    "cumulus-runtime/std",
+    "cumulus-upward-message/std",
+    "cumulus-token-dealer/std",
+    "parachain-info/std",
+    "rococo-parachain-primitives/std",
+    "polkadot-parachain/std",
+    "rococo-runtime/std",
 ]
 runtime-benchmarks = [
     "frame-benchmarking",
@@ -132,4 +157,9 @@ runtime-benchmarks = [
     "staking/runtime-benchmarks",
     "market/runtime-benchmarks",
     "swork/runtime-benchmarks",
+]
+
+# Will be enabled by the `wasm-builder` when building the runtime for WASM.
+runtime-wasm = [
+    "cumulus-upward-message/runtime-wasm",
 ]

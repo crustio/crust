@@ -54,6 +54,10 @@ pub use sp_runtime::BuildStorage;
 use session::{historical as session_historical};
 pub use timestamp::Call as TimestampCall;
 
+/// Import the token dealer pallet.
+pub use cumulus_token_dealer;
+use rococo_parachain_primitives::*;
+
 use impls::CurrencyToVoteHandler;
 
 /// Crust primitives
@@ -560,6 +564,30 @@ impl payment::Trait for Runtime {
     type Frequency = Frequency;
 }
 
+impl cumulus_parachain_upgrade::Trait for Runtime {
+    type Event = Event;
+    type OnValidationFunctionParams = ();
+}
+
+impl cumulus_message_broker::Trait for Runtime {
+    type Event = Event;
+    type DownwardMessageHandlers = TokenDealer;
+    type UpwardMessage = cumulus_upward_message::RococoUpwardMessage;
+    type XCMPMessageHandlers = TokenDealer;
+    type XCMPMessage = cumulus_token_dealer::XCMPMessage<AccountId, Balance>;
+    type ParachainId = ParachainInfo;
+}
+
+impl cumulus_token_dealer::Trait for Runtime {
+    type Event = Event;
+    type UpwardMessageSender = MessageBroker;
+    type UpwardMessage = cumulus_upward_message::RococoUpwardMessage;
+    type Currency = Balances;
+    type XCMPMessageSender = MessageBroker;
+}
+
+impl parachain_info::Trait for Runtime {}
+
 construct_runtime! {
     pub enum Runtime where
         Block = Block,
@@ -602,6 +630,12 @@ construct_runtime! {
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: sudo::{Module, Call, Storage, Config<T>, Event<T>},
+
+        // Parachain
+        ParachainUpgrade: cumulus_parachain_upgrade::{Module, Call, Storage, Inherent, Event},
+		MessageBroker: cumulus_message_broker::{Module, Call, Inherent, Event<T>},
+		TokenDealer: cumulus_token_dealer::{Module, Call, Event<T>},
+		ParachainInfo: parachain_info::{Module, Storage, Config}
     }
 }
 
@@ -843,3 +877,5 @@ impl_runtime_apis! {
         }
     }
 }
+
+cumulus_runtime::register_validate_block!(Block, Executive);

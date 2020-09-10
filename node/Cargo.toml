@@ -19,29 +19,50 @@ structopt = { version = '0.3.8', optional = true }
 hex-literal = "0.2.1"
 
 # substrate client dependencies
-babe = { version = '0.8.0-rc6', package = 'sc-consensus-babe' }
-grandpa = { version = "0.8.0-rc6", package = "sc-finality-grandpa" }
-sc-basic-authorship = '0.8.0-rc6'
-authority-discovery = { version = '0.8.0-rc6', package= 'sc-authority-discovery' }
-sc-client-api = '2.0.0-rc6'
-sc-cli = { version = '0.8.0-rc6', features = ["wasmtime"], optional = true }
-sc-consensus = '0.8.0-rc6'
-sc-executor = { version = '0.8.0-rc6', features = ["wasmtime"] }
-sc-network = '0.8.0-rc6'
-service = { version = '0.8.0-rc6', package = "sc-service", features = ["wasmtime"] }
-sc-transaction-pool = '2.0.0-rc6'
+babe = {  package = "pallet-babe", git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+grandpa = { package = "pallet-grandpa", git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sc-basic-authorship = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+authority-discovery = { package= 'pallet-authority-discovery' , git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sc-client-api = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sc-cli = {  features = ["wasmtime"], optional = true, git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sc-consensus = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sc-executor = { features = ['wasmtime'], git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sc-network = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+service = { package = "sc-service", features = ['wasmtime'], git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sc-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
 
 # substrate primitives
-sp-transaction-pool = '2.0.0-rc6'
-sp-core = '2.0.0-rc6'
-sp-consensus = '0.8.0-rc6'
-sp-consensus-babe = '0.8.0-rc6'
-sp-inherents = '2.0.0-rc6'
-sp-io = '2.0.0-rc6'
-sp-runtime = '2.0.0-rc6'
-grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc6' }
-frame-benchmarking-cli = { version = '2.0.0-rc6', optional = true }
-frame-benchmarking = '2.0.0-rc6'
+sp-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sp-consensus = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sp-consensus-babe = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sp-inherents = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+grandpa-primitives = { package = 'sp-finality-grandpa', git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+frame-benchmarking-cli = { optional = true,  git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+
 
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.8.1' }
@@ -51,8 +72,8 @@ primitives = { package = 'cst-primitives', path = '../primitives', version = '0.
 crust-rpc = { path =  '../rpc', version = '0.8.1' }
 
 [build-dependencies]
-build-script-utils = { version = "2.0.0-rc6",  package = "substrate-build-script-utils", optional = true }
-frame-benchmarking-cli = { version = '2.0.0-rc6', optional = true }
+build-script-utils = {  git = "https://github.com/paritytech/substrate", branch = "rococo-branch", package = "substrate-build-script-utils", optional = true }
+frame-benchmarking-cli = { optional = true,  git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
 
 [features]
 default = [ "cli" ]

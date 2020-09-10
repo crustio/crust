@@ -76,20 +76,20 @@ payment = { package = 'cstrml-payment', path = '../cstrml/payment', default-feat
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
 balances = { default-features = false, package = 'cstrml-balances', path = '../cstrml/balances' }
 
-# cumulus modules
-cumulus-message-broker = { git = "https://github.com/paritytech/cumulus", default-features = false }
-cumulus-parachain-upgrade = { git = "https://github.com/paritytech/cumulus", default-features = false }
-cumulus-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false }
-cumulus-runtime = { git = "https://github.com/paritytech/cumulus", default-features = false }
-cumulus-upward-message = { git = "https://github.com/paritytech/cumulus", default-features = false }
+# Cumulus dependencies
+cumulus-runtime = { git = "https://github.com/paritytech/cumulus",  default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
+cumulus-parachain-upgrade = { git = "https://github.com/paritytech/cumulus",  default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
+cumulus-message-broker = { git = "https://github.com/paritytech/cumulus",  default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
+cumulus-upward-message = { git = "https://github.com/paritytech/cumulus",  default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
+cumulus-primitives = { git = "https://github.com/paritytech/cumulus",  default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
+cumulus-token-dealer = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
 
-cumulus-token-dealer = { git = "https://github.com/paritytech/cumulus", default-features = false }
-parachain-info = { git = "https://github.com/paritytech/cumulus", default-features = false }
-rococo-parachain-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false }
+parachain-info = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9'}
+rococo-parachain-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9'}
 
 # polkadot dependencies
-rococo-runtime = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = 'rococo-branch' }
-polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = 'rococo-branch'}
+rococo-runtime = { git = "https://github.com/paritytech/polkadot", default-features = false, rev = '93f0029184a6c1749ce9420f4df1628a313a117d' }
+polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, rev = '93f0029184a6c1749ce9420f4df1628a313a117d' }
 
 [features]
 default = ['std']

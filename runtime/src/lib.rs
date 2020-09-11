@@ -56,7 +56,6 @@ pub use timestamp::Call as TimestampCall;
 
 /// Import the token dealer pallet.
 pub use cumulus_token_dealer;
-use rococo_parachain_primitives::*;
 
 use impls::CurrencyToVoteHandler;
 

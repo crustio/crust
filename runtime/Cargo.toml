@@ -88,7 +88,6 @@ parachain-info = { git = "https://github.com/paritytech/cumulus", default-featur
 rococo-parachain-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9'}
 
 # polkadot dependencies
-rococo-runtime = { git = "https://github.com/paritytech/polkadot", default-features = false, rev = '93f0029184a6c1749ce9420f4df1628a313a117d' }
 polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, rev = '93f0029184a6c1749ce9420f4df1628a313a117d' }
 
 [features]
@@ -148,8 +147,7 @@ std = [
     "cumulus-token-dealer/std",
     "parachain-info/std",
     "rococo-parachain-primitives/std",
-    "polkadot-parachain/std",
-    "rococo-runtime/std",
+    "polkadot-parachain/std"
 ]
 runtime-benchmarks = [
     "frame-benchmarking",

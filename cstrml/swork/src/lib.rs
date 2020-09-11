@@ -27,7 +27,7 @@ use primitives::{
 use market::{OrderStatus, MarketInterface, OrderInspector};
 
 /// Provides crypto and other std functions by implementing `runtime_interface`
-pub mod api;
+// pub mod api;
 
 #[cfg(test)]
 mod mock;
@@ -665,14 +665,15 @@ impl<T: Trait> Module<T> {
         let enclave_code = Self::code();
         let applier = account_id.encode();
 
-        api::crypto::verify_identity(
+        /*api::crypto::verify_identity(
             ias_sig,
             ias_cert,
             &applier,
             isv_body,
             sig,
             &enclave_code,
-        )
+        )*/
+        None
     }
 
     /// This function is judging if the work report identity is legal,
@@ -735,14 +736,15 @@ impl<T: Trait> Module<T> {
         files: &Vec<(MerkleRoot, u64)>,
         sig: &SworkerSignature
     ) -> bool {
-        api::crypto::verify_work_report_sig(
+        /*api::crypto::verify_work_report_sig(
             pub_key,
             block_number,
             block_hash,
             reserved,
             files,
             sig,
-        )
+        )*/
+        false
     }
 
     fn get_current_block_number() -> BlockNumber {

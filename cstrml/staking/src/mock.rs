@@ -4,7 +4,7 @@ use crate::*;
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     StorageValue, IterableStorageMap,
-    traits::{Currency, Get, FindAuthor, OnInitialize},
+    traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize},
     weights::{Weight, constants::RocksDbWeight},
 };
 use sp_core::{crypto::key_types, H256};
@@ -218,7 +218,7 @@ parameter_types! {
 }
 impl Trait for Test {
     type Currency = balances::Module<Self>;
-    type Time = pallet_timestamp::Module<Self>;
+    type UnixTime = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
     type Randomness = ();
@@ -551,8 +551,8 @@ pub fn advance_session() {
 
 pub fn start_session(session_index: SessionIndex, with_reward: bool) {
     // Compensate for session delay
-    let session_index = session_index + 1;
     for i in Session::current_index()..session_index {
+        Staking::on_finalize(System::block_number());
         System::set_block_number(((i+1)*100).into());
         if with_reward {
             Timestamp::set_timestamp(System::block_number() * 1000);
@@ -565,7 +565,8 @@ pub fn start_session(session_index: SessionIndex, with_reward: bool) {
 
 pub fn start_era(era_index: EraIndex, with_reward: bool) {
     start_session((era_index * 3).into(), with_reward);
-    assert_eq!(Staking::current_era().unwrap_or(0), era_index);
+    assert_eq!(Staking::current_era().unwrap(), era_index);
+    assert_eq!(Staking::active_era().unwrap().index, era_index);
 }
 
 pub fn reward_all_elected() {
@@ -606,7 +607,7 @@ pub fn on_offence_in_era(
         let _ = Staking::on_offence(
             offenders,
             slash_fraction,
-            Staking::current_era_start_session_index(),
+            Staking::eras_start_session_index(era).unwrap(),
         );
     } else {
         panic!("cannot slash in era {}", era);

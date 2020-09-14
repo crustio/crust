@@ -14,24 +14,24 @@ frame-rpc-system = { package = "substrate-frame-rpc-system", version = "2.0.0-rc
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false }
 
 # substrate client dependencies
-sc-client-api = "2.0.0-rc6"
-sc-rpc = "2.0.0-rc6"
-sc-consensus-babe = "0.8.0-rc6"
-sc-consensus-babe-rpc = "0.8.0-rc6"
-sc-consensus-epochs = "0.8.0-rc6"
-sc-finality-grandpa = "0.8.0-rc6"
-sc-finality-grandpa-rpc = "0.8.0-rc6"
-sc-keystore = "2.0.0-rc6"
+sc-client-api = { version = "2.0.0-rc6" }
+sc-rpc = { version = "2.0.0-rc6" }
+sc-consensus-babe = { version = "0.8.0-rc6" }
+sc-consensus-babe-rpc = { version = "0.8.0-rc6" }
+sc-consensus-epochs = { version = "0.8.0-rc6" }
+sc-finality-grandpa = { version = "0.8.0-rc6" }
+sc-finality-grandpa-rpc = { version = "0.8.0-rc6" }
+sc-keystore = { version = "2.0.0-rc6" }
 
 # substrate pallet dependencies
-sp-blockchain = "2.0.0-rc6"
-sp-runtime = "2.0.0-rc6"
-sp-api = "2.0.0-rc6"
-sp-consensus = "0.8.0-rc6"
-sp-consensus-babe = "0.8.0-rc6"
+sp-blockchain = { version = "2.0.0-rc6" }
+sp-runtime = { version = "2.0.0-rc6" }
+sp-api = { version = "2.0.0-rc6" }
+sp-consensus = { version = "0.8.0-rc6" }
+sp-consensus-babe = { version = "0.8.0-rc6" }
 txpool-api = { package = "sp-transaction-pool", version = "2.0.0-rc6" }
-pallet-transaction-payment-rpc = "2.0.0-rc6"
-sp-block-builder = "2.0.0-rc6"
+pallet-transaction-payment-rpc = { version = "2.0.0-rc6" }
+sp-block-builder = { version = "2.0.0-rc6" }
 
 # crust dependent
 crust-primitives = { package = 'cst-primitives', path='../primitives' }

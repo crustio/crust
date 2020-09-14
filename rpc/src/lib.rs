@@ -63,9 +63,9 @@ pub struct FullDeps<C, P, SC> {
     /// Whether to deny unsafe calls
     pub deny_unsafe: DenyUnsafe,
     /// BABE specific dependencies.
-    pub babe: BabeDeps,
+    pub babe: Option<BabeDeps>,
     /// GRANDPA specific dependencies.
-    pub grandpa: GrandpaDeps,
+    pub grandpa: Option<GrandpaDeps>,
 }
 
 /// Instantiate all RPC extensions.
@@ -91,20 +91,46 @@ pub fn create_full<C, P, SC>(deps: FullDeps<C, P, SC>) -> RpcExtension where
         pool,
         select_chain,
         deny_unsafe,
-        babe,
-        grandpa,
+        babe: maybe_babe,
+        grandpa: maybe_grandpa,
     } = deps;
-    let BabeDeps {
-        keystore,
-        babe_config,
-        shared_epoch_changes,
-    } = babe;
-    let GrandpaDeps {
-        shared_voter_state,
-        shared_authority_set,
-        justification_stream,
-        subscriptions,
-    } = grandpa;
+
+    if let Some(babe) = maybe_babe {
+        let BabeDeps {
+            keystore,
+            babe_config,
+            shared_epoch_changes,
+        } = babe;
+
+        io.extend_with(
+            sc_consensus_babe_rpc::BabeApi::to_delegate(
+                BabeRpcHandler::new(
+                    client,
+                    shared_epoch_changes,
+                    keystore,
+                    babe_config,
+                    select_chain,
+                    deny_unsafe,
+                )
+            )
+        );
+    }
+    if let Some(grandpa) = maybe_grandpa {
+        let GrandpaDeps {
+            shared_voter_state,
+            shared_authority_set,
+            justification_stream,
+            subscriptions,
+        } = grandpa;
+        io.extend_with(
+            GrandpaApi::to_delegate(GrandpaRpcHandler::new(
+                shared_authority_set,
+                shared_voter_state,
+                justification_stream,
+                subscriptions,
+            ))
+        );
+    }
 
     io.extend_with(
         SystemApi::to_delegate(FullSystem::new(client.clone(), pool, deny_unsafe))
@@ -112,26 +138,7 @@ pub fn create_full<C, P, SC>(deps: FullDeps<C, P, SC>) -> RpcExtension where
     io.extend_with(
         TransactionPaymentApi::to_delegate(TransactionPayment::new(client.clone()))
     );
-    io.extend_with(
-        sc_consensus_babe_rpc::BabeApi::to_delegate(
-            BabeRpcHandler::new(
-                client,
-                shared_epoch_changes,
-                keystore,
-                babe_config,
-                select_chain,
-                deny_unsafe,
-            )
-        )
-    );
-    io.extend_with(
-        GrandpaApi::to_delegate(GrandpaRpcHandler::new(
-            shared_authority_set,
-            shared_voter_state,
-            justification_stream,
-            subscriptions,
-        ))
-    );
+
     io
 }
 

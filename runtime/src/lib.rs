@@ -822,14 +822,14 @@ impl_runtime_apis! {
 			repeat: u32,
 			extra: bool,
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-            use frame_benchmarking::{BenchmarkBatch, add_benchmark, Benchmarking};
+            use frame_benchmarking::{BenchmarkBatch, add_benchmark, Benchmarking, TrackedStorageKey};
             // Trying to add benchmarks directly to the Session Pallet caused cyclic dependency issues.
             // To get around that, we separated the Session benchmarks into its own crate, which is why
             // we need these two lines below.
             use frame_system_benchmarking::Module as SystemBench;
 
             impl frame_system_benchmarking::Trait for Runtime {}
-            let whitelist: Vec<Vec<u8>> = vec![];
+            let whitelist: Vec<TrackedStorageKey> = vec![];
             let mut batches = Vec::<BenchmarkBatch>::new();
 			let params = (&pallet, &benchmark, &lowest_range_values, &highest_range_values, &steps, repeat, &whitelist, extra);
             add_benchmark!(params, batches, balances, Balances);

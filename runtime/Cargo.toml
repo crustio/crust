@@ -10,11 +10,7 @@ repository = "https://github.com/crustio/crust/"
 
 [build-dependencies.wasm-builder-runner]
 package = "substrate-wasm-builder-runner"
-git = "https://github.com/paritytech/substrate"
-branch = "rococo-branch" 
-
-[dev-dependencies]
-sp-io = { git = "https://github.com/paritytech/substrate", branch = "rococo-branch"  }
+version = "1.0.6"
 
 [dependencies]
 # third party dependencies
@@ -83,12 +79,7 @@ cumulus-message-broker = { git = "https://github.com/paritytech/cumulus",  defau
 cumulus-upward-message = { git = "https://github.com/paritytech/cumulus",  default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
 cumulus-primitives = { git = "https://github.com/paritytech/cumulus",  default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
 cumulus-token-dealer = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
-
-parachain-info = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9'}
-rococo-parachain-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9'}
-
-# polkadot dependencies
-polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, rev = '93f0029184a6c1749ce9420f4df1628a313a117d' }
+parachain-info = { git = "https://github.com/paritytech/cumulus", default-features = false, rev = '4e7f138c828bcf118df1c988a400d4dac8e904d9' }
 
 [features]
 default = ['std']
@@ -145,24 +136,8 @@ std = [
     "cumulus-runtime/std",
     "cumulus-upward-message/std",
     "cumulus-token-dealer/std",
-    "parachain-info/std",
-    "rococo-parachain-primitives/std",
-    "polkadot-parachain/std"
+    "parachain-info/std"
 ]
-runtime-benchmarks = [
-    "frame-benchmarking",
-    "frame-support/runtime-benchmarks",
-    "system/runtime-benchmarks",
-    "sp-runtime/runtime-benchmarks",
-    "collective/runtime-benchmarks",
-    "balances/runtime-benchmarks",
-    "frame-system-benchmarking",
-    "staking/runtime-benchmarks",
-    "market/runtime-benchmarks",
-    "swork/runtime-benchmarks",
-]
-
-disable-runtime-api = []
 
 # Will be enabled by the `wasm-builder` when building the runtime for WASM.
 runtime-wasm = [

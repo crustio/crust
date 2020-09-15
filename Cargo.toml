@@ -9,6 +9,5 @@ members = [
     'cstrml/market',
     'cstrml/payment',
     'runtime',
-    'rpc',
     'node',
 ]

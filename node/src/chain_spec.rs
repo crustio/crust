@@ -175,6 +175,11 @@ pub fn maxwell_config() -> Result<CrustChainSpec, String> {
     CrustChainSpec::from_json_bytes(&include_bytes!("../res/maxwell.json")[..])
 }
 
+/// Crust maxwell rococo parachain(aka. open testnet) config
+pub fn maxwell_rococo_config() -> Result<CrustChainSpec, String> {
+    CrustChainSpec::from_json_bytes(&include_bytes!("../res/maxwell-rococo.json")[..])
+}
+
 /// Crust rocky staging config
 pub fn rocky_staging_config(id: ParaId) -> Result<CrustChainSpec, String> {
     Ok(CrustChainSpec::from_genesis(

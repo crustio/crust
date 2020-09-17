@@ -19,29 +19,30 @@ serde = { features = ['derive'], optional = true, version = '1.0.106' }
 static_assertions = "1.1.0"
 
 # substrate frame dependencies
-authorship = { default-features = false, package = 'pallet-authorship', version = '2.0.0-rc6' }
-authority-discovery = { default-features = false, package = 'pallet-authority-discovery', version = '2.0.0-rc6' }
-babe = { default-features = false, package = 'pallet-babe', version = '2.0.0-rc6' }
-collective = { default-features = false, package = 'pallet-collective', version = '2.0.0-rc6' }
+pallet-authorship = { default-features = false, version = '2.0.0-rc6' }
+pallet-authority-discovery = { default-features = false, version = '2.0.0-rc6' }
+pallet-babe = { default-features = false, version = '2.0.0-rc6' }
+pallet-collective = { default-features = false, version = '2.0.0-rc6' }
+pallet-finality-tracker = { default-features = false, version = '2.0.0-rc6' }
+pallet-grandpa = { default-features = false, version = '2.0.0-rc6' }
+pallet-indices = { version = '2.0.0-rc6', default-features = false }
+pallet-im-online = { default-features = false, version = '2.0.0-rc6' }
+pallet-randomness-collective-flip = { default-features = false, version = '2.0.0-rc6' }
+frame-system = { default-features = false, version = '2.0.0-rc6' }
+pallet-session = { default-features = false, version = '2.0.0-rc6' }
+pallet-staking-reward-curve = { default-features = false, version = '2.0.0-rc6' }
+pallet-timestamp = { default-features = false, version = '2.0.0-rc6' }
+pallet-transaction-payment = { default-features = false, version = '2.0.0-rc6' }
+pallet-scheduler = { default-features = false, version = '2.0.0-rc6' }
+pallet-sudo = { default-features = false, version = '2.0.0-rc6' }
+pallet-offences = { default-features = false, version = '2.0.0-rc6' }
+pallet-treasury = { default-features = false, version = '2.0.0-rc6' }
+pallet-elections-phragmen = { default-features = false, version = '2.0.0-rc6' }
+pallet-identity = { default-features = false, version = '2.0.0-rc6'}
+pallet-utility = { default-features = false, version = '2.0.0-rc6' }
+
 frame-executive = { default-features = false, version = '2.0.0-rc6' }
 frame-support = { default-features = false, version = "2.0.0-rc6" }
-finality-tracker = { default-features = false, package = 'pallet-finality-tracker', version = '2.0.0-rc6' }
-grandpa = { default-features = false, package = 'pallet-grandpa', version = '2.0.0-rc6' }
-indices = { package = "pallet-indices", version = '2.0.0-rc6', default-features = false }
-im-online = { default-features = false, package = 'pallet-im-online', version = '2.0.0-rc6' }
-randomness-collective-flip = { default-features = false, package = 'pallet-randomness-collective-flip', version = '2.0.0-rc6' }
-system = { default-features = false, package = 'frame-system', version = '2.0.0-rc6' }
-session = { default-features = false, package = 'pallet-session', version = '2.0.0-rc6' }
-pallet-staking-reward-curve = { default-features = false, version = '2.0.0-rc6' }
-timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-rc6' }
-transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-rc6' }
-scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc6' }
-sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc6' }
-offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc6' }
-treasury = { default-features = false, package = 'pallet-treasury', version = '2.0.0-rc6' }
-elections-phragmen = { default-features = false, package = 'pallet-elections-phragmen', version = '2.0.0-rc6' }
-identity = { default-features = false, package = 'pallet-identity', version = '2.0.0-rc6'}
-utility = { default-features = false, package = 'pallet-utility', version = '2.0.0-rc6' }
 frame-benchmarking = { default-features = false, version = '2.0.0-rc6', optional = true }
 frame-system-benchmarking = { default-features = false, version = '2.0.0-rc6', optional = true }
 
@@ -77,21 +78,21 @@ balances = { default-features = false, package = 'cstrml-balances', path = '../c
 [features]
 default = ['std']
 std = [
-    'authorship/std',
+    'pallet-authorship/std',
     'authority-discovery-primitives/std',
-    'authority-discovery/std',
-    'babe/std',
+    'pallet-authority-discovery/std',
+    'pallet-babe/std',
     'babe-primitives/std',
     'balances/std',
     'codec/std',
-    'collective/std',
+    'pallet-collective/std',
     'frame-executive/std',
     'frame-support/std',
-    'grandpa/std',
-    'finality-tracker/std',
-    'im-online/std',
-    'indices/std',
-    'randomness-collective-flip/std',
+    'pallet-grandpa/std',
+    'pallet-finality-tracker/std',
+    'pallet-im-online/std',
+    'pallet-indices/std',
+    'pallet-randomness-collective-flip/std',
     'serde',
     'sp-api/std',
     'sp-block-builder/std',
@@ -105,16 +106,16 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
-    'sudo/std',
-    'session/std',
-    'system/std',
+    'pallet-sudo/std',
+    'pallet-session/std',
+    'frame-system/std',
     'frame-system-rpc-runtime-api/std',
-    'timestamp/std',
-    'transaction-payment/std',
-    'scheduler/std',
-    'offences/std',
-    'treasury/std',
-    'elections-phragmen/std',
+    'pallet-timestamp/std',
+    'pallet-transaction-payment/std',
+    'pallet-scheduler/std',
+    'pallet-offences/std',
+    'pallet-treasury/std',
+    'pallet-elections-phragmen/std',
     'sp-runtime-interface/std',
     'swork/std',
     'staking/std',
@@ -122,15 +123,15 @@ std = [
     'payment/std',
     'primitives/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
-    'utility/std',
-    'identity/std'
+    'pallet-utility/std',
+    'pallet-identity/std'
 ]
 runtime-benchmarks = [
     "frame-benchmarking",
     "frame-support/runtime-benchmarks",
-    "system/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
     "sp-runtime/runtime-benchmarks",
-    "collective/runtime-benchmarks",
+    "pallet-collective/runtime-benchmarks",
     "balances/runtime-benchmarks",
     "frame-system-benchmarking",
     "staking/runtime-benchmarks",

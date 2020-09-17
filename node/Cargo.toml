@@ -1,10 +1,6 @@
 [package]
 name = 'crust'
-<<<<<<< HEAD
 version = '0.8.0'
-=======
-version = '0.8.1'
->>>>>>> 316e448c061bba5268f94e197129fdff8cbe23aa
 authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
@@ -23,16 +19,16 @@ structopt = { version = '0.3.8', optional = true }
 hex-literal = "0.2.1"
 
 # substrate client dependencies
-babe = { version = '0.8.0-rc6', package = 'sc-consensus-babe' }
-grandpa = { version = "0.8.0-rc6", package = "sc-finality-grandpa" }
+sc-consensus-babe = '0.8.0-rc6'
+sc-finality-grandpa = "0.8.0-rc6"
 sc-basic-authorship = '0.8.0-rc6'
-authority-discovery = { version = '0.8.0-rc6', package= 'sc-authority-discovery' }
+sc-authority-discovery = '0.8.0-rc6'
 sc-client-api = '2.0.0-rc6'
 sc-cli = { version = '0.8.0-rc6', features = ["wasmtime"], optional = true }
 sc-consensus = '0.8.0-rc6'
 sc-executor = { version = '0.8.0-rc6', features = ["wasmtime"] }
 sc-network = '0.8.0-rc6'
-service = { version = '0.8.0-rc6', package = "sc-service", features = ["wasmtime"] }
+sc-service = { version = '0.8.0-rc6', features = ["wasmtime"] }
 sc-transaction-pool = '2.0.0-rc6'
 
 # substrate primitives
@@ -43,7 +39,7 @@ sp-consensus-babe = '0.8.0-rc6'
 sp-inherents = '2.0.0-rc6'
 sp-io = '2.0.0-rc6'
 sp-runtime = '2.0.0-rc6'
-grandpa-primitives = { package = 'sp-finality-grandpa', version = '2.0.0-rc6' }
+sp-finality-grandpa = '2.0.0-rc6'
 frame-benchmarking-cli = { version = '2.0.0-rc6', optional = true }
 frame-benchmarking = '2.0.0-rc6'
 
@@ -64,7 +60,7 @@ cli = [
     "wasmi-errno",
     "sc-cli",
     "frame-benchmarking-cli",
-    "service/db",
+    "sc-service/db",
     "structopt",
     "build-script-utils",
 ]

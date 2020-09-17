@@ -8,7 +8,7 @@ use crate::cli::{Cli, Subcommand};
 use crate::service as crust_service;
 use crate::executor::Executor;
 use crust_service::{new_partial, new_full, new_light};
-use service::PartialComponents;
+use sc_service::PartialComponents;
 use sc_cli::{SubstrateCli, RuntimeVersion, Role, ChainSpec};
 use crust_runtime::Block;
 
@@ -27,7 +27,7 @@ impl SubstrateCli for Cli {
 
     fn copyright_start_year() -> i32 { 2019 }
 
-    fn load_spec(&self, id: &str) -> Result<Box<dyn service::ChainSpec>, String> {
+    fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
         Ok(match id {
             "rocky" => Box::new(chain_spec::rocky_config()?),
             "maxwell" => Box::new(chain_spec::maxwell_config()?),

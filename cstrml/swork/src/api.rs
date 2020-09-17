@@ -143,8 +143,6 @@ DaVzWh5aiEx+idkSGMnX
         block_hash: &Vec<u8>,
         rsv: u64,
         fs: &Vec<(MerkleRoot, u64)>,
-        reserved_root: &MerkleRoot,
-        files_root: &MerkleRoot,
         sig: &Vec<u8>,
     ) -> bool {
         // 1. Encode u64
@@ -152,15 +150,13 @@ DaVzWh5aiEx+idkSGMnX
         let reserved = rsv.to_string().as_bytes().to_vec();
         let files_byes = encode_files(fs);
 
-        // 2. Construct work report data
+        // 2. Construct identity data
         //{
         //    pub_key: PubKey,
         //    block_number: u64,
         //    block_hash: Vec<u8>,
         //    reserved: u64,
-        //    files: Vec<(MerkleRoot, u64)> -> Vec<u8>,
-        //    reserved_root: Vec<u8>,
-        //    files_root: Vec<u8>
+        //    files: Vec<(MerkleRoot, u64)> -> Vec<u8>
         //}
         let data: Vec<u8> = [
             &pk[..],
@@ -168,8 +164,6 @@ DaVzWh5aiEx+idkSGMnX
             &block_hash[..],
             &reserved[..],
             &files_byes[..],
-            &reserved_root[..],
-            &files_root[..]
         ]
         .concat();
 

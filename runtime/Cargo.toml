@@ -40,6 +40,8 @@ sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc6
 offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc6' }
 treasury = { default-features = false, package = 'pallet-treasury', version = '2.0.0-rc6' }
 elections-phragmen = { default-features = false, package = 'pallet-elections-phragmen', version = '2.0.0-rc6' }
+identity = { default-features = false, package = 'pallet-identity', version = '2.0.0-rc6'}
+utility = { default-features = false, package = 'pallet-utility', version = '2.0.0-rc6' }
 frame-benchmarking = { default-features = false, version = '2.0.0-rc6', optional = true }
 frame-system-benchmarking = { default-features = false, version = '2.0.0-rc6', optional = true }
 
@@ -119,7 +121,9 @@ std = [
     'market/std',
     'payment/std',
     'primitives/std',
-    'pallet-transaction-payment-rpc-runtime-api/std'
+    'pallet-transaction-payment-rpc-runtime-api/std',
+    'utility/std',
+    'identity/std'
 ]
 runtime-benchmarks = [
     "frame-benchmarking",

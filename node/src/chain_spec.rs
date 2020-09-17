@@ -8,10 +8,10 @@ use crust_runtime::{
 };
 use cstrml_staking::Forcing;
 use cstrml_swork::WorkReport;
-use grandpa_primitives::AuthorityId as GrandpaId;
+use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
-use service::ChainType;
+use sc_service::ChainType;
 use sp_runtime::{traits::{Verify, IdentifyAccount}, Perbill};
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";
@@ -67,7 +67,7 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (
 }
 
 /// The `ChainSpec parametrised for crust runtime`.
-pub type CrustChainSpec = service::GenericChainSpec<GenesisConfig>;
+pub type CrustChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
 type AccountPublic = <Signature as Verify>::Signer;
 
 /// Crust development config (single validator Alice)

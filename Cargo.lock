@@ -917,7 +917,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "crust"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "crust-rpc",
  "crust-runtime",

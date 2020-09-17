@@ -204,10 +204,10 @@ fn testnet_genesis(
     const STASH: u128 = 20_000 * CRUS;
 	let num_endowed_accounts = endowed_accounts.len();
     GenesisConfig {
-        sudo: Some(SudoConfig {
+        pallet_sudo: Some(SudoConfig {
             key: endowed_accounts[0].clone(),
         }),
-        system: Some(SystemConfig {
+        frame_system: Some(SystemConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
@@ -218,10 +218,10 @@ fn testnet_genesis(
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
         }),
-        indices: Some(IndicesConfig {
+        pallet_indices: Some(IndicesConfig {
             indices: vec![],
         }),
-        session: Some(SessionConfig {
+        pallet_session: Some(SessionConfig {
             keys: initial_authorities
                 .iter()
                 .map(|x| {
@@ -245,10 +245,10 @@ fn testnet_genesis(
             slash_reward_fraction: Perbill::from_percent(10),
             ..Default::default()
         }),
-        babe: Some(Default::default()),
-        grandpa: Some(Default::default()),
-        im_online: Some(Default::default()),
-        authority_discovery: Some(AuthorityDiscoveryConfig {
+        pallet_babe: Some(Default::default()),
+        pallet_grandpa: Some(Default::default()),
+        pallet_im_online: Some(Default::default()),
+        pallet_authority_discovery: Some(AuthorityDiscoveryConfig {
             keys: vec![]
         }),
         swork: Some(SworkConfig {
@@ -268,9 +268,9 @@ fn testnet_genesis(
                 })
                 .collect(),
         }),
-        collective_Instance1: Some(CouncilConfig::default()),
-        treasury: Some(Default::default()),
-        elections_phragmen: Some(ElectionsConfig {
+        pallet_collective_Instance1: Some(CouncilConfig::default()),
+        pallet_treasury: Some(Default::default()),
+        pallet_elections_phragmen: Some(ElectionsConfig {
 			members: endowed_accounts.iter()
 						.take((num_endowed_accounts + 1) / 2)
 						.cloned()
@@ -332,10 +332,10 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     const WORKLOAD: u64 = 1073741824;
 
     GenesisConfig {
-        sudo: Some(SudoConfig {
+        pallet_sudo: Some(SudoConfig {
             key: endowed_accounts[0].clone(),
         }),
-        system: Some(SystemConfig {
+        frame_system: Some(SystemConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
@@ -346,10 +346,10 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
         }),
-        indices: Some(IndicesConfig {
+        pallet_indices: Some(IndicesConfig {
             indices: vec![],
         }),
-        session: Some(SessionConfig {
+        pallet_session: Some(SessionConfig {
             keys: initial_authorities.iter().map(|x| (
                 x.0.clone(),
                 x.0.clone(),
@@ -368,10 +368,10 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             slash_reward_fraction: Perbill::from_percent(10),
             ..Default::default()
         }),
-        babe: Some(Default::default()),
-        grandpa: Some(Default::default()),
-        im_online: Some(Default::default()),
-        authority_discovery: Some(AuthorityDiscoveryConfig {
+        pallet_babe: Some(Default::default()),
+        pallet_grandpa: Some(Default::default()),
+        pallet_im_online: Some(Default::default()),
+        pallet_authority_discovery: Some(AuthorityDiscoveryConfig {
             keys: vec![]
         }),
         swork: Some(SworkConfig {
@@ -398,9 +398,9 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 ))
                 .collect(),
         }),
-        collective_Instance1: Some(CouncilConfig::default()),
-        treasury: Some(Default::default()),
-        elections_phragmen: Some(ElectionsConfig {
+        pallet_collective_Instance1: Some(CouncilConfig::default()),
+        pallet_treasury: Some(Default::default()),
+        pallet_elections_phragmen: Some(ElectionsConfig {
 			members: endowed_accounts.iter()
 						.take((num_endowed_accounts + 1) / 2)
 						.cloned()
@@ -466,10 +466,10 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     const WORKLOAD: u64 = 1073741824;
 
     GenesisConfig {
-        sudo: Some(SudoConfig {
+        pallet_sudo: Some(SudoConfig {
             key: endowed_accounts[0].clone(),
         }),
-        system: Some(SystemConfig {
+        frame_system: Some(SystemConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
@@ -480,10 +480,10 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
         }),
-        indices: Some(IndicesConfig {
+        pallet_indices: Some(IndicesConfig {
             indices: vec![],
         }),
-        session: Some(SessionConfig {
+        pallet_session: Some(SessionConfig {
             keys: initial_authorities.iter().map(|x| (
                 x.0.clone(),
                 x.0.clone(),
@@ -502,10 +502,10 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             slash_reward_fraction: Perbill::from_percent(10),
             ..Default::default()
         }),
-        babe: Some(Default::default()),
-        grandpa: Some(Default::default()),
-        im_online: Some(Default::default()),
-        authority_discovery: Some(AuthorityDiscoveryConfig {
+        pallet_babe: Some(Default::default()),
+        pallet_grandpa: Some(Default::default()),
+        pallet_im_online: Some(Default::default()),
+        pallet_authority_discovery: Some(AuthorityDiscoveryConfig {
             keys: vec![]
         }),
         swork: Some(SworkConfig {
@@ -532,9 +532,9 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
                 ))
                 .collect(),
         }),
-        collective_Instance1: Some(CouncilConfig::default()),
-        treasury: Some(Default::default()),
-        elections_phragmen: Some(ElectionsConfig {
+        pallet_collective_Instance1: Some(CouncilConfig::default()),
+        pallet_treasury: Some(Default::default()),
+        pallet_elections_phragmen: Some(ElectionsConfig {
 			members: endowed_accounts.iter()
 						.take((num_endowed_accounts + 1) / 2)
 						.cloned()

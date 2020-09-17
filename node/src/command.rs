@@ -6,14 +6,14 @@
 use crate::chain_spec;
 use crate::cli::{Cli, Subcommand};
 use crate::service as crust_service;
-use crate::service::new_full_params;
 use crate::executor::Executor;
-use service::ServiceParams;
+use crust_service::{new_partial, new_full, new_light};
+use service::PartialComponents;
 use sc_cli::{SubstrateCli, RuntimeVersion, Role, ChainSpec};
 use crust_runtime::Block;
 
 impl SubstrateCli for Cli {
-    fn impl_name() -> String { "Crust Node".into() }
+    fn impl_name() -> String { "Crust".into() }
 
     fn impl_version() -> String { env!("SUBSTRATE_CLI_IMPL_VERSION").into() }
 
@@ -54,8 +54,8 @@ pub fn run() -> sc_cli::Result<()> {
         Some(Subcommand::Base(subcommand)) => {
             let runner = cli.create_runner(subcommand)?;
             runner.run_subcommand(subcommand, |config| {
-                let (ServiceParams { client, backend, task_manager, import_queue, .. }, ..)
-                    = new_full_params(config)?;
+                let PartialComponents { client, backend, task_manager, import_queue, .. }
+                    = new_partial(&config)?;
                 Ok((client, backend, import_queue, task_manager))
             })
         }
@@ -73,8 +73,8 @@ pub fn run() -> sc_cli::Result<()> {
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit( |config| match config.role {
-                Role::Light => crust_service::new_light(config),
-                _ => crust_service::new_full(config),
+                Role::Light => new_light(config),
+                _ => new_full(config),
             })
         }
     }

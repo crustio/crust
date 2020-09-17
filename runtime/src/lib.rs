@@ -9,9 +9,10 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 mod impls;
+mod weights;
 
 use sp_core::{
-    u32_trait::{_2, _4},
+    u32_trait::{_1, _2, _4},
     OpaqueMetadata,
 };
 use sp_runtime::traits::{
@@ -110,6 +111,12 @@ pub fn native_version() -> NativeVersion {
         can_author_with: Default::default(),
     }
 }
+
+type MoreThanHalfCouncil = EnsureOneOf<
+    AccountId,
+    EnsureRoot<AccountId>,
+    collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>
+>;
 
 parameter_types! {
     pub const BlockHashCount: BlockNumber = 2400;
@@ -288,6 +295,37 @@ impl finality_tracker::Trait for Runtime {
 }
 
 parameter_types! {
+	// Minimum 100 bytes/CRU deposited (1 CENT/byte)
+	pub const BasicDeposit: Balance = 10 * DOLLARS;       // 258 bytes on-chain
+	pub const FieldDeposit: Balance = 250 * CENTS;        // 66 bytes on-chain
+	pub const SubAccountDeposit: Balance = 2 * DOLLARS;   // 53 bytes on-chain
+	pub const MaxSubAccounts: u32 = 100;
+	pub const MaxAdditionalFields: u32 = 100;
+	pub const MaxRegistrars: u32 = 20;
+}
+
+impl identity::Trait for Runtime {
+    type Event = Event;
+    type Currency = Balances;
+    type Slashed = Treasury;
+    type BasicDeposit = BasicDeposit;
+    type FieldDeposit = FieldDeposit;
+    type SubAccountDeposit = SubAccountDeposit;
+    type MaxSubAccounts = MaxSubAccounts;
+    type MaxAdditionalFields = MaxAdditionalFields;
+    type MaxRegistrars = MaxRegistrars;
+    type RegistrarOrigin = MoreThanHalfCouncil;
+    type ForceOrigin = MoreThanHalfCouncil;
+    type WeightInfo = ();
+}
+
+impl utility::Trait for Runtime {
+    type Event = Event;
+    type Call = Call;
+    type WeightInfo = weights::pallet_utility::WeightInfo;
+}
+
+parameter_types! {
     pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
 
@@ -345,13 +383,14 @@ parameter_types! {
 
 impl staking::Trait for Runtime {
     type Currency = Balances;
-    type Time = Timestamp;
+    type UnixTime = Timestamp;
 
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
     type Event = Event;
     type Slash = ();
     type Reward = ();
+    type Randomness = RandomnessCollectiveFlip;
     type SessionsPerEra = SessionsPerEra;
     type BondingDuration = BondingDuration;
     type SlashDeferDuration = SlashDeferDuration;
@@ -569,7 +608,7 @@ construct_runtime! {
         System: system::{Module, Call, Storage, Config, Event<T>},
         RandomnessCollectiveFlip: randomness_collective_flip::{Module, Storage},
 
-        // Must be before session.
+        // Must be before session
         Babe: babe::{Module, Call, Storage, Config, Inherent, ValidateUnsigned},
 
         Timestamp: timestamp::{Module, Call, Storage, Inherent},
@@ -587,12 +626,20 @@ construct_runtime! {
         ImOnline: im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: authority_discovery::{Module, Call, Config},
         Offences: offences::{Module, Call, Storage, Event},
+
+        // Governance stuff
         Treasury: treasury::{Module, Call, Storage, Config, Event<T>},
         Council: collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
         Elections: elections_phragmen::{Module, Call, Storage, Event<T>, Config<T>},
 
         // System scheduler
         Scheduler: scheduler::{Module, Call, Storage, Event<T>},
+
+        // Utility module
+		Utility: utility::{Module, Call, Event},
+
+		// Less simple identity module
+		Identity: identity::{Module, Call, Storage, Event<T>},
 
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
@@ -798,6 +845,18 @@ impl_runtime_apis! {
         }
     }
 
+    impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<
+        Block,
+        Balance,
+    > for Runtime {
+        fn query_info(
+            uxt: <Block as BlockT>::Extrinsic,
+            len: u32
+        ) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
+			TransactionPayment::query_info(uxt, len)
+		}
+    }
+
     #[cfg(feature = "runtime-benchmarks")]
     impl frame_benchmarking::Benchmark<Block> for Runtime {
         fn dispatch_benchmark(
@@ -829,17 +888,4 @@ impl_runtime_apis! {
             Ok(batches)
         }
     }
-
-    // FIXME: 3rd type argument failed, bump it next version: https://github.com/paritytech/substrate/pull/6792/files
-    /*impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<
-        Block,
-        Balance,
-    > for Runtime {
-        fn query_info(
-            uxt: <Block as BlockT>::Extrinsic,
-            len: u32
-        ) -> RuntimeDispatchInfo<Balance> {
-            TransactionPayment::query_info(uxt, len)
-        }
-    }*/
 }

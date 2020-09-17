@@ -2,7 +2,7 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-runtime'
-version = '0.8.0'
+version = '0.8.1'
 build = 'build.rs'
 license = "GPL-3.0"
 homepage = "https://crust.network"
@@ -19,50 +19,52 @@ serde = { features = ['derive'], optional = true, version = '1.0.106' }
 static_assertions = "1.1.0"
 
 # substrate frame dependencies
-authorship = { default-features = false, package = 'pallet-authorship', version = '2.0.0-rc5' }
-authority-discovery = { default-features = false, package = 'pallet-authority-discovery', version = '2.0.0-rc5' }
-babe = { default-features = false, package = 'pallet-babe', version = '2.0.0-rc5' }
-collective = { default-features = false, package = 'pallet-collective', version = '2.0.0-rc5' }
-frame-executive = { default-features = false, version = '2.0.0-rc5' }
-frame-support = { default-features = false, version = "2.0.0-rc5" }
-finality-tracker = { default-features = false, package = 'pallet-finality-tracker', version = '2.0.0-rc5' }
-grandpa = { default-features = false, package = 'pallet-grandpa', version = '2.0.0-rc5' }
-indices = { package = "pallet-indices", version = '2.0.0-rc5', default-features = false }
-im-online = { default-features = false, package = 'pallet-im-online', version = '2.0.0-rc5' }
-randomness-collective-flip = { default-features = false, package = 'pallet-randomness-collective-flip', version = '2.0.0-rc5' }
-system = { default-features = false, package = 'frame-system', version = '2.0.0-rc5' }
-session = { default-features = false, package = 'pallet-session', version = '2.0.0-rc5' }
-pallet-staking-reward-curve = { default-features = false, version = '2.0.0-rc5' }
-timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-rc5' }
-transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-rc5' }
-scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc5' }
-sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc5' }
-offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc5' }
-treasury = { default-features = false, package = 'pallet-treasury', version = '2.0.0-rc5' }
-elections-phragmen = { default-features = false, package = 'pallet-elections-phragmen', version = '2.0.0-rc5' }
-frame-benchmarking = { default-features = false, version = '2.0.0-rc5', optional = true }
-frame-system-benchmarking = { default-features = false, version = '2.0.0-rc5', optional = true }
+authorship = { default-features = false, package = 'pallet-authorship', version = '2.0.0-rc6' }
+authority-discovery = { default-features = false, package = 'pallet-authority-discovery', version = '2.0.0-rc6' }
+babe = { default-features = false, package = 'pallet-babe', version = '2.0.0-rc6' }
+collective = { default-features = false, package = 'pallet-collective', version = '2.0.0-rc6' }
+frame-executive = { default-features = false, version = '2.0.0-rc6' }
+frame-support = { default-features = false, version = "2.0.0-rc6" }
+finality-tracker = { default-features = false, package = 'pallet-finality-tracker', version = '2.0.0-rc6' }
+grandpa = { default-features = false, package = 'pallet-grandpa', version = '2.0.0-rc6' }
+indices = { package = "pallet-indices", version = '2.0.0-rc6', default-features = false }
+im-online = { default-features = false, package = 'pallet-im-online', version = '2.0.0-rc6' }
+randomness-collective-flip = { default-features = false, package = 'pallet-randomness-collective-flip', version = '2.0.0-rc6' }
+system = { default-features = false, package = 'frame-system', version = '2.0.0-rc6' }
+session = { default-features = false, package = 'pallet-session', version = '2.0.0-rc6' }
+pallet-staking-reward-curve = { default-features = false, version = '2.0.0-rc6' }
+timestamp = { default-features = false, package = 'pallet-timestamp', version = '2.0.0-rc6' }
+transaction-payment = { default-features = false, package = 'pallet-transaction-payment', version = '2.0.0-rc6' }
+scheduler = { default-features = false, package = 'pallet-scheduler', version = '2.0.0-rc6' }
+sudo = { default-features = false, package = 'pallet-sudo', version = '2.0.0-rc6' }
+offences = { default-features = false, package = 'pallet-offences', version = '2.0.0-rc6' }
+treasury = { default-features = false, package = 'pallet-treasury', version = '2.0.0-rc6' }
+elections-phragmen = { default-features = false, package = 'pallet-elections-phragmen', version = '2.0.0-rc6' }
+identity = { default-features = false, package = 'pallet-identity', version = '2.0.0-rc6'}
+utility = { default-features = false, package = 'pallet-utility', version = '2.0.0-rc6' }
+frame-benchmarking = { default-features = false, version = '2.0.0-rc6', optional = true }
+frame-system-benchmarking = { default-features = false, version = '2.0.0-rc6', optional = true }
 
 # Used for the crust's RPCs
-frame-system-rpc-runtime-api = { default-features = false, version = '2.0.0-rc5' }
-pallet-transaction-payment-rpc-runtime-api = { default-features = false, version = '2.0.0-rc5' }
+frame-system-rpc-runtime-api = { default-features = false, version = '2.0.0-rc6' }
+pallet-transaction-payment-rpc-runtime-api = { default-features = false, version = '2.0.0-rc6' }
 
 # substrate primitives
-authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc5' }
-babe-primitives = { default-features = false, package = 'sp-consensus-babe', version = '0.8.0-rc5' }
-sp-api = { default-features = false, version = '2.0.0-rc5' }
-sp-block-builder = { default-features = false, version = '2.0.0-rc5' }
-sp-core = { default-features = false, version = '2.0.0-rc5' }
-sp-inherents = { default-features = false, version = '2.0.0-rc5' }
-sp-io = { default-features = false, version = '2.0.0-rc5' }
-sp-offchain = { default-features = false, version = '2.0.0-rc5' }
-sp-runtime = { default-features = false, version = '2.0.0-rc5' }
-sp-session = { default-features = false, version = '2.0.0-rc5' }
-sp-staking = { default-features = false, version = '2.0.0-rc5' }
-sp-std = { default-features = false, version = '2.0.0-rc5' }
-sp-transaction-pool = { default-features = false, version = '2.0.0-rc5' }
-sp-version = { default-features = false, version = '2.0.0-rc5' }
-sp-runtime-interface = { default-features = false, version = '2.0.0-rc5' }
+authority-discovery-primitives = { default-features = false, package = 'sp-authority-discovery', version = '2.0.0-rc6' }
+babe-primitives = { default-features = false, package = 'sp-consensus-babe', version = '0.8.0-rc6' }
+sp-api = { default-features = false, version = '2.0.0-rc6' }
+sp-block-builder = { default-features = false, version = '2.0.0-rc6' }
+sp-core = { default-features = false, version = '2.0.0-rc6' }
+sp-inherents = { default-features = false, version = '2.0.0-rc6' }
+sp-io = { default-features = false, version = '2.0.0-rc6' }
+sp-offchain = { default-features = false, version = '2.0.0-rc6' }
+sp-runtime = { default-features = false, version = '2.0.0-rc6' }
+sp-session = { default-features = false, version = '2.0.0-rc6' }
+sp-staking = { default-features = false, version = '2.0.0-rc6' }
+sp-std = { default-features = false, version = '2.0.0-rc6' }
+sp-transaction-pool = { default-features = false, version = '2.0.0-rc6' }
+sp-version = { default-features = false, version = '2.0.0-rc6' }
+sp-runtime-interface = { default-features = false, version = '2.0.0-rc6' }
 
 # crust runtime modules
 swork = { package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
@@ -119,7 +121,9 @@ std = [
     'market/std',
     'payment/std',
     'primitives/std',
-    'pallet-transaction-payment-rpc-runtime-api/std'
+    'pallet-transaction-payment-rpc-runtime-api/std',
+    'utility/std',
+    'identity/std'
 ]
 runtime-benchmarks = [
     "frame-benchmarking",

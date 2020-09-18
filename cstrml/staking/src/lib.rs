@@ -19,16 +19,16 @@ use frame_support::{
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
-        Time, EnsureOrigin
+        UnixTime, EnsureOrigin, Randomness
     },
     dispatch::DispatchResult
 };
 use pallet_session::historical;
 use sp_runtime::{
-    Perbill, RuntimeDebug,
+    Perbill, RuntimeDebug, SaturatedConversion,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd
+        CheckedAdd, TrailingZeroInput
     },
 };
 use sp_staking::{
@@ -49,6 +49,8 @@ use primitives::{
     traits::TransferrableCurrency
 };
 
+use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
+
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
 const MAX_GUARANTEE: usize = 16;
@@ -58,30 +60,17 @@ const STAKING_ID: LockIdentifier = *b"staking ";
 pub type EraIndex = u32;
 
 /// Counter for the number of "reward" points earned by a given validator.
-pub type Points = u32;
+pub type RewardPoint = u32;
 
 /// Reward points of an era. Used to split era total payout between validators.
-#[derive(Encode, Decode, Default)]
-// TODO: change to `ErasRewardPoints` for not using index corresponds
-pub struct EraPoints {
+///
+/// This points will be used to reward validators and their respective nominators.
+#[derive(PartialEq, Encode, Decode, Default, RuntimeDebug)]
+pub struct EraRewardPoints<AccountId: Ord> {
     /// Total number of points. Equals the sum of reward points for each validator.
-    total: Points,
-    /// The reward points earned by a given validator. The index of this vec corresponds to the
-    /// index into the current validator set.
-    individual: Vec<Points>,
-}
-
-impl EraPoints {
-    /// Add the reward to the validator at the given index. Index must be valid
-    /// (i.e. `index < current_elected.len()`).
-    fn add_points_to_index(&mut self, index: u32, points: u32) {
-        if let Some(new_total) = self.total.checked_add(points) {
-            self.total = new_total;
-            self.individual
-                .resize((index as usize + 1).max(self.individual.len()), 0);
-            self.individual[index as usize] += points; // Addition is less than total
-        }
-    }
+    total: RewardPoint,
+    /// The reward points earned by a given validator.
+    individual: BTreeMap<AccountId, RewardPoint>,
 }
 
 /// Indicates the initial status of the staker.
@@ -128,6 +117,18 @@ impl Default for ValidatorPrefs {
             fee: Perbill::one(),
         }
     }
+}
+
+/// Information regarding the active era (era in used in session).
+#[derive(Encode, Decode, RuntimeDebug)]
+pub struct ActiveEraInfo {
+    /// Index of era.
+    pub index: EraIndex,
+    /// Moment of start expressed as millisecond from `$UNIX_EPOCH`.
+    ///
+    /// Start can be none if start hasn't been set for the era yet,
+    /// Start is set on the first on_finalize of the era to guarantee usage of `Time`.
+    start: Option<u64>,
 }
 
 /// A record of the nominations made by a specific account.
@@ -299,7 +300,6 @@ type PositiveImbalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::NegativeImbalance;
-type MomentOf<T> = <<T as Trait>::Time as Time>::Moment;
 
 /// Means for interacting with a specialized version of the `session` trait.
 ///
@@ -356,7 +356,10 @@ pub trait Trait: frame_system::Trait {
     type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
     /// Time used for computing era duration.
-    type Time: Time;
+    ///
+    /// It is guaranteed to start being called from the first `on_finalize`. Thus value at genesis
+    /// is not used.
+    type UnixTime: UnixTime;
 
     /// Convert a balance into a number used for election calculation.
     /// This must fit into a `u64` but is allowed to be sensibly lossy.
@@ -376,6 +379,9 @@ pub trait Trait: frame_system::Trait {
 
     /// Handler for the unbalanced increment when rewarding a staker.
     type Reward: OnUnbalanced<PositiveImbalanceOf<Self>>;
+
+    /// Something that provides randomness in the runtime.
+    type Randomness: Randomness<Self::Hash>;
 
     /// Number of sessions per era.
     type SessionsPerEra: Get<SessionIndex>;
@@ -439,7 +445,7 @@ decl_storage! {
         /// Where the reward payment should be made. Keyed by stash.
         pub Payee get(fn payee): map hasher(twox_64_concat) T::AccountId => RewardDestination;
 
-		/// The map from (wannabe) validator stash key to the preferences of that validator.
+        /// The map from (wannabe) validator stash key to the preferences of that validator.
         pub Validators get(fn validators):
             map hasher(twox_64_concat) T::AccountId => ValidatorPrefs;
 
@@ -505,14 +511,20 @@ decl_storage! {
         /// The current era index.
         pub CurrentEra get(fn current_era): Option<EraIndex>;
 
-        /// The start of the current era.
-        pub CurrentEraStart get(fn current_era_start): MomentOf<T>;
+        /// The active era information, it holds index and start.
+        ///
+        /// The active era is the era currently rewarded.
+        /// Validator set of this era must be equal to `SessionInterface::validators`.
+        pub ActiveEra get(fn active_era): Option<ActiveEraInfo>;
 
-        /// The session index at which the current era started.
-        pub CurrentEraStartSessionIndex get(fn current_era_start_session_index): SessionIndex;
+        /// The session index at which the era start for the last `HISTORY_DEPTH` eras.
+        pub ErasStartSessionIndex get(fn eras_start_session_index):
+            map hasher(twox_64_concat) EraIndex => Option<SessionIndex>;
 
-        /// Rewards for the current era. Using indices of current elected set.
-        CurrentEraPointsEarned get(fn current_era_reward): EraPoints;
+        /// Rewards for the last `HISTORY_DEPTH` eras.
+        /// If reward hasn't been set or has been removed then 0 reward is returned.
+        pub ErasRewardPoints get(fn eras_reward_points):
+        map hasher(twox_64_concat) EraIndex => EraRewardPoints<T::AccountId>;
 
         /// True if the next session change will be a new era regardless of index.
         pub ForceEra get(fn force_era) config(): Forcing;
@@ -615,15 +627,15 @@ decl_event!(
         /// Total reward at each era
         EraReward(EraIndex, Balance, Balance),
         /// An account has bonded this amount. [stash, amount]
-		///
-		/// NOTE: This event is only emitted when funds are bonded via a dispatchable. Notably,
-		/// it will not be emitted for staking rewards when they are added to stake.
-		Bonded(AccountId, Balance),
-		/// An account has unbonded this amount. [stash, amount]
-		Unbonded(AccountId, Balance),
-		/// An account has called `withdraw_unbonded` and removed unbonding chunks worth `Balance`
-		/// from the unlocking queue. [stash, amount]
-		Withdrawn(AccountId, Balance),
+        ///
+        /// NOTE: This event is only emitted when funds are bonded via a dispatchable. Notably,
+        /// it will not be emitted for staking rewards when they are added to stake.
+        Bonded(AccountId, Balance),
+        /// An account has unbonded this amount. [stash, amount]
+        Unbonded(AccountId, Balance),
+        /// An account has called `withdraw_unbonded` and removed unbonding chunks worth `Balance`
+        /// from the unlocking queue. [stash, amount]
+        Withdrawn(AccountId, Balance),
         // TODO: add stake limitation change event
     }
 );
@@ -674,9 +686,15 @@ decl_module! {
 
         fn on_finalize() {
             // Set the start of the first era.
-            if !<CurrentEraStart<T>>::exists() {
-                <CurrentEraStart<T>>::put(T::Time::now());
+            if let Some(mut active_era) = Self::active_era() {
+                if active_era.start.is_none() {
+                    let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
+                    active_era.start = Some(now_as_millis_u64);
+                    // This write only ever happens once, we don't include it in the weight in general
+                    ActiveEra::put(active_era);
+                }
             }
+            // `on_finalize` weight is tracked in `on_initialize`
         }
 
         /// Take the origin account as a stash and lock up `value` of its balance. `controller` will
@@ -772,18 +790,18 @@ decl_module! {
         fn bond_extra(origin, #[compact] max_additional: BalanceOf<T>) {
             let stash = ensure_signed(origin)?;
 
-			let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
-			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+            let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
+            let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-			let mut extra = T::Currency::transfer_balance(&stash);
+            let mut extra = T::Currency::transfer_balance(&stash);
 
-			if extra > Zero::zero() {
-				extra = extra.min(max_additional);
-				ledger.total += extra;
-				ledger.active += extra;
-				Self::deposit_event(RawEvent::Bonded(stash, extra));
-				Self::update_ledger(&controller, &ledger);
-			}
+            if extra > Zero::zero() {
+                extra = extra.min(max_additional);
+                ledger.total += extra;
+                ledger.active += extra;
+                Self::deposit_event(RawEvent::Bonded(stash, extra));
+                Self::update_ledger(&controller, &ledger);
+            }
         }
 
         /// Schedule a portion of the stash to be unlocked ready for transfer out after the bond
@@ -820,30 +838,30 @@ decl_module! {
         /// </weight>
         #[weight = 50 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 3)]
         fn unbond(origin, #[compact] value: BalanceOf<T>) {
-			let controller = ensure_signed(origin)?;
-			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-			ensure!(
-				ledger.unlocking.len() < MAX_UNLOCKING_CHUNKS,
-				Error::<T>::NoMoreChunks,
-			);
+            let controller = ensure_signed(origin)?;
+            let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+            ensure!(
+                ledger.unlocking.len() < MAX_UNLOCKING_CHUNKS,
+                Error::<T>::NoMoreChunks,
+            );
 
-			let mut value = value.min(ledger.active);
+            let mut value = value.min(ledger.active);
 
-			if !value.is_zero() {
-				ledger.active -= value;
+            if !value.is_zero() {
+                ledger.active -= value;
 
-				// Avoid there being a dust balance left in the staking system.
-				if ledger.active < T::Currency::minimum_balance() {
-					value += ledger.active;
-					ledger.active = Zero::zero();
-				}
+                // Avoid there being a dust balance left in the staking system.
+                if ledger.active < T::Currency::minimum_balance() {
+                    value += ledger.active;
+                    ledger.active = Zero::zero();
+                }
 
-				// Note: in case there is no current era it is fine to bond one era more.
-				let era = Self::current_era().unwrap_or(0) + T::BondingDuration::get();
-				ledger.unlocking.push(UnlockChunk { value, era });
-				Self::update_ledger(&controller, &ledger);
-				Self::deposit_event(RawEvent::Unbonded(ledger.stash, value));
-			}
+                // Note: in case there is no current era it is fine to bond one era more.
+                let era = Self::current_era().unwrap_or(0) + T::BondingDuration::get();
+                ledger.unlocking.push(UnlockChunk { value, era });
+                Self::update_ledger(&controller, &ledger);
+                Self::deposit_event(RawEvent::Unbonded(ledger.stash, value));
+            }
         }
 
         /// Remove any unlocked chunks from the `unlocking` queue from our management.
@@ -882,7 +900,7 @@ decl_module! {
         fn withdraw_unbonded(origin) {
             let controller = ensure_signed(origin)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-			let (stash, old_total) = (ledger.stash.clone(), ledger.total);
+            let (stash, old_total) = (ledger.stash.clone(), ledger.total);
             if let Some(current_era) = Self::current_era() {
                 ledger = ledger.consolidate_unlocked(current_era)
             }
@@ -900,12 +918,12 @@ decl_module! {
             }
 
             // `old_total` should never be less than the new total because
-			// `consolidate_unlocked` strictly subtracts balance.
-			if ledger.total < old_total {
-				// Already checked that this won't overflow by entry condition.
-				let value = old_total - ledger.total;
-				Self::deposit_event(RawEvent::Withdrawn(stash, value));
-			}
+            // `consolidate_unlocked` strictly subtracts balance.
+            if ledger.total < old_total {
+                // Already checked that this won't overflow by entry condition.
+                let value = old_total - ledger.total;
+                Self::deposit_event(RawEvent::Withdrawn(stash, value));
+            }
         }
 
         /// Declare the desire to validate for the origin controller.
@@ -930,7 +948,7 @@ decl_module! {
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let v_stash = &ledger.stash;
             <Guarantors<T>>::remove(v_stash);
-			<Validators<T>>::insert(v_stash, prefs);
+            <Validators<T>>::insert(v_stash, prefs);
         }
 
         /// Declare the desire to guarantee `targets` for the origin controller.
@@ -1584,10 +1602,16 @@ impl<T: Trait> Module<T> {
     fn new_session(
         session_index: SessionIndex,
     ) -> Option<Vec<T::AccountId>> {
-        if Self::current_era().is_some() {
-            let era_length = session_index
-                .checked_sub(Self::current_era_start_session_index())
-                .unwrap_or(0);
+        if let Some(current_era) = Self::current_era() {
+            // Initial era has been set.
+            let current_era_start_session_index = Self::eras_start_session_index(current_era)
+                .unwrap_or_else(|| {
+                    frame_support::print("Error: start_session_index must be set for current_era");
+                    0
+                });
+
+            let era_length = session_index.checked_sub(current_era_start_session_index)
+                .unwrap_or(0); // Must never happen.
             // TODO: remove ForceNew? cause this will make work report update invalid
             match ForceEra::get() {
                 Forcing::ForceNew => ForceEra::kill(),
@@ -1603,18 +1627,6 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// End a session potentially ending an era.
-    fn end_session(session_index: SessionIndex) {
-        if Self::current_era().is_some() {
-            let era_length = session_index
-                .checked_sub(Self::current_era_start_session_index())
-                .unwrap_or(0);
-            // End of era
-            if era_length == T::SessionsPerEra::get() - 1 {
-                Self::end_era();
-            }
-        }
-    }
 
     /// The era has changed - enact new staking set.
     ///
@@ -1622,34 +1634,78 @@ impl<T: Trait> Module<T> {
     /// get a chance to set their session keys.
     /// This also checks stake limitation based on work reports
     fn new_era(start_session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
-        // Increment current era.
+        // Increment or set current era.
         let current_era = CurrentEra::mutate(|s| {
             *s = Some(s.map(|s| s + 1).unwrap_or(0));
             s.unwrap()
         });
-
-        CurrentEraStartSessionIndex::mutate(|v| {
-            *v = start_session_index;
-        });
-        let bonding_duration = T::BondingDuration::get();
+        ErasStartSessionIndex::insert(&current_era, &start_session_index);
 
         // Clean old era information.
-        // TODO: double check the economic mechanism.
         if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 1) {
             Self::clear_era_information(old_era);
         }
 
-        // Slashing
-        // TODO: put slashing into start_era(judging at start_session) like Kusama does?
-        BondedEras::mutate(|bonded| {
-            bonded.push((current_era, start_session_index));
+        // Set staking information for new era.
+        let maybe_new_validators = Self::select_and_update_validators(current_era);
 
-            if current_era > bonding_duration {
-                let first_kept = current_era - bonding_duration;
+        maybe_new_validators
+    }
+
+    /// Start a session potentially starting an era.
+    fn start_session(start_session: SessionIndex) {
+        let next_active_era = Self::active_era().map(|e| e.index + 1).unwrap_or(0);
+        if let Some(next_active_era_start_session_index) =
+            Self::eras_start_session_index(next_active_era)
+        {
+            if next_active_era_start_session_index == start_session {
+                Self::start_era(start_session);
+            } else if next_active_era_start_session_index < start_session {
+                // This arm should never happen, but better handle it than to stall the
+                // staking pallet.
+                frame_support::print("Warning: A session appears to have been skipped.");
+                Self::start_era(start_session);
+            }
+        }
+    }
+
+    /// End a session potentially ending an era.
+    fn end_session(session_index: SessionIndex) {
+        if let Some(active_era) = Self::active_era() {
+            if let Some(next_active_era_start_session_index) =
+                Self::eras_start_session_index(active_era.index + 1)
+            {
+                if next_active_era_start_session_index == session_index + 1 {
+                    Self::end_era(active_era, session_index);
+                }
+            }
+        }
+    }
+
+    /// * Increment `active_era.index`,
+    /// * reset `active_era.start`,
+    /// * update `BondedEras` and apply slashes.
+    fn start_era(start_session: SessionIndex) {
+        let active_era = ActiveEra::mutate(|active_era| {
+            let new_index = active_era.as_ref().map(|info| info.index + 1).unwrap_or(0);
+            *active_era = Some(ActiveEraInfo {
+                index: new_index,
+                // Set new active era start in next `on_finalize`. To guarantee usage of `Time`
+                start: None,
+            });
+            new_index
+        });
+
+        let bonding_duration = T::BondingDuration::get();
+
+        BondedEras::mutate(|bonded| {
+            bonded.push((active_era, start_session));
+
+            if active_era > bonding_duration {
+                let first_kept = active_era - bonding_duration;
 
                 // prune out everything that's from before the first-kept index.
-                let n_to_prune = bonded
-                    .iter()
+                let n_to_prune = bonded.iter()
                     .take_while(|&&(era_idx, _)| era_idx < first_kept)
                     .count();
 
@@ -1664,45 +1720,42 @@ impl<T: Trait> Module<T> {
             }
         });
 
-        // Reassign all stakers.
-        let maybe_new_validators = Self::select_and_update_validators(current_era);
-        Self::apply_unapplied_slashes(current_era);
-
-        maybe_new_validators
+        Self::apply_unapplied_slashes(active_era);
     }
 
     /// Compute payout for era.
-    fn end_era() {
-        // Payout
-        let now = T::Time::now();
-        let previous_era_start = <CurrentEraStart<T>>::mutate(|v| sp_std::mem::replace(v, now));
-        let era_duration = now - previous_era_start;
-        if !era_duration.is_zero() {
-            let points = CurrentEraPointsEarned::take();
-            let validators = Self::current_elected();
-            let total_authoring_payout = Self::authoring_rewards_in_era();
-            // let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
-            let current_era = Self::current_era().unwrap_or(0);
-            // 1. Block authoring payout
-            for (v, p) in validators.iter().zip(points.individual.into_iter()) {
-                if p != 0 {
-                    let authoring_reward =
-                        Perbill::from_rational_approximation(p, points.total) * total_authoring_payout;
-                    <ErasAuthoringPayout<T>>::insert(&current_era, v, authoring_reward);
+    fn end_era(active_era: ActiveEraInfo, _session_index: SessionIndex) {
+        // Note: active_era_start can be None if end era is called during genesis config.
+        if let Some(active_era_start) = active_era.start {
+            let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
+
+            let era_duration = now_as_millis_u64 - active_era_start;
+            if !era_duration.is_zero() {
+                let active_era_index = active_era.index.clone();
+                let points = <ErasRewardPoints<T>>::get(&active_era_index);
+                let total_authoring_payout = Self::authoring_rewards_in_era();
+                // let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
+                // 1. Block authoring payout
+                for (v, p) in points.individual.iter() {
+                    if *p != 0u32 {
+                        let authoring_reward =
+                            Perbill::from_rational_approximation(*p, points.total) * total_authoring_payout;
+                        <ErasAuthoringPayout<T>>::insert(&active_era_index, v, authoring_reward);
+                    }
                 }
+    
+                // 2. Staking payout
+                let total_staking_payout = Self::staking_rewards_in_era(active_era_index);
+                <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
+    
+                // 3. Deposit era reward event
+                Self::deposit_event(RawEvent::EraReward(active_era_index, total_authoring_payout, total_staking_payout));
+    
+                // TODO: enable treasury and might bring this back
+                // T::Reward::on_unbalanced(total_imbalance);
+                // This is not been used
+                // T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
             }
-
-            // 2. Staking payout
-            let total_staking_payout = Self::staking_rewards_in_era(current_era);
-            <ErasStakingPayout<T>>::insert(&current_era, total_staking_payout);
-
-            // 3. Deposit era reward event
-            Self::deposit_event(RawEvent::EraReward(current_era, total_authoring_payout, total_staking_payout));
-
-            // TODO: enable treasury and might bring this back
-            // T::Reward::on_unbalanced(total_imbalance);
-            // This is not been used
-            // T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
         }
     }
 
@@ -1713,6 +1766,8 @@ impl<T: Trait> Module<T> {
         <ErasStakingPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
         <ErasAuthoringPayout<T>>::remove_prefix(era_index);
+        <ErasRewardPoints<T>>::remove(era_index);
+        ErasStartSessionIndex::remove(era_index);
     }
 
     /// Block authoring rewards per era, this won't be changed in every era
@@ -1756,20 +1811,18 @@ impl<T: Trait> Module<T> {
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.
-    fn apply_unapplied_slashes(current_era: EraIndex) {
+    fn apply_unapplied_slashes(active_era: EraIndex) {
         let slash_defer_duration = T::SlashDeferDuration::get();
-        <Self as Store>::EarliestUnappliedSlash::mutate(|earliest| {
-            if let Some(ref mut earliest) = earliest {
-                let keep_from = current_era.saturating_sub(slash_defer_duration);
-                for era in (*earliest)..keep_from {
-                    let era_slashes = <Self as Store>::UnappliedSlashes::take(&era);
-                    for slash in era_slashes {
-                        slashing::apply_slash::<T>(slash);
-                    }
+        <Self as Store>::EarliestUnappliedSlash::mutate(|earliest| if let Some(ref mut earliest) = earliest {
+            let keep_from = active_era.saturating_sub(slash_defer_duration);
+            for era in (*earliest)..keep_from {
+                let era_slashes = <Self as Store>::UnappliedSlashes::take(&era);
+                for slash in era_slashes {
+                    slashing::apply_slash::<T>(slash);
                 }
-
-                *earliest = (*earliest).max(keep_from)
             }
+
+            *earliest = (*earliest).max(keep_from)
         })
     }
 
@@ -1889,13 +1942,7 @@ impl<T: Trait> Module<T> {
             validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
         }
 
-        // V. TopDown Election Algorithm
-        // Select new validators by top-down their total `valid` stakes
-        // - time complex is O(2n)
-        // - DB try is 1
-        // 1. Populate elections and figure out the minimum stake behind a slot.
-        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
-
+        // V. TopDown Election Algorithm with Randomlization
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
         // 2. If there's no validators, be as same as little validators
@@ -1903,11 +1950,7 @@ impl<T: Trait> Module<T> {
             return None;
         }
 
-        let elected_stashes = validators_stakes[0..to_elect]
-            .iter()
-            .map(|(who, _stakes)| who.clone())
-            .collect::<Vec<T::AccountId>>();
-
+        let elected_stashes= Self::do_election(validators_stakes, to_elect);
         // VI. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
@@ -1967,34 +2010,17 @@ impl<T: Trait> Module<T> {
     ///
     /// COMPLEXITY: Complexity is `number_of_validator_to_reward x current_elected_len`.
     /// If you need to reward lots of validator consider using `reward_by_indices`.
-    pub fn reward_by_ids(validators_points: impl IntoIterator<Item = (T::AccountId, u32)>) {
-        CurrentEraPointsEarned::mutate(|rewards| {
-            let current_elected = <Module<T>>::current_elected();
-            for (validator, points) in validators_points.into_iter() {
-                if let Some(index) = current_elected
-                    .iter()
-                    .position(|elected| *elected == validator)
-                {
-                    rewards.add_points_to_index(index as u32, points);
+    pub fn reward_by_ids(
+        validators_points: impl IntoIterator<Item = (T::AccountId, u32)>
+    ) {
+        if let Some(active_era) = Self::active_era() {
+            <ErasRewardPoints<T>>::mutate(active_era.index, |era_rewards| {
+                for (validator, points) in validators_points.into_iter() {
+                    *era_rewards.individual.entry(validator).or_default() += points;
+                    era_rewards.total += points;
                 }
-            }
-        });
-    }
-
-    /// Add reward points to validators using their validator index.
-    ///
-    /// For each element in the iterator the given number of points in u32 is added to the
-    /// validator, thus duplicates are handled.
-    pub fn reward_by_indices(validators_points: impl IntoIterator<Item = (u32, u32)>) {
-        let current_elected_len = <Module<T>>::current_elected().len() as u32;
-
-        CurrentEraPointsEarned::mutate(|rewards| {
-            for (validator_index, points) in validators_points.into_iter() {
-                if validator_index < current_elected_len {
-                    rewards.add_points_to_index(validator_index, points);
-                }
-            }
-        });
+            });
+        }
     }
 
     /// Ensures that at the end of the current session there will be a new era.
@@ -2002,6 +2028,56 @@ impl<T: Trait> Module<T> {
         match ForceEra::get() {
             Forcing::ForceAlways | Forcing::ForceNew => (),
             _ => ForceEra::put(Forcing::ForceNew),
+        }
+    }
+
+    fn do_election(
+        mut validators_stakes: Vec<(T::AccountId, u128)>,
+        to_elect: usize) -> Vec<T::AccountId> {
+        // Select new validators by top-down their total `valid` stakes
+        // then randomly choose some of them from the top validators
+
+        let candidate_to_elect = validators_stakes.len().min(to_elect * 2);
+        // sort by 'valid' stakes
+        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // choose top candidate_to_elect number of validators
+        let mut candidate_stashes = validators_stakes[0..candidate_to_elect]
+        .iter()
+        .map(|(who, stakes)| (who.clone(), *stakes))
+        .collect::<Vec<(T::AccountId, u128)>>();
+
+        // shuffle it
+        Self::shuffle_candidates(&mut candidate_stashes);
+
+        // choose elected_stashes number of validators
+        let elected_stashes = candidate_stashes[0..to_elect]
+        .iter()
+        .map(|(who, _stakes)| who.clone())
+        .collect::<Vec<T::AccountId>>();
+        elected_stashes
+    }
+
+    fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {
+        // 1. Construct random seed, 👼 bless the randomness
+        // seed = [ block_hash, phrase ]
+        let phrase = b"candidates_shuffle";
+        let bn = <frame_system::Module<T>>::block_number();
+        let bh: T::Hash = <frame_system::Module<T>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &phrase.encode()[..]
+        ].concat();
+
+        // we'll need a random seed here.
+        let seed = T::Randomness::random(seed.as_slice());
+        // seed needs to be guaranteed to be 32 bytes.
+        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))
+            .expect("input is padded with zeroes; qed");
+        let mut rng = ChaChaRng::from_seed(seed);
+        for i in (0..candidates_stakes.len()).rev() {
+            let random_index = (rng.next_u32() % (i as u32 + 1)) as usize;
+            candidates_stakes.swap(random_index, i);
         }
     }
 }
@@ -2013,24 +2089,19 @@ impl<T: Trait> Module<T> {
 /// some session can lag in between the newest session planned and the latest session started.
 impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
     fn new_session(new_index: SessionIndex) -> Option<Vec<T::AccountId>> {
-        let mut idx = new_index;
-        if idx > 0 {
-            idx -= 1;
-        }
-        Self::new_session(idx)
+        Self::new_session(new_index)
+    }
+    fn start_session(start_index: SessionIndex) {
+        Self::start_session(start_index)
     }
     fn end_session(end_index: SessionIndex) {
-        // Do nothing
-        Self::end_session(end_index);
-    }
-    fn start_session(_start_index: SessionIndex) {
-        // Do nothing
+        Self::end_session(end_index)
     }
 }
 
 impl<T: Trait> historical::SessionManager<T::AccountId, Exposure<T::AccountId, BalanceOf<T>>> for Module<T> {
     fn new_session(new_index: SessionIndex)
-                   -> Option<Vec<(T::AccountId, Exposure<T::AccountId, BalanceOf<T>>)>>
+        -> Option<Vec<(T::AccountId, Exposure<T::AccountId, BalanceOf<T>>)>>
     {
         <Self as pallet_session::SessionManager<_>>::new_session(new_index).map(|validators| {
             let current_era = Self::current_era()
@@ -2050,6 +2121,7 @@ impl<T: Trait> historical::SessionManager<T::AccountId, Exposure<T::AccountId, B
         <Self as pallet_session::SessionManager<_>>::end_session(end_index)
     }
 }
+
 
 impl<T: Trait> swork::Works<T::AccountId> for Module<T> {
     fn report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
@@ -2093,8 +2165,8 @@ impl<T: Trait> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>
     for ExposureOf<T>
 {
     fn convert(validator: T::AccountId) -> Option<Exposure<T::AccountId, BalanceOf<T>>> {
-        if let Some(current_era) = <Module<T>>::current_era() {
-            Some(<Module<T>>::eras_stakers(current_era, &validator))
+        if let Some(active_era) = <Module<T>>::active_era() {
+            Some(<Module<T>>::eras_stakers(active_era.index, &validator))
         } else {
             None
         }
@@ -2102,7 +2174,9 @@ impl<T: Trait> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>
 }
 
 /// This is intended to be used with `FilterHistoricalOffences`.
-impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::IdentificationTuple<T>, Weight> for Module<T> where
+impl <T: Trait>
+    OnOffenceHandler<T::AccountId, pallet_session::historical::IdentificationTuple<T>, Weight>
+for Module<T> where
     T: pallet_session::Trait<ValidatorId = <T as frame_system::Trait>::AccountId>,
     T: pallet_session::historical::Trait<
         FullIdentification = Exposure<<T as frame_system::Trait>::AccountId, BalanceOf<T>>,
@@ -2110,58 +2184,78 @@ impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::Ident
     >,
     T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Trait>::AccountId>,
     T::SessionManager: pallet_session::SessionManager<<T as frame_system::Trait>::AccountId>,
-    T::ValidatorIdOf: Convert<<T as frame_system::Trait>::AccountId, Option<<T as frame_system::Trait>::AccountId>>
+    T::ValidatorIdOf: Convert<
+        <T as frame_system::Trait>::AccountId,
+        Option<<T as frame_system::Trait>::AccountId>,
+    >,
 {
     fn on_offence(
-        offenders: &[OffenceDetails<
-            T::AccountId,
-            pallet_session::historical::IdentificationTuple<T>,
-        >],
+        offenders: &[OffenceDetails<T::AccountId, pallet_session::historical::IdentificationTuple<T>>],
         slash_fraction: &[Perbill],
         slash_session: SessionIndex,
     ) -> Result<Weight, ()> {
+        if !Self::can_report() {
+            return Err(())
+        }
+
         let reward_proportion = SlashRewardFraction::get();
+        let mut consumed_weight: Weight = 0;
+        let mut add_db_reads_writes = |reads, writes| {
+            consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+        };
 
-        let era_now = Self::current_era().unwrap_or(0);
-        let window_start = era_now.saturating_sub(T::BondingDuration::get());
-        let current_era_start_session = CurrentEraStartSessionIndex::get();
-        // TODO: calculate with db weights
-        let consumed_weight: Weight = 0;
+        let active_era = {
+            let active_era = Self::active_era();
+            add_db_reads_writes(1, 0);
+            if active_era.is_none() {
+                // this offence need not be re-submitted.
+                return Ok(consumed_weight)
+            }
+            active_era.expect("value checked not to be `None`; qed").index
+        };
+        let active_era_start_session_index = Self::eras_start_session_index(active_era)
+            .unwrap_or_else(|| {
+                frame_support::print("Error: start_session_index must be set for current_era");
+                0
+            });
+        add_db_reads_writes(1, 0);
 
-        // fast path for current-era report - most likely.
-        let slash_era = if slash_session >= current_era_start_session {
-            era_now
+        let window_start = active_era.saturating_sub(T::BondingDuration::get());
+
+        // fast path for active-era report - most likely.
+        // `slash_session` cannot be in a future active era. It must be in `active_era` or before.
+        let slash_era = if slash_session >= active_era_start_session_index {
+            active_era
         } else {
             let eras = BondedEras::get();
+            add_db_reads_writes(1, 0);
 
             // reverse because it's more likely to find reports from recent eras.
-
-            match eras
-                .iter()
-                .rev()
-                .filter(|&&(_, ref sesh)| sesh <= &slash_session)
-                .next()
-            {
-                None => return Ok(consumed_weight), // before bonding period. defensive - should be filtered out.
+            match eras.iter().rev().filter(|&&(_, ref sesh)| sesh <= &slash_session).next() {
                 Some(&(ref slash_era, _)) => *slash_era,
+                // before bonding period. defensive - should be filtered out.
+                None => return Ok(consumed_weight),
             }
         };
 
         <Self as Store>::EarliestUnappliedSlash::mutate(|earliest| {
             if earliest.is_none() {
-                *earliest = Some(era_now)
+                *earliest = Some(active_era)
             }
         });
+        add_db_reads_writes(1, 1);
 
         let slash_defer_duration = T::SlashDeferDuration::get();
 
+        let invulnerables = Self::invulnerables();
+        add_db_reads_writes(1, 0);
+
         for (details, slash_fraction) in offenders.iter().zip(slash_fraction) {
-            let stash = &details.offender.0;
-            let exposure = &details.offender.1;
+            let (stash, exposure) = &details.offender;
 
             // Skip if the validator is invulnerable.
-            if Self::invulnerables().contains(stash) {
-                continue;
+            if invulnerables.contains(stash) {
+                continue
             }
 
             let unapplied = slashing::compute_slash::<T>(slashing::SlashParams {
@@ -2170,23 +2264,44 @@ impl <T: Trait> OnOffenceHandler<T::AccountId, pallet_session::historical::Ident
                 exposure,
                 slash_era,
                 window_start,
-                now: era_now,
+                now: active_era,
                 reward_proportion,
             });
 
             if let Some(mut unapplied) = unapplied {
+                let nominators_len = unapplied.others.len() as u64;
+                let reporters_len = details.reporters.len() as u64;
+
+                {
+                    let upper_bound = 1 /* Validator/NominatorSlashInEra */ + 2 /* fetch_spans */;
+                    let rw = upper_bound + nominators_len * upper_bound;
+                    add_db_reads_writes(rw, rw);
+                }
                 unapplied.reporters = details.reporters.clone();
                 if slash_defer_duration == 0 {
                     // apply right away.
                     slashing::apply_slash::<T>(unapplied);
+                    {
+                        let slash_cost = (6, 5);
+                        let reward_cost = (2, 2);
+                        add_db_reads_writes(
+                            (1 + nominators_len) * slash_cost.0 + reward_cost.0 * reporters_len,
+                            (1 + nominators_len) * slash_cost.1 + reward_cost.1 * reporters_len
+                        );
+                    }
                 } else {
                     // defer to end of some `slash_defer_duration` from now.
-                    <Self as Store>::UnappliedSlashes::mutate(era_now, move |for_later| {
-                        for_later.push(unapplied)
-                    });
+                    <Self as Store>::UnappliedSlashes::mutate(
+                        active_era,
+                        move |for_later| for_later.push(unapplied),
+                    );
+                    add_db_reads_writes(1, 1);
                 }
+            } else {
+                add_db_reads_writes(4 /* fetch_spans */, 5 /* kick_out_if_recent */)
             }
         }
+
         Ok(consumed_weight)
     }
 

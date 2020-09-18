@@ -54,8 +54,9 @@ pub struct WorkReport {
     pub block_number: u64,
     pub used: u64,
     pub reserved: u64,
-    pub cached_reserved: u64,
     pub files: Vec<(MerkleRoot, u64)>,
+    pub reserved_root: MerkleRoot,
+    pub files_root: MerkleRoot
 }
 
 /// An event handler for reporting works
@@ -110,7 +111,7 @@ decl_storage! {
         /// The sWorker identities, mapping from controller to an optional identity tuple
         /// (elder_id, current_id) = (before-upgrade identity, upgraded identity)
         pub Identities get(fn identities) config():
-            map hasher(blake2_128_concat) T::AccountId => (Option<Identity>, Option<Identity>);
+            map hasher(blake2_128_concat) T::AccountId => Option<Identity>;
 
         /// Node's work report, mapping from controller to an optional work report
         pub WorkReports get(fn work_reports) config():
@@ -122,13 +123,13 @@ decl_storage! {
         /// Recording whether the validator reported works of each era
         /// We leave it keep all era's report info
         /// cause B-tree won't build index on key2(ReportSlot)
-        /// value (bool, bool) represent two id (elder_reported, current_reported)
+        /// value represent if reported in this slot
         pub ReportedInSlot get(fn reported_in_slot) build(|config: &GenesisConfig<T>| {
             config.work_reports.iter().map(|(account_id, _)|
-                (account_id.clone(), 0, (false, true))
+                (account_id.clone(), 0, true)
             ).collect::<Vec<_>>()
         }): double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) ReportSlot
-        => (bool, bool) = (false, false);
+        => bool = false;
 
         /// The used workload, used for calculating stake limit in the end of era
         /// default is 0
@@ -156,7 +157,9 @@ decl_error! {
         /// Invalid timing
         InvalidReportTime,
         /// Illegal work report signature
-        IllegalWorkReportSig
+        IllegalWorkReportSig,
+        /// Illegal upgrade work report
+        IllegalUpgradeWorkReport
     }
 }
 

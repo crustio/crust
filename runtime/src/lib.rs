@@ -390,7 +390,6 @@ impl staking::Trait for Runtime {
     type Event = Event;
     type Slash = ();
     type Reward = ();
-    type Randomness = RandomnessCollectiveFlip;
     type SessionsPerEra = SessionsPerEra;
     type BondingDuration = BondingDuration;
     type SlashDeferDuration = SlashDeferDuration;

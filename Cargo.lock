@@ -1142,7 +1142,6 @@ dependencies = [
  "pallet-session",
  "pallet-timestamp",
  "parity-scale-codec",
- "rand_chacha 0.2.2",
  "safe-mix",
  "serde",
  "sp-core",

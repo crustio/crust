@@ -252,6 +252,15 @@ fn rewards_should_work() {
                     others: vec![IndividualExposure { who: 2, value: 500 }],
                 },
             );
+            <ErasStakersClipped<Test>>::insert(
+                0,
+                &11,
+                Exposure {
+                    own: 500,
+                    total: 1000,
+                    others: vec![IndividualExposure { who: 2, value: 500 }],
+                },
+            );
 
             <Payee<Test>>::insert(&2, RewardDestination::Stash);
             assert_eq!(Staking::payee(2), RewardDestination::Stash);
@@ -1316,6 +1325,15 @@ fn validator_payment_prefs_work() {
                 others: vec![IndividualExposure { who: 2, value: 500 }],
             },
         );
+        <ErasStakersClipped<Test>>::insert(
+            0,
+            &11,
+            Exposure {
+                own: 500, // equal division indicates that the reward will be equally divided among validator and guarantor.
+                total: 1000,
+                others: vec![IndividualExposure { who: 2, value: 500 }],
+            },
+        );
         <ErasValidatorPrefs<Test>>::insert(
             0,
             &11,
@@ -2302,6 +2320,16 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
             },
         );
 
+        <ErasStakersClipped<Test>>::insert(
+            0,
+            &11,
+            Exposure {
+                total: stake,
+                own: stake,
+                others: vec![],
+            },
+        );
+
         <ErasStakingPayout<Test>>::insert(
             0,
             reward_slash
@@ -2325,6 +2353,19 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
         )
         .unwrap();
         <ErasStakers<Test>>::insert(
+            0,
+            &11,
+            Exposure {
+                total: stake,
+                own: 1,
+                others: vec![IndividualExposure {
+                    who: 2,
+                    value: stake - 1,
+                }],
+            },
+        );
+
+        <ErasStakersClipped<Test>>::insert(
             0,
             &11,
             Exposure {
@@ -4004,12 +4045,14 @@ fn era_clean_should_work() {
             assert!(<ErasStakingPayout<Test>>::contains_key(0));
             assert!(<ErasTotalStakes<Test>>::contains_key(0));
             assert!(<ErasStakers<Test>>::contains_key(0, 21));
+            assert!(<ErasStakersClipped<Test>>::contains_key(0, 21));
             assert!(<ErasValidatorPrefs<Test>>::contains_key(0, 21));
             start_era(85, true);
             assert!(!<ErasStakingPayout<Test>>::contains_key(0));
             assert!(!<ErasAuthoringPayout<Test>>::contains_key(0, 21));
             assert!(!<ErasTotalStakes<Test>>::contains_key(0));
             assert!(!<ErasStakers<Test>>::contains_key(0, 21));
+            assert!(!<ErasStakersClipped<Test>>::contains_key(0, 21));
             assert!(!<ErasValidatorPrefs<Test>>::contains_key(0, 21));
         });
 }

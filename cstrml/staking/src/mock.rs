@@ -226,6 +226,7 @@ impl Trait for Test {
     type Slash = ();
     type Reward = ();
     type SessionsPerEra = SessionsPerEra;
+    type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
     type BondingDuration = BondingDuration;
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;

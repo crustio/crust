@@ -389,6 +389,12 @@ pub trait Trait: frame_system::Trait {
     /// Number of eras that staked funds must remain bonded for.
     type BondingDuration: Get<EraIndex>;
 
+    /// The maximum number of nominators rewarded for each validator.
+	///
+	/// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
+	/// their reward. This used to limit the i/o cost for the nominator payout.
+	type MaxNominatorRewardedPerValidator: Get<u32>;
+
     /// Number of eras that slashes are deferred by, after computation. This
     /// should be less than the bonding duration. Set to 0 if slashes should be
     /// applied immediately, without opportunity for intervention.
@@ -467,6 +473,21 @@ decl_storage! {
         pub ErasStakers get(fn eras_stakers):
             double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
             => Exposure<T::AccountId, BalanceOf<T>>;
+
+        /// Clipped Exposure of validator at era.
+		///
+		/// This is similar to [`ErasStakers`] but number of nominators exposed is reduced to the
+		/// `T::MaxNominatorRewardedPerValidator` biggest stakers.
+		/// (Note: the field `total` and `own` of the exposure remains unchanged).
+		/// This is used to limit the i/o cost for the nominator payout.
+		///
+		/// This is keyed fist by the era index to allow bulk deletion and then the stash account.
+		///
+		/// Is it removed after `HISTORY_DEPTH` eras.
+		/// If stakers hasn't been set or has been removed then empty exposure is returned.
+		pub ErasStakersClipped get(fn eras_stakers_clipped):
+        double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+        => Exposure<T::AccountId, BalanceOf<T>>;
             
         /// Similar to `ErasStakers`, this holds the preferences of validators.
         ///
@@ -679,6 +700,13 @@ decl_module! {
 
         /// Number of eras that staked funds must remain bonded for.
         const BondingDuration: EraIndex = T::BondingDuration::get();
+
+        /// The maximum number of nominators rewarded for each validator.
+		///
+		/// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
+		/// their reward. This used to limit the i/o cost for the nominator payout.
+		const MaxNominatorRewardedPerValidator: u32 = T::MaxNominatorRewardedPerValidator::get();
+
 
         type Error = Error<T>;
 
@@ -1560,7 +1588,7 @@ impl<T: Trait> Module<T> {
             Err(pos) => ledger.claimed_rewards.insert(pos, era),
         }
         /* Input data seems good, no errors allowed after this point */
-        let exposure = <ErasStakers<T>>::get(&era, &ledger.stash);
+        let exposure = <ErasStakersClipped<T>>::get(&era, &ledger.stash);
         <Ledger<T>>::insert(&controller, &ledger);
 
         // 2. Pay authoring reward
@@ -1762,6 +1790,7 @@ impl<T: Trait> Module<T> {
         /// Clear all era information for given era.
     fn clear_era_information(era_index: EraIndex) {
         <ErasStakers<T>>::remove_prefix(era_index);
+        <ErasStakersClipped<T>>::remove_prefix(era_index);
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
         <ErasStakingPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
@@ -1931,15 +1960,24 @@ impl<T: Trait> Module<T> {
 
             // 4. Update snapshots
             <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
+            let exposure_total = new_exposure.total;
+            let mut exposure_clipped = new_exposure;
+            let clipped_max_len = T::MaxNominatorRewardedPerValidator::get() as usize;
+            if exposure_clipped.others.len() > clipped_max_len {
+                exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
+                exposure_clipped.others.truncate(clipped_max_len);
+            }
+            <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
+
             <ErasValidatorPrefs<T>>::insert(&current_era, &v_stash, Self::validators(&v_stash).clone());
-            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&new_exposure.total) {
+            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&exposure_total) {
                 eras_total_stakes = maybe_total_stakes;
             } else {
                 eras_total_stakes = to_balance(u64::max_value() as u128);
             }
 
             // 5. Push validator stakes
-            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
+            validators_stakes.push((v_stash.clone(), to_votes(exposure_total)))
         }
 
         // V. TopDown Election Algorithm with Randomlization

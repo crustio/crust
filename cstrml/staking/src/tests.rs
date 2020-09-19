@@ -3327,6 +3327,146 @@ fn update_stakers_should_work_new_era() {
 }
 
 #[test]
+fn eras_stakers_clipped_should_work_new_era() {
+    ExtBuilder::default()
+    .guarantee(false)
+    .fair(false) // to give 20 more staked value
+    .build()
+    .execute_with(|| {
+        assert!(!<ErasStakers<Test>>::contains_key(0, &5));
+
+        // remember + compare this along with the test.
+        assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+
+        // put some money in account that we'll use.
+        for i in 110..120 {
+            let _ = Balances::make_free_balance_be(&i, 3000);
+        }
+        for i in 1..10 {
+            let _ = Balances::make_free_balance_be(&i, 3000);
+        }
+
+        // --- Block 1:
+        start_session(1, false);
+        // add a new candidate for being a validator. account 3 controlled by 4.
+        assert_ok!(Staking::bond(
+            Origin::signed(5),
+            4,
+            1000,
+            RewardDestination::Controller
+        ));
+        assert_ok!(Staking::bond(
+            Origin::signed(111),
+            110,
+            1000,
+            RewardDestination::Controller
+        ));
+
+        assert_ok!(Staking::bond(
+            Origin::signed(113),
+            112,
+            1000,
+            RewardDestination::Controller
+        ));
+
+        assert_ok!(Staking::bond(
+            Origin::signed(115),
+            114,
+            1000,
+            RewardDestination::Controller
+        ));
+
+        assert_ok!(Staking::bond(
+            Origin::signed(117),
+            116,
+            1000,
+            RewardDestination::Controller
+        ));
+
+        assert_ok!(Staking::bond(
+            Origin::signed(119),
+            118,
+            1000,
+            RewardDestination::Controller
+        ));
+
+        Staking::upsert_stake_limit(&5, 4000);
+        assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
+
+        assert_ok!(Staking::guarantee(Origin::signed(110), (5, 500)));
+        assert_ok!(Staking::guarantee(Origin::signed(112), (5, 500)));
+        assert_ok!(Staking::guarantee(Origin::signed(114), (5, 500)));
+        assert_ok!(Staking::guarantee(Origin::signed(116), (5, 500)));
+        assert_ok!(Staking::guarantee(Origin::signed(118), (5, 400)));
+
+        // No effects will be seen so far.
+        assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+
+        // --- Block 2:
+        start_session(2, false);
+
+        // --- Block 3: the validators will now be queued.
+        start_session(3, false);
+        assert_eq!(Staking::current_era().unwrap_or(0), 1);
+
+        // --- Block 4: the validators will now be changed.
+        start_session(4, false);
+
+        assert_eq_uvec!(validator_controllers(), vec![20, 30]);
+        assert_eq!(
+            Staking::eras_stakers(1, &5),
+            Exposure {
+                total: 3400,
+                own: 1000,
+                others: vec![IndividualExposure {
+                    who: 115,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 113,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 119,
+                    value: 400
+                },
+                IndividualExposure {
+                    who: 117,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 111,
+                    value: 500
+                }]
+            }
+        );
+        assert_eq!(
+            Staking::eras_stakers_clipped(1, &5),
+            Exposure {
+                total: 3400,
+                own: 1000,
+                others: vec![IndividualExposure {
+                    who: 115,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 113,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 117,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 111,
+                    value: 500
+                }]
+            }
+        );
+    });
+}
+
+#[test]
 fn guarantee_should_work() {
     ExtBuilder::default()
         .guarantee(false)

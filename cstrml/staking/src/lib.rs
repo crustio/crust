@@ -390,10 +390,10 @@ pub trait Trait: frame_system::Trait {
     type BondingDuration: Get<EraIndex>;
 
     /// The maximum number of nominators rewarded for each validator.
-	///
-	/// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
-	/// their reward. This used to limit the i/o cost for the nominator payout.
-	type MaxNominatorRewardedPerValidator: Get<u32>;
+    ///
+    /// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
+    /// their reward. This used to limit the i/o cost for the nominator payout.
+    type MaxNominatorRewardedPerValidator: Get<u32>;
 
     /// Number of eras that slashes are deferred by, after computation. This
     /// should be less than the bonding duration. Set to 0 if slashes should be
@@ -475,17 +475,17 @@ decl_storage! {
             => Exposure<T::AccountId, BalanceOf<T>>;
 
         /// Clipped Exposure of validator at era.
-		///
-		/// This is similar to [`ErasStakers`] but number of nominators exposed is reduced to the
-		/// `T::MaxNominatorRewardedPerValidator` biggest stakers.
-		/// (Note: the field `total` and `own` of the exposure remains unchanged).
-		/// This is used to limit the i/o cost for the nominator payout.
-		///
-		/// This is keyed fist by the era index to allow bulk deletion and then the stash account.
-		///
-		/// Is it removed after `HISTORY_DEPTH` eras.
-		/// If stakers hasn't been set or has been removed then empty exposure is returned.
-		pub ErasStakersClipped get(fn eras_stakers_clipped):
+        ///
+        /// This is similar to [`ErasStakers`] but number of nominators exposed is reduced to the
+        /// `T::MaxNominatorRewardedPerValidator` biggest stakers.
+        /// (Note: the field `total` and `own` of the exposure remains unchanged).
+        /// This is used to limit the i/o cost for the nominator payout.
+        ///
+        /// This is keyed fist by the era index to allow bulk deletion and then the stash account.
+        ///
+        /// Is it removed after `HISTORY_DEPTH` eras.
+        /// If stakers hasn't been set or has been removed then empty exposure is returned.
+        pub ErasStakersClipped get(fn eras_stakers_clipped):
         double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
         => Exposure<T::AccountId, BalanceOf<T>>;
             
@@ -702,10 +702,10 @@ decl_module! {
         const BondingDuration: EraIndex = T::BondingDuration::get();
 
         /// The maximum number of nominators rewarded for each validator.
-		///
-		/// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
-		/// their reward. This used to limit the i/o cost for the nominator payout.
-		const MaxNominatorRewardedPerValidator: u32 = T::MaxNominatorRewardedPerValidator::get();
+        ///
+        /// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
+        /// their reward. This used to limit the i/o cost for the nominator payout.
+        const MaxNominatorRewardedPerValidator: u32 = T::MaxNominatorRewardedPerValidator::get();
 
 
         type Error = Error<T>;

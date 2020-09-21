@@ -1520,10 +1520,6 @@ impl<T: Trait> Module<T> {
     ///   * CurrentEraStartSessionIndex
     ///   * CurrentEraPointsEarned
     fn do_upgrade() {
-        if StorageVersion::get() == Releases::V2 {
-            return
-        }
-
         // Deprecated storages used for migration only
         mod deprecated {
             use crate::{Trait, Moment, SessionIndex};
@@ -1584,9 +1580,6 @@ impl<T: Trait> Module<T> {
         deprecated::CurrentEraStart::kill();
         deprecated::CurrentEraStartSessionIndex::kill();
         deprecated::CurrentEraPointsEarned::kill();
-
-        // 4. Upgrade StorageVersion
-        StorageVersion::put(Releases::V2);
     }
 
     /// Insert new or update old stake limit

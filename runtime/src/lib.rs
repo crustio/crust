@@ -379,6 +379,8 @@ parameter_types! {
     pub const SlashDeferDuration: staking::EraIndex = 28;
     // 80_000 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `80_000`
     pub const SPowerRatio: u128 = 80_000;
+    // 64 guarantors for one validator.
+    pub const MaxGuarantorRewardedPerValidator: u32 = 64;
 }
 
 impl staking::Trait for Runtime {
@@ -394,6 +396,7 @@ impl staking::Trait for Runtime {
     type SessionsPerEra = SessionsPerEra;
     type BondingDuration = BondingDuration;
     type SlashDeferDuration = SlashDeferDuration;
+    type MaxGuarantorRewardedPerValidator = MaxGuarantorRewardedPerValidator;
 
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;

@@ -213,7 +213,7 @@ impl swork::Trait for Test {
 parameter_types! {
     pub const SessionsPerEra: SessionIndex = 3;
     pub const BondingDuration: EraIndex = 3;
-    pub const MaxNominatorRewardedPerValidator: u32 = 64;
+    pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
 }
 impl Trait for Test {
@@ -226,6 +226,7 @@ impl Trait for Test {
     type Slash = ();
     type Reward = ();
     type SessionsPerEra = SessionsPerEra;
+    type MaxGuarantorRewardedPerValidator = MaxGuarantorRewardedPerValidator;
     type BondingDuration = BondingDuration;
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;

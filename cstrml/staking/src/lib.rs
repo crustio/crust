@@ -391,9 +391,9 @@ pub trait Trait: frame_system::Trait {
 
     /// The maximum number of nominators rewarded for each validator.
     ///
-    /// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
+    /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
     /// their reward. This used to limit the i/o cost for the nominator payout.
-    type MaxNominatorRewardedPerValidator: Get<u32>;
+    type MaxGuarantorRewardedPerValidator: Get<u32>;
 
     /// Number of eras that slashes are deferred by, after computation. This
     /// should be less than the bonding duration. Set to 0 if slashes should be
@@ -477,7 +477,7 @@ decl_storage! {
         /// Clipped Exposure of validator at era.
         ///
         /// This is similar to [`ErasStakers`] but number of nominators exposed is reduced to the
-        /// `T::MaxNominatorRewardedPerValidator` biggest stakers.
+        /// `T::MaxGuarantorRewardedPerValidator` biggest stakers.
         /// (Note: the field `total` and `own` of the exposure remains unchanged).
         /// This is used to limit the i/o cost for the nominator payout.
         ///
@@ -703,9 +703,9 @@ decl_module! {
 
         /// The maximum number of nominators rewarded for each validator.
         ///
-        /// For each validator only the `$MaxNominatorRewardedPerValidator` biggest stakers can claim
+        /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
         /// their reward. This used to limit the i/o cost for the nominator payout.
-        const MaxNominatorRewardedPerValidator: u32 = T::MaxNominatorRewardedPerValidator::get();
+        const MaxGuarantorRewardedPerValidator: u32 = T::MaxGuarantorRewardedPerValidator::get();
 
 
         type Error = Error<T>;
@@ -1309,7 +1309,7 @@ decl_module! {
         /// Pay out all the stakers behind a single validator for a single era.
         ///
         /// - `validator_stash` is the stash account of the validator. Their nominators, up to
-        ///   `T::MaxNominatorRewardedPerValidator`, will also receive their rewards.
+        ///   `T::MaxGuarantorRewardedPerValidator`, will also receive their rewards.
         /// - `era` may be any era between `[current_era - history_depth; current_era]`.
         ///
         /// The origin of this call must be _Signed_. Any account can call this function, even if
@@ -1962,7 +1962,7 @@ impl<T: Trait> Module<T> {
             <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
             let exposure_total = new_exposure.total;
             let mut exposure_clipped = new_exposure;
-            let clipped_max_len = T::MaxNominatorRewardedPerValidator::get() as usize;
+            let clipped_max_len = T::MaxGuarantorRewardedPerValidator::get() as usize;
             if exposure_clipped.others.len() > clipped_max_len {
                 exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
                 exposure_clipped.others.truncate(clipped_max_len);

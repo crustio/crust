@@ -7,7 +7,6 @@ use crust_runtime::{
     ElectionsConfig, CouncilConfig, WASM_BINARY
 };
 use cstrml_staking::Forcing;
-use cstrml_swork::WorkReport;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
@@ -252,21 +251,7 @@ fn testnet_genesis(
             keys: vec![]
         }),
         swork: Some(SworkConfig {
-            code: vec![],
-            current_report_slot: 0,
-            identities: endowed_accounts
-                .iter()
-                .map(|x| (x.clone(), Default::default()))
-                .collect(),
-            work_reports: endowed_accounts
-                .iter()
-                .map(|x| {
-                    (
-                        x.clone(),
-                        Default::default(),
-                    )
-                })
-                .collect(),
+            code: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),
@@ -329,7 +314,6 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     // Constants
     const ENDOWMENT: u128 = 2_500_000 * CRUS;
     const STASH: u128 = 1_250_000 * CRUS;
-    const WORKLOAD: u64 = 1073741824;
 
     GenesisConfig {
         pallet_sudo: Some(SudoConfig {
@@ -375,25 +359,7 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             keys: vec![]
         }),
         swork: Some(SworkConfig {
-            code: vec![],
-            current_report_slot: 0,
-            identities: endowed_accounts
-                .iter()
-                .map(|x| (x.clone(), Default::default()))
-                .collect(),
-            work_reports: endowed_accounts
-                .iter()
-                .map(|x| (
-                    x.clone(),
-                    WorkReport {
-                        block_number: 0,
-                        files: vec![],
-                        reserved: WORKLOAD,
-                        used: 0,
-                        cached_reserved: 0
-                    },
-                ))
-                .collect(),
+            code: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),
@@ -460,7 +426,6 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     // Constants
     const ENDOWMENT: u128 = 2_500_000 * CRUS;
     const STASH: u128 = 1_250_000 * CRUS;
-    const WORKLOAD: u64 = 1073741824;
 
     GenesisConfig {
         pallet_sudo: Some(SudoConfig {
@@ -506,25 +471,7 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             keys: vec![]
         }),
         swork: Some(SworkConfig {
-            code: vec![],
-            current_report_slot: 0,
-            identities: endowed_accounts
-                .iter()
-                .map(|x| (x.clone(), Default::default()))
-                .collect(),
-            work_reports: endowed_accounts
-                .iter()
-                .map(|x| (
-                    x.clone(),
-                    WorkReport {
-                        block_number: 0,
-                        files: vec![],
-                        reserved: WORKLOAD,
-                        used: 0,
-                        cached_reserved: 0
-                    },
-                ))
-                .collect(),
+            code: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),

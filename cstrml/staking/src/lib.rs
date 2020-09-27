@@ -590,7 +590,6 @@ decl_storage! {
 
                 gensis_total_stakes += balance;
 
-                <Module<T>>::upsert_stake_limit(stash, balance+balance);
                 let _ = match status {
                     StakerStatus::Validator => {
                         <Module<T>>::validate(
@@ -1612,13 +1611,18 @@ impl<T: Trait> Module<T> {
 
             let era_length = session_index.checked_sub(current_era_start_session_index)
                 .unwrap_or(0); // Must never happen.
-            // TODO: remove ForceNew? cause this will make work report update invalid
             match ForceEra::get() {
                 Forcing::ForceNew => ForceEra::kill(),
                 Forcing::ForceAlways => (),
                 Forcing::NotForcing if era_length >= T::SessionsPerEra::get() => (),
+                Forcing::NotForcing if era_length == T::SessionsPerEra::get() - 1 => {
+                    // The last but 1 session per era, we do update stake limit
+                    T::SworkInterface::update_identities();
+                    return None
+                },
                 _ => return None,
             }
+
             // New era
             Self::new_era(session_index)
         } else {
@@ -1832,11 +1836,7 @@ impl<T: Trait> Module<T> {
     ///
     /// This should only be called at the end of an era.
     fn select_and_update_validators(current_era: EraIndex) -> Option<Vec<T::AccountId>> {
-        // I. Update all swork identities work report and clear stakers
-        // TODO: this actually should already be prepared in the swork module
-        T::SworkInterface::update_identities();
-
-        // II. Ensure minimum validator count
+        // I. Ensure minimum validator count
         let validator_count = <Validators<T>>::iter().count();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
@@ -1854,7 +1854,7 @@ impl<T: Trait> Module<T> {
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
         let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
-        // III. Construct and fill in the V/G graph
+        // II. Construct and fill in the V/G graph
         // TC is O(V + G*1), V means validator's number, G means guarantor's number
         // DB try is 2
         let mut vg_graph: BTreeMap<T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>> =
@@ -1883,7 +1883,7 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        // IV. This part will cover
+        // III. This part will cover
         // 1. Get `ErasStakers` with `stake_limit` and `vg_graph`
         // 2. Get `ErasValidatorPrefs`
         // 3. Get `total_valid_stakes`
@@ -1942,16 +1942,17 @@ impl<T: Trait> Module<T> {
             validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
         }
 
-        // V. TopDown Election Algorithm with Randomlization
+        // IV. TopDown Election Algorithm with Randomlization
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
-        // 2. If there's no validators, be as same as little validators
+        // If there's no validators, be as same as little validators
         if to_elect < minimum_validator_count {
             return None;
         }
 
         let elected_stashes= Self::do_election(validators_stakes, to_elect);
-        // VI. Update general staking storage
+
+        // V. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
 
@@ -2091,11 +2092,11 @@ impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
     fn new_session(new_index: SessionIndex) -> Option<Vec<T::AccountId>> {
         Self::new_session(new_index)
     }
-    fn start_session(start_index: SessionIndex) {
-        Self::start_session(start_index)
-    }
     fn end_session(end_index: SessionIndex) {
         Self::end_session(end_index)
+    }
+    fn start_session(start_index: SessionIndex) {
+        Self::start_session(start_index)
     }
 }
 

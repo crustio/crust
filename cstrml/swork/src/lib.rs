@@ -12,7 +12,7 @@ use frame_support::{
     }
 };
 use sp_runtime::traits::Saturating;
-use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
+use sp_std::{str, convert::TryInto, prelude::*};
 use frame_system::{self as system, ensure_root, ensure_signed};
 
 #[cfg(feature = "std")]
@@ -45,9 +45,7 @@ pub type BalanceOf<T> =
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct WorkReport<AccountId> {
-    pub reporter: AccountId,
-
+pub struct WorkReport {
     /// Timing judgement
     pub report_slot: u64,
 
@@ -64,7 +62,7 @@ pub struct WorkReport<AccountId> {
 
 /// An event handler for reporting works
 pub trait Works<AccountId> {
-    fn report_works(controller: &AccountId, own_workload: u128, total_workload: u128);
+    fn report_works(reporter: &AccountId, own_workload: u128, total_workload: u128);
 }
 
 impl<AId> Works<AId> for () {
@@ -75,14 +73,21 @@ impl<AId> Works<AId> for () {
 /// and return if the order is legality
 impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
     fn check_works(merchant: &T::AccountId, file_size: u64) -> bool {
-        if let Some(wr) = Self::work_reports(merchant) {
-              wr.reserved > file_size
-        } else {
-            if cfg!(feature = "runtime-benchmarks"){
-                true
-            } else {
-                false
+        let mut free = 0;
+
+        // Loop and sum all pks
+        for pk in Self::id_bonds(merchant) {
+            if let Some(wr) = Self::work_reports(pk) {
+                // Pruning
+                if wr.free > file_size { return true }
+                free = free.saturating_add(wr.free);
             }
+        }
+
+        if cfg!(feature = "runtime-benchmarks") {
+            true
+        } else {
+            free > file_size
         }
     }
 }
@@ -113,8 +118,8 @@ decl_storage! {
 
         /// The bond relationship between AccountId <-> SworkerPubKeys
         /// e.g. 5HdZ269vAbuoZRK7GT67px6RmwFw2NrWsAbh2wENDqtb5WMN -> ['0x123', '0x456', ...]
-        pub IdBonds get(id_bonds):
-            map hasher(blake2_128_concat) T::AccountId => Vec<SworkerPubKey>
+        pub IdBonds get(fn id_bonds):
+            map hasher(blake2_128_concat) T::AccountId => Vec<SworkerPubKey>;
 
         /// The sWorker identities, mapping from sWorker public key to an optional identity tuple
         pub Identities get(fn identities):
@@ -124,7 +129,7 @@ decl_storage! {
         /// WorkReport only been replaced, it won't get removed cause we need to check the
         /// status transition from off-chain sWorker
         pub WorkReports get(fn work_reports):
-            map hasher(twox_64_concat) SworkerPubKey  => Option<WorkReport<T::AccountId>>;
+            map hasher(twox_64_concat) SworkerPubKey  => Option<WorkReport>;
 
         /// The current report slot block number, this value should be a multiple of era block
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
@@ -198,7 +203,7 @@ decl_module! {
         /// Register as new trusted node, can only called from sWorker.
         /// All `inputs` can only be generated from sWorker's enclave
         ///
-        /// The dispatch origin for this call must be _Signed_ by the controller account.
+        /// The dispatch origin for this call must be _Signed_ by the reporter account.
         ///
         /// Emits `RegisterSuccess` if new id has been registered.
         ///
@@ -232,10 +237,11 @@ decl_module! {
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalIdentity);
 
             //3. Upsert new id
-            Self::maybe_upsert_id(&applier, &identity);
+            let pk = maybe_pk.unwrap();
+            Self::maybe_upsert_id(&applier, &pk, &Self::code());
 
             // 4. Emit event
-            Self::deposit_event(RawEvent::RegisterSuccess(who));
+            Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())
         }
@@ -243,7 +249,7 @@ decl_module! {
         /// Report storage works from sWorker
         /// All `inputs` can only be generated from sWorker's enclave
         ///
-        /// The dispatch origin for this call must be _Signed_ by the controller account.
+        /// The dispatch origin for this call must be _Signed_ by the reporter account.
         ///
         /// Emits `WorksReportSuccess` if new work report has been reported
         ///
@@ -282,7 +288,7 @@ decl_module! {
             }
 
             // 2. Ensure reporter is registered
-            ensure!(<Identities<T>>::contains_key(&curr_pk), Error::<T>::IllegalReporter);
+            ensure!(Identities::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
             // 3. Ensure reporter's code is legal
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
@@ -360,7 +366,7 @@ decl_module! {
             );
 
             // 9. Emit work report event
-            Self::deposit_event(RawEvent::WorksReportSuccess(reporter, curr_pk));
+            Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk));
 
             // 10. Emit A/B upgrade event
             if is_ab_upgrade {
@@ -384,73 +390,45 @@ impl<T: Trait> Module<T> {
     /// TC = O(2n)
     /// DB try is 2n+5+Works_DB_try
     pub fn update_identities() {
-        // TODO: do this in previous session instead of end era.
         // Ideally, reported_rs should be current_rs + 1
-        let reported_rs = Self::get_reported_slot();
+        let reported_rs = Self::get_current_reported_slot();
         let current_rs = Self::current_report_slot();
+
         // 1. Report slot did not change, it should not trigger updating
         if current_rs == reported_rs {
             return;
         }
 
-        // 2. Update id's work report, get id's workload and total workload
         let mut total_used = 0;
-        let mut total_reserved = 0;
+        let mut total_free = 0;
 
+        // 2. Loop all identities and get the workload map
         // TODO: avoid iterate all identities
-        let workload_map: Vec<(T::AccountId, u128)> = <Identities<T>>::iter().map(|(controller, _)| {
-            // a. calculate this controller's order file map
-            // TC = O(nm), `n` is stored files number and `m` is corresponding order ids
-            let mut success_sorder_files: Vec<(MerkleRoot, T::Hash)> = vec![];
-            let mut ongoing_sorder_ids: Vec<T::Hash> = vec![];
-            let mut overdue_sorder_ids: Vec<T::Hash> = vec![];
-            if let Some(minfo) = T::MarketInterface::merchants(&controller) {
-                for (f_id, order_ids) in minfo.file_map.iter() {
-                    for order_id in order_ids {
-                        // Get order status(should exist) and (maybe) change the status
-                        let sorder =
-                            T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
-                        if sorder.status == OrderStatus::Success {
-                            success_sorder_files.push((f_id.clone(), order_id.clone()))
-                        }
-                        ongoing_sorder_ids.push(order_id.clone());
-                        if Self::get_current_block_number() >= sorder.expired_on {
-                            // TODO: add extra punishment logic when we close overdue sorder
-                            overdue_sorder_ids.push(order_id.clone());
-                        }
-                    }
-                }
-            }
-            // do punishment
-            for order_id in ongoing_sorder_ids {
-                T::MarketInterface::maybe_punish_merchant(&order_id);
-            }
-            // close overdue storage order
-            for order_id in overdue_sorder_ids {
-                T::MarketInterface::close_sorder(&order_id);
+        let workload_map: Vec<(T::AccountId, u128)> = <IdBonds<T>>::iter().map(|(reporter, ids)| {
+            let mut workload = 0;
+            for id in ids {
+                // 2.1 Calculate reporter's own reserved and used space
+                let (free, used) = Self::get_workload(&reporter, &id, current_rs);
+
+                // 2.2 Update total
+                total_used = total_used.saturating_add(used);
+                total_free = total_free.saturating_add(free);
+                workload = workload.saturating_add(used).saturating_add(free);
             }
 
-            // b. calculate controller's own reserved and used space
-            let (reserved, used) = Self::update_and_get_workload(&controller, &success_sorder_files, current_rs);
-
-            // c. add to total
-            total_used += used;
-            total_reserved += reserved;
-
-            // d. return my own to construct workload map
-            (controller.clone(), used + reserved)
+            (reporter.clone(), workload)
         }).collect();
 
         Used::put(total_used);
-        Free::put(total_reserved);
-        let total_workload = total_used + total_reserved;
+        Free::put(total_free);
+        let total_workload = total_used.saturating_add(total_free);
 
         // 3. Update current report slot
         CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
-        // 4. Update stake limit
-        for (controller, own_workload) in workload_map {
-            T::Works::report_works(&controller, own_workload, total_workload);
+        // 4. Update stake limit for every reporter
+        for (reporter, own_workload) in workload_map {
+            T::Works::report_works(&reporter, own_workload, total_workload);
         }
     }
 
@@ -475,16 +453,19 @@ impl<T: Trait> Module<T> {
     /// 3. Remove `work_report`
     fn chill(who: &T::AccountId, pk: &SworkerPubKey) {
         // 1. Remove from `identities`
-        Identities::remove(&old_pk);
+        Identities::remove(&pk);
 
-        // 2. Remove from `id_bonds`
-        <WorkReport<T>>::remove(&old_pk);
+        // 2. Remove from `work_reports`
+        WorkReports::remove(&pk);
 
-        // 3. Remove from `work_reports`
+        // 3. Remove from `id_bonds`
         <IdBonds<T>>::mutate(
             who,
-            move |bonds| bonds.retains(|bond| bond != pk)
+            move |bonds| bonds.retain(|bond| bond != pk)
         );
+        if Self::id_bonds(who).is_empty() {
+            <IdBonds<T>>::remove(who);
+        }
     }
 
     /// This function will (maybe) update or insert a work report, in details:
@@ -503,7 +484,7 @@ impl<T: Trait> Module<T> {
         deleted_files: &Vec<(MerkleRoot, u64)>,
         reported_srd_root: &MerkleRoot,
         reported_files_root: &MerkleRoot,
-        slot: u64
+        report_slot: u64
     ) {
         let mut old_used: u128 = 0;
         let mut old_free: u128 = 0;
@@ -513,7 +494,12 @@ impl<T: Trait> Module<T> {
         if let Some(old_wr) = Self::work_reports(prev_pk) {
             old_used = old_wr.used as u128;
             old_free = old_wr.free as u128;
-            files = old_wr.files;
+
+            // If this is resuming reporting, set all files storage order status to success
+            if old_wr.report_slot < report_slot - REPORT_SLOT {
+                let files: Vec<(MerkleRoot, u64)> = old_wr.files.into_iter().collect();
+                let _ = Self::update_sorder(reporter, &files, true);
+            }
         }
 
         // 2. Update sOrder and get changed size
@@ -529,10 +515,9 @@ impl<T: Trait> Module<T> {
         }
 
         // 4. Construct work report
-        let used = files.iter().fold(0, |acc, (f_id, f_size)| acc + *f_size);
+        let used = files.iter().fold(0, |acc, (_, f_size)| acc + *f_size);
         let wr = WorkReport {
-            reporter,
-            report_slot: slot,
+            report_slot,
             used,
             free: reported_srd_size,
             files,
@@ -542,14 +527,14 @@ impl<T: Trait> Module<T> {
         };
 
         // 5. Upsert work report
-        <WorkReports<T>>::insert(curr_pk, &wr);
+        WorkReports::insert(curr_pk, wr);
 
         // 6. Mark who has reported in this (report)slot
-        <ReportedInSlot<T>>::insert(curr_pk, slot, true);
+        ReportedInSlot::insert(curr_pk, report_slot, true);
 
         // 7. Update workload
-        let total_used = Self::used().saturating_sub(old_used).saturating_add(added_files_size).saturating_sub(deleted_files_size);
-        let total_free = Self::reserved().saturating_sub(old_free).saturating_add(reported_srd_size);
+        let total_used = Self::used().saturating_sub(old_used).saturating_add(used as u128);
+        let total_free = Self::free().saturating_sub(old_free).saturating_add(reported_srd_size as u128);
 
         Used::put(total_used);
         Free::put(total_free);
@@ -563,6 +548,7 @@ impl<T: Trait> Module<T> {
     /// Update sOrder information based on changed files, return the real changed files
     fn update_sorder(reporter: &T::AccountId, changed_files: &Vec<(MerkleRoot, u64)>, is_added: bool) -> Vec<(MerkleRoot, u64)> {
         let mut real_files = vec![];
+
         if let Some(mi) = T::MarketInterface::merchants(reporter) {
             let file_map = mi.file_map;
 
@@ -576,156 +562,58 @@ impl<T: Trait> Module<T> {
                             T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
 
                         // b. Change sOrder
-                        if is_added && sorder.status == OrderStatus::Pending {
+                        if !is_added {
+                            sorder.status = OrderStatus::Failed;
+                        } else if is_added && sorder.status == OrderStatus::Pending {
                             let current_block_numeric = Self::get_current_block_number();
                             // go panic if `current_block_numeric` > `created_on`
                             sorder.expired_on += current_block_numeric - sorder.created_on;
                             sorder.completed_on = current_block_numeric;
                             sorder.status = OrderStatus::Success;
-                        } else if is_added && sorder.status == OrderStatus::Failed {
-                            sorder.status = OrderStatus::Success;
-                        } else if !is_added {
-                            sorder.status = OrderStatus::Failed;
                         } else {
-                            // added with OrderStatus = Success
-                            // then duplicate file reported, WTF? 🤡
+                            sorder.status = OrderStatus::Success;
                         }
 
                         // c. Set sOrder
-                        T::MarketInterface::maybe_set_sorder(order_id, &sorder);
+                        T::MarketInterface::maybe_set_sorder(sorder_id, &sorder);
                     }
-                    Some((f_id, size))
+                    Some((f_id.clone(), *size))
+                } else {
+                    // 3. Or invalid
+                    None
                 }
-
-                // 3. Or invalid
-                None
             }).collect();
         }
 
         real_files
     }
 
-    /// Get updated workload by controller account,
-    /// this function should only be called in the new era
+    /// Get workload by reporter account,
+    /// this function should only be called in the 2nd last session of new era
     /// otherwise, it will be an void in this recursive loop, it mainly includes:
-    /// 1. passive check according to market order, it (maybe) update `used` and `order_status`;
-    /// 2. (maybe) remove outdated work report
-    /// 3. return the (reserved, used) storage of this controller account
-    fn update_and_get_workload(controller: &T::AccountId, order_map: &Vec<(MerkleRoot, T::Hash)>, current_rs: u64) -> (u128, u128) {
-        let mut wr_files: Vec<MerkleRoot> = vec![];
-        let mut works: (u128, u128) = (0, 0);
-
-        // Judge if this controller reported works in this current era
-        if let Some(wr) = Self::work_reports(controller) {
-            let (elder_reported, current_reported) = Self::reported_in_slot(controller, current_rs);
-            if elder_reported || current_reported {
-                // 1. Get all work report files
-                wr_files = wr.files.iter().map(|(f_id, _)| f_id.clone()).collect();
-
-                // 2. Get reserved and used
-                works =  (wr.reserved as u128, wr.used as u128)
+    /// 1. passive check work report: judge if the work report is outdated
+    /// 2. (maybe) set corresponding storage order to failed if wr is outdated
+    /// 2. return the (reserved, used) storage of this reporter account
+    fn get_workload(reporter: &T::AccountId, pk: &SworkerPubKey, current_rs: u64) -> (u128, u128) {
+        // Normally contains wr
+        if let Some(wr) = Self::work_reports(pk) {
+            if Self::reported_in_slot(pk, current_rs) {
+                return (wr.free as u128, wr.used as u128)
             } else {
-                // 2. Remove work report when it is outdated
-                if wr.block_number < current_rs {
-                    <WorkReports<T>>::remove(controller);
+                // If it is the 1st time failed
+                if wr.report_slot == current_rs - REPORT_SLOT {
+                    let files: Vec<(MerkleRoot, u64)> = wr.files.into_iter().collect();
+                    let _ = Self::update_sorder(reporter, &files, false);
                 }
+                // Or is already fucked
             }
         }
-        // Or work report not exist at all
+        // Or nope, idk wtf? 🙂
 
-        // 3. Check every order files are stored by controller
-        for (f_id, order_id) in order_map {
-            if !wr_files.contains(f_id) {
-                // Set status to failed, sorder.status should be successful before.
-                let mut sorder =
-                    T::MarketInterface::maybe_get_sorder(order_id).unwrap_or_default();
-                sorder.status = OrderStatus::Failed;
-                T::MarketInterface::maybe_set_sorder(order_id, &sorder);         
-            }
-        }
-
-        return works
+        (0, 0)
     }
 
     // PRIVATE IMMUTABLES
-    /// This function will generated the merged work report, merging includes:
-    /// 1. `files`: merged with same block number, covered with different block number
-    /// 2. `cached_reserved`: valued only `elder_reported == true` and `block_number != wr.block_number`,
-    /// will be clear when it been used, this value also used to
-    /// 3. `merged_reserved`: added with `cached_reserved` when `current_reported == true`
-    fn merged_work_report(who: &T::AccountId,
-                          reserved: u64,
-                          files: &Vec<(MerkleRoot, u64)>,
-                          block_number: u64,
-                          elder_reported: bool,
-                          current_reported: bool) -> WorkReport {
-        let mut merged_reserved = reserved;
-        let mut merged_files = files.clone();
-        let mut cached_reserved: u64 = 0;
-
-        if let Some(wr) = Self::work_reports(who) {
-            // I. New report slot round
-            if wr.block_number < block_number {
-                // 1. Cover the files(aka. do nothing)
-                if current_reported {
-                    // 2. If the current id reported first: merged_reserved = reserved(aka. update to this slot round)
-                } else if elder_reported {
-                    // 3. If the elder id reported first:
-                    // a. If wr.cached_reserved == 0 (which means node already upgraded and sum up with 2 identities)
-                    //    -> merged_reserved = wr.reserved(aka. keep the last slot round)
-                    // b. If wr.cached_reserved != 0 (which means node has not been upgraded)
-                    //    -> merged_reserved = reserved(aka. use the submited workload)
-                    if wr.cached_reserved == 0 {
-                        merged_reserved = wr.reserved;
-                    } else {
-                        // Do nothing with initial value
-                    }
-                }
-                // 4. Cached the reserved;
-                cached_reserved = reserved;
-
-            // II. Merge the work reports(elder + current)
-            // NOTE: NOT permit multiple submit with same public key(current/elder can only report once),
-            // otherwise this could lead a BIG trouble.
-            } else if wr.block_number == block_number {
-                // 1. Merge the files
-                merged_files = Self::merged_files(files, &wr.files);
-
-                // 2. Sum up the reserved
-                merged_reserved = wr.cached_reserved + reserved;
-
-                // 3. Clean up cached_reserved
-            }
-        }
-
-        WorkReport {
-            block_number,
-            used: 0,
-            reserved: merged_reserved,
-            cached_reserved,
-            files: merged_files
-        }
-    }
-
-    /// This function will merge SetA(`files_a`) and SetB(`files_b`)
-    fn merged_files(files_a: &Vec<(MerkleRoot, u64)>,
-                    files_b: &Vec<(MerkleRoot, u64)>) -> Vec<(MerkleRoot, u64)> {
-
-        let mut root_hashes: BTreeSet<MerkleRoot> = BTreeSet::new();
-        let mut unmerged_files = files_a.clone();
-        unmerged_files.extend(files_b.clone());
-        let mut merged_files: Vec<(MerkleRoot, u64)> = vec![];
-
-        for (root_hash, size) in unmerged_files {
-            if !root_hashes.contains(&root_hash) {
-                merged_files.push((root_hash.clone(), size));
-                root_hashes.insert(root_hash.clone());
-            }
-        }
-
-        merged_files
-    }
-
     /// This function will check work report files status transition
     fn files_transition_check(
         old_file_size: u64,
@@ -764,7 +652,8 @@ impl<T: Trait> Module<T> {
     fn reporter_code_check(pk: &SworkerPubKey, block_number: u64) -> bool {
         if let Some(reporter_code) = Self::identities(pk) {
             return reporter_code == Self::code() ||
-                (Self::ab_expire().is_some() && block_number < Self::ab_expire().unwrap())
+                (Self::ab_expire().is_some() && block_number <
+                    TryInto::<u64>::try_into(Self::ab_expire().unwrap()).ok().unwrap())
         }
 
         false
@@ -786,7 +675,7 @@ impl<T: Trait> Module<T> {
 
         // 2. Check work report timing
         ensure!(
-            wr_block_number == 1 || wr_block_number == Self::get_reported_slot(),
+            wr_block_number == 1 || wr_block_number == Self::get_current_reported_slot(),
             "work report is outdated or beforehand"
         );
 
@@ -800,7 +689,7 @@ impl<T: Trait> Module<T> {
         block_hash: &Vec<u8>,
         reserved: u64,
         used: u64,
-        reserved_root: &MerkleRoot,
+        free_root: &MerkleRoot,
         files_root: &MerkleRoot,
         added_files: &Vec<(MerkleRoot, u64)>,
         deleted_files: &Vec<(MerkleRoot, u64)>,
@@ -813,7 +702,7 @@ impl<T: Trait> Module<T> {
             block_hash,
             reserved,
             used,
-            reserved_root,
+            free_root,
             files_root,
             added_files,
             deleted_files,
@@ -826,7 +715,7 @@ impl<T: Trait> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn get_reported_slot() -> u64 {
+    fn get_current_reported_slot() -> u64 {
         let current_block_numeric = Self::get_current_block_number() as u64;
         let current_report_index = current_block_numeric / REPORT_SLOT;
         current_report_index * REPORT_SLOT
@@ -838,7 +727,7 @@ decl_event!(
     where
         AccountId = <T as system::Trait>::AccountId,
     {
-        RegisterSuccess(AccountId),
+        RegisterSuccess(AccountId, SworkerPubKey),
         WorksReportSuccess(AccountId, SworkerPubKey),
         ABUpgradeSuccess(AccountId),
     }

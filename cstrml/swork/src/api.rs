@@ -138,37 +138,54 @@ DaVzWh5aiEx+idkSGMnX
     }
 
     fn verify_work_report_sig(
-        pk: &Vec<u8>,
-        bn: u64,
+        curr_pk: &Vec<u8>,
+        prev_pk: &Vec<u8>,
+        block_number: u64,
         block_hash: &Vec<u8>,
-        rsv: u64,
-        fs: &Vec<(MerkleRoot, u64)>,
+        free: u64,
+        used: u64,
+        free_root: &Vec<u8>,
+        files_root: &Vec<u8>,
+        added_files: &Vec<(MerkleRoot, u64)>,
+        deleted_files: &Vec<(MerkleRoot, u64)>,
         sig: &Vec<u8>,
     ) -> bool {
         // 1. Encode u64
-        let block_number = bn.to_string().as_bytes().to_vec();
-        let reserved = rsv.to_string().as_bytes().to_vec();
-        let files_byes = encode_files(fs);
+        let block_number_bytes = block_number.to_string().as_bytes().to_vec();
+        let free_bytes = free.to_string().as_bytes().to_vec();
+        let used_bytes = used.to_string().as_bytes().to_vec();
+        let added_files_bytes = encode_files(added_files);
+        let deleted_files_bytes = encode_files(deleted_files);
 
-        // 2. Construct identity data
+        // 2. Construct work report data
         //{
-        //    pub_key: PubKey,
-        //    block_number: u64,
+        //    curr_pk: SworkerPubKey,
+        //    prev_pk: SworkerPubKey,
+        //    block_number: u64, -> Vec<u8>
         //    block_hash: Vec<u8>,
-        //    reserved: u64,
-        //    files: Vec<(MerkleRoot, u64)> -> Vec<u8>
+        //    free: u64, -> Vec<u8>
+        //    used: u64, -> Vec<u8>
+        //    free_root: MerkleRoot,
+        //    used_root: MerkleRoot,
+        //    added_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
+        //    deleted_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
         //}
         let data: Vec<u8> = [
-            &pk[..],
-            &block_number[..],
+            &curr_pk[..],
+            &prev_pk[..],
+            &block_number_bytes[..],
             &block_hash[..],
-            &reserved[..],
-            &files_byes[..],
+            &free_bytes[..],
+            &used_bytes[..],
+            &free_root[..],
+            &files_root[..],
+            &added_files_bytes[..],
+            &deleted_files_bytes[..]
         ]
         .concat();
 
         // 3. do p256 sig check
-        verify_p256_sig(pk, &data, sig)
+        verify_p256_sig(curr_pk, &data, sig)
     }
 
     fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {

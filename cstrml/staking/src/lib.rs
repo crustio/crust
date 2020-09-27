@@ -64,7 +64,7 @@ pub type RewardPoint = u32;
 
 /// Reward points of an era. Used to split era total payout between validators.
 ///
-/// This points will be used to reward validators and their respective nominators.
+/// This points will be used to reward validators and their respective guarantors.
 #[derive(PartialEq, Encode, Decode, Default, RuntimeDebug)]
 pub struct EraRewardPoints<AccountId: Ord> {
     /// Total number of points. Equals the sum of reward points for each validator.
@@ -106,7 +106,7 @@ impl Default for RewardDestination {
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct ValidatorPrefs {
     /// Reward that validator takes up-front; only the rest is split between themselves and
-    /// nominators.
+    /// guarantors.
     #[codec(compact)]
     pub fee: Perbill,
 }
@@ -389,6 +389,12 @@ pub trait Trait: frame_system::Trait {
     /// Number of eras that staked funds must remain bonded for.
     type BondingDuration: Get<EraIndex>;
 
+    /// The maximum number of guarantors rewarded for each validator.
+    ///
+    /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
+    /// their reward. This used to limit the i/o cost for the guarantor payout.
+    type MaxGuarantorRewardedPerValidator: Get<u32>;
+
     /// Number of eras that slashes are deferred by, after computation. This
     /// should be less than the bonding duration. Set to 0 if slashes should be
     /// applied immediately, without opportunity for intervention.
@@ -467,6 +473,21 @@ decl_storage! {
         pub ErasStakers get(fn eras_stakers):
             double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
             => Exposure<T::AccountId, BalanceOf<T>>;
+
+        /// Clipped Exposure of validator at era.
+        ///
+        /// This is similar to [`ErasStakers`] but number of guarantors exposed is reduced to the
+        /// `T::MaxGuarantorRewardedPerValidator` biggest stakers.
+        /// (Note: the field `total` and `own` of the exposure remains unchanged).
+        /// This is used to limit the i/o cost for the guarantor payout.
+        ///
+        /// This is keyed fist by the era index to allow bulk deletion and then the stash account.
+        ///
+        /// Is it removed after `HISTORY_DEPTH` eras.
+        /// If stakers hasn't been set or has been removed then empty exposure is returned.
+        pub ErasStakersClipped get(fn eras_stakers_clipped):
+        double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+        => Exposure<T::AccountId, BalanceOf<T>>;
             
         /// Similar to `ErasStakers`, this holds the preferences of validators.
         ///
@@ -678,6 +699,13 @@ decl_module! {
 
         /// Number of eras that staked funds must remain bonded for.
         const BondingDuration: EraIndex = T::BondingDuration::get();
+
+        /// The maximum number of guarantors rewarded for each validator.
+        ///
+        /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
+        /// their reward. This used to limit the i/o cost for the guarantor payout.
+        const MaxGuarantorRewardedPerValidator: u32 = T::MaxGuarantorRewardedPerValidator::get();
+
 
         type Error = Error<T>;
 
@@ -1267,7 +1295,7 @@ decl_module! {
         /// Base Weight: 75.94 µs
         /// DB Weight:
         /// - Reads: Stash Account, Bonded, Slashing Spans, Locks
-        /// - Writes: Bonded, Ledger, Payee, Validators, Nominators, Stash Account, Locks
+        /// - Writes: Bonded, Ledger, Payee, Validators, guarantors, Stash Account, Locks
         /// # </weight>
         #[weight = T::DbWeight::get().reads_writes(4, 7)
             .saturating_add(76 * WEIGHT_PER_MICROS)]
@@ -1279,8 +1307,8 @@ decl_module! {
 
         /// Pay out all the stakers behind a single validator for a single era.
         ///
-        /// - `validator_stash` is the stash account of the validator. Their nominators, up to
-        ///   `T::MaxNominatorRewardedPerValidator`, will also receive their rewards.
+        /// - `validator_stash` is the stash account of the validator. Their guarantors, up to
+        ///   `T::MaxGuarantorRewardedPerValidator`, will also receive their rewards.
         /// - `era` may be any era between `[current_era - history_depth; current_era]`.
         ///
         /// The origin of this call must be _Signed_. Any account can call this function, even if
@@ -1559,7 +1587,7 @@ impl<T: Trait> Module<T> {
             Err(pos) => ledger.claimed_rewards.insert(pos, era),
         }
         /* Input data seems good, no errors allowed after this point */
-        let exposure = <ErasStakers<T>>::get(&era, &ledger.stash);
+        let exposure = <ErasStakersClipped<T>>::get(&era, &ledger.stash);
         <Ledger<T>>::insert(&controller, &ledger);
 
         // 2. Pay authoring reward
@@ -1766,6 +1794,7 @@ impl<T: Trait> Module<T> {
         /// Clear all era information for given era.
     fn clear_era_information(era_index: EraIndex) {
         <ErasStakers<T>>::remove_prefix(era_index);
+        <ErasStakersClipped<T>>::remove_prefix(era_index);
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
         <ErasStakingPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
@@ -1931,15 +1960,24 @@ impl<T: Trait> Module<T> {
 
             // 4. Update snapshots
             <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
+            let exposure_total = new_exposure.total;
+            let mut exposure_clipped = new_exposure;
+            let clipped_max_len = T::MaxGuarantorRewardedPerValidator::get() as usize;
+            if exposure_clipped.others.len() > clipped_max_len {
+                exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
+                exposure_clipped.others.truncate(clipped_max_len);
+            }
+            <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
+
             <ErasValidatorPrefs<T>>::insert(&current_era, &v_stash, Self::validators(&v_stash).clone());
-            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&new_exposure.total) {
+            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&exposure_total) {
                 eras_total_stakes = maybe_total_stakes;
             } else {
                 eras_total_stakes = to_balance(u64::max_value() as u128);
             }
 
             // 5. Push validator stakes
-            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
+            validators_stakes.push((v_stash.clone(), to_votes(exposure_total)))
         }
 
         // IV. TopDown Election Algorithm with Randomlization
@@ -2270,12 +2308,12 @@ for Module<T> where
             });
 
             if let Some(mut unapplied) = unapplied {
-                let nominators_len = unapplied.others.len() as u64;
+                let guarantors_len = unapplied.others.len() as u64;
                 let reporters_len = details.reporters.len() as u64;
 
                 {
-                    let upper_bound = 1 /* Validator/NominatorSlashInEra */ + 2 /* fetch_spans */;
-                    let rw = upper_bound + nominators_len * upper_bound;
+                    let upper_bound = 1 /* Validator/guarantorSlashInEra */ + 2 /* fetch_spans */;
+                    let rw = upper_bound + guarantors_len * upper_bound;
                     add_db_reads_writes(rw, rw);
                 }
                 unapplied.reporters = details.reporters.clone();
@@ -2286,8 +2324,8 @@ for Module<T> where
                         let slash_cost = (6, 5);
                         let reward_cost = (2, 2);
                         add_db_reads_writes(
-                            (1 + nominators_len) * slash_cost.0 + reward_cost.0 * reporters_len,
-                            (1 + nominators_len) * slash_cost.1 + reward_cost.1 * reporters_len
+                            (1 + guarantors_len) * slash_cost.0 + reward_cost.0 * reporters_len,
+                            (1 + guarantors_len) * slash_cost.1 + reward_cost.1 * reporters_len
                         );
                     }
                 } else {

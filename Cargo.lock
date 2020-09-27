@@ -923,7 +923,6 @@ dependencies = [
  "crust-runtime",
  "cst-primitives",
  "cstrml-staking",
- "cstrml-swork",
  "frame-benchmarking",
  "frame-benchmarking-cli",
  "futures 0.3.5",

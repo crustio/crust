@@ -46,6 +46,7 @@ frame-benchmarking = '2.0.0-rc6'
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.8.1' }
 cstrml-staking = { path = '../cstrml/staking', version = '0.8.1' }
+cstrml-swork = { path = '../cstrml/swork', version = '0.8.1' }
 primitives = { package = 'cst-primitives', path = '../primitives', version = '0.8.1' }
 crust-rpc = { path =  '../rpc', version = '0.8.1' }
 

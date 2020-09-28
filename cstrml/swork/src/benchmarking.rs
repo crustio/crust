@@ -1,3 +1,5 @@
+// TODO: enable it with new register and report works
+/*
 use super::*;
 
 use system::{self as frame_system, RawOrigin};
@@ -9,8 +11,7 @@ const MAX_EXISTENTIAL_DEPOSIT: u32 = 1000;
 const MAX_USER_INDEX: u32 = 1000;
 const BLOCK_NUMBER: u32 = 200;
 
-// TODO: enable it with new register and report works
-/*benchmarks! {
+benchmarks! {
     _ {
         let e in 2 .. MAX_EXISTENTIAL_DEPOSIT => ();
         let u in 1 .. MAX_USER_INDEX => ();

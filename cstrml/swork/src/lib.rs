@@ -264,7 +264,7 @@ decl_module! {
         pub fn report_works(
             origin,
             curr_pk: SworkerPubKey,
-            old_pk: SworkerPubKey,
+            ab_upgrade_pk: SworkerPubKey,
             slot: u64,
             slot_hash: Vec<u8>,
             reported_srd_size: u64,
@@ -290,10 +290,10 @@ decl_module! {
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
             // 4. Ensure A/B upgrade is legal
-            let is_ab_upgrade = !old_pk.is_empty();
+            let is_ab_upgrade = !ab_upgrade_pk.is_empty();
             if is_ab_upgrade {
                 // 4.1 Previous pk should already reported works
-                let maybe_prev_wr = Self::work_reports(&old_pk);
+                let maybe_prev_wr = Self::work_reports(&ab_upgrade_pk);
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
 
                 // 4.2 Current work report should NOT be changed at all
@@ -305,7 +305,7 @@ decl_module! {
                     Error::<T>::ABUpgradeFailed);
 
                 // 4.3 Set the real previous public key(contains work report);
-                prev_pk = old_pk.clone();
+                prev_pk = ab_upgrade_pk.clone();
             }
 
             // 5. Timing check
@@ -315,7 +315,7 @@ decl_module! {
             ensure!(
                 Self::work_report_sig_check(
                     &curr_pk,
-                    &old_pk,
+                    &ab_upgrade_pk,
                     slot,
                     &slot_hash,
                     reported_srd_size,
@@ -353,14 +353,14 @@ decl_module! {
                 &reporter,
                 &curr_pk,
                 &prev_pk,
-                &old_pk,
                 reported_srd_size,
                 reported_files_size,
                 &added_files,
                 &deleted_files,
                 &reported_srd_root,
                 &reported_files_root,
-                slot
+                slot,
+                &ab_upgrade_pk
             );
 
             // 9. Emit work report event
@@ -475,14 +475,14 @@ impl<T: Trait> Module<T> {
         reporter: &T::AccountId,
         curr_pk: &SworkerPubKey,
         prev_pk: &SworkerPubKey,
-        old_pk: &SworkerPubKey,
         reported_srd_size: u64,
         reported_files_size: u64,
         added_files: &Vec<(MerkleRoot, u64)>,
         deleted_files: &Vec<(MerkleRoot, u64)>,
         reported_srd_root: &MerkleRoot,
         reported_files_root: &MerkleRoot,
-        report_slot: u64
+        report_slot: u64,
+        ab_upgrade_pk: &SworkerPubKey
     ) {
         let mut old_used: u128 = 0;
         let mut old_free: u128 = 0;
@@ -539,8 +539,8 @@ impl<T: Trait> Module<T> {
         Free::put(total_free);
 
         // 8. Delete old A's storage status
-        if !old_pk.is_empty() {
-            Self::chill(reporter, old_pk);
+        if !ab_upgrade_pk.is_empty() {
+            Self::chill(reporter, ab_upgrade_pk);
         }
     }
 
@@ -594,7 +594,7 @@ impl<T: Trait> Module<T> {
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
     fn get_workload(reporter: &T::AccountId, pk: &SworkerPubKey, current_rs: u64) -> (u128, u128) {
-        // Normally contains wr
+        // Got work report
         if let Some(wr) = Self::work_reports(pk) {
             if Self::reported_in_slot(pk, current_rs) {
                 return (wr.free as u128, wr.used as u128)

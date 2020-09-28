@@ -105,11 +105,18 @@ pub struct TestOrderInspector;
 impl OrderInspector<AccountId> for TestOrderInspector {
     // file size should smaller than merchant's num
     fn check_works(merchant: &AccountId, file_size: u64) -> bool {
-        if let Some(wr) = Swork::work_reports(merchant) {
-            wr.reserved > file_size
-        } else {
-            false
+        let mut free = 0;
+
+        // Loop and sum all pks
+        for pk in Swork::id_bonds(merchant) {
+            if let Some(wr) = Swork::work_reports(pk) {
+                // Pruning
+                if wr.free > file_size { return true }
+                free = free + wr.free;
+            }
         }
+
+        free > file_size
     }
 }
 
@@ -162,43 +169,75 @@ pub type System = system::Module<Test>;
 pub type Swork = swork::Module<Test>;
 pub type Balances = balances::Module<Test>;
 
-// This function basically just builds a genesis storage key/value store according to
-// our desired mockup.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = system::GenesisConfig::default()
     .build_storage::<Test>()
     .unwrap();
 
-    // swork genesis
-    let identities: Vec<u64> = vec![0, 100, 200];
-    let work_reports: Vec<(u64, swork::WorkReport)> = identities
-            .iter()
-            .map(|id| {
-                (
-                    *id,
-                    swork::WorkReport {
-                        block_number: 0,
-                        files: vec![],
-                        used: 0,
-                        reserved: *id,
-                        cached_reserved: 0
-                    },
-                )
-            })
-            .collect();
-
-    let _ = swork::GenesisConfig::<Test> {
-        current_report_slot: 0,
+    let _ = swork::GenesisConfig {
         code: vec![],
-        identities: identities
-            .iter()
-            .map(|id| (*id, Default::default()))
-            .collect(),
-        work_reports
-    }
-    .assimilate_storage(&mut t);
+    }.assimilate_storage(&mut t);
 
     t.into()
+}
+
+pub fn init_swork_setup() {
+    // 1. Register for 0, 100, 200
+    let pk1 = hex::decode("11").unwrap();
+    let pk2 = hex::decode("22").unwrap();
+    let pk3 = hex::decode("33").unwrap();
+    let pk4 = hex::decode("44").unwrap();
+    let code = hex::decode("").unwrap();
+
+    <swork::Identities>::insert(pk1.clone(), code.clone());
+    <swork::Identities>::insert(pk1.clone(), code.clone());
+    <swork::Identities>::insert(pk1.clone(), code.clone());
+
+    <swork::IdBonds<Test>>::insert(0, vec![pk1.clone()]);
+
+    // Test star network
+    <swork::IdBonds<Test>>::insert(100, vec![pk2.clone(), pk3.clone()]);
+    <swork::IdBonds<Test>>::insert(200, vec![pk4.clone()]);
+
+    <swork::WorkReports>::insert(pk1.clone(), swork::WorkReport{
+        report_slot: 0,
+        used: 0,
+        free: 0,
+        files: Default::default(),
+        reported_files_size: 0,
+        reported_srd_root: vec![],
+        reported_files_root: vec![]
+    });
+
+    // Test star network
+    <swork::WorkReports>::insert(pk2.clone(), swork::WorkReport{
+        report_slot: 0,
+        used: 0,
+        free: 50,
+        files: Default::default(),
+        reported_files_size: 0,
+        reported_srd_root: vec![],
+        reported_files_root: vec![]
+    });
+    <swork::WorkReports>::insert(pk3.clone(), swork::WorkReport{
+        report_slot: 0,
+        used: 0,
+        free: 50,
+        files: Default::default(),
+        reported_files_size: 0,
+        reported_srd_root: vec![],
+        reported_files_root: vec![]
+    });
+
+    <swork::WorkReports>::insert(pk4.clone(), swork::WorkReport{
+        report_slot: 0,
+        used: 0,
+        free: 200,
+        files: Default::default(),
+        reported_files_size: 0,
+        reported_srd_root: vec![],
+        reported_files_root: vec![]
+    });
 }
 
 /// Run until a particular block.

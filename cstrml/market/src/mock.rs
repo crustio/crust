@@ -178,7 +178,12 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         code: vec![],
     }.assimilate_storage(&mut t);
 
-    t.into()
+    let mut ext: sp_io::TestExternalities = t.into();
+    ext.execute_with(|| {
+        init_swork_setup();
+    });
+
+    ext
 }
 
 pub fn init_swork_setup() {

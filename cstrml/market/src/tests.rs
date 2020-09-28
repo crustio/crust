@@ -25,7 +25,6 @@ fn set_punishment_in_success_count(order_id: &H256, success_count: EraIndex) {
 #[test]
 fn test_for_storage_order_should_work() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -106,7 +105,6 @@ fn test_for_storage_order_should_work() {
 #[test]
 fn test_for_storage_order_should_fail_due_to_file_size() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -140,7 +138,6 @@ fn test_for_storage_order_should_fail_due_to_file_size() {
 #[test]
 fn test_for_storage_order_should_fail_due_to_duration_too_short() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -173,7 +170,6 @@ fn test_for_storage_order_should_fail_due_to_duration_too_short() {
 #[test]
 fn test_for_register_should_fail_due_to_low_price() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -194,7 +190,6 @@ fn test_for_register_should_fail_due_to_low_price() {
 #[test]
 fn test_for_storage_order_should_fail_due_to_wr_not_exist() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -215,7 +210,6 @@ fn test_for_storage_order_should_fail_due_to_wr_not_exist() {
 #[test]
 fn test_for_storage_order_should_fail_due_to_merchant_not_register() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -244,7 +238,6 @@ fn test_for_storage_order_should_fail_due_to_merchant_not_register() {
 #[test]
 fn test_for_pledge_should_work() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
         let merchant = 100;
@@ -272,7 +265,6 @@ fn test_for_pledge_should_work() {
 #[test]
 fn test_for_pledge_extra_should_fail_due_to_merchant_not_pledges() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -295,7 +287,6 @@ fn test_for_pledge_extra_should_fail_due_to_merchant_not_pledges() {
 #[test]
 fn test_for_pledge_should_fail_due_to_insufficient_currency() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -318,7 +309,6 @@ fn test_for_pledge_should_fail_due_to_insufficient_currency() {
 #[test]
 fn test_for_pledge_should_fail_due_to_insufficient_pledge() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -367,7 +357,6 @@ fn test_for_pledge_should_fail_due_to_insufficient_pledge() {
 #[test]
 fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -436,7 +425,6 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
 #[test]
 fn test_for_pledge_should_fail_due_to_double_pledge() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
         let merchant = 100;
@@ -459,7 +447,6 @@ fn test_for_pledge_should_fail_due_to_double_pledge() {
 #[test]
 fn test_for_pledge_should_work_without_register() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
         let merchant = 100;
@@ -484,7 +471,6 @@ fn test_for_pledge_should_work_without_register() {
 #[test]
 fn test_for_half_punish_should_work() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -555,7 +541,6 @@ fn test_for_half_punish_should_work() {
 #[test]
 fn test_for_full_punish_should_work() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -625,7 +610,6 @@ fn test_for_full_punish_should_work() {
 #[test]
 fn test_for_close_sorder() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 
@@ -696,7 +680,6 @@ fn test_for_close_sorder() {
 #[test]
 fn test_scenario_for_file_alias_should_work() {
     new_test_ext().execute_with(|| {
-        init_swork_setup();
         // generate 50 blocks first
         run_to_block(50);
 

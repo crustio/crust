@@ -611,6 +611,7 @@ decl_storage! {
 
                 gensis_total_stakes += balance;
 
+                <Module<T>>::upsert_stake_limit(stash, balance+balance);
                 let _ = match status {
                     StakerStatus::Validator => {
                         <Module<T>>::validate(

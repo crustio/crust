@@ -7,39 +7,10 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use primitives::*;
 
 use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
 type AccountId = AccountId32;
-
-struct ReportWorksInfo {
-    pub_key: SworkerPubKey,
-    block_number: u64,
-    block_hash: Vec<u8>,
-    reserved: u64,
-    files: Vec<(MerkleRoot, u64)>,
-    sig: SworkerSignature
-}
-
-fn valid_report_works_info() -> ReportWorksInfo {
-    let pub_key = hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap();
-    let block_hash = hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap();
-    let files: Vec<(Vec<u8>, u64)> = [
-        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408),
-        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816)
-    ].to_vec();
-    let sig = hex::decode("9c12986c01efe715ed8bed80b7e391601c45bf152e280693ffcfd10a4b386deaaa0f088fc26b0ebeca64c33cf122d372ebd787aa77beaaba9d2e499ce40a76e6").unwrap();
-
-    ReportWorksInfo {
-        pub_key,
-        block_number: 300,
-        block_hash,
-        reserved: 4294967296,
-        sig,
-        files
-    }
-}
 
 #[test]
 fn test_for_storage_order_and_payment_should_work() {
@@ -85,19 +56,7 @@ fn test_for_storage_order_and_payment_should_work() {
             unreserved: 0
         });
 
-        // Check workloads
-        assert_eq!(Swork::reserved(), 0);
-
-        let report_works_info = valid_report_works_info();
-        assert_ok!(Swork::report_works(
-            Origin::signed(merchant.clone()),
-            report_works_info.pub_key,
-            report_works_info.block_number,
-            report_works_info.block_hash,
-            report_works_info.reserved,
-            report_works_info.files,
-            report_works_info.sig
-        ));
+        add_work_report(&merchant);
         assert_eq!(Balances::reserved_balance(client.clone()), 60);
         assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount);
         assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
@@ -200,19 +159,7 @@ fn test_for_storage_order_and_payment_should_suspend() {
             unreserved: 0
         });
 
-        // Check workloads
-        assert_eq!(Swork::reserved(), 0);
-
-        let report_works_info = valid_report_works_info();
-        assert_ok!(Swork::report_works(
-            Origin::signed(merchant.clone()),
-            report_works_info.pub_key,
-            report_works_info.block_number,
-            report_works_info.block_hash,
-            report_works_info.reserved,
-            report_works_info.files,
-            report_works_info.sig
-        ));
+        add_work_report(&merchant);
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount);
         assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {
@@ -314,19 +261,7 @@ fn test_for_close_storage_order_in_payment() {
             unreserved: 0
         });
 
-        // Check workloads
-        assert_eq!(Swork::reserved(), 0);
-
-        let report_works_info = valid_report_works_info();
-        assert_ok!(Swork::report_works(
-            Origin::signed(merchant.clone()),
-            report_works_info.pub_key,
-            report_works_info.block_number,
-            report_works_info.block_hash,
-            report_works_info.reserved,
-            report_works_info.files,
-            report_works_info.sig
-        ));
+        add_work_report(&merchant);
         assert_eq!(Balances::reserved_balance(source.clone()), 60);
         assert_eq!(Balances::free_balance(merchant.clone()), pledge_amount);
         assert_eq!(CstrmlPayment::payment_ledgers(order_id).unwrap(), PaymentLedger {

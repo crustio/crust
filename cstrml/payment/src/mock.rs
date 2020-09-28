@@ -3,7 +3,7 @@ use super::*;
 use frame_support::{
     impl_outer_origin, parameter_types, impl_outer_dispatch,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{OnFinalize, OnInitialize, Get}
+    traits::{OnFinalize, OnInitialize, Get}, assert_ok
 };
 use sp_runtime::{
     testing::Header,
@@ -14,7 +14,6 @@ use std::{cell::RefCell};
 use balances::AccountData;
 pub type Balance = u64;
 
-use keyring::Sr25519Keyring;
 use sp_core::{crypto::AccountId32, H256};
 pub type AccountId = AccountId32;
 
@@ -180,45 +179,9 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .build_storage::<Test>()
     .unwrap();
 
-    // initial authorities: [Alice, Bob]
-    let accounts = [
-        (
-            Sr25519Keyring::Alice.to_account_id(),
-            hex::decode("0fb42b36f26b69b7bbd3f60b2e377e66a4dacf0284877731bb59ca2cc9ce2759390dfb4b7023986e238d74df027f0f7f34b51f4b0dbf60e5f0ac90812d977499").unwrap()
-        ),
-        (
-            Sr25519Keyring::Bob.to_account_id(),
-            hex::decode("b0b0c191996073c67747eb1068ce53036d76870516a2973cef506c29aa37323892c5cc5f379f17e63a64bb7bc69fbea14016eea76dae61f467c23de295d7f689").unwrap()
-        )
-    ];
-
-    let identities = accounts
-        .iter()
-        .map(|(id, pk)| {
-            (
-                id.clone(),
-                (
-                    None,
-                    Some(swork::Identity {
-                        pub_key: pk.clone(),
-                        code: vec![],
-                    })
-                ),
-            )
-        })
-        .collect();
-    let work_reports = accounts
-        .iter()
-        .map(|(x, _)| (x.clone(), Default::default()))
-        .collect();
-
-    let _ = swork::GenesisConfig::<Test> {
-        current_report_slot: 0,
+    let _ = swork::GenesisConfig {
         code: vec![],
-        identities,
-        work_reports
-    }
-    .assimilate_storage(&mut t);
+    }.assimilate_storage(&mut t);
 
     t.into()
 }
@@ -226,9 +189,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 /// Run until a particular block.
 // TODO: make it into util?
 pub fn run_to_block(n: u64) {
-    let fake_bh = H256::from_slice(hex::decode("05404b690b0c785bf180b2dd82a431d88d29baf31346c53dbda95e83e34c8a75").unwrap().as_slice());
     while System::block_number() < n {
-        <system::BlockHash<Test>>::insert(System::block_number(), fake_bh.clone());
         if System::block_number() > 1 {
             System::on_finalize(System::block_number());
         }
@@ -236,4 +197,41 @@ pub fn run_to_block(n: u64) {
         System::on_initialize(System::block_number());
         Payment::on_initialize(System::block_number());
     }
+}
+
+pub fn add_work_report(merchant: &AccountId) {
+    let curr_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 300;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 402868224;
+    let added_files: Vec<(Vec<u8>, u64)> = [
+        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408),
+        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816)
+    ].to_vec();
+    let deleted_files: Vec<(Vec<u8>, u64)> = vec![];
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("b3f78863ec972955d9ca22d444a5475085a4f7975a738aba1eae1d98dd718fc691a77a35b764a148a3a861a4a2ef3279f3d5e25f607c73ca85ea86e1176ba662").unwrap();
+
+    // 1. Register for this merchant
+    <swork::Identities>::insert(curr_pk.clone(), hex::decode("").unwrap());
+    <swork::IdBonds<Test>>::insert(merchant.clone(), vec![curr_pk.clone()]);
+
+    // 2. Report works
+    assert_ok!(Swork::report_works(
+        Origin::signed(merchant.clone()),
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        added_files,
+        deleted_files,
+        srd_root,
+        files_root,
+        sig
+    ));
 }

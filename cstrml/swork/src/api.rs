@@ -10,7 +10,10 @@ use signatory::{
 };
 #[cfg(feature = "std")]
 use signatory_ring::ecdsa::p256::{PublicKey, Verifier};
-use primitives::MerkleRoot;
+use primitives::{
+    MerkleRoot, SworkerPubKey, SworkerSignature,
+    IASSig, SworkerCert, ISVBody, SworkerCode
+};
 
 #[cfg(feature = "std")]
 use openssl::{
@@ -25,12 +28,12 @@ use serde_json::{Result as JsonResult, Value};
 #[runtime_interface]
 pub trait Crypto {
     fn verify_identity(
-        ias_sig: &Vec<u8>,
-        ias_cert: &Vec<u8>,
+        ias_sig: &IASSig,
+        ias_cert: &SworkerCert,
         account_id: &Vec<u8>,
-        isv_body: &Vec<u8>,
-        sig: &Vec<u8>,
-        enclave_code: &Vec<u8>
+        isv_body: &ISVBody,
+        sig: &SworkerSignature,
+        enclave_code: &SworkerCode
     ) -> Option<Vec<u8>> {
         // 0. Define this fucking big root certificate💩
         let root_ca: Vec<u8> = "-----BEGIN CERTIFICATE-----
@@ -138,19 +141,19 @@ DaVzWh5aiEx+idkSGMnX
     }
 
     fn verify_work_report_sig(
-        curr_pk: &Vec<u8>,
-        prev_pk: &Vec<u8>,
+        curr_pk: &SworkerPubKey,
+        prev_pk: &SworkerPubKey,
         block_number: u64,
         block_hash: &Vec<u8>,
         free: u64,
         used: u64,
-        free_root: &Vec<u8>,
-        files_root: &Vec<u8>,
+        srd_root: &MerkleRoot,
+        files_root: &MerkleRoot,
         added_files: &Vec<(MerkleRoot, u64)>,
         deleted_files: &Vec<(MerkleRoot, u64)>,
-        sig: &Vec<u8>,
+        sig: &SworkerSignature,
     ) -> bool {
-        // 1. Encode u64
+        // 1. Encode
         let block_number_bytes = block_number.to_string().as_bytes().to_vec();
         let free_bytes = free.to_string().as_bytes().to_vec();
         let used_bytes = used.to_string().as_bytes().to_vec();
@@ -177,7 +180,7 @@ DaVzWh5aiEx+idkSGMnX
             &block_hash[..],
             &free_bytes[..],
             &used_bytes[..],
-            &free_root[..],
+            &srd_root[..],
             &files_root[..],
             &added_files_bytes[..],
             &deleted_files_bytes[..]

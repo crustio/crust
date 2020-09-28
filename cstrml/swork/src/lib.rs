@@ -162,18 +162,14 @@ decl_error! {
         IllegalReporter,
         /// Outdated reporter
         OutdatedReporter,
-        /// Invalid public key
-        InvalidPubKey,
         /// Invalid timing
         InvalidReportTime,
         /// Illegal work report signature
         IllegalWorkReportSig,
-        /// Illegal upgrade work report
-        IllegalUpgradeWorkReport,
         /// A/B Upgrade failed
         ABUpgradeFailed,
         /// Files change not legal
-        IllegalFilesTrasition,
+        IllegalFilesTransition,
     }
 }
 
@@ -334,14 +330,16 @@ decl_module! {
             );
 
             // 7. Files storage status transition check
-            let mut prev_files_size = 0;
-            if let Some(prev_wr) = Self::work_reports(&prev_pk) {
-                prev_files_size = prev_wr.reported_files_size;
-            }
-
             ensure!(
-                Self::files_transition_check(prev_files_size, reported_files_size, &added_files, &deleted_files),
-                Error::<T>::IllegalFilesTrasition
+                Self::files_transition_check(
+                    &prev_pk,
+                    reported_files_size,
+                    &added_files,
+                    &deleted_files,
+                    &reported_srd_root,
+                    &reported_files_root
+                ),
+                Error::<T>::IllegalFilesTransition
             );
 
             // 8. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
@@ -494,11 +492,12 @@ impl<T: Trait> Module<T> {
         if let Some(old_wr) = Self::work_reports(prev_pk) {
             old_used = old_wr.used as u128;
             old_free = old_wr.free as u128;
+            files = old_wr.files.clone();
 
             // If this is resuming reporting, set all files storage order status to success
             if old_wr.report_slot < report_slot - REPORT_SLOT {
-                let files: Vec<(MerkleRoot, u64)> = old_wr.files.into_iter().collect();
-                let _ = Self::update_sorder(reporter, &files, true);
+                let old_files: Vec<(MerkleRoot, u64)> = old_wr.files.into_iter().collect();
+                let _ = Self::update_sorder(reporter, &old_files, true);
             }
         }
 
@@ -601,7 +600,7 @@ impl<T: Trait> Module<T> {
                 return (wr.free as u128, wr.used as u128)
             } else {
                 // If it is the 1st time failed
-                if wr.report_slot == current_rs - REPORT_SLOT {
+                if wr.report_slot == current_rs.saturating_sub(REPORT_SLOT) {
                     let files: Vec<(MerkleRoot, u64)> = wr.files.into_iter().collect();
                     let _ = Self::update_sorder(reporter, &files, false);
                 }
@@ -616,15 +615,28 @@ impl<T: Trait> Module<T> {
     // PRIVATE IMMUTABLES
     /// This function will check work report files status transition
     fn files_transition_check(
-        old_file_size: u64,
+        prev_pk: &SworkerPubKey,
         new_files_size: u64,
-        added_files: &Vec<(MerkleRoot, u64)>,
-        deleted_files: &Vec<(MerkleRoot, u64)>,
+        reported_added_files: &Vec<(MerkleRoot, u64)>,
+        reported_deleted_files: &Vec<(MerkleRoot, u64)>,
+        reported_srd_root: &MerkleRoot,
+        reported_files_root: &MerkleRoot
     ) -> bool {
-        let added_files_size = added_files.iter().fold(0, |acc, (_, size)| acc+*size);
-        let deleted_files_size = deleted_files.iter().fold(0, |acc, (_, size)| acc+*size);
+        if let Some(prev_wr) = Self::work_reports(&prev_pk) {
+            let old_files_size = prev_wr.reported_files_size;
+            let added_files_size = reported_added_files.iter().fold(0, |acc, (_, size)| acc+*size);
+            let deleted_files_size = reported_deleted_files.iter().fold(0, |acc, (_, size)| acc+*size);
 
-        old_file_size.saturating_add(added_files_size).saturating_sub(deleted_files_size) == new_files_size
+            // File size change should equal between before and after
+            return if old_files_size == new_files_size {
+                reported_srd_root == &prev_wr.reported_srd_root && reported_files_root == &prev_wr.reported_files_root
+            } else {
+                old_files_size.saturating_add(added_files_size).saturating_sub(deleted_files_size) == new_files_size
+            }
+        } else {
+            // Or just return for the baby 👶🏼
+            true
+        }
     }
 
     fn check_and_get_pk(
@@ -689,7 +701,7 @@ impl<T: Trait> Module<T> {
         block_hash: &Vec<u8>,
         reserved: u64,
         used: u64,
-        free_root: &MerkleRoot,
+        srd_root: &MerkleRoot,
         files_root: &MerkleRoot,
         added_files: &Vec<(MerkleRoot, u64)>,
         deleted_files: &Vec<(MerkleRoot, u64)>,
@@ -702,7 +714,7 @@ impl<T: Trait> Module<T> {
             block_hash,
             reserved,
             used,
-            free_root,
+            srd_root,
             files_root,
             added_files,
             deleted_files,

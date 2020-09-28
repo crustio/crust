@@ -5,7 +5,6 @@ use frame_support::{
     weights::{Weight, constants::RocksDbWeight},
     traits::{OnInitialize, OnFinalize, Get}
 };
-use keyring::Sr25519Keyring;
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
     testing::Header,
@@ -208,6 +207,8 @@ pub fn run_to_block(n: u64) {
     }
 }
 
+/// Build allllllll fucking kinds of stupid work reports 🤬
+/// TODO: move work report generator into this repo
 pub fn legal_register_info() -> RegisterInfo {
     let applier: AccountId =
         AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
@@ -318,9 +319,43 @@ pub fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
     }
 }
 
+pub fn resuming_work_report() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 900;
+    legal_wr.curr_pk = hex::decode("8dfc5c61af8b9acf32e2d0eee52666da84cd8a205527a02c97d57220044982e5592ace42cd5e0ad483a3569d81b793723cd28e9973fddfc6c5ca44c95dc91f33").unwrap();
+    legal_wr.sig = hex::decode("577b5c8753cc7ccd8a63604e8b773fdb18b5b82d7926f916d7243f9bfd3bcb12d4b3a1109ee8d1c5d261a39eba8a4869208e14d5e6bd4de6c62e35dbdeb6128f").unwrap();
+    legal_wr
+}
+
+pub fn ab_upgrade_work_report() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 600;
+    legal_wr.curr_pk = hex::decode("1a2d3955addab8e476ab746f7279b0967936cbb36b7f50bc6ff86475003479bcd49ecc32715a3cfaad13012148a085497dc2d5ded049498a18644e01a4fdb559").unwrap();
+    legal_wr.prev_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
+    legal_wr.sig = hex::decode("3979e64a132dce573ddfe9c3593826dc8a2e2fd8280c824be53c39c7ea2782e9a5c37382287bd41797fe006fd2deca05d71cb30084054171f871c9d28cd33567").unwrap();
+    legal_wr
+}
+
+pub fn continuous_work_report_300() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 300;
+    legal_wr.curr_pk = hex::decode("8a71e8588914aeaeaebd27fbf315486398d76d4d32c2169b174a022f671e2e5bd7c9acb1d9259edf9f362e2af29f2df148c5c97eb1f2aec616a5d3c899a39a36").unwrap();
+    legal_wr.sig = hex::decode("38a4bf8a17b9578c3ac4758e542f10836b7609f698ebadc76fe9d6314270460ed3adaab60f2c08617fc9307c703192c4b831393a714f88dc62013f0123c19ec9").unwrap();
+
+    legal_wr
+}
+
+pub fn continuous_work_report_600() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 600;
+    legal_wr.curr_pk = hex::decode("8a71e8588914aeaeaebd27fbf315486398d76d4d32c2169b174a022f671e2e5bd7c9acb1d9259edf9f362e2af29f2df148c5c97eb1f2aec616a5d3c899a39a36").unwrap();
+    legal_wr.sig = hex::decode("e435a3f626c101ed377eea85271cb47f249ab2d90e17a606a2211dd760ee84de6444d9ac200bffc7f11728439ea866881fb3c497b5b8f2a99ce9e91fb69d4373").unwrap();
+
+    legal_wr
+}
+
 pub fn register(who: &AccountId, pk: &SworkerPubKey, code: &SworkerCode) {
-    <self::Identities>::insert(pk.clone(), code.clone());
-    <self::IdBonds<Test>>::insert(who.clone(), vec![pk.clone()]);
+    Swork::maybe_upsert_id(who, pk, code);
 }
 
 pub fn add_wr(pk: &SworkerPubKey, wr: &WorkReport) {

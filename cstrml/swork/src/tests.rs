@@ -230,8 +230,8 @@ fn report_works_should_work() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
             let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
                 used: legal_wr_info.used,
@@ -270,6 +270,7 @@ fn report_works_should_work() {
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 402868224);
+            assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
 
             // Check same file all been confirmed
             assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
@@ -288,8 +289,8 @@ fn report_works_should_work_without_sorders() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
             let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
 
@@ -362,8 +363,8 @@ fn report_works_should_failed_with_illegal_code() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
             let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
             let illegal_code = hex::decode("0011").unwrap();
 
             // register with
@@ -402,8 +403,8 @@ fn report_works_should_failed_with_wrong_timing() {
             run_to_block(50);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
             let illegal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = illegal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
 
@@ -440,8 +441,8 @@ fn report_works_should_failed_with_illegal_sig() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
             let mut illegal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = illegal_wr_info.curr_pk.clone();
             illegal_wr_info.sig = hex::decode("b3f78863ec972955d9ca22d444a5475085a4f7975a738aba1eae1d98dd718fc691a77a35b764a148a3a861a4a2ef3279f3d5e25f607c73ca85ea86e1176ba664").unwrap();
 
             register(&reporter, &legal_pk, &LegalCode::get());
@@ -479,8 +480,8 @@ fn report_works_should_failed_with_illegal_file_transition() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
-            let mut illegal_wr_info = legal_work_report_with_added_files();
+            let illegal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = illegal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
 
@@ -529,8 +530,8 @@ fn incremental_report_should_work_without_change() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
             let legal_wr_info = legal_work_report();
+            let legal_pk = legal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
             add_wr(&legal_pk, &WorkReport {
@@ -572,8 +573,9 @@ fn incremental_report_should_work_with_files_change() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("819e555a290c4f725739eb03a3e8d0f31db074a6e16abeec3a9a6a7c0379b6de9ad4d7658c44257746d58764e9db9c736d39474199ce53e4edfcc3d5340f1916").unwrap();
             let legal_wr_info = legal_work_report_with_deleted_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
                 used: legal_wr_info.used,
@@ -638,8 +640,8 @@ fn incremental_report_should_failed_with_root_change() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
             let illegal_wr_info = legal_work_report();
+            let legal_pk = illegal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
             add_wr(&legal_pk, &WorkReport {
@@ -688,8 +690,9 @@ fn incremental_report_should_failed_with_wrong_file_size_change() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
             let illegal_wr_info = legal_work_report(); // No change but with file size down
+            let legal_pk = illegal_wr_info.curr_pk.clone();
+
 
             register(&reporter, &legal_pk, &LegalCode::get());
             add_wr(&legal_pk, &WorkReport {
@@ -736,8 +739,8 @@ fn update_identities_should_work() {
         .build()
         .execute_with(|| {
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
             let legal_wr_info = legal_work_report();
+            let legal_pk = legal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
             add_wr(&legal_pk, &WorkReport {
@@ -762,7 +765,7 @@ fn update_identities_should_work() {
             assert_eq!(Swork::used(), 2);
             assert_eq!(Swork::current_report_slot(), 300);
 
-            // 2. Report works in 300 slot
+            // 2. Report works in slot 300
             assert_ok!(Swork::report_works(
                 Origin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
@@ -790,393 +793,400 @@ fn update_identities_should_work() {
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
             assert_eq!(Swork::current_report_slot(), 600);
+
+            // 6. Runs to 909, work report is outdated
+            run_to_block(909);
+            Swork::update_identities();
+
+            // 7. Free and used should goes to 0, and the corresponding storage order should failed
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::current_report_slot(), 900);
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
         });
 }
 
-/*
 #[test]
-fn test_for_wr_check_failed_order_by_no_file_in_wr() {
-    new_test_ext().execute_with(|| {
-        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        add_success_sorder(350);
-        // generate 303 blocks first
-        run_to_block(303, None);
+fn resuming_report_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_wr_info = resuming_work_report();
+            let legal_pk = legal_wr_info.curr_pk.clone();
 
-        let report_works_info = valid_report_works_info();
+            register(&reporter, &legal_pk, &LegalCode::get());
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 0,
+                used: 2,
+                free: 0,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+                ].into_iter().collect(),
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            add_success_sorders(&reporter);
 
-        // report works should ok
-        assert_ok!(Swork::report_works(
-            Origin::signed(account.clone()),
-            report_works_info.pub_key,
-            report_works_info.block_number,
-            report_works_info.block_hash,
-            report_works_info.reserved,
-            report_works_info.files,
-            report_works_info.sig
-        ));
+            // 1. Runs to 303 block
+            run_to_block(303);
+            Swork::update_identities();
 
-        // check work report and workload, current_report_slot updating should work
-        Swork::update_identities();
+            // 2. No works reported, but orders should still be ok
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
 
-        // Check this 99 order should be failed
-        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
-                   OrderStatus::Failed);
-    });
-}
+            // 3. Runs to 606
+            run_to_block(606);
+            Swork::update_identities();
 
-#[test]
-fn test_for_wr_check_failed_order_by_not_reported() {
-    new_test_ext().execute_with(|| {
-        // 1st era
-        run_to_block(303, None);
-        Swork::update_identities();
+            // 4. Storage order should still be success
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
 
-        add_success_sorder(650);
+            // 5. Runs to 909, work report is outdated
+            run_to_block(909);
+            Swork::update_identities();
 
-        // 2nd era
-        run_to_block(606, None);
-        Swork::update_identities();
+            // 6. Report works in slot 900
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
 
-        // Check this 99 order should be failed, cause wr is outdated
-        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
-                   OrderStatus::Failed);
-    });
-}
-
-#[test]
-fn test_for_wr_check_failed_order_by_no_wr() {
-    new_test_ext().execute_with(|| {
-        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        // 1st era
-        run_to_block(303, None);
-        add_success_sorder(350);
-
-        // This won't happen when previous test case occurs, cause `not reported` will
-        // set sorder.status = Failed, but we still design this test case anyway.
-        remove_work_report(&account);
-        Swork::update_identities();
-
-        // Check this 99 order should be failed, cause wr is outdated
-        assert_eq!(Market::storage_orders(Hash::repeat_byte(99)).unwrap().status,
-                   OrderStatus::Failed);
-    });
-}
-
-#[test]
-fn test_for_outdated_work_reports() {
-    new_test_ext().execute_with(|| {
-        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        // generate 303 blocks first
-        run_to_block(303, None);
-
-        let report_works_info = valid_report_works_info();
-        let wr = WorkReport {
-            block_number: report_works_info.block_number,
-            used: 0,
-            reserved: report_works_info.reserved.clone(),
-            cached_reserved: report_works_info.reserved.clone(),
-            files: report_works_info.files.clone()
-        };
-
-        // report works should ok
-        assert_ok!(Swork::report_works(
-            Origin::signed(account.clone()),
-            report_works_info.pub_key,
-            report_works_info.block_number,
-            report_works_info.block_hash,
-            report_works_info.reserved,
-            report_works_info.files,
-            report_works_info.sig
-        ));
-
-        // check work report and workload, current_report_slot updating should work
-        assert_eq!(Swork::current_report_slot(), 0);
-        Swork::update_identities();
-        assert_eq!(Swork::current_report_slot(), 300);
-
-        // Check workloads
-        assert_eq!(Swork::reserved(), 4294967296);
-        assert_eq!(Swork::used(), 0);
-
-        // generate 401 blocks, wr still valid
-        run_to_block(401, None);
-        assert_eq!(
-            Swork::work_reports(&account),
-            Some(wr.clone())
-        );
-        assert!(Swork::reported_in_slot(&account, 300).1);
-
-        // generate 602 blocks
-        run_to_block(602, None);
-        assert_eq!(Swork::current_report_slot(), 300);
-        Swork::update_identities();
-        assert_eq!(Swork::current_report_slot(), 600);
-        assert_eq!(
-            Swork::work_reports(&account),
-            Some(wr.clone())
-        );
-        assert!(!Swork::reported_in_slot(&account, 600).1);
-
-        // Check workloads
-        assert_eq!(Swork::reserved(), 4294967296);
-        assert_eq!(Swork::used(), 0);
-
-        run_to_block(903, None);
-        assert_eq!(Swork::current_report_slot(), 600);
-        Swork::update_identities();
-        assert_eq!(Swork::current_report_slot(), 900);
-
-        // Check workloads
-        assert_eq!(Swork::work_reports(&account), None);
-        assert_eq!(Swork::reserved(), 0);
-        assert_eq!(Swork::used(), 0);
-    });
-}
-
-#[test]
-fn test_abnormal_era() {
-    new_test_ext().execute_with(|| {
-        let account: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let report_works_info = valid_report_works_info();
-        let wr = WorkReport {
-            block_number: report_works_info.block_number,
-            used: 0,
-            reserved: report_works_info.reserved.clone(),
-            cached_reserved: report_works_info.reserved.clone(),
-            files: report_works_info.files.clone()
-        };
-
-        // If new era happens in 101, next work is not reported
-        run_to_block(101, None);
-        Swork::update_identities();
-        assert_eq!(
-            Swork::work_reports(&account),
-            Some(Default::default())
-        );
-        assert_eq!(Swork::reserved(), 0);
-        assert_eq!(Swork::current_report_slot(), 0);
-
-        // If new era happens on 301, we should update work report and current report slot
-        run_to_block(301, None);
-        Swork::update_identities();
-        assert_eq!(
-            Swork::work_reports(&account),
-            Some(Default::default())
-        );
-        assert_eq!(
-            Swork::current_report_slot(),
-            300
-        );
-        assert!(Swork::reported_in_slot(&account, 0).1);
-
-        // If next new era happens on 303, then nothing should happen
-        run_to_block(303, None);
-        Swork::update_identities();
-        assert_eq!(
-            Swork::work_reports(&account),
-            Some(Default::default())
-        );
-        assert_eq!(
-            Swork::current_report_slot(),
-            300
-        );
-        assert!(Swork::reported_in_slot(&account, 0).1);
-        assert!(!Swork::reported_in_slot(&account, 300).1);
-
-        // Then report works
-        // reserved: 4294967296,
-        // used: 1676266280,
-        run_to_block(304, None);
-        assert_ok!(Swork::report_works(
-            Origin::signed(account.clone()),
-            report_works_info.pub_key,
-            report_works_info.block_number,
-            report_works_info.block_hash,
-            report_works_info.reserved,
-            report_works_info.files,
-            report_works_info.sig
-        ));
-        assert_eq!(Swork::work_reports(&account), Some(wr));
-        // total workload should keep same, cause we only updated in a new era
-        assert_eq!(Swork::reserved(), 4294967296);
-        assert_eq!(Swork::used(), 0);
-        assert!(Swork::reported_in_slot(&account, 300).1);
-    })
-}
-
-#[test]
-fn test_ab_upgrade_should_work() {
-    new_test_ext().execute_with(|| {
-        let reporter: AccountId = Sr25519Keyring::Bob.to_account_id();
-        let old_code = hex::decode("bc55e1730c64d9d9788e25161825b3dca016b2288c51daa844bc95f29a010241").unwrap();
-        let old_pub_key = hex::decode("c11153203b6003932e50bab39d29cac12fda34d9fc05d96c265940666285f655290d3de363bb81afb36f183123549915268da4589165f4c85c4bfc436305002c").unwrap();
-        let old_bh = hex::decode("f59a7fa70a1bc287d6def78c272739b8763c54aa41d254a58b8eca2986baee03").unwrap();
-        let old_files = vec![(hex::decode("1111").unwrap(), 40), (hex::decode("2222").unwrap(), 80)];
-        let old_id = Identity {
-            pub_key: old_pub_key.clone(),
-            code: old_code.clone(),
-        };
-        let mut old_work_report = WorkReport {
-            block_number: 37_200,
-            used: 0,
-            reserved: 42_949_672_960,
-            cached_reserved: 42_949_672_960,
-            files: old_files.clone()
-        };
-
-        // 1. Normal report should be ✅
-        // a. Run to 37205 block first with old sworker code
-        Code::put(old_code.clone());
-        run_to_block(37205, Some(old_bh.clone()));
-
-        // b. Identity should do `upgrade` with current_id.code != code
-        assert!(Swork::maybe_upsert_id(&reporter, &old_id));
-
-        // c. Report works with current id should be ✅
-        assert_ok!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            old_pub_key.clone(),
-            37_200,
-            old_bh.clone(),
-            42_949_672_960,
-            old_files.clone(),
-            hex::decode("a30eb07fd09687264a7b7215061cd9424f945c898bfeb326c9bfa5870ec3926639d10032d7f5141514b03af32142fec7bb8ad09f028d6e0c5e40f4bc03d56272").unwrap(),
-        ));
-        assert_eq!(Swork::work_reports(&reporter).unwrap(), old_work_report.clone());
-        assert_eq!(Swork::reported_in_slot(&reporter, 37200), (false, true));
-
-        // 2. AB Upgrade should be ✅(accept 2 ids report works)
-        // a. Bob do the upgrade
-        let new_code = hex::decode("d7e6c3c814a5efe3152e1ee5db8ae57ae64836a65102fd328fdc449375baabc8").unwrap();
-        let new_bh = hex::decode("d5181df4310eb49f08df7f49cccd61dc3e42aa99cb9d6dfa954cc344a7fa4373").unwrap();
-        let new_pk = hex::decode("6a6b80246a52ebdfbd2d51dfaca18b4d05c883baf6e1178bdaa940d1c8dbcc27745b4d2db2673e7def5cb1697018f722edbd8c49e7447d921e863c84342d86a8").unwrap();
-        let new_files = vec![(hex::decode("2222").unwrap(), 80)];
-        let new_id = Identity {
-            pub_key: new_pk.clone(),
-            code: new_code.clone(),
-        };
-        let mut new_work_report = WorkReport {
-            block_number: 38_700,
-            used: 0,
-            reserved: 40_000,
-            cached_reserved: 40_000,
-            files: new_files.clone()
-        };
-
-        // b. Run to 38705 block with new sworker code, and do the upgrade
-        run_to_block(38705, Some(new_bh.clone()));
-        assert_ok!(Swork::upgrade(Origin::root(), new_code.clone(), 39000));
-
-        assert!(Swork::maybe_upsert_id(&reporter, &new_id));
-        assert_eq!(Swork::identities(&reporter), (Some(old_id.clone()), Some(new_id.clone())));
-
-        // c. Report with new identity should be ✅
-        assert_ok!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            new_pk.clone(),
-            38_700,
-            new_bh.clone(),
-            40_000,
-            new_files.clone(),
-            hex::decode("525fd0d4afcd99965166c6fca2cb74ce34bb303109921d6ab0e172aafb00a4c3ec6086c59e4abe232782848170b88d19b2641d470bb30ba7827d5161ec5ad46e").unwrap(),
-        ));
-        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Swork::reported_in_slot(&reporter, 38700), (false, true));
-
-        // d. Report with old identity should also be ✅
-        assert_ok!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            old_pub_key.clone(),
-            38700,
-            new_bh.clone(),
-            100,
-            old_files.clone(),
-            hex::decode("c29ff453b318c9f9e508b9215ff81a7b31df5817630ecb80abbbbf9d7c6e26193ca091a9ff0632974af55db0d2e83c4415fcb03dc46f6f75eba168fd93c24609").unwrap(),
-        ));
-        old_work_report.reserved = 100;
-        new_work_report.cached_reserved = 0;
-        new_work_report.reserved += old_work_report.reserved;
-        new_work_report.files = old_files.clone();
-
-        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Swork::reported_in_slot(&reporter, 38700), (true, true));
-
-        // 3. AB expire should work, replay the block authoring
-        // a. Bob do not upgrade
-        assert_ok!(Swork::upgrade(Origin::root(), new_code.clone(), 38800));
-
-        // b. Double report would be ignore in the first place ❌, even the sig is illegal
-        assert_ok!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            old_pub_key.clone(),
-            38700,
-            new_bh.clone(),
-            100,
-            old_files.clone(),
-            hex::decode("1111").unwrap(),
-        ));
-        assert_ok!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            new_pk.clone(),
-            38700,
-            new_bh.clone(),
-            100,
-            new_files.clone(),
-            hex::decode("2222").unwrap(),
-        ));
-        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
-
-        // c. Run to block 39005, report should ❌
-        run_to_block(39005, Some(new_bh.clone()));
-        assert_noop!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            old_pub_key.clone(),
-            39000,
-            new_bh.clone(),
-            10,
-            old_files.clone(),
-            hex::decode("422459e0365445fc1fa14682cef15298f34259cf57206622e4f8355c4633d3a5c14cfea81051b6a11754001f234515115caca6bf3b96b43b0c31fe93f9082d5e").unwrap(),
-        ), DispatchError::Module {
-            index: 0,
-            error: 4,
-            message: Some("InvalidPubKey"),
+            // 7. Orders should reset back
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
         });
+}
 
-        // 4. Shrink attack(do not upgrade and shrink his disk) detection should works fine
-        assert_ok!(Swork::upgrade(Origin::root(), new_code.clone(), 39500));
+#[test]
+fn abnormal_era_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_pk = LegalPK::get();
 
-        // a. Report with old identity should also be ✅
-        assert_ok!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            old_pub_key.clone(),
-            39000,
-            new_bh.clone(),
-            10,
-            old_files.clone(),
-            hex::decode("422459e0365445fc1fa14682cef15298f34259cf57206622e4f8355c4633d3a5c14cfea81051b6a11754001f234515115caca6bf3b96b43b0c31fe93f9082d5e").unwrap(),
-        ));
-        new_work_report.cached_reserved = 10;
-        new_work_report.block_number = 39000;
-        new_work_report.files = old_files.clone();
-        // b. This will keep the same with elder work report
-        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Swork::reported_in_slot(&reporter, 39000), (true, false));
+            register(&reporter, &legal_pk, &LegalCode::get());
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 0,
+                used: 2,
+                free: 0,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+                ].into_iter().collect(),
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            add_success_sorders(&reporter);
 
-        // c. Reporter with old identity, the reserved should be right(after shrink the workload)
-        run_to_block(39305, Some(new_bh.clone()));
-        assert_ok!(Swork::report_works(
-            Origin::signed(reporter.clone()),
-            old_pub_key.clone(),
-            39300,
-            new_bh.clone(),
-            0,
-            old_files.clone(),
-            hex::decode("be15fd80b7b590bd08e60a19acf6e01292ec9f05fbd4eff79d03bdea1c43aec6e0ebda676b0215c0ab553cab2add696f98d3b759719ad1442360dc2303241ae7").unwrap(),
-        ));
-        new_work_report.reserved = 0;
-        new_work_report.cached_reserved = 0;
-        new_work_report.block_number = 39300;
-        assert_eq!(Swork::work_reports(&reporter).unwrap(), new_work_report.clone());
-        assert_eq!(Swork::reported_in_slot(&reporter, 39300), (true, false));
-    });
-}*/
+            // 1. Normal new era, runs to 301 block
+            run_to_block(301);
+            Swork::update_identities();
+
+            // 2. Everything goes well
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 2);
+
+            // 4. Abnormal era happened, new era goes like 404
+            run_to_block(404);
+            Swork::update_identities();
+
+            // 5. Free and used should not change
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 2);
+        });
+}
+
+/// A/B upgrade test cases
+#[test]
+fn ab_upgrade_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let a_wr_info = legal_work_report();
+            let b_wr_info = ab_upgrade_work_report();
+            let a_pk = a_wr_info.curr_pk.clone();
+            let b_pk = b_wr_info.curr_pk.clone();
+
+            // 0. Initial setup
+            register(&reporter, &a_pk, &LegalCode::get());
+            add_wr(&a_pk, &WorkReport {
+                report_slot: 0,
+                used: 2,
+                free: 0,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+                ].into_iter().collect(),
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            // 1. Runs to 303 block
+            run_to_block(303);
+
+            // 2. Report works with sWorker A
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                a_wr_info.curr_pk,
+                a_wr_info.prev_pk,
+                a_wr_info.block_number,
+                a_wr_info.block_hash,
+                a_wr_info.free,
+                a_wr_info.used,
+                a_wr_info.added_files,
+                a_wr_info.deleted_files,
+                a_wr_info.srd_root,
+                a_wr_info.files_root,
+                a_wr_info.sig
+            ));
+
+            // 3. Check A's work report
+            assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
+                report_slot: 300,
+                used: 2,
+                free: 4294967296,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+                ].into_iter().collect(),
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            // 4. Runs to 606, and do sWorker upgrade
+            run_to_block(606);
+            // Fake do upgrade
+
+            // 5. (Fake) Register B 🤣, suppose B's code is upgraded
+            register(&reporter, &b_pk, &LegalCode::get());
+
+            // 6. Report works with sWorker B
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                b_wr_info.curr_pk,
+                b_wr_info.prev_pk,
+                b_wr_info.block_number,
+                b_wr_info.block_hash,
+                b_wr_info.free,
+                b_wr_info.used,
+                b_wr_info.added_files,
+                b_wr_info.deleted_files,
+                b_wr_info.srd_root,
+                b_wr_info.files_root,
+                b_wr_info.sig
+            ));
+
+            // 7. Check B's work report
+            assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
+                report_slot: 600,
+                used: 2,
+                free: 4294967296,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+                ].into_iter().collect(),
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            // 8. Check A is already be chilled
+            assert_eq!(Swork::identities(&a_pk), None);
+            assert_eq!(Swork::work_reports(&a_pk), None);
+            assert_eq!(Swork::id_bonds(&reporter), vec![b_pk.clone()]);
+        });
+}
+
+#[test]
+fn ab_upgrade_expire_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let wr_info_300 = continuous_work_report_300();
+            let wr_info_600 = continuous_work_report_600();
+            let legal_pk = wr_info_300.curr_pk.clone();
+
+            // 0. Initial setup
+            register(&reporter, &legal_pk, &LegalCode::get());
+            add_wr(&legal_pk, &&WorkReport {
+                report_slot: 0,
+                used: 2,
+                free: 0,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+                ].into_iter().collect(),
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            // 1. Arrange an upgrade immediately, expired at 500
+            assert_ok!(Swork::upgrade(Origin::root(), hex::decode("0011").unwrap(), 500));
+
+            // 1. Runs to 303 block
+            run_to_block(303);
+
+            // 2. Report works still worked
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                wr_info_300.curr_pk,
+                wr_info_300.prev_pk,
+                wr_info_300.block_number,
+                wr_info_300.block_hash,
+                wr_info_300.free,
+                wr_info_300.used,
+                wr_info_300.added_files,
+                wr_info_300.deleted_files,
+                wr_info_300.srd_root,
+                wr_info_300.files_root,
+                wr_info_300.sig
+            ));
+
+            // 3. Runs to 606
+            run_to_block(606);
+
+            // 4. Report works should failed due to the expired time
+            assert_noop!(
+                Swork::report_works(
+                    Origin::signed(reporter.clone()),
+                    wr_info_600.curr_pk,
+                    wr_info_600.prev_pk,
+                    wr_info_600.block_number,
+                    wr_info_600.block_hash,
+                    wr_info_600.free,
+                    wr_info_600.used,
+                    wr_info_600.added_files,
+                    wr_info_600.deleted_files,
+                    wr_info_600.srd_root,
+                    wr_info_600.files_root,
+                    wr_info_600.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 3,
+                    message: Some("OutdatedReporter"),
+                }
+            );
+        });
+}
+
+#[test]
+fn ab_upgrade_should_failed_with_files_size_unmatch() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let a_wr_info = legal_work_report();
+            let mut b_wr_info = ab_upgrade_work_report();
+            let a_pk = a_wr_info.curr_pk.clone();
+            let b_pk = b_wr_info.curr_pk.clone();
+
+            // 0. Initial setup
+            register(&reporter, &a_pk, &LegalCode::get());
+            add_wr(&a_pk, &WorkReport {
+                report_slot: 0,
+                used: 2,
+                free: 0,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+                ].into_iter().collect(),
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            // 1. Report A
+            run_to_block(303);
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                a_wr_info.curr_pk,
+                a_wr_info.prev_pk,
+                a_wr_info.block_number,
+                a_wr_info.block_hash,
+                a_wr_info.free,
+                a_wr_info.used,
+                a_wr_info.added_files,
+                a_wr_info.deleted_files,
+                a_wr_info.srd_root,
+                a_wr_info.files_root,
+                a_wr_info.sig
+            ));
+
+            // 2. Report B with added_files
+            b_wr_info.added_files = vec![(hex::decode("6aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 10)];
+
+            // 4. Runs to 606, and do sWorker upgrade
+            run_to_block(606);
+            // Fake do upgrade
+
+            // 5. (Fake) Register B 🤣, suppose B's code is upgraded
+            register(&reporter, &b_pk, &LegalCode::get());
+
+            // 6. Report works with sWorker B will failed
+            assert_noop!(
+                Swork::report_works(
+                    Origin::signed(reporter.clone()),
+                    b_wr_info.curr_pk,
+                    b_wr_info.prev_pk,
+                    b_wr_info.block_number,
+                    b_wr_info.block_hash,
+                    b_wr_info.free,
+                    b_wr_info.used,
+                    b_wr_info.added_files,
+                    b_wr_info.deleted_files,
+                    b_wr_info.srd_root,
+                    b_wr_info.files_root,
+                    b_wr_info.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 6,
+                    message: Some("ABUpgradeFailed"),
+                }
+            );
+        });
+}
+
+/// Star network test cases
+/// As for the star network, more should be tested in market module(space size) and staking module(stake limit)
+#[test]
+fn multiple_bond_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter = Sr25519Keyring::Alice.to_account_id();
+            let wr_info_1 = legal_work_report();
+            let wr_info_2 = legal_work_report_with_added_files();
+            let pk1 = wr_info_1.curr_pk.clone();
+            let pk2 = wr_info_2.curr_pk.clone();
+
+            register(&reporter, &pk1, &LegalCode::get());
+            register(&reporter, &pk2, &LegalCode::get());
+
+            assert_eq!(Swork::id_bonds(&reporter), vec![pk1.clone(), pk2.clone()]);
+        });
+}

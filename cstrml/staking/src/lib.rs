@@ -1643,11 +1643,6 @@ impl<T: Trait> Module<T> {
                 Forcing::ForceNew => ForceEra::kill(),
                 Forcing::ForceAlways => (),
                 Forcing::NotForcing if era_length >= T::SessionsPerEra::get() => (),
-                Forcing::NotForcing if era_length == T::SessionsPerEra::get() - 1 => {
-                    // The last but 1 session per era, we do update stake limit
-                    T::SworkInterface::update_identities();
-                    return None
-                },
                 _ => return None,
             }
 
@@ -1679,6 +1674,8 @@ impl<T: Trait> Module<T> {
         }
 
         // Set staking information for new era.
+        // TODO: move this update 1 session in advance
+        T::SworkInterface::update_identities();
         let maybe_new_validators = Self::select_and_update_validators(current_era);
 
         maybe_new_validators

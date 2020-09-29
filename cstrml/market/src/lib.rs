@@ -311,7 +311,7 @@ decl_module! {
                     // Update merchant
                     debug::info!(
                         target: "market",
-                        "Change {:?}'s address information and storage price.",
+                        "🏢 Change {:?}'s address information and storage price.",
                         who
                     );
                     minfo.address_info = address_info;
@@ -320,7 +320,7 @@ decl_module! {
                     // New merchant
                     debug::info!(
                         target: "market",
-                        "New merchant {:?} is registered.",
+                        "🏢 New merchant {:?} is registered.",
                         who
                     );
                     *maybe_minfo = Some(MerchantInfo {
@@ -440,7 +440,7 @@ decl_module! {
             if pledge.total.is_zero() {
                 debug::info!(
                     target: "market",
-                    "Remove pledge for {:?}",
+                    "🏢 Remove pledge for {:?}",
                     who
                 );
                 <Pledges<T>>::remove(&who);
@@ -517,7 +517,7 @@ decl_module! {
                 // a. update pledge
                 debug::info!(
                     target: "market",
-                    "Update pledge for {:?} and order ids for {:?}",
+                    "🏢 Update pledge for {:?} and order ids for {:?}",
                     merchant,
                     who
                 );
@@ -575,7 +575,7 @@ impl<T: Trait> Module<T> {
                     so.status == OrderStatus::Success {
                         debug::info!(
                             target: "market",
-                            "Start payment for sorder {:?}",
+                            "🏢 Start payment for sorder {:?}",
                             order_id
                         );
                         T::Payment::pay_sorder(order_id);
@@ -662,7 +662,7 @@ impl<T: Trait> Module<T> {
             if !T::Payment::reserve_sorder(&order_id, client, amount) {
                 debug::debug!(
                     target: "market",
-                    "Cannot reserve currency for sorder {:?}",
+                    "🏢 Cannot reserve currency for sorder {:?}",
                     order_id
                 );
                 return None
@@ -677,7 +677,7 @@ impl<T: Trait> Module<T> {
                 if let Some(minfo) = maybe_minfo {
                     debug::info!(
                         target: "market",
-                        "Add sorder {:?} into merchant {:?}",
+                        "🏢 Add sorder {:?} into merchant {:?}",
                         order_id,
                         merchant
                     );
@@ -755,7 +755,7 @@ impl<T: Trait> Module<T> {
     ) {
         debug::info!(
             target: "market",
-            "Update pledge for merchant {:?}",
+            "🏢 Update pledge for merchant {:?}",
             merchant
         );
         // 1. Set lock

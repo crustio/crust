@@ -162,7 +162,7 @@ impl<T: Trait> Module<T> {
     pub fn batch_transfer(slot_factor: BlockNumber) {
         debug::info!(
             target: "payment",
-            "Batch transfer for block number {:?}.",
+            "💰 Batch transfer for block number {:?}.",
             slot_factor
         );
         for (sorder_id, slot_value) in <SlotPayments<T>>::iter_prefix(slot_factor) {
@@ -222,7 +222,7 @@ impl<T: Trait> Module<T> {
                     // TODO: Double check this behavior since it should be a workaround. Maybe a special status is better?
                     debug::debug!(
                         target: "payment",
-                        "Reserve the currency  due to unknow reason for sorder {:?}.",
+                        "💰 Reserve the currency  due to unknow reason for sorder {:?}.",
                         sorder_id
                     );
                     let _ = T::Currency::reserve(&client, real_amount);
@@ -236,7 +236,7 @@ impl<T: Trait> Module<T> {
             _ => {
                 debug::info!(
                     target: "payment",
-                    "Fail to transfer currency due to failed status for sorder {:?}.",
+                    "💰 Fail to transfer currency due to failed status for sorder {:?}.",
                     sorder_id
                 );
             }

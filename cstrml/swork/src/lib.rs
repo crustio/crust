@@ -193,7 +193,7 @@ decl_module! {
             ensure_root(origin)?;
             debug::info!(
                 target: "swork",
-                "Set new Code and ABExpire for swork."
+                "🔒 Set new Code and ABExpire for swork."
             );
             <Code>::put(new_code);
             <ABExpire<T>>::put(expire_block);
@@ -285,7 +285,7 @@ decl_module! {
             if Self::reported_in_slot(&curr_pk, slot) {
                 debug::info!(
                     target: "swork",
-                    "Already reported with same pub key {:?} in the same slot {:?}.",
+                    "🔒 Already reported with same pub key {:?} in the same slot {:?}.",
                     curr_pk,
                     slot
                 );
@@ -303,7 +303,7 @@ decl_module! {
             if is_ab_upgrade {
                 debug::info!(
                     target: "swork",
-                    "Do AB upgrade."
+                    "🔒 Do AB upgrade."
                 );
                 // 4.1 Previous pk should already reported works
                 let maybe_prev_wr = Self::work_reports(&ab_upgrade_pk);
@@ -415,7 +415,7 @@ impl<T: Trait> Module<T> {
 
         debug::info!(
             target: "swork",
-            "Loop all identities and update the workload map for slot {:?}",
+            "🔒 Loop all identities and update the workload map for slot {:?}",
             reported_rs
         );
         // 2. Loop all identities and get the workload map
@@ -445,7 +445,7 @@ impl<T: Trait> Module<T> {
         // 4. Update stake limit for every reporter
         debug::info!(
             target: "swork",
-            "Update stake limit for all reporters."
+            "🔒 Update stake limit for all reporters."
         );
         for (reporter, own_workload) in workload_map {
             T::Works::report_works(&reporter, own_workload, total_workload);
@@ -520,7 +520,7 @@ impl<T: Trait> Module<T> {
             if old_wr.report_slot < report_slot - REPORT_SLOT {
                 debug::info!(
                     target: "swork",
-                    "Resume reporting and set sorder status to success for reporter {:?}",
+                    "🔒 Resume reporting and set sorder status to success for reporter {:?}",
                     reporter
                 );
                 let old_files: Vec<(MerkleRoot, u64)> = old_wr.files.into_iter().collect();
@@ -569,7 +569,7 @@ impl<T: Trait> Module<T> {
         if !ab_upgrade_pk.is_empty() {
             debug::info!(
                 target: "swork",
-                "Chill old identity, id_bond and work report for reporter {:?}.",
+                "🔒 Chill old identity, id_bond and work report for reporter {:?}.",
                 reporter
             );
             Self::chill(reporter, ab_upgrade_pk);
@@ -613,7 +613,7 @@ impl<T: Trait> Module<T> {
                     // 3. Or invalid
                     debug::debug!(
                         target: "swork",
-                        "Invalid file id {:?} for reporter {:?}.",
+                        "🔒 Invalid file id {:?} for reporter {:?}.",
                         f_id,
                         reporter
                     );
@@ -648,7 +648,7 @@ impl<T: Trait> Module<T> {
         // Or nope, idk wtf? 🙂
         debug::debug!(
             target: "swork",
-            "No workload for reporter {:?} in slot {:?}",
+            "🔒 No workload for reporter {:?} in slot {:?}",
             reporter,
             current_rs
         );

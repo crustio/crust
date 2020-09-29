@@ -3,7 +3,7 @@ use super::*;
 use frame_support::{
     impl_outer_origin, parameter_types, impl_outer_dispatch,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{OnFinalize, OnInitialize, Get}, assert_ok
+    traits::{OnFinalize, OnInitialize, Get, TestRandomness}, assert_ok
 };
 use sp_runtime::{
     testing::Header,
@@ -102,7 +102,7 @@ impl system::Trait for Test {
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
-    type ModuleToIndex = ();
+    type PalletInfo = ();
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
@@ -131,6 +131,7 @@ impl balances::Trait for Test {
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
+    type MaxLocks = ();
 }
 
 impl swork::Trait for Test {
@@ -148,7 +149,7 @@ impl market::Trait for Test {
     type Currency = Balances;
     type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();
-    type Randomness = ();
+    type Randomness = TestRandomness;
     type Payment = Payment;
     type OrderInspector = TestOrderInspector;
     type MinimumStoragePrice = MinimumStoragePrice;

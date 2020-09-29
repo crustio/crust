@@ -401,8 +401,8 @@ impl staking::Trait for Runtime {
     type Randomness = RandomnessCollectiveFlip;
     type SessionsPerEra = SessionsPerEra;
     type BondingDuration = BondingDuration;
-    type SlashDeferDuration = SlashDeferDuration;
     type MaxGuarantorRewardedPerValidator = MaxGuarantorRewardedPerValidator;
+    type SlashDeferDuration = SlashDeferDuration;
 
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;

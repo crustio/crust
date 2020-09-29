@@ -32,13 +32,16 @@ pub fn new_partial(config: &Configuration) -> Result<
         sp_consensus::DefaultImportQueue<Block, FullClient>,
         sc_transaction_pool::FullPool<Block, FullClient>,
         (
-            impl Fn(crust_rpc::DenyUnsafe, crust_rpc::SubscriptionManager) -> crust_rpc::RpcExtension,
+            impl Fn(crust_rpc::DenyUnsafe, crust_rpc::SubscriptionTaskExecutor) -> crust_rpc::RpcExtension,
             (
                 sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,
                 sc_finality_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
                 sc_consensus_babe::BabeLink<Block>
             ),
-            sc_finality_grandpa::SharedVoterState,
+            (
+                sc_finality_grandpa::SharedVoterState,
+                Arc<GrandpaFinalityProofProvider<FullBackend, Block>>
+            )
         )
     >, ServiceError> {
 
@@ -84,9 +87,11 @@ pub fn new_partial(config: &Configuration) -> Result<
     let justification_stream = grandpa_link.justification_stream();
     let shared_authority_set = grandpa_link.shared_authority_set().clone();
     let shared_voter_state = sc_finality_grandpa::SharedVoterState::empty();
+    let finality_proof_provider =
+        GrandpaFinalityProofProvider::new_for_service(backend.clone(), client.clone());
 
     let import_setup = (babe_block_import.clone(), grandpa_link, babe_link.clone());
-    let rpc_setup = shared_voter_state.clone();
+    let rpc_setup = (shared_voter_state.clone(), finality_proof_provider.clone());
 
     let babe_config = babe_link.config().clone();
     let shared_epoch_changes = babe_link.epoch_changes().clone();
@@ -97,7 +102,7 @@ pub fn new_partial(config: &Configuration) -> Result<
         let transaction_pool = transaction_pool.clone();
         let select_chain = select_chain.clone();
 
-        move |deny_unsafe, subscriptions| -> crust_rpc::RpcExtension {
+        move |deny_unsafe, subscription_executor| -> crust_rpc::RpcExtension {
             let deps = crust_rpc::FullDeps {
                 client: client.clone(),
                 pool: transaction_pool.clone(),
@@ -112,7 +117,8 @@ pub fn new_partial(config: &Configuration) -> Result<
                     shared_voter_state: shared_voter_state.clone(),
                     shared_authority_set: shared_authority_set.clone(),
                     justification_stream: justification_stream.clone(),
-                    subscriptions,
+                    subscription_executor,
+                    finality_provider: finality_proof_provider.clone(),
                 },
             };
 
@@ -153,8 +159,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
 
     let prometheus_registry = config.prometheus_registry().cloned();
 
-    let finality_proof_provider =
-        GrandpaFinalityProofProvider::new_for_service(backend.clone(), client.clone());
+    let (shared_voter_state, finality_proof_provider) = rpc_setup;
 
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
         sc_service::build_network(sc_service::BuildNetworkParams {
@@ -193,8 +198,6 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
     })?;
 
     let (babe_block_import, grandpa_link, babe_link) = import_setup;
-
-    let shared_voter_state = rpc_setup;
 
     if is_authority {
         let proposer =

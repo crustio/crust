@@ -3,7 +3,7 @@ use crate::*;
 use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{OnInitialize, OnFinalize, Get}
+    traits::{OnInitialize, OnFinalize, Get, TestRandomness}
 };
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
@@ -106,7 +106,7 @@ impl system::Trait for Test {
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
-    type ModuleToIndex = ();
+    type PalletInfo = ();
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
@@ -120,6 +120,7 @@ impl balances::Trait for Test {
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = system::Module<Test>;
     type WeightInfo = ();
+    type MaxLocks = ();
 }
 
 impl market::Payment<<Test as system::Trait>::AccountId,
@@ -142,7 +143,7 @@ impl market::Trait for Test {
     type Currency = balances::Module<Self>;
     type CurrencyToBalance = ();
     type Event = ();
-    type Randomness = ();
+    type Randomness = TestRandomness;
     type Payment = Swork;
     type OrderInspector = Swork;
     type MinimumStoragePrice = ();

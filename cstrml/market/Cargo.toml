@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-market"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -14,16 +14,16 @@ serde = { optional = true, version = '1.0.106' }
 serde_json = "1.0.51"
 
 # substrate frames
-frame-system = { default-features = false, version = '2.0.0-rc6' }
-frame-support = { default-features = false, version = '2.0.0-rc6' }
+frame-system = { default-features = false, version = '2.0.0' }
+frame-support = { default-features = false, version = '2.0.0' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-rc6' }
-sp-io = { default-features = false, version = '2.0.0-rc6' }
-sp-runtime = { default-features = false, version = '2.0.0-rc6' }
-sp-std = { default-features = false, version = '2.0.0-rc6' }
+sp-core = { default-features = false, version = '2.0.0' }
+sp-io = { default-features = false, version = '2.0.0' }
+sp-runtime = { default-features = false, version = '2.0.0' }
+sp-std = { default-features = false, version = '2.0.0' }
 
-frame-benchmarking = { version = '2.0.0-rc6', default-features = false, optional = true }
+frame-benchmarking = { version = '2.0.0', default-features = false, optional = true }
 
 # crust runtime modules
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
@@ -49,4 +49,4 @@ runtime-benchmarks = [
 hex = '0.4.2'
 swork = { package = 'cstrml-swork', path = '../swork' }
 balances = { package = 'cstrml-balances', path = '../balances' }
-frame-benchmarking = { version = '2.0.0-rc6' }
+frame-benchmarking = { version = '2.0.0' }

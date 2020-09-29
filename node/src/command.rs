@@ -51,14 +51,54 @@ pub fn run() -> sc_cli::Result<()> {
     let cli = Cli::from_args();
 
     match &cli.subcommand {
-        Some(Subcommand::Base(subcommand)) => {
-            let runner = cli.create_runner(subcommand)?;
-            runner.run_subcommand(subcommand, |config| {
-                let PartialComponents { client, backend, task_manager, import_queue, .. }
+        Some(Subcommand::BuildSpec(cmd)) => {
+            let runner = cli.create_runner(cmd)?;
+            runner.sync_run(|config| cmd.run(config.chain_spec, config.network))
+        },
+        Some(Subcommand::CheckBlock(cmd)) => {
+            let runner = cli.create_runner(cmd)?;
+            runner.async_run(|config| {
+                let PartialComponents { client, task_manager, import_queue, .. }
                     = new_partial(&config)?;
-                Ok((client, backend, import_queue, task_manager))
+                Ok((cmd.run(client, import_queue), task_manager))
             })
-        }
+        },
+        Some(Subcommand::ExportBlocks(cmd)) => {
+            let runner = cli.create_runner(cmd)?;
+            runner.async_run(|config| {
+                let PartialComponents { client, task_manager, ..}
+                    = new_partial(&config)?;
+                Ok((cmd.run(client, config.database), task_manager))
+            })
+        },
+        Some(Subcommand::ExportState(cmd)) => {
+            let runner = cli.create_runner(cmd)?;
+            runner.async_run(|config| {
+                let PartialComponents { client, task_manager, ..}
+                    = new_partial(&config)?;
+                Ok((cmd.run(client, config.chain_spec), task_manager))
+            })
+        },
+        Some(Subcommand::ImportBlocks(cmd)) => {
+            let runner = cli.create_runner(cmd)?;
+            runner.async_run(|config| {
+                let PartialComponents { client, task_manager, import_queue, ..}
+                    = new_partial(&config)?;
+                Ok((cmd.run(client, import_queue), task_manager))
+            })
+        },
+        Some(Subcommand::PurgeChain(cmd)) => {
+            let runner = cli.create_runner(cmd)?;
+            runner.sync_run(|config| cmd.run(config.database))
+        },
+        Some(Subcommand::Revert(cmd)) => {
+            let runner = cli.create_runner(cmd)?;
+            runner.async_run(|config| {
+                let PartialComponents { client, task_manager, backend, ..}
+                    = new_partial(&config)?;
+                Ok((cmd.run(client, backend), task_manager))
+            })
+        },
         Some(Subcommand::Benchmark(subcommand)) => {
             if cfg!(feature = "runtime-benchmarks") {
                 let runner = cli.create_runner(subcommand)?;
@@ -69,7 +109,7 @@ pub fn run() -> sc_cli::Result<()> {
                 You can enable it with `--features runtime-benchmarks`.");
                 Ok(())
             }
-        }
+        },
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit( |config| match config.role {

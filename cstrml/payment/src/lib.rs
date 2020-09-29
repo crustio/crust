@@ -3,7 +3,8 @@
 
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
-    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, Parameter,
+    decl_event, decl_module, decl_storage, decl_error,
+    dispatch::DispatchResult, Parameter, debug,
     storage::IterableStorageDoubleMap,
     weights::Weight,
     traits::{
@@ -159,6 +160,11 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     pub fn batch_transfer(slot_factor: BlockNumber) {
+        debug::info!(
+            target: "payment",
+            "Batch transfer for block number {:?}.",
+            slot_factor
+        );
         for (sorder_id, slot_value) in <SlotPayments<T>>::iter_prefix(slot_factor) {
             // 3. Prepare payment amount
             let ledger = Self::payment_ledgers(&sorder_id).unwrap_or_default();
@@ -214,6 +220,11 @@ impl<T: Trait> Module<T> {
                 } else {
                     // 7. Reserve it back
                     // TODO: Double check this behavior since it should be a workaround. Maybe a special status is better?
+                    debug::debug!(
+                        target: "payment",
+                        "Reserve the currency  due to unknow reason for sorder {:?}.",
+                        sorder_id
+                    );
                     let _ = T::Currency::reserve(&client, real_amount);
                     <PaymentLedgers<T>>::mutate(&sorder_id, |ledger| {
                         if let Some(p) = ledger {
@@ -222,7 +233,13 @@ impl<T: Trait> Module<T> {
                     });
                 }
             },
-            _ => {}
+            _ => {
+                debug::info!(
+                    target: "payment",
+                    "Fail to transfer currency due to failed status for sorder {:?}.",
+                    sorder_id
+                );
+            }
         }
 
         Ok(())

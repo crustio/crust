@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-balances"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["Crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -13,17 +13,17 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 serde = { version = "1.0.101", optional = true }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
-sp-std = { default-features = false, version = '2.0.0-rc6' }
-sp-runtime = { default-features = false, version = '2.0.0-rc6' }
-frame-benchmarking = { version = "2.0.0-rc6", default-features = false, optional = true }
-frame-support = { version = "2.0.0-rc6", default-features = false }
-frame-system = { version = "2.0.0-rc6", default-features = false }
+sp-std = { default-features = false, version = '2.0.0' }
+sp-runtime = { default-features = false, version = '2.0.0' }
+frame-benchmarking = { version = "2.0.0", default-features = false, optional = true }
+frame-support = { version = "2.0.0", default-features = false }
+frame-system = { version = "2.0.0", default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-sp-io = { version = "2.0.0-rc6" }
-sp-core = { version = "2.0.0-rc6" }
-pallet-transaction-payment = { version = "2.0.0-rc6" }
+sp-io = "2.0.0"
+sp-core = "2.0.0"
+pallet-transaction-payment = "2.0.0"
 
 [features]
 default = ["std"]

@@ -3,7 +3,8 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, ensure,
+    decl_event, decl_module, decl_storage, decl_error,
+    dispatch::DispatchResult, ensure, debug,
     traits::{
         Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
         WithdrawReasons, Get
@@ -308,10 +309,20 @@ decl_module! {
             <Merchants<T>>::mutate(&who, |maybe_minfo| {
                 if let Some(minfo) = maybe_minfo {
                     // Update merchant
+                    debug::info!(
+                        target: "market",
+                        "Change {:?}'s address information and storage price.",
+                        who
+                    );
                     minfo.address_info = address_info;
                     minfo.storage_price = storage_price;
                 } else {
                     // New merchant
+                    debug::info!(
+                        target: "market",
+                        "New merchant {:?} is registered.",
+                        who
+                    );
                     *maybe_minfo = Some(MerchantInfo {
                         address_info,
                         storage_price,
@@ -427,6 +438,11 @@ decl_module! {
 
             // 5 Upsert pledge
             if pledge.total.is_zero() {
+                debug::info!(
+                    target: "market",
+                    "Remove pledge for {:?}",
+                    who
+                );
                 <Pledges<T>>::remove(&who);
                 // Remove the lock.
                 T::Currency::remove_lock(MARKET_ID, &who);
@@ -499,6 +515,12 @@ decl_module! {
             // 10. Pay the order and (maybe) add storage order
             if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &storage_order) {
                 // a. update pledge
+                debug::info!(
+                    target: "market",
+                    "Update pledge for {:?} and order ids for {:?}",
+                    merchant,
+                    who
+                );
                 <Pledges<T>>::mutate(&merchant, |pledge| {
                         pledge.used += amount;
                 });
@@ -551,8 +573,13 @@ impl<T: Trait> Module<T> {
                 // `pay_sorder` will trigger the payment scheduler.
                 if old_sorder.status == OrderStatus::Pending &&
                     so.status == OrderStatus::Success {
-                    T::Payment::pay_sorder(order_id);
-                }
+                        debug::info!(
+                            target: "market",
+                            "Start payment for sorder {:?}",
+                            order_id
+                        );
+                        T::Payment::pay_sorder(order_id);
+                    }
             }
         }
     }
@@ -633,6 +660,11 @@ impl<T: Trait> Module<T> {
             // 0. If reserve client's balance failed return error
             // TODO: return different error type
             if !T::Payment::reserve_sorder(&order_id, client, amount) {
+                debug::debug!(
+                    target: "market",
+                    "Cannot reserve currency for sorder {:?}",
+                    order_id
+                );
                 return None
             }
 
@@ -643,6 +675,12 @@ impl<T: Trait> Module<T> {
             <Merchants<T>>::mutate(merchant, |maybe_minfo| {
                 // `minfo` cannot be None
                 if let Some(minfo) = maybe_minfo {
+                    debug::info!(
+                        target: "market",
+                        "Add sorder {:?} into merchant {:?}",
+                        order_id,
+                        merchant
+                    );
                     let mut order_ids: Vec::<T::Hash> = vec![];
                     if let Some(o_ids) = minfo.file_map.get(&so.file_identifier) {
                         order_ids = o_ids.clone();
@@ -715,6 +753,11 @@ impl<T: Trait> Module<T> {
         merchant: &T::AccountId,
         pledge: &Pledge<BalanceOf<T>>
     ) {
+        debug::info!(
+            target: "market",
+            "Update pledge for merchant {:?}",
+            merchant
+        );
         // 1. Set lock
         T::Currency::set_lock(
             MARKET_ID,

@@ -925,7 +925,6 @@ dependencies = [
  "crust-runtime",
  "cst-primitives",
  "jsonrpc-core",
- "jsonrpc-pubsub",
  "pallet-transaction-payment-rpc",
  "parity-scale-codec",
  "sc-client-api",

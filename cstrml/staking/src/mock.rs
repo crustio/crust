@@ -4,7 +4,7 @@ use crate::*;
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     StorageValue, IterableStorageMap,
-    traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize},
+    traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize, TestRandomness},
     weights::{Weight, constants::RocksDbWeight},
 };
 use sp_core::{crypto::key_types, H256};
@@ -137,7 +137,7 @@ impl frame_system::Trait for Test {
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
-    type ModuleToIndex = ();
+    type PalletInfo = ();
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
@@ -154,6 +154,7 @@ impl balances::Trait for Test {
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
+    type MaxLocks = ();
 }
 parameter_types! {
     pub const Period: BlockNumber = 1;
@@ -216,18 +217,19 @@ parameter_types! {
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
 }
+
 impl Trait for Test {
     type Currency = balances::Module<Self>;
     type UnixTime = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
-    type Randomness = ();
     type Event = ();
     type Slash = ();
     type Reward = ();
+    type Randomness = TestRandomness;
     type SessionsPerEra = SessionsPerEra;
-    type MaxGuarantorRewardedPerValidator = MaxGuarantorRewardedPerValidator;
     type BondingDuration = BondingDuration;
+    type MaxGuarantorRewardedPerValidator = MaxGuarantorRewardedPerValidator;
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;

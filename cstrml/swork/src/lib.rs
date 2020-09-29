@@ -4,7 +4,7 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
-    dispatch::DispatchResult,
+    dispatch::DispatchResult, debug,
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
@@ -191,7 +191,10 @@ decl_module! {
         #[weight = 1_000_000]
         pub fn upgrade(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
             ensure_root(origin)?;
-
+            debug::info!(
+                target: "swork",
+                "Set new Code and ABExpire for swork."
+            );
             <Code>::put(new_code);
             <ABExpire<T>>::put(expire_block);
         }
@@ -280,6 +283,12 @@ decl_module! {
 
             // 1. Already reported with same pub key in the same slot, return immediately
             if Self::reported_in_slot(&curr_pk, slot) {
+                debug::info!(
+                    target: "swork",
+                    "Already reported with same pub key {:?} in the same slot {:?}.",
+                    curr_pk,
+                    slot
+                );
                 return Ok(())
             }
 
@@ -292,6 +301,10 @@ decl_module! {
             // 4. Ensure A/B upgrade is legal
             let is_ab_upgrade = !ab_upgrade_pk.is_empty() && Self::work_reports(&curr_pk).is_none();
             if is_ab_upgrade {
+                debug::info!(
+                    target: "swork",
+                    "Do AB upgrade."
+                );
                 // 4.1 Previous pk should already reported works
                 let maybe_prev_wr = Self::work_reports(&ab_upgrade_pk);
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
@@ -400,6 +413,11 @@ impl<T: Trait> Module<T> {
         let mut total_used = 0;
         let mut total_free = 0;
 
+        debug::info!(
+            target: "swork",
+            "Loop all identities and update the workload map for slot {:?}",
+            reported_rs
+        );
         // 2. Loop all identities and get the workload map
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <IdBonds<T>>::iter().map(|(reporter, ids)| {
@@ -425,6 +443,10 @@ impl<T: Trait> Module<T> {
         CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
         // 4. Update stake limit for every reporter
+        debug::info!(
+            target: "swork",
+            "Update stake limit for all reporters."
+        );
         for (reporter, own_workload) in workload_map {
             T::Works::report_works(&reporter, own_workload, total_workload);
         }
@@ -496,6 +518,11 @@ impl<T: Trait> Module<T> {
 
             // If this is resuming reporting, set all files storage order status to success
             if old_wr.report_slot < report_slot - REPORT_SLOT {
+                debug::info!(
+                    target: "swork",
+                    "Resume reporting and set sorder status to success for reporter {:?}",
+                    reporter
+                );
                 let old_files: Vec<(MerkleRoot, u64)> = old_wr.files.into_iter().collect();
                 let _ = Self::update_sorder(reporter, &old_files, true);
             }
@@ -540,6 +567,11 @@ impl<T: Trait> Module<T> {
 
         // 8. Delete old A's storage status
         if !ab_upgrade_pk.is_empty() {
+            debug::info!(
+                target: "swork",
+                "Chill old identity, id_bond and work report for reporter {:?}.",
+                reporter
+            );
             Self::chill(reporter, ab_upgrade_pk);
         }
     }
@@ -579,6 +611,12 @@ impl<T: Trait> Module<T> {
                     Some((f_id.clone(), *size))
                 } else {
                     // 3. Or invalid
+                    debug::debug!(
+                        target: "swork",
+                        "Invalid file id {:?} for reporter {:?}.",
+                        f_id,
+                        reporter
+                    );
                     None
                 }
             }).collect();
@@ -608,7 +646,12 @@ impl<T: Trait> Module<T> {
             }
         }
         // Or nope, idk wtf? 🙂
-
+        debug::debug!(
+            target: "swork",
+            "No workload for reporter {:?} in slot {:?}",
+            reporter,
+            current_rs
+        );
         (0, 0)
     }
 

@@ -284,7 +284,6 @@ fn test_for_pledge_extra_should_fail_due_to_merchant_not_pledges() {
     });
 }
 
-
 #[test]
 fn test_for_pledge_should_fail_due_to_insufficient_currency() {
     new_test_ext().execute_with(|| {

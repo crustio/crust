@@ -31,8 +31,8 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target2-${{ hashFiles('**/Cargo.toml') }}
-      - run: sudo apt-get remove -y clang-6.0 libclang-common-6.0-dev libclang1-6.0 libllvm6.0
-      - run: sudo apt update && sudo apt install -y cmake pkg-config libssl-dev git gcc build-essential clang libclang-dev
+      - run: sudo apt remove clang-6.0 libclang-common-6.0-dev libclang1-6.0 libllvm6.0
+      - run: sudo apt update && sudo apt install cmake pkg-config libssl-dev git gcc build-essential clang
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2020-08-10-x86_64-unknown-linux-gnu

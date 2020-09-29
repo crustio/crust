@@ -645,7 +645,7 @@ construct_runtime! {
 		Identity: pallet_identity::{Module, Call, Storage, Event<T>},
 
         // Crust modules
-        Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
+        Swork: swork::{Module, Call, Storage, Event<T>, Config},
         Market: market::{Module, Call, Storage, Event<T>},
         Payment: payment::{Module, Call, Storage, Event<T>},
 

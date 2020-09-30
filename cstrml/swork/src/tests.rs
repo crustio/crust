@@ -922,9 +922,10 @@ fn ab_upgrade_should_work() {
         .execute_with(|| {
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
             let a_wr_info = legal_work_report();
-            let b_wr_info = ab_upgrade_work_report();
+            let b_wr_info_1 = ab_upgrade_work_report();
+            let b_wr_info_2 = continuous_ab_upgrade_work_report();
             let a_pk = a_wr_info.curr_pk.clone();
-            let b_pk = b_wr_info.curr_pk.clone();
+            let b_pk = b_wr_info_1.curr_pk.clone();
 
             // 0. Initial setup
             register(&reporter, &a_pk, &LegalCode::get());
@@ -940,6 +941,8 @@ fn ab_upgrade_should_work() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
+            add_pending_sorders(&reporter); // with b_wr_info_2's added file
+            add_success_sorders(&reporter); // with b_wr_info_2's deleted file
 
             // 1. Runs to 303 block
             run_to_block(303);
@@ -960,7 +963,7 @@ fn ab_upgrade_should_work() {
                 a_wr_info.sig
             ));
 
-            // 3. Check A's work report
+            // 3. Check A's work report and free & used
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 used: 2,
@@ -973,6 +976,8 @@ fn ab_upgrade_should_work() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 2);
 
             // 4. Runs to 606, and do sWorker upgrade
             run_to_block(606);
@@ -984,20 +989,20 @@ fn ab_upgrade_should_work() {
             // 6. Report works with sWorker B
             assert_ok!(Swork::report_works(
                 Origin::signed(reporter.clone()),
-                b_wr_info.curr_pk,
-                b_wr_info.prev_pk,
-                b_wr_info.block_number,
-                b_wr_info.block_hash,
-                b_wr_info.free,
-                b_wr_info.used,
-                b_wr_info.added_files,
-                b_wr_info.deleted_files,
-                b_wr_info.srd_root,
-                b_wr_info.files_root,
-                b_wr_info.sig
+                b_wr_info_1.curr_pk,
+                b_wr_info_1.prev_pk,
+                b_wr_info_1.block_number,
+                b_wr_info_1.block_hash,
+                b_wr_info_1.free,
+                b_wr_info_1.used,
+                b_wr_info_1.added_files,
+                b_wr_info_1.deleted_files,
+                b_wr_info_1.srd_root,
+                b_wr_info_1.files_root,
+                b_wr_info_1.sig
             ));
 
-            // 7. Check B's work report
+            // 7. Check B's work report and free & used
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
                 used: 2,
@@ -1010,11 +1015,54 @@ fn ab_upgrade_should_work() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 2);
 
             // 8. Check A is already be chilled
             assert_eq!(Swork::identities(&a_pk), None);
             assert_eq!(Swork::work_reports(&a_pk), None);
             assert_eq!(Swork::id_bonds(&reporter), vec![b_pk.clone()]);
+
+            // 9. Runs to 909
+            run_to_block(909);
+
+            // 10. B normally report with A's pk(and with files changing), it should be ok
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                b_wr_info_2.curr_pk,
+                b_wr_info_2.prev_pk,
+                b_wr_info_2.block_number,
+                b_wr_info_2.block_hash,
+                b_wr_info_2.free,
+                b_wr_info_2.used,
+                b_wr_info_2.added_files,
+                b_wr_info_2.deleted_files,
+                b_wr_info_2.srd_root,
+                b_wr_info_2.files_root,
+                b_wr_info_2.sig
+            ));
+
+            // 11. Check B's work report and free & used again
+            assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
+                report_slot: 900,
+                used: 3,
+                free: 4294967296,
+                files: vec![
+                    (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+                    (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 2)
+                ].into_iter().collect(),
+                reported_files_size: 3,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 3); // Added 2 and delete 1
+
+            // 12. Corresponding sorder should work
+            // 5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
+            // 99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
         });
 }
 

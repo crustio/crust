@@ -290,7 +290,7 @@ decl_module! {
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
             // 4. Ensure A/B upgrade is legal
-            let is_ab_upgrade = !ab_upgrade_pk.is_empty();
+            let is_ab_upgrade = !ab_upgrade_pk.is_empty() && Self::work_reports(&curr_pk).is_none();
             if is_ab_upgrade {
                 // 4.1 Previous pk should already reported works
                 let maybe_prev_wr = Self::work_reports(&ab_upgrade_pk);

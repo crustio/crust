@@ -517,11 +517,11 @@ decl_module! {
                 });
                 // b. Add `order_id` to client orders
                 <Clients<T>>::mutate(&who, file_alias, |maybe_client_orders| {
-                    if let Some(client_order) = maybe_client_orders {    
-                        client_order.push(order_id.clone());    
-                    } else {    
-                        *maybe_client_orders = Some(vec![order_id.clone()])    
-                    }    
+                    if let Some(client_order) = maybe_client_orders {
+                        client_order.push(order_id.clone());
+                    } else {
+                        *maybe_client_orders = Some(vec![order_id.clone()])
+                    }
                 });
                 // c. emit storage order success event
                 Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));

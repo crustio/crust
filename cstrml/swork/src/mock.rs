@@ -331,9 +331,19 @@ pub fn resuming_work_report() -> ReportWorksInfo {
 pub fn ab_upgrade_work_report() -> ReportWorksInfo {
     let mut legal_wr = legal_work_report();
     legal_wr.block_number = 600;
-    legal_wr.curr_pk = hex::decode("1a2d3955addab8e476ab746f7279b0967936cbb36b7f50bc6ff86475003479bcd49ecc32715a3cfaad13012148a085497dc2d5ded049498a18644e01a4fdb559").unwrap();
+    legal_wr.curr_pk = hex::decode("3dd32a6624d1a39af67620fb9221928f6892907456109167a8230b331f662458263805d7db1598b98ed363b594ab6f1a52f2c66a6524d09fbd19f064f02c0a73").unwrap();
     legal_wr.prev_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
-    legal_wr.sig = hex::decode("3979e64a132dce573ddfe9c3593826dc8a2e2fd8280c824be53c39c7ea2782e9a5c37382287bd41797fe006fd2deca05d71cb30084054171f871c9d28cd33567").unwrap();
+    legal_wr.sig = hex::decode("3949297f56d65adacb6f5837b63a050c2aaf2f5674c425792b37823f78a36254a67a259ab5e03bbfab31d8d716db101036cc42cfb1fbb126c04772763c44486d").unwrap();
+    legal_wr
+}
+
+pub fn continuous_ab_upgrade_work_report() -> ReportWorksInfo {
+    let mut legal_wr = ab_upgrade_work_report();
+    legal_wr.block_number = 900;
+    legal_wr.added_files = vec![(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 2)];
+    legal_wr.deleted_files = vec![(hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)];
+    legal_wr.used = 3;
+    legal_wr.sig = hex::decode("d0fb8ec28beea243a550a51b99ae92a046b9829d87783cbc70e86d98ac9cf3b47cfa8148ba4ce6e8ed4352f8fa550437db6effe5f31a3ada755c0f783c83f2c3").unwrap();
     legal_wr
 }
 

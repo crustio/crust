@@ -4,7 +4,7 @@
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
-    dispatch::DispatchResult, Parameter, debug,
+    dispatch::DispatchResult, Parameter,
     storage::IterableStorageDoubleMap,
     weights::Weight,
     traits::{
@@ -29,6 +29,18 @@ use serde::{Deserialize, Serialize};
 use primitives::BlockNumber;
 
 use market::{OrderStatus, MarketInterface, Payment};
+
+pub(crate) const LOG_TARGET: &'static str = "payment";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
 
 #[cfg(test)]
 mod mock;
@@ -160,11 +172,6 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     pub fn batch_transfer(slot_factor: BlockNumber) {
-        debug::info!(
-            target: "payment",
-            "💰 Batch transfer for block number {:?}.",
-            slot_factor
-        );
         for (sorder_id, slot_value) in <SlotPayments<T>>::iter_prefix(slot_factor) {
             // 3. Prepare payment amount
             let ledger = Self::payment_ledgers(&sorder_id).unwrap_or_default();
@@ -220,8 +227,8 @@ impl<T: Trait> Module<T> {
                 } else {
                     // 7. Reserve it back
                     // TODO: Double check this behavior since it should be a workaround. Maybe a special status is better?
-                    debug::debug!(
-                        target: "payment",
+                    log!(
+                        debug,
                         "💰 Reserve the currency  due to unknow reason for sorder {:?}.",
                         sorder_id
                     );
@@ -233,13 +240,7 @@ impl<T: Trait> Module<T> {
                     });
                 }
             },
-            _ => {
-                debug::info!(
-                    target: "payment",
-                    "💰 Fail to transfer currency due to failed status for sorder {:?}.",
-                    sorder_id
-                );
-            }
+            _ => {}
         }
 
         Ok(())

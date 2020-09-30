@@ -4,7 +4,7 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
-    dispatch::DispatchResult, debug,
+    dispatch::DispatchResult,
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
@@ -42,6 +42,18 @@ pub mod benchmarking;
 
 pub type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
+
+pub(crate) const LOG_TARGET: &'static str = "swork";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -191,10 +203,6 @@ decl_module! {
         #[weight = 1_000_000]
         pub fn upgrade(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
             ensure_root(origin)?;
-            debug::info!(
-                target: "swork",
-                "🔒 Set new Code and ABExpire for swork."
-            );
             <Code>::put(new_code);
             <ABExpire<T>>::put(expire_block);
         }
@@ -207,16 +215,16 @@ decl_module! {
         /// Emits `RegisterSuccess` if new id has been registered.
         ///
         /// # <weight>
-		/// - Independent of the arguments. Moderate complexity.
-		/// - TC depends on identities' number.
-		/// - DB try depends on identities' number.
-		///
-		/// ------------------
-		/// Base Weight: 154.8 µs
-		/// DB Weight:
-		/// - Read: Identities
-		/// - Write: 3
-		/// # </weight>
+        /// - Independent of the arguments. Moderate complexity.
+        /// - TC depends on identities' number.
+        /// - DB try depends on identities' number.
+        ///
+        /// ------------------
+        /// Base Weight: 154.8 µs
+        /// DB Weight:
+        /// - Read: Identities
+        /// - Write: 3
+        /// # </weight>
         #[weight = (154 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(13, 3), DispatchClass::Operational)]
         pub fn register(
             origin,
@@ -253,16 +261,16 @@ decl_module! {
         /// Emits `WorksReportSuccess` if new work report has been reported
         ///
         /// # <weight>
-		/// - Independent of the arguments. Moderate complexity.
-		/// - TC depends on identities' size and market.Merchant.file_map size
-		/// - DB try depends on identities and market.Merchant.file_map
-		///
-		/// ------------------
-		/// Base Weight: 212 µs
-		/// DB Weight:
-		/// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
-		/// - Write: WorkReport, ReportedInSlot, market.SOrder
-		/// # </weight>
+        /// - Independent of the arguments. Moderate complexity.
+        /// - TC depends on identities' size and market.Merchant.file_map size
+        /// - DB try depends on identities and market.Merchant.file_map
+        ///
+        /// ------------------
+        /// Base Weight: 212 µs
+        /// DB Weight:
+        /// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
+        /// - Write: WorkReport, ReportedInSlot, market.SOrder
+        /// # </weight>
         #[weight = (212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7), DispatchClass::Operational)]
         pub fn report_works(
             origin,
@@ -283,8 +291,8 @@ decl_module! {
 
             // 1. Already reported with same pub key in the same slot, return immediately
             if Self::reported_in_slot(&curr_pk, slot) {
-                debug::info!(
-                    target: "swork",
+                log!(
+                    trace,
                     "🔒 Already reported with same pub key {:?} in the same slot {:?}.",
                     curr_pk,
                     slot
@@ -301,10 +309,6 @@ decl_module! {
             // 4. Ensure A/B upgrade is legal
             let is_ab_upgrade = !ab_upgrade_pk.is_empty() && Self::work_reports(&curr_pk).is_none();
             if is_ab_upgrade {
-                debug::info!(
-                    target: "swork",
-                    "🔒 Do AB upgrade."
-                );
                 // 4.1 Previous pk should already reported works
                 let maybe_prev_wr = Self::work_reports(&ab_upgrade_pk);
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
@@ -413,8 +417,8 @@ impl<T: Trait> Module<T> {
         let mut total_used = 0;
         let mut total_free = 0;
 
-        debug::info!(
-            target: "swork",
+        log!(
+            trace,
             "🔒 Loop all identities and update the workload map for slot {:?}",
             reported_rs
         );
@@ -443,8 +447,8 @@ impl<T: Trait> Module<T> {
         CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
         // 4. Update stake limit for every reporter
-        debug::info!(
-            target: "swork",
+        log!(
+            trace,
             "🔒 Update stake limit for all reporters."
         );
         for (reporter, own_workload) in workload_map {
@@ -518,11 +522,6 @@ impl<T: Trait> Module<T> {
 
             // If this is resuming reporting, set all files storage order status to success
             if old_wr.report_slot < report_slot - REPORT_SLOT {
-                debug::info!(
-                    target: "swork",
-                    "🔒 Resume reporting and set sorder status to success for reporter {:?}",
-                    reporter
-                );
                 let old_files: Vec<(MerkleRoot, u64)> = old_wr.files.into_iter().collect();
                 let _ = Self::update_sorder(reporter, &old_files, true);
             }
@@ -567,11 +566,6 @@ impl<T: Trait> Module<T> {
 
         // 8. Delete old A's storage status
         if !ab_upgrade_pk.is_empty() {
-            debug::info!(
-                target: "swork",
-                "🔒 Chill old identity, id_bond and work report for reporter {:?}.",
-                reporter
-            );
             Self::chill(reporter, ab_upgrade_pk);
         }
     }
@@ -611,12 +605,6 @@ impl<T: Trait> Module<T> {
                     Some((f_id.clone(), *size))
                 } else {
                     // 3. Or invalid
-                    debug::debug!(
-                        target: "swork",
-                        "🔒 Invalid file id {:?} for reporter {:?}.",
-                        f_id,
-                        reporter
-                    );
                     None
                 }
             }).collect();
@@ -646,8 +634,8 @@ impl<T: Trait> Module<T> {
             }
         }
         // Or nope, idk wtf? 🙂
-        debug::debug!(
-            target: "swork",
+        log!(
+            debug,
             "🔒 No workload for reporter {:?} in slot {:?}",
             reporter,
             current_rs

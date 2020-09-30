@@ -15,7 +15,7 @@ mod tests;
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
     decl_module, decl_event, decl_storage, ensure, decl_error,
-    storage::IterableStorageMap, debug,
+    storage::IterableStorageMap,
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
@@ -55,6 +55,18 @@ const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
 const MAX_GUARANTEE: usize = 16;
 const STAKING_ID: LockIdentifier = *b"staking ";
+
+pub(crate) const LOG_TARGET: &'static str = "staking";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
 
 /// Counter for the number of eras that have passed.
 pub type EraIndex = u32;
@@ -1387,12 +1399,6 @@ impl<T: Trait> Module<T> {
     ) -> Option<Guarantee<T::AccountId, BalanceOf<T>>> {
         // 1. Already guaranteed
         if let Some(guarantee) = Self::guarantors(g_stash) {
-            debug::info!(
-                target: "staking",
-                "📈 Increase votes to validator {:?} from gurantor {:?}.",
-                v_stash,
-                g_stash
-            );
             let remains = bonded.saturating_sub(guarantee.total);
             let real_votes = remains.min(votes);
             let new_total = guarantee.total.saturating_add(real_votes);
@@ -1400,9 +1406,9 @@ impl<T: Trait> Module<T> {
             let mut update = false;
 
             if real_votes <= Zero::zero() {
-                debug::info!(
-                    target: "staking",
-                    "📈 Staking limit of validator {:?} is zero.",
+                log!(
+                    debug,
+                    "💸 Staking limit of validator {:?} is zero.",
                     v_stash
                 );
                 return None
@@ -1440,12 +1446,6 @@ impl<T: Trait> Module<T> {
 
         // 2. New guarantee
         } else {
-            debug::info!(
-                target: "staking",
-                "📈 New votes to validator {:?} from gurantor {:?}",
-                v_stash,
-                g_stash
-            );
             let real_votes = bonded.min(votes);
             let new_total = real_votes;
 
@@ -1684,10 +1684,10 @@ impl<T: Trait> Module<T> {
             *s = Some(s.map(|s| s + 1).unwrap_or(0));
             s.unwrap()
         });
-        debug::info!(
-            target: "staking",
-            "📈 Plan a new era {:?}",
-            current_era
+        log!(
+            trace,
+            "💸 Plan a new era {:?}",
+            current_era,
         );
         ErasStartSessionIndex::insert(&current_era, &start_session_index);
 
@@ -1747,10 +1747,10 @@ impl<T: Trait> Module<T> {
             });
             new_index
         });
-        debug::info!(
-            target: "staking",
-            "📈 Start the era {:?}",
-            active_era
+        log!(
+            trace,
+            "💸 Start the era {:?}",
+            active_era,
         );
         let bonding_duration = T::BondingDuration::get();
 
@@ -1782,21 +1782,16 @@ impl<T: Trait> Module<T> {
     /// Compute payout for era.
     fn end_era(active_era: ActiveEraInfo, _session_index: SessionIndex) {
         // Note: active_era_start can be None if end era is called during genesis config.
-        debug::info!(
-            target: "staking",
-            "📈 End the era {:?}",
-            active_era.index
+        log!(
+            trace,
+            "💸 End the era {:?}",
+            active_era.index,
         );
         if let Some(active_era_start) = active_era.start {
             let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
 
             let era_duration = now_as_millis_u64 - active_era_start;
             if !era_duration.is_zero() {
-                debug::info!(
-                    target: "staking",
-                    "📈 Calculate rewards for the era {:?}",
-                    active_era.index
-                );
                 let active_era_index = active_era.index.clone();
                 let points = <ErasRewardPoints<T>>::get(&active_era_index);
                 let total_authoring_payout = Self::authoring_rewards_in_era();
@@ -1827,11 +1822,6 @@ impl<T: Trait> Module<T> {
 
         /// Clear all era information for given era.
     fn clear_era_information(era_index: EraIndex) {
-        debug::info!(
-            target: "staking",
-            "📈 Clear old era {:?} information.",
-            era_index
-        );
         <ErasStakers<T>>::remove_prefix(era_index);
         <ErasStakersClipped<T>>::remove_prefix(era_index);
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
@@ -1926,10 +1916,10 @@ impl<T: Trait> Module<T> {
         // TC is O(V + G*1), V means validator's number, G means guarantor's number
         // DB try is 2
 
-        debug::info!(
-            target: "staking",
-            "📈 Construct and fill in the V/G graph for the era {:?}.",
-            current_era
+        log!(
+            debug,
+            "💸 Construct and fill in the V/G graph for the era {:?}.",
+            current_era,
         );
         let mut vg_graph: BTreeMap<T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>> =
             <Validators<T>>::iter().map(|(v_stash, _)|
@@ -1962,10 +1952,10 @@ impl<T: Trait> Module<T> {
         // 2. Get `ErasValidatorPrefs`
         // 3. Get `total_valid_stakes`
         // 4. Fill in `validator_stakes`
-        debug::info!(
-            target: "staking",
-            "📈 Build the erasStakers for the era {:?}.",
-            current_era
+        log!(
+            debug,
+            "💸 Build the erasStakers for the era {:?}.",
+            current_era,
         );
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
@@ -2031,11 +2021,6 @@ impl<T: Trait> Module<T> {
         }
 
         // IV. TopDown Election Algorithm with Randomlization
-        debug::info!(
-            target: "staking",
-            "📈 Validators election for the era {:?}.",
-            current_era
-        );
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
         // If there's no validators, be as same as little validators
@@ -2044,7 +2029,12 @@ impl<T: Trait> Module<T> {
         }
 
         let elected_stashes= Self::do_election(validators_stakes, to_elect);
-
+        log!(
+            info,
+            "💸 new validator set of size {:?} has been elected via for era {:?}",
+            elected_stashes.len(),
+            current_era,
+        );
         // V. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);

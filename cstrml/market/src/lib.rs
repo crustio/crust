@@ -4,7 +4,7 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
-    dispatch::DispatchResult, ensure, debug,
+    dispatch::DispatchResult, ensure,
     traits::{
         Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
         WithdrawReasons, Get
@@ -37,6 +37,18 @@ mod tests;
 pub mod benchmarking;
 
 const MARKET_ID: LockIdentifier = *b"market  ";
+
+pub(crate) const LOG_TARGET: &'static str = "market";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
 
 /// Counter for the number of eras that have passed.
 pub type EraIndex = u32;
@@ -283,12 +295,12 @@ decl_module! {
         /// this will require you to pledge first, complexity depends on `Pledges`(P) and `swork.WorkReports`(W).
         ///
         /// # <weight>
-		/// Complexity: O(logP)
-		/// - Base: 30.26 µs
-		/// - Read: Pledge
-		/// - Write: WorkReports, Merchants
-		/// # </weight>
-		#[weight = 30 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 3)]
+        /// Complexity: O(logP)
+        /// - Base: 30.26 µs
+        /// - Read: Pledge
+        /// - Write: WorkReports, Merchants
+        /// # </weight>
+        #[weight = 30 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 3)]
         pub fn register(
             origin,
             address_info: AddressInfo,
@@ -309,20 +321,10 @@ decl_module! {
             <Merchants<T>>::mutate(&who, |maybe_minfo| {
                 if let Some(minfo) = maybe_minfo {
                     // Update merchant
-                    debug::info!(
-                        target: "market",
-                        "🏢 Change {:?}'s address information and storage price.",
-                        who
-                    );
                     minfo.address_info = address_info;
                     minfo.storage_price = storage_price;
                 } else {
                     // New merchant
-                    debug::info!(
-                        target: "market",
-                        "🏢 New merchant {:?} is registered.",
-                        who
-                    );
                     *maybe_minfo = Some(MerchantInfo {
                         address_info,
                         storage_price,
@@ -341,12 +343,12 @@ decl_module! {
         /// this will require you to pledge first, complexity depends on `Pledges`(P).
         ///
         /// # <weight>
-		/// Complexity: O(logP)
-		/// - Base: 69.86 µs
-		/// - Read: Pledge
-		/// - Write: Pledge
-		/// # </weight>
-		#[weight = 70 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
+        /// Complexity: O(logP)
+        /// - Base: 69.86 µs
+        /// - Read: Pledge
+        /// - Write: Pledge
+        /// # </weight>
+        #[weight = 70 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
         pub fn pledge(
             origin,
             #[compact] value: BalanceOf<T>
@@ -380,12 +382,12 @@ decl_module! {
         /// Pledge extra amount of currency to accept market order.
         ///
         /// # <weight>
-		/// Complexity: O(logP)
-		/// - Base: 66.6 µs
-		/// - Read: Pledge
-		/// - Write: Pledge
-		/// # </weight>
-		#[weight = 67 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
+        /// Complexity: O(logP)
+        /// - Base: 66.6 µs
+        /// - Read: Pledge
+        /// - Write: Pledge
+        /// # </weight>
+        #[weight = 67 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
         pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -414,12 +416,12 @@ decl_module! {
         /// Decrease pledge amount of currency for market order.
         ///
         /// # <weight>
-		/// Complexity: O(logP)
-		/// - Base: 73.5 µs
-		/// - Read: Pledge
-		/// - Write: Pledge
-		/// # </weight>
-		#[weight = 73 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
+        /// Complexity: O(logP)
+        /// - Base: 73.5 µs
+        /// - Read: Pledge
+        /// - Write: Pledge
+        /// # </weight>
+        #[weight = 73 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
         pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -438,11 +440,6 @@ decl_module! {
 
             // 5 Upsert pledge
             if pledge.total.is_zero() {
-                debug::info!(
-                    target: "market",
-                    "🏢 Remove pledge for {:?}",
-                    who
-                );
                 <Pledges<T>>::remove(&who);
                 // Remove the lock.
                 T::Currency::remove_lock(MARKET_ID, &who);
@@ -515,22 +512,16 @@ decl_module! {
             // 10. Pay the order and (maybe) add storage order
             if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &storage_order) {
                 // a. update pledge
-                debug::info!(
-                    target: "market",
-                    "🏢 Update pledge for {:?} and order ids for {:?}",
-                    merchant,
-                    who
-                );
                 <Pledges<T>>::mutate(&merchant, |pledge| {
                         pledge.used += amount;
                 });
                 // b. Add `order_id` to client orders
                 <Clients<T>>::mutate(&who, file_alias, |maybe_client_orders| {
-                    if let Some(client_order) = maybe_client_orders {	
-                        client_order.push(order_id.clone());	
-                    } else {	
-                        *maybe_client_orders = Some(vec![order_id.clone()])	
-                    }	
+                    if let Some(client_order) = maybe_client_orders {    
+                        client_order.push(order_id.clone());    
+                    } else {    
+                        *maybe_client_orders = Some(vec![order_id.clone()])    
+                    }    
                 });
                 // c. emit storage order success event
                 Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
@@ -573,11 +564,6 @@ impl<T: Trait> Module<T> {
                 // `pay_sorder` will trigger the payment scheduler.
                 if old_sorder.status == OrderStatus::Pending &&
                     so.status == OrderStatus::Success {
-                        debug::info!(
-                            target: "market",
-                            "🏢 Start payment for sorder {:?}",
-                            order_id
-                        );
                         T::Payment::pay_sorder(order_id);
                     }
             }
@@ -660,8 +646,8 @@ impl<T: Trait> Module<T> {
             // 0. If reserve client's balance failed return error
             // TODO: return different error type
             if !T::Payment::reserve_sorder(&order_id, client, amount) {
-                debug::debug!(
-                    target: "market",
+                log!(
+                    debug,
                     "🏢 Cannot reserve currency for sorder {:?}",
                     order_id
                 );
@@ -675,12 +661,6 @@ impl<T: Trait> Module<T> {
             <Merchants<T>>::mutate(merchant, |maybe_minfo| {
                 // `minfo` cannot be None
                 if let Some(minfo) = maybe_minfo {
-                    debug::info!(
-                        target: "market",
-                        "🏢 Add sorder {:?} into merchant {:?}",
-                        order_id,
-                        merchant
-                    );
                     let mut order_ids: Vec::<T::Hash> = vec![];
                     if let Some(o_ids) = minfo.file_map.get(&so.file_identifier) {
                         order_ids = o_ids.clone();
@@ -753,11 +733,6 @@ impl<T: Trait> Module<T> {
         merchant: &T::AccountId,
         pledge: &Pledge<BalanceOf<T>>
     ) {
-        debug::info!(
-            target: "market",
-            "🏢 Update pledge for merchant {:?}",
-            merchant
-        );
         // 1. Set lock
         T::Currency::set_lock(
             MARKET_ID,

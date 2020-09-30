@@ -56,6 +56,18 @@ const MAX_UNLOCKING_CHUNKS: usize = 32;
 const MAX_GUARANTEE: usize = 16;
 const STAKING_ID: LockIdentifier = *b"staking ";
 
+pub(crate) const LOG_TARGET: &'static str = "staking";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
+
 /// Counter for the number of eras that have passed.
 pub type EraIndex = u32;
 
@@ -1394,6 +1406,11 @@ impl<T: Trait> Module<T> {
             let mut update = false;
 
             if real_votes <= Zero::zero() {
+                log!(
+                    debug,
+                    "💸 Staking limit of validator {:?} is zero.",
+                    v_stash
+                );
                 return None
             }
 
@@ -1667,6 +1684,11 @@ impl<T: Trait> Module<T> {
             *s = Some(s.map(|s| s + 1).unwrap_or(0));
             s.unwrap()
         });
+        log!(
+            trace,
+            "💸 Plan a new era {:?}",
+            current_era,
+        );
         ErasStartSessionIndex::insert(&current_era, &start_session_index);
 
         // Clean old era information.
@@ -1725,7 +1747,11 @@ impl<T: Trait> Module<T> {
             });
             new_index
         });
-
+        log!(
+            trace,
+            "💸 Start the era {:?}",
+            active_era,
+        );
         let bonding_duration = T::BondingDuration::get();
 
         BondedEras::mutate(|bonded| {
@@ -1756,6 +1782,11 @@ impl<T: Trait> Module<T> {
     /// Compute payout for era.
     fn end_era(active_era: ActiveEraInfo, _session_index: SessionIndex) {
         // Note: active_era_start can be None if end era is called during genesis config.
+        log!(
+            trace,
+            "💸 End the era {:?}",
+            active_era.index,
+        );
         if let Some(active_era_start) = active_era.start {
             let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
 
@@ -1884,6 +1915,12 @@ impl<T: Trait> Module<T> {
         // II. Construct and fill in the V/G graph
         // TC is O(V + G*1), V means validator's number, G means guarantor's number
         // DB try is 2
+
+        log!(
+            debug,
+            "💸 Construct and fill in the V/G graph for the era {:?}.",
+            current_era,
+        );
         let mut vg_graph: BTreeMap<T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>> =
             <Validators<T>>::iter().map(|(v_stash, _)|
                 (v_stash, Vec::<IndividualExposure<T::AccountId, BalanceOf<T>>>::new())
@@ -1915,6 +1952,11 @@ impl<T: Trait> Module<T> {
         // 2. Get `ErasValidatorPrefs`
         // 3. Get `total_valid_stakes`
         // 4. Fill in `validator_stakes`
+        log!(
+            debug,
+            "💸 Build the erasStakers for the era {:?}.",
+            current_era,
+        );
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
@@ -1987,7 +2029,12 @@ impl<T: Trait> Module<T> {
         }
 
         let elected_stashes= Self::do_election(validators_stakes, to_elect);
-
+        log!(
+            info,
+            "💸 new validator set of size {:?} has been elected via for era {:?}",
+            elected_stashes.len(),
+            current_era,
+        );
         // V. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);

@@ -43,6 +43,18 @@ pub mod benchmarking;
 pub type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
+pub(crate) const LOG_TARGET: &'static str = "swork";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct WorkReport {
@@ -191,7 +203,6 @@ decl_module! {
         #[weight = 1_000_000]
         pub fn upgrade(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
             ensure_root(origin)?;
-
             <Code>::put(new_code);
             <ABExpire<T>>::put(expire_block);
         }
@@ -204,16 +215,16 @@ decl_module! {
         /// Emits `RegisterSuccess` if new id has been registered.
         ///
         /// # <weight>
-		/// - Independent of the arguments. Moderate complexity.
-		/// - TC depends on identities' number.
-		/// - DB try depends on identities' number.
-		///
-		/// ------------------
-		/// Base Weight: 154.8 µs
-		/// DB Weight:
-		/// - Read: Identities
-		/// - Write: 3
-		/// # </weight>
+        /// - Independent of the arguments. Moderate complexity.
+        /// - TC depends on identities' number.
+        /// - DB try depends on identities' number.
+        ///
+        /// ------------------
+        /// Base Weight: 154.8 µs
+        /// DB Weight:
+        /// - Read: Identities
+        /// - Write: 3
+        /// # </weight>
         #[weight = (154 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(13, 3), DispatchClass::Operational)]
         pub fn register(
             origin,
@@ -250,16 +261,16 @@ decl_module! {
         /// Emits `WorksReportSuccess` if new work report has been reported
         ///
         /// # <weight>
-		/// - Independent of the arguments. Moderate complexity.
-		/// - TC depends on identities' size and market.Merchant.file_map size
-		/// - DB try depends on identities and market.Merchant.file_map
-		///
-		/// ------------------
-		/// Base Weight: 212 µs
-		/// DB Weight:
-		/// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
-		/// - Write: WorkReport, ReportedInSlot, market.SOrder
-		/// # </weight>
+        /// - Independent of the arguments. Moderate complexity.
+        /// - TC depends on identities' size and market.Merchant.file_map size
+        /// - DB try depends on identities and market.Merchant.file_map
+        ///
+        /// ------------------
+        /// Base Weight: 212 µs
+        /// DB Weight:
+        /// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
+        /// - Write: WorkReport, ReportedInSlot, market.SOrder
+        /// # </weight>
         #[weight = (212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7), DispatchClass::Operational)]
         pub fn report_works(
             origin,
@@ -280,6 +291,12 @@ decl_module! {
 
             // 1. Already reported with same pub key in the same slot, return immediately
             if Self::reported_in_slot(&curr_pk, slot) {
+                log!(
+                    trace,
+                    "🔒 Already reported with same pub key {:?} in the same slot {:?}.",
+                    curr_pk,
+                    slot
+                );
                 return Ok(())
             }
 
@@ -400,6 +417,11 @@ impl<T: Trait> Module<T> {
         let mut total_used = 0;
         let mut total_free = 0;
 
+        log!(
+            trace,
+            "🔒 Loop all identities and update the workload map for slot {:?}",
+            reported_rs
+        );
         // 2. Loop all identities and get the workload map
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <IdBonds<T>>::iter().map(|(reporter, ids)| {
@@ -425,6 +447,10 @@ impl<T: Trait> Module<T> {
         CurrentReportSlot::mutate(|crs| *crs = reported_rs);
 
         // 4. Update stake limit for every reporter
+        log!(
+            trace,
+            "🔒 Update stake limit for all reporters."
+        );
         for (reporter, own_workload) in workload_map {
             T::Works::report_works(&reporter, own_workload, total_workload);
         }
@@ -608,7 +634,12 @@ impl<T: Trait> Module<T> {
             }
         }
         // Or nope, idk wtf? 🙂
-
+        log!(
+            debug,
+            "🔒 No workload for reporter {:?} in slot {:?}",
+            reporter,
+            current_rs
+        );
         (0, 0)
     }
 

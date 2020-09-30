@@ -3,7 +3,8 @@
 
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{
-    decl_event, decl_module, decl_storage, decl_error, dispatch::DispatchResult, Parameter,
+    decl_event, decl_module, decl_storage, decl_error,
+    dispatch::DispatchResult, Parameter,
     storage::IterableStorageDoubleMap,
     weights::Weight,
     traits::{
@@ -28,6 +29,18 @@ use serde::{Deserialize, Serialize};
 use primitives::BlockNumber;
 
 use market::{OrderStatus, MarketInterface, Payment};
+
+pub(crate) const LOG_TARGET: &'static str = "payment";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
 
 #[cfg(test)]
 mod mock;
@@ -214,6 +227,11 @@ impl<T: Trait> Module<T> {
                 } else {
                     // 7. Reserve it back
                     // TODO: Double check this behavior since it should be a workaround. Maybe a special status is better?
+                    log!(
+                        debug,
+                        "💰 Reserve the currency  due to unknow reason for sorder {:?}.",
+                        sorder_id
+                    );
                     let _ = T::Currency::reserve(&client, real_amount);
                     <PaymentLedgers<T>>::mutate(&sorder_id, |ledger| {
                         if let Some(p) = ledger {

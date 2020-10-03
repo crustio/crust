@@ -123,20 +123,8 @@ impl balances::Trait for Test {
     type MaxLocks = ();
 }
 
-impl market::Payment<<Test as system::Trait>::AccountId,
-    <Test as system::Trait>::Hash, BalanceOf<Test>> for Swork
-{
-    fn reserve_sorder(_: &Hash, _: &AccountId, _: Balance) -> bool {
-        true
-    }
-
-    fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
-
-    fn close_sorder(_: &Hash, _: &AccountId, _: &BlockNumber) { }
-}
-
 parameter_types! {
-    pub const PunishDuration: market::EraIndex = 100;
+    pub const MaxRewardLength: u32 = 100;
 }
 
 impl market::Trait for Test {
@@ -144,11 +132,10 @@ impl market::Trait for Test {
     type CurrencyToBalance = ();
     type Event = ();
     type Randomness = TestRandomness;
-    type Payment = Swork;
     type OrderInspector = Swork;
     type MinimumStoragePrice = ();
     type MinimumSorderDuration = ();
-    type PunishDuration = PunishDuration;
+    type MaxRewardLength = MaxRewardLength;
 }
 
 impl Trait for Test {

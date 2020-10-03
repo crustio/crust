@@ -7,7 +7,7 @@ use frame_support::{
     dispatch::DispatchResult, ensure,
     traits::{
         Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
-        WithdrawReasons, Get
+        WithdrawReasons, Get, ExistenceRequirement
     },
     weights::constants::WEIGHT_PER_MICROS
 };
@@ -64,7 +64,8 @@ pub struct StorageOrder<AccountId, Balance> {
     pub merchant: AccountId,
     pub client: AccountId,
     pub amount: Balance,
-    pub status: OrderStatus
+    pub status: OrderStatus,
+    pub claimed_at: BlockNumber
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
@@ -77,10 +78,20 @@ pub enum OrderStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct MerchantPunishment<Balance> {
-    pub success: EraIndex,
-    pub failed: EraIndex,
-    pub value: Balance
+pub struct MerchantPunishment {
+    pub success: BlockNumber,
+    pub failed: BlockNumber,
+    pub updated_at: BlockNumber
+}
+
+impl Default for MerchantPunishment {
+    fn default() -> Self {
+        MerchantPunishment {
+            success: 0,
+            failed: 0,
+            updated_at: 0
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -114,16 +125,6 @@ pub struct MerchantInfo<Hash, Balance> {
 type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
-/// An event handler for paying market order
-pub trait Payment<AccountId, Hash, Balance> {
-    /// Reserve client's transferable balances
-    fn reserve_sorder(sorder_id: &Hash, client: &AccountId, amount: Balance) -> bool;
-    /// Start delayed payment for a reserved storage order
-    fn pay_sorder(sorder_id: &Hash);
-    /// To remove closed sorder's payment info
-    fn close_sorder(sorder_id: &Hash, client: &AccountId, amount: &BlockNumber);
-}
-
 /// A trait for checking order's legality
 /// This wanyi is an outer inspector to judge if s/r order can be accepted 😵
 pub trait OrderInspector<AccountId> {
@@ -143,10 +144,8 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
     /// (Maybe) set storage order's status
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>);
-    /// Upsert punish record and (maybe) punish merchant
-    fn maybe_punish_merchant(order_id: &Hash);
-    /// close storage order
-    fn close_sorder(order_id: &Hash);
+    /// Update merchant punishment
+    fn update_merchant_punishment(order_id: &Hash, current_block: &BlockNumber, so_status: &OrderStatus);
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
@@ -162,12 +161,8 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
 
     }
 
-    fn maybe_punish_merchant(_: &Hash) {
+    fn update_merchant_punishment(_: &Hash, _: &BlockNumber, _: &OrderStatus) {
 
-    }
-
-    fn close_sorder(_: &Hash) {
-        
     }
 }
 
@@ -189,12 +184,10 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
         Self::maybe_set_sorder(order_id, so);
     }
 
-    fn maybe_punish_merchant(order_id: &<T as system::Trait>::Hash) {
-        Self::maybe_punish_merchant(order_id);
-    }
-
-    fn close_sorder(order_id: &<T as system::Trait>::Hash) {
-        Self::close_sorder(order_id);
+    fn update_merchant_punishment(order_id: &<T as system::Trait>::Hash,
+                                  current_block: &BlockNumber,
+                                  so_status: &OrderStatus) {
+        Self::update_merchant_punishment(order_id, current_block, so_status);
     }
 }
 
@@ -212,9 +205,6 @@ pub trait Trait: system::Trait {
     /// Something that provides randomness in the runtime.
     type Randomness: Randomness<Self::Hash>;
 
-    /// Connector with payment module
-    type Payment: Payment<Self::AccountId, Self::Hash, BalanceOf<Self>>;
-
     /// Connector with swork module
     type OrderInspector: OrderInspector<Self::AccountId>;
 
@@ -224,8 +214,8 @@ pub trait Trait: system::Trait {
     /// Minimum storage order duration
     type MinimumSorderDuration: Get<u32>;
 
-    /// Punishment Duration
-    type PunishDuration: Get<EraIndex>;
+    /// Max Reward Length
+    type MaxRewardLength: Get<u32>;
 }
 
 // This module's storage items.
@@ -245,7 +235,7 @@ decl_storage! {
 
         /// Order status counts used for punishment
         pub MerchantPunishments get(fn merchant_punishments):
-        map hasher(twox_64_concat) T::Hash => Option<MerchantPunishment<BalanceOf<T>>>;
+        map hasher(twox_64_concat) T::Hash => Option<MerchantPunishment>;
 
         /// Pledge details iterated by merchant id
         pub Pledges get(fn pledges):
@@ -280,6 +270,8 @@ decl_error! {
         LowStoragePrice,
         /// Invalid file alias
         InvalidFileAlias,
+        /// Reward length is too long
+        RewardLengthTooLong,
     }
 }
 
@@ -506,7 +498,8 @@ decl_module! {
                 merchant: merchant.clone(),
                 client: who.clone(),
                 amount,
-                status: OrderStatus::Pending
+                status: OrderStatus::Pending,
+                claimed_at: created_on
             };
 
             // 10. Pay the order and (maybe) add storage order
@@ -549,6 +542,42 @@ decl_module! {
             Self::deposit_event(RawEvent::SetAliasSuccess(who, old_file_alias, new_file_alias));
             Ok(())
         }
+
+        /// Rename the file path for a storage order
+        #[weight = 1_000_000]
+        pub fn reward_merchant(
+            origin,
+            order_ids: Vec<T::Hash>
+        ) {
+            ensure_signed(origin)?;
+
+            // 1. length of order_ids cannot be too long.
+            ensure!(order_ids.len()<=T::MaxRewardLength::get().try_into().unwrap(), Error::<T>::RewardLengthTooLong);
+
+            let current_block_numeric = Self::get_current_block_number();
+            for order_id in order_ids.iter() {
+                if let Some(so) = Self::storage_orders(order_id) {
+                    if so.status == OrderStatus::Pending {
+                        continue;
+                    }
+                    let reward_block = current_block_numeric.min(so.expired_on);
+                    Self::update_merchant_punishment(&order_id, &reward_block, &so.status);
+                    let reward_amount = Perbill::from_rational_approximation(reward_block - so.claimed_at, so.expired_on - so.completed_on) * so.amount;
+                    let reward_ratio = Self::get_reward_ratio(&order_id);
+                    T::Currency::unreserve(&so.client, reward_amount);
+                    if T::Currency::transfer(&so.client, &so.merchant, reward_ratio * reward_amount, ExistenceRequirement::AllowDeath).is_ok() {
+                        // Self::deposit_event(RawEvent::PaymentSuccess(&so.client));
+                    }
+                    if reward_ratio.is_zero() {
+                        let slash_value = (Perbill::from_percent(50)) * so.amount;
+                        Self::slash_pledge(&so.merchant, slash_value);
+                        Self::close_sorder(&order_id, so.amount - slash_value);
+                    } else if current_block_numeric > so.expired_on {
+                        Self::close_sorder(&order_id, so.amount);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -559,74 +588,34 @@ impl<T: Trait> Module<T> {
             if &old_sorder != so {
                 // 1. Update storage order first(`pay_sorder` depends on the newest `completed_on`)
                 <StorageOrders<T>>::insert(order_id, so);
-
-                // 2. Order has been confirmed in the first time { Pending -> Success }
-                // `pay_sorder` will trigger the payment scheduler.
-                if old_sorder.status == OrderStatus::Pending &&
-                    so.status == OrderStatus::Success {
-                        T::Payment::pay_sorder(order_id);
-                    }
             }
         }
     }
 
-    pub fn maybe_punish_merchant(order_id: &<T as system::Trait>::Hash) {
-        if let Some(so) = Self::storage_orders(order_id) {
-            if let Some(mut punishment) = Self::merchant_punishments(order_id) {
-                // 1. Update Merchant Punishment
-                let punish_duration = T::PunishDuration::get();
-                if so.status == OrderStatus::Success {
-                    punishment.success += 1;
-                } else if so.status == OrderStatus::Failed {
-                    punishment.failed += 1;
-                } else {
-        
-                }
-                if punishment.success + punishment.failed >= punish_duration && punishment.value < so.amount {
-                    // 2. Do slash
-                    let real_punish_value = Self::punish_merchant(&so, &punishment, &punish_duration);
-                    punishment.value += real_punish_value;
-                    // 3. Reset Merchant Punishment
-                    punishment.success = 0;
-                    punishment.failed = 0;
-                } else {
-        
-                }
-                <MerchantPunishments<T>>::insert(&order_id, punishment.clone());
-                if punishment.value >= so.amount {
-                    Self::close_sorder(&order_id);
-                }
-            }
-        }   
+    pub fn update_merchant_punishment(order_id: &T::Hash, current_block: &BlockNumber, so_status: &OrderStatus) {
+        if let Some(mut p) = Self::merchant_punishments(order_id) {
+            match so_status {
+                OrderStatus::Success => p.success += current_block - p.updated_at,
+                OrderStatus::Failed => p.failed += current_block - p.updated_at,
+                OrderStatus::Pending => {}
+            };
+            p.updated_at = *current_block;
+            <MerchantPunishments<T>>::insert(order_id, p);
+        }
     }
 
-    pub fn punish_merchant(
-        so: &StorageOrder<T::AccountId, BalanceOf<T>>,
-        punishment: &MerchantPunishment<BalanceOf<T>>,
-        punish_duration: &EraIndex
-    ) -> BalanceOf<T> {
-        // Calculate real punish value
-        let mut real_punish_value = Zero::zero();
-        if punishment.success >= ((*punish_duration as f64) * 0.95) as EraIndex {
-        } 
-        else if punishment.success >= ((*punish_duration as f64) * 0.90) as EraIndex {
-            real_punish_value = (Perbill::from_percent(50)) * so.amount;
-        } 
-        else {
-            real_punish_value = so.amount;
-        }
-
-        // Do slash
-        if !real_punish_value.is_zero() {
-            real_punish_value = real_punish_value.min(so.amount - punishment.value);
-            T::Currency::slash(&so.merchant, real_punish_value);
-            // Update ledger
-            let mut pledge = Self::pledges(&so.merchant);
-            pledge.total -= real_punish_value;
-            pledge.used -= real_punish_value;
-            Self::upsert_pledge(&so.merchant, &pledge);
-        }
-        real_punish_value
+    // Slash pledge value for a merchant
+    pub fn slash_pledge(
+        merchant: &T::AccountId,
+        slash_value: BalanceOf<T>
+    ) {
+        T::Currency::slash(merchant, slash_value);
+        // Update ledger
+        let mut pledge = Self::pledges(merchant);
+        pledge.total -= slash_value;
+        pledge.used -= slash_value;
+        Self::upsert_pledge(merchant, &pledge);
+        //TODO: Move slash value into treasury
     }
 
     // MUTABLE PRIVATE
@@ -645,7 +634,7 @@ impl<T: Trait> Module<T> {
         } else {
             // 0. If reserve client's balance failed return error
             // TODO: return different error type
-            if !T::Payment::reserve_sorder(&order_id, client, amount) {
+            if !T::Currency::reserve(&so.client, amount).is_ok() {
                 log!(
                     debug,
                     "🏢 Cannot reserve currency for sorder {:?}",
@@ -675,7 +664,7 @@ impl<T: Trait> Module<T> {
             let merchant_punishment = MerchantPunishment {
                 success: 0,
                 failed: 0,
-                value: Zero::zero()
+                updated_at: 0
             };
             <MerchantPunishments<T>>::insert(&order_id, merchant_punishment);
 
@@ -684,48 +673,45 @@ impl<T: Trait> Module<T> {
     }
 
     // Remove a sorder
-    fn close_sorder(order_id: &<T as system::Trait>::Hash) {
+    fn close_sorder(
+        order_id: &<T as system::Trait>::Hash,
+        free_pledge: BalanceOf<T>
+    ) {
         if let Some(so) = Self::storage_orders(order_id) {
-            if let Some(punishment) = Self::merchant_punishments(order_id) {
-                // 1. Remove sorder's payment info
-                T::Payment::close_sorder(order_id, &so.client, &so.completed_on);
+            // 1. Remove `file_identifier` -> `order_id`s from merchant's file_map
+            <Merchants<T>>::mutate(&so.merchant, |maybe_minfo| {
+                // `minfo` cannot be None
+                if let Some(minfo) = maybe_minfo {
+                    let mut sorder_ids: Vec<T::Hash> = minfo
+                        .file_map
+                        .get(&so.file_identifier)
+                        .unwrap_or(&vec![])
+                        .clone();
+                    sorder_ids.retain(|&id| {&id != order_id});
 
-                // 2. Remove `file_identifier` -> `order_id`s from merchant's file_map
-                <Merchants<T>>::mutate(&so.merchant, |maybe_minfo| {
-                    // `minfo` cannot be None
-                    if let Some(minfo) = maybe_minfo {
-                        let mut sorder_ids: Vec<T::Hash> = minfo
-                            .file_map
-                            .get(&so.file_identifier)
-                            .unwrap_or(&vec![])
-                            .clone();
-                        sorder_ids.retain(|&id| {&id != order_id});
-
-                        if sorder_ids.is_empty() {
-                            minfo.file_map.remove(&so.file_identifier);
-                        } else {
-                            minfo.file_map.insert(so.file_identifier.clone(), sorder_ids.clone());
-                        }
+                    if sorder_ids.is_empty() {
+                        minfo.file_map.remove(&so.file_identifier);
+                    } else {
+                        minfo.file_map.insert(so.file_identifier.clone(), sorder_ids.clone());
                     }
-                });
-
-                // 3. Update `Pledge` for merchant
-                let real_used_value = so.amount.min(so.amount - punishment.value);
-                let mut pledge = Self::pledges(&so.merchant);
-                // `checked_sub`, prevent overflow
-                if real_used_value >= pledge.used {
-                    pledge.used = Zero::zero();
-                } else {
-                    pledge.used -= real_used_value;
                 }
-                Self::upsert_pledge(&so.merchant, &pledge);
+            });
 
-                // 4. Remove Merchant Punishment
-                <MerchantPunishments<T>>::remove(order_id);
-
-                // 5. Remove storage order
-                <StorageOrders<T>>::remove(order_id);
+            // 2. Update `Pledge` for merchant
+            let mut pledge = Self::pledges(&so.merchant);
+            // `checked_sub`, prevent overflow
+            if free_pledge >= pledge.used {
+                pledge.used = Zero::zero();
+            } else {
+                pledge.used -= free_pledge;
             }
+            Self::upsert_pledge(&so.merchant, &pledge);
+
+            // 3. Remove Merchant Punishment
+            <MerchantPunishments<T>>::remove(order_id);
+
+            // 4. Remove storage order
+            <StorageOrders<T>>::remove(order_id);
         }
     }
 
@@ -772,6 +758,32 @@ impl<T: Trait> Module<T> {
         // Convert file size into `Currency`
         price.checked_mul(&<T::CurrencyToBalance
         as Convert<u64, BalanceOf<T>>>::convert(rounded_file_size * (duration as u64)))
+    }
+
+    fn get_current_block_number() -> BlockNumber {
+        let current_block_number = <system::Module<T>>::block_number();
+        TryInto::<u32>::try_into(current_block_number).ok().unwrap()
+    }
+
+    fn get_reward_ratio(order_id: &T::Hash) -> Perbill {
+        let mut reward_ratio: Perbill = Perbill::one();
+        if let Some(punishment) = Self::merchant_punishments(order_id) {
+            let punishment_ratio: f64 = punishment.success as f64 / (punishment.success + punishment.failed) as f64;
+            if punishment_ratio > 0.99 {
+                reward_ratio = Perbill::one();
+            } else if punishment_ratio > 0.98 {
+                reward_ratio = Perbill::from_percent(95);
+            } else if punishment_ratio > 0.95 {
+                reward_ratio = Perbill::from_percent(90);
+            } else if punishment_ratio > 0.90 {
+                reward_ratio = Perbill::from_percent(80);
+            } else if punishment_ratio > 0.85 {
+                reward_ratio = Perbill::from_percent(50);
+            } else {
+                reward_ratio = Perbill::zero();
+            }
+        }
+        reward_ratio
     }
 }
 

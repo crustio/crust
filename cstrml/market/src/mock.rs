@@ -137,20 +137,8 @@ impl swork::Trait for Test {
     type MarketInterface = ();
 }
 
-impl Payment<<Test as system::Trait>::AccountId,
-    <Test as system::Trait>::Hash, BalanceOf<Test>> for Market
-{
-    fn reserve_sorder(_: &Hash, _: &AccountId, _: Balance) -> bool {
-        true
-    }
-
-    fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
-
-    fn close_sorder(_: &Hash, _: &AccountId, _: &BlockNumber) { }
-}
-
 parameter_types! {
-    pub const TestPunishDuration: EraIndex = 100;
+    pub const TestPunishDuration: u32 = 100;
 }
 
 impl Trait for Test {
@@ -158,11 +146,10 @@ impl Trait for Test {
     type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();
     type Randomness = TestRandomness;
-    type Payment = Market;
     type OrderInspector = TestOrderInspector;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
-    type PunishDuration = TestPunishDuration;
+    type MaxRewardLength = TestMaxRewardLength;
 }
 
 pub type Market = Module<Test>;

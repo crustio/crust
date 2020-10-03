@@ -585,20 +585,23 @@ impl<T: Trait> Module<T> {
                     for sorder_id in sorder_ids {
                         let mut sorder =
                             T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
-
+                        let current_block_numeric = Self::get_current_block_number();
+                        if current_block_numeric > sorder.expired_on {
+                            continue;
+                        }
+                        T::MarketInterface::update_merchant_punishment(&sorder_id, &current_block_numeric, &sorder.status);
                         // b. Change sOrder
                         if !is_added {
                             sorder.status = OrderStatus::Failed;
                         } else if is_added && sorder.status == OrderStatus::Pending {
-                            let current_block_numeric = Self::get_current_block_number();
                             // go panic if `current_block_numeric` > `created_on`
                             sorder.expired_on += current_block_numeric - sorder.created_on;
                             sorder.completed_on = current_block_numeric;
+                            sorder.claimed_at = current_block_numeric;
                             sorder.status = OrderStatus::Success;
                         } else {
                             sorder.status = OrderStatus::Success;
                         }
-
                         // c. Set sOrder
                         T::MarketInterface::maybe_set_sorder(sorder_id, &sorder);
                     }

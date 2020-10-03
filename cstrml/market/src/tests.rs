@@ -8,20 +8,6 @@ use hex;
 use crate::{StorageOrder, MerchantInfo};
 use sp_core::H256;
 
-fn set_punishment_in_success_count(order_id: &H256, success_count: EraIndex) {
-    let mut so = Market::storage_orders(&order_id).unwrap();
-    so.status = OrderStatus::Success;
-    Market::maybe_set_sorder(&order_id, &so);
-    for _ in 0 .. success_count {
-        Market::maybe_punish_merchant(&order_id);
-    }
-    so.status = OrderStatus::Failed;
-    Market::maybe_set_sorder(&order_id, &so);
-    for _ in success_count .. <mock::Test as Trait>::PunishDuration::get(){
-        Market::maybe_punish_merchant(&order_id);
-    }
-}
-
 #[test]
 fn test_for_storage_order_should_work() {
     new_test_ext().execute_with(|| {
@@ -83,7 +69,8 @@ fn test_for_storage_order_should_work() {
             merchant,
             client,
             amount,
-            status: OrderStatus::Pending
+            status: OrderStatus::Pending,
+            claimed_at: 50
         });
 
         // 2. Register after get order, address should update but others should not
@@ -413,7 +400,8 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
             merchant: 100,
             client: 0,
             amount,
-            status: Default::default()
+            status: Default::default(),
+            claimed_at: 50
         });
         assert_eq!(Market::pledges(merchant), Pledge {
             total: 60,
@@ -469,145 +457,6 @@ fn test_for_pledge_should_work_without_register() {
 }
 
 #[test]
-fn test_for_half_punish_should_work() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let client: u64 = 0;
-        let file_size = 16; // should less than merchant
-        let duration = 10;
-        let fee: u64 = 1;
-        let amount: u64 = 10;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 60);
-        let file_alias = "/test/file1".as_bytes().to_vec();
-
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
-
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias
-        ));
-
-        let order_id = H256::default();
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            completed_on: 50,
-            expired_on: 50+10*10,
-            merchant,
-            client,
-            amount,
-            status: OrderStatus::Pending
-        });
-
-        set_punishment_in_success_count(&order_id, 90);
-
-        assert_eq!(Balances::free_balance(&merchant), 195);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 55,
-            used: 5
-        });
-
-        set_punishment_in_success_count(&order_id, 90);
-
-        assert_eq!(Balances::free_balance(&merchant), 190);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 50,
-            used: 0
-        });
-
-        // total fee has been punished. The order has been closed
-        assert_eq!(Balances::free_balance(&merchant), 190);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 50,
-            used: 0
-        });
-        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
-        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
-    });
-}
-
-#[test]
-fn test_for_full_punish_should_work() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let client: u64 = 0;
-        let file_size = 16; // should less than merchant
-        let duration = 10;
-        let fee: u64 = 1;
-        let amount: u64 = 10;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 60);
-        let file_alias = "/test/file1".as_bytes().to_vec();
-
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
-
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias
-        ));
-
-        let order_id = H256::default();
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            completed_on: 50,
-            expired_on: 50+10*10,
-            merchant,
-            client,
-            amount,
-            status: OrderStatus::Pending
-        });
-
-        set_punishment_in_success_count(&order_id, 95);
-
-        assert_eq!(Balances::free_balance(&merchant), 200);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 60,
-            used: 10
-        });
-
-        set_punishment_in_success_count(&order_id, 89);
-
-        assert_eq!(Balances::free_balance(&merchant), 190);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 50,
-            used: 0
-        });
-
-        // total fee has been punished. The order has been closed
-        assert_eq!(Balances::free_balance(&merchant), 190);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 50,
-            used: 0
-        });
-        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
-        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
-    });
-}
-
-#[test]
 fn test_for_close_sorder() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
@@ -645,10 +494,11 @@ fn test_for_close_sorder() {
             merchant,
             client,
             amount,
-            status: OrderStatus::Pending
+            status: OrderStatus::Pending,
+            claimed_at: 50
         });
 
-        Market::close_sorder(&order_id);
+        Market::close_sorder(&order_id, amount.clone());
 
         // storage order has been closed
         assert_eq!(Balances::free_balance(&merchant), 200);
@@ -666,7 +516,7 @@ fn test_for_close_sorder() {
 
 
         // delete it twice would not have bad effect
-        Market::close_sorder(&order_id);
+        Market::close_sorder(&order_id, amount);
         assert_eq!(Balances::free_balance(&merchant), 200);
         assert_eq!(Market::pledges(&merchant), Pledge {
             total: 60,
@@ -727,7 +577,8 @@ fn test_scenario_for_file_alias_should_work() {
             merchant,
             client,
             amount,
-            status: OrderStatus::Pending
+            status: OrderStatus::Pending,
+            claimed_at: 50
         });
 
 

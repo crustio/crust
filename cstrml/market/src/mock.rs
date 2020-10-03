@@ -12,7 +12,6 @@ use sp_runtime::{
     Perbill,
 };
 use std::{cell::RefCell};
-use primitives::Hash;
 use balances::AccountData;
 
 pub type AccountId = u64;
@@ -138,7 +137,7 @@ impl swork::Trait for Test {
 }
 
 parameter_types! {
-    pub const TestPunishDuration: u32 = 100;
+    pub const TestMaxRewardLength: u32 = 100;
 }
 
 impl Trait for Test {

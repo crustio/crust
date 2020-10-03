@@ -275,8 +275,8 @@ fn report_works_should_work() {
             // Check same file all been confirmed
             assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
             assert_eq!(Market::storage_orders(Hash::repeat_byte(2)).unwrap_or_default().status, OrderStatus::Success);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 653);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(2)).unwrap_or_default().expired_on, 653);
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 1303);
+            assert_eq!(Market::storage_orders(Hash::repeat_byte(2)).unwrap_or_default().expired_on, 1303);
         });
 }
 

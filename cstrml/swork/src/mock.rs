@@ -8,7 +8,7 @@ use frame_support::{
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup, Zero},
+    traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
 use market::{MerchantInfo, StorageOrder, MerchantPunishment};
@@ -369,7 +369,7 @@ pub fn add_pending_sorders(who: &AccountId) {
     ].to_vec();
 
     for (idx, file) in files.iter().enumerate() {
-        insert_sorder(who, file, idx as u8, 350, OrderStatus::Pending);
+        insert_sorder(who, file, idx as u8, 1000, OrderStatus::Pending);
     }
 }
 
@@ -380,7 +380,7 @@ pub fn add_success_sorders(who: &AccountId) {
     ].to_vec();
 
     for (idx, file) in files.iter().enumerate() {
-        insert_sorder(who, file, idx as u8, 350, OrderStatus::Success);
+        insert_sorder(who, file, idx as u8, 1000, OrderStatus::Success);
     }
 }
 
@@ -396,7 +396,8 @@ fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os
         merchant: who.clone(),
         client: who.clone(),
         amount: 10,
-        status: os
+        status: os,
+        claimed_at: 0
     };
     if let Some(orders) = file_map.get_mut(f_id) {
         orders.push(sorder_id.clone())
@@ -414,7 +415,7 @@ fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os
     let punishment = MerchantPunishment {
         success: 0,
         failed: 0,
-        value: Zero::zero()
+        updated_at: 50
     };
     <market::MerchantPunishments<Test>>::insert(sorder_id, punishment);
 }

@@ -573,6 +573,7 @@ impl<T: Trait> Module<T> {
     /// Update sOrder information based on changed files, return the real changed files
     fn update_sorder(reporter: &T::AccountId, changed_files: &Vec<(MerkleRoot, u64)>, is_added: bool) -> Vec<(MerkleRoot, u64)> {
         let mut real_files = vec![];
+        let current_block_numeric = Self::get_current_block_number();
 
         if let Some(mi) = T::MarketInterface::merchants(reporter) {
             let file_map = mi.file_map;
@@ -585,7 +586,6 @@ impl<T: Trait> Module<T> {
                     for sorder_id in sorder_ids {
                         let mut sorder =
                             T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
-                        let current_block_numeric = Self::get_current_block_number();
                         if current_block_numeric > sorder.expired_on {
                             continue;
                         }

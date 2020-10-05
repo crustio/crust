@@ -654,7 +654,7 @@ fn test_for_update_punishment_for_merchant() {
 }
 
 #[test]
-fn test_for_reward_merchant() {
+fn test_for_sorder_payment() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -708,7 +708,7 @@ fn test_for_reward_merchant() {
         run_to_block(150);
         assert_eq!(Balances::free_balance(&merchant), 500000);
         assert_eq!(Balances::free_balance(&source), 400000);
-        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
         assert_eq!(Balances::free_balance(&merchant), 508000);
         assert_eq!(Balances::free_balance(&source), 402000);
 
@@ -723,7 +723,7 @@ fn test_for_reward_merchant() {
         run_to_block(250);
         assert_eq!(Balances::free_balance(&merchant), 508000);
         assert_eq!(Balances::free_balance(&source), 402000);
-        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
         assert_eq!(Balances::free_balance(&merchant), 517000);
         assert_eq!(Balances::free_balance(&source), 403000);
 
@@ -741,7 +741,7 @@ fn test_for_reward_merchant() {
             total: 500000,
             used: 100000
         });
-        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
         // 50% pledge is slashed
         assert_eq!(Balances::free_balance(&merchant), 467000);
         assert_eq!(Balances::free_balance(&source), 483000);
@@ -755,7 +755,7 @@ fn test_for_reward_merchant() {
 }
 
 #[test]
-fn test_for_reward_merchant_for_out_dated_order() {
+fn test_for_sorder_payment_for_out_dated_order() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -806,7 +806,7 @@ fn test_for_reward_merchant_for_out_dated_order() {
             total: 500000,
             used: 100000
         });
-        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
         // 50% pledge is slashed
         assert_eq!(Balances::free_balance(&merchant), 600000);
         assert_eq!(Balances::free_balance(&source), 400000);

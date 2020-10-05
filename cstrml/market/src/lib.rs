@@ -543,9 +543,9 @@ decl_module! {
             Ok(())
         }
 
-        /// Rename the file path for a storage order
+        /// Do storage order payment
         #[weight = 1_000_000]
-        pub fn reward_merchant(
+        pub fn sorder_payment(
             origin,
             order_ids: Vec<T::Hash>
         ) {
@@ -585,7 +585,7 @@ decl_module! {
                     }
                 }
             }
-            Self::deposit_event(RawEvent::RewardSuccess(who));
+            Self::deposit_event(RawEvent::PaymentSuccess(who));
         }
     }
 }
@@ -806,6 +806,6 @@ decl_event!(
         RegisterSuccess(AccountId),
         PledgeSuccess(AccountId),
         SetAliasSuccess(AccountId, FileAlias, FileAlias),
-        RewardSuccess(AccountId),
+        PaymentSuccess(AccountId),
     }
 );

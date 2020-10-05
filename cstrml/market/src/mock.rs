@@ -13,6 +13,7 @@ use sp_runtime::{
 };
 use std::{cell::RefCell};
 use balances::AccountData;
+pub use primitives::{MerkleRoot, Hash};
 
 pub type AccountId = u64;
 pub type Balance = u64;
@@ -242,4 +243,40 @@ pub fn run_to_block(n: u64) {
         System::set_block_number(System::block_number() + 1);
         System::on_initialize(System::block_number());
     }
+}
+
+pub fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
+    let mut file_map = Market::merchants(who).unwrap_or_default().file_map;
+    let sorder_id: Hash = Hash::repeat_byte(rd);
+    let sorder = StorageOrder {
+        file_identifier: f_id.clone(),
+        file_size: 0,
+        created_on: 0,
+        completed_on: 0,
+        expired_on,
+        merchant: who.clone(),
+        client: who.clone(),
+        amount: 10,
+        status: os,
+        claimed_at: 50
+    };
+    if let Some(orders) = file_map.get_mut(f_id) {
+        orders.push(sorder_id.clone())
+    } else {
+        file_map.insert(f_id.clone(), vec![sorder_id.clone()]);
+    }
+
+    let provision = MerchantInfo {
+        address_info: vec![],
+        storage_price: 1,
+        file_map
+    };
+    <Merchants<Test>>::insert(who, provision);
+    <StorageOrders<Test>>::insert(sorder_id.clone(), sorder);
+    let punishment = MerchantPunishment {
+        success: 0,
+        failed: 0,
+        updated_at: 50
+    };
+    <MerchantPunishments<Test>>::insert(sorder_id, punishment);
 }

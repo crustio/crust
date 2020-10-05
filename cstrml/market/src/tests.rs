@@ -1,11 +1,12 @@
 use super::*;
+
 use crate::mock::*;
 use frame_support::{
     assert_noop, assert_ok,
     dispatch::DispatchError,
 };
 use hex;
-use crate::{StorageOrder, MerchantInfo};
+use crate::{StorageOrder, MerchantInfo, MerchantPunishment};
 use sp_core::H256;
 
 #[test]
@@ -596,5 +597,224 @@ fn test_scenario_for_file_alias_should_work() {
         Market::set_file_alias(Origin::signed(source.clone()), file_alias.clone(), new_file_alias.clone()).unwrap();
         assert!(!<Clients<Test>>::contains_key(&client, &file_alias));
         assert_eq!(Market::clients(&client, &new_file_alias).unwrap(), vec![order_id.clone()]);
+    });
+}
+
+#[test]
+fn test_for_update_punishment_for_merchant() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let merchant: u64 = 100;
+        let fee: u64 = 1;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 60);
+
+        // 1. Normal flow, aka happy pass 😃
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
+        insert_sorder(&merchant, &file_identifier, 0, 1000, OrderStatus::Success);
+
+        let order_id = Hash::repeat_byte(0);
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 0,
+            created_on: 0,
+            completed_on: 0,
+            expired_on: 1000,
+            merchant,
+            client: 100,
+            amount: 10,
+            status: OrderStatus::Success,
+            claimed_at: 50
+        });
+        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+            success: 0,
+            failed: 0,
+            updated_at: 50
+        });
+        Market::update_merchant_punishment(&order_id, &100, &OrderStatus::Success);
+        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+            success: 50,
+            failed: 0,
+            updated_at: 100
+        });
+        Market::update_merchant_punishment(&order_id, &120, &OrderStatus::Failed);
+        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+            success: 50,
+            failed: 20,
+            updated_at: 120
+        });
+    });
+}
+
+#[test]
+fn test_for_reward_merchant() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let merchant: u64 = 100;
+        let client: u64 = 0;
+        let file_size = 16; // should less than merchant
+        let duration: u32 = 100;
+        let fee: u64 = 1000;
+        let amount: u64 = duration as u64 * fee;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let file_alias = "/test/file1".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 500000);
+
+        // 1. Normal flow, aka happy pass 😃
+        let _ = Balances::make_free_balance_be(&merchant, 500000);
+        assert_ok!(Market::pledge(Origin::signed(merchant), 500000));
+        assert_ok!(Market::register(Origin::signed(merchant), address_info.clone(), fee));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), merchant,
+            file_identifier.clone(), file_size, duration, file_alias
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 50,
+            completed_on: 50,
+            expired_on: 50+duration*10,
+            merchant,
+            client,
+            amount,
+            status: OrderStatus::Pending,
+            claimed_at: 50
+        });
+        let mut so = Market::storage_orders(&order_id).unwrap();
+        so.status = OrderStatus::Success;
+        <StorageOrders<Test>>::insert(order_id.clone(), so);
+        // 91% SLA
+        Market::update_merchant_punishment(&order_id, &141, &OrderStatus::Success);
+        Market::update_merchant_punishment(&order_id, &150, &OrderStatus::Failed);
+        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+            success: 91,
+            failed: 9,
+            updated_at: 150
+        });
+        run_to_block(150);
+        assert_eq!(Balances::free_balance(&merchant), 500000);
+        assert_eq!(Balances::free_balance(&source), 400000);
+        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        assert_eq!(Balances::free_balance(&merchant), 508000);
+        assert_eq!(Balances::free_balance(&source), 402000);
+
+        // 95% SLA
+        Market::update_merchant_punishment(&order_id, &249, &OrderStatus::Success);
+        Market::update_merchant_punishment(&order_id, &250, &OrderStatus::Failed);
+        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+            success: 190,
+            failed: 10,
+            updated_at: 250
+        });
+        run_to_block(250);
+        assert_eq!(Balances::free_balance(&merchant), 508000);
+        assert_eq!(Balances::free_balance(&source), 402000);
+        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        assert_eq!(Balances::free_balance(&merchant), 517000);
+        assert_eq!(Balances::free_balance(&source), 403000);
+
+        // ~50% SLA
+        Market::update_merchant_punishment(&order_id, &450, &OrderStatus::Failed);
+        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+            success: 190,
+            failed: 210,
+            updated_at: 450
+        });
+        run_to_block(450);
+        assert_eq!(Balances::free_balance(&merchant), 517000);
+        assert_eq!(Balances::free_balance(&source), 403000);
+        assert_eq!(Market::pledges(&merchant), Pledge {
+            total: 500000,
+            used: 100000
+        });
+        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        // 50% pledge is slashed
+        assert_eq!(Balances::free_balance(&merchant), 467000);
+        assert_eq!(Balances::free_balance(&source), 483000);
+        assert_eq!(Market::pledges(&merchant), Pledge {
+            total: 450000,
+            used: 0
+        });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
+    });
+}
+
+#[test]
+fn test_for_reward_merchant_for_out_dated_order() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = 0;
+        let file_identifier =
+        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let merchant: u64 = 100;
+        let client: u64 = 0;
+        let file_size = 16; // should less than merchant
+        let duration: u32 = 100;
+        let fee: u64 = 1000;
+        let amount: u64 = duration as u64 * fee;
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let file_alias = "/test/file1".as_bytes().to_vec();
+        let _ = Balances::make_free_balance_be(&source, 500000);
+
+        // 1. Normal flow, aka happy pass 😃
+        let _ = Balances::make_free_balance_be(&merchant, 500000);
+        assert_ok!(Market::pledge(Origin::signed(merchant), 500000));
+        assert_ok!(Market::register(Origin::signed(merchant), address_info.clone(), fee));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), merchant,
+            file_identifier.clone(), file_size, duration, file_alias
+        ));
+
+        let order_id = H256::default();
+        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+            file_identifier: file_identifier.clone(),
+            file_size: 16,
+            created_on: 50,
+            completed_on: 50,
+            expired_on: 50+duration*10,
+            merchant,
+            client,
+            amount,
+            status: OrderStatus::Pending,
+            claimed_at: 50
+        });
+        let mut so = Market::storage_orders(&order_id).unwrap();
+        so.status = OrderStatus::Success;
+        <StorageOrders<Test>>::insert(order_id.clone(), so);
+        
+        run_to_block(1050);
+        assert_eq!(Balances::free_balance(&merchant), 500000);
+        assert_eq!(Balances::free_balance(&source), 400000);
+        assert_eq!(Market::pledges(&merchant), Pledge {
+            total: 500000,
+            used: 100000
+        });
+        assert_ok!(Market::reward_merchant(Origin::signed(source), vec![order_id]));
+        // 50% pledge is slashed
+        assert_eq!(Balances::free_balance(&merchant), 600000);
+        assert_eq!(Balances::free_balance(&source), 400000);
+        assert_eq!(Market::pledges(&merchant), Pledge {
+            total: 500000,
+            used: 0
+        });
+        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
     });
 }

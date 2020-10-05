@@ -556,24 +556,28 @@ decl_module! {
 
             let current_block_numeric = Self::get_current_block_number();
             for order_id in order_ids.iter() {
-                if let Some(so) = Self::storage_orders(order_id) {
+                if let Some(mut so) = Self::storage_orders(order_id) {
                     if so.status == OrderStatus::Pending {
                         continue;
                     }
-                    let reward_block = current_block_numeric.min(so.expired_on);
+                    let mut reward_block = current_block_numeric.min(so.expired_on);
+                    let mut slash_value = Zero::zero();
                     Self::update_merchant_punishment(&order_id, &reward_block, &so.status);
-                    let reward_amount = Perbill::from_rational_approximation(reward_block - so.claimed_at, so.expired_on - so.completed_on) * so.amount;
                     let reward_ratio = Self::get_reward_ratio(&order_id);
-                    T::Currency::unreserve(&so.client, reward_amount);
-                    if T::Currency::transfer(&so.client, &so.merchant, reward_ratio * reward_amount, ExistenceRequirement::AllowDeath).is_ok() {
-                        // Self::deposit_event(RawEvent::PaymentSuccess(&so.client));
-                    }
+
                     if reward_ratio.is_zero() {
-                        let slash_value = (Perbill::from_percent(50)) * so.amount;
+                        slash_value = (Perbill::from_percent(50)) * so.amount;
                         Self::slash_pledge(&so.merchant, slash_value);
+                        reward_block = so.expired_on;
+                    }
+                    let reward_amount = Perbill::from_rational_approximation(reward_block - so.claimed_at, so.expired_on - so.completed_on) * so.amount;
+                    T::Currency::unreserve(&so.client, reward_amount);
+                    T::Currency::transfer(&so.client, &so.merchant, reward_ratio * reward_amount, ExistenceRequirement::AllowDeath);
+                    if reward_block >= so.expired_on {
                         Self::close_sorder(&order_id, so.amount - slash_value);
-                    } else if current_block_numeric > so.expired_on {
-                        Self::close_sorder(&order_id, so.amount);
+                    } else {
+                        so.claimed_at = reward_block;
+                        <StorageOrders<T>>::insert(order_id, so);
                     }
                 }
             }
@@ -664,7 +668,7 @@ impl<T: Trait> Module<T> {
             let merchant_punishment = MerchantPunishment {
                 success: 0,
                 failed: 0,
-                updated_at: 0
+                updated_at: so.created_on
             };
             <MerchantPunishments<T>>::insert(&order_id, merchant_punishment);
 
@@ -769,15 +773,15 @@ impl<T: Trait> Module<T> {
         let mut reward_ratio: Perbill = Perbill::one();
         if let Some(punishment) = Self::merchant_punishments(order_id) {
             let punishment_ratio: f64 = punishment.success as f64 / (punishment.success + punishment.failed) as f64;
-            if punishment_ratio > 0.99 {
+            if punishment_ratio >= 0.99 {
                 reward_ratio = Perbill::one();
-            } else if punishment_ratio > 0.98 {
+            } else if punishment_ratio >= 0.98 {
                 reward_ratio = Perbill::from_percent(95);
-            } else if punishment_ratio > 0.95 {
+            } else if punishment_ratio >= 0.95 {
                 reward_ratio = Perbill::from_percent(90);
-            } else if punishment_ratio > 0.90 {
+            } else if punishment_ratio >= 0.90 {
                 reward_ratio = Perbill::from_percent(80);
-            } else if punishment_ratio > 0.85 {
+            } else if punishment_ratio >= 0.85 {
                 reward_ratio = Perbill::from_percent(50);
             } else {
                 reward_ratio = Perbill::zero();

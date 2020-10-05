@@ -549,9 +549,9 @@ decl_module! {
             origin,
             order_ids: Vec<T::Hash>
         ) {
-            ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
 
-            // 1. length of order_ids cannot be too long.
+            // The length of order_ids cannot be too long.
             ensure!(order_ids.len()<=T::MaxRewardLength::get().try_into().unwrap(), Error::<T>::RewardLengthTooLong);
 
             let current_block_numeric = Self::get_current_block_number();
@@ -561,26 +561,31 @@ decl_module! {
                         continue;
                     }
                     let mut reward_block = current_block_numeric.min(so.expired_on);
-                    let mut slash_value = Zero::zero();
                     Self::update_merchant_punishment(&order_id, &reward_block, &so.status);
-                    let reward_ratio = Self::get_reward_ratio(&order_id);
 
+                    let reward_ratio = Self::get_reward_ratio(&order_id);
+                    let mut slash_value = Zero::zero();
+                    // If it's the badest situation.
                     if reward_ratio.is_zero() {
                         slash_value = (Perbill::from_percent(50)) * so.amount;
                         Self::slash_pledge(&so.merchant, slash_value);
+                        // Set the reward block to the expired on to trigger closing the order
                         reward_block = so.expired_on;
                     }
+                    // Do the payment
                     let reward_amount = Perbill::from_rational_approximation(reward_block - so.claimed_at, so.expired_on - so.completed_on) * so.amount;
                     T::Currency::unreserve(&so.client, reward_amount);
-                    T::Currency::transfer(&so.client, &so.merchant, reward_ratio * reward_amount, ExistenceRequirement::AllowDeath);
-                    if reward_block >= so.expired_on {
-                        Self::close_sorder(&order_id, so.amount - slash_value);
-                    } else {
-                        so.claimed_at = reward_block;
-                        <StorageOrders<T>>::insert(order_id, so);
+                    if T::Currency::transfer(&so.client, &so.merchant, reward_ratio * reward_amount, ExistenceRequirement::AllowDeath).is_ok() {
+                        if reward_block >= so.expired_on {
+                            Self::close_sorder(&order_id, so.amount - slash_value);
+                        } else {
+                            so.claimed_at = reward_block;
+                            <StorageOrders<T>>::insert(order_id, so);
+                        }
                     }
                 }
             }
+            Self::deposit_event(RawEvent::RewardSuccess(who));
         }
     }
 }
@@ -801,5 +806,6 @@ decl_event!(
         RegisterSuccess(AccountId),
         PledgeSuccess(AccountId),
         SetAliasSuccess(AccountId, FileAlias, FileAlias),
+        RewardSuccess(AccountId),
     }
 );

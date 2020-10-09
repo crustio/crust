@@ -620,7 +620,7 @@ construct_runtime! {
         Staking: staking::{Module, Call, Storage, Config<T>, Event<T>},
         Historical: session_historical::{Module},
         Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
-        FinalityTracker: pallet_finality_tracker::{Module, Call, Inherent},
+        FinalityTracker: pallet_finality_tracker::{Module, Call, Storage, Inherent},
         Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event, ValidateUnsigned},
         ImOnline: pallet_im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: pallet_authority_discovery::{Module, Call, Config},

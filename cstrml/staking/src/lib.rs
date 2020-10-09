@@ -693,6 +693,13 @@ decl_module! {
         /// Number of eras that staked funds must remain bonded for.
         const BondingDuration: EraIndex = T::BondingDuration::get();
 
+        /// Number of eras that slashes are deferred by, after computation.
+		///
+		/// This should be less than the bonding duration.
+		/// Set to 0 if slashes should be applied immediately, without opportunity for
+		/// intervention.
+		const SlashDeferDuration: EraIndex = T::SlashDeferDuration::get();
+
         type Error = Error<T>;
 
         fn deposit_event() = default;

@@ -138,7 +138,7 @@ impl swork::Trait for Test {
 }
 
 parameter_types! {
-    pub const TestMaxRewardLength: u32 = 100;
+    pub const TestClaimLimit: u32 = 100;
 }
 
 impl Trait for Test {
@@ -149,7 +149,7 @@ impl Trait for Test {
     type OrderInspector = TestOrderInspector;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
-    type MaxRewardLength = TestMaxRewardLength;
+    type ClaimLimit = TestClaimLimit;
 }
 
 pub type Market = Module<Test>;

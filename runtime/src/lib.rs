@@ -579,7 +579,7 @@ parameter_types! {
     pub const MinimumStoragePrice: Balance = 40;
     /// Unit is minute
     pub const MinimumSorderDuration: u32 = 30;
-    pub const MaxRewardLength: u32 = 1000;
+    pub const ClaimLimit: u32 = 1000;
     pub const Frequency: BlockNumber = 10 * MINUTES;
 }
 
@@ -592,7 +592,7 @@ impl market::Trait for Runtime {
     type OrderInspector = Swork;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
-    type MaxRewardLength = MaxRewardLength;
+    type ClaimLimit = ClaimLimit;
 }
 
 construct_runtime! {

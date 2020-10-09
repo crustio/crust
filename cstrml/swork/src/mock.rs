@@ -124,7 +124,7 @@ impl balances::Trait for Test {
 }
 
 parameter_types! {
-    pub const MaxRewardLength: u32 = 100;
+    pub const ClaimLimit: u32 = 100;
 }
 
 impl market::Trait for Test {
@@ -135,7 +135,7 @@ impl market::Trait for Test {
     type OrderInspector = Swork;
     type MinimumStoragePrice = ();
     type MinimumSorderDuration = ();
-    type MaxRewardLength = MaxRewardLength;
+    type ClaimLimit = ClaimLimit;
 }
 
 impl Trait for Test {

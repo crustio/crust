@@ -214,8 +214,8 @@ pub trait Trait: system::Trait {
     /// Minimum storage order duration
     type MinimumSorderDuration: Get<u32>;
 
-    /// Max Reward Length
-    type MaxRewardLength: Get<u32>;
+    /// Max limit for the length of sorders in each payment claim
+    type ClaimLimit: Get<u32>;
 }
 
 // This module's storage items.
@@ -544,6 +544,14 @@ decl_module! {
         }
 
         /// Do storage order payment
+        /// Would loop each sorder in the list
+        /// For each sorder, the process is 
+        /// 1. Update the sorder punishment
+        /// 2. Calculate payment ratio and slash ratio
+        /// 3. If the slash ratio is not zero, do slash and prepare for closing sorder
+        /// 4. Calculate total payment amount, unreserve the payment amount
+        /// 5. Transfer the payment ratio * payment amount currency
+        /// 6. Close the sorder or update the sorder
         #[weight = 1_000_000]
         pub fn pay_sorders(
             origin,
@@ -552,7 +560,7 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // The length of order_ids cannot be too long.
-            ensure!(order_ids.len() <= T::MaxRewardLength::get().try_into().unwrap(), Error::<T>::RewardLengthTooLong);
+            ensure!(order_ids.len() <= T::ClaimLimit::get().try_into().unwrap(), Error::<T>::RewardLengthTooLong);
 
             let current_block_numeric = Self::get_current_block_number();
             for order_id in order_ids.iter() {

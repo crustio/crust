@@ -145,7 +145,7 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
     /// (Maybe) set storage order's status
     fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>);
     /// Update merchant punishment
-    fn update_merchant_punishment(order_id: &Hash, current_block: &BlockNumber, so_status: &OrderStatus);
+    fn update_sorder_punishment(order_id: &Hash, current_block: &BlockNumber, so_status: &OrderStatus);
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
@@ -161,7 +161,7 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
 
     }
 
-    fn update_merchant_punishment(_: &Hash, _: &BlockNumber, _: &OrderStatus) {
+    fn update_sorder_punishment(_: &Hash, _: &BlockNumber, _: &OrderStatus) {
 
     }
 }
@@ -184,10 +184,10 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
         Self::maybe_set_sorder(order_id, so);
     }
 
-    fn update_merchant_punishment(order_id: &<T as system::Trait>::Hash,
+    fn update_sorder_punishment(order_id: &<T as system::Trait>::Hash,
                                   current_block: &BlockNumber,
                                   so_status: &OrderStatus) {
-        Self::update_merchant_punishment(order_id, current_block, so_status);
+        Self::update_sorder_punishment(order_id, current_block, so_status);
     }
 }
 
@@ -560,26 +560,26 @@ decl_module! {
                     if so.status == OrderStatus::Pending {
                         continue;
                     }
-                    let mut reward_block = current_block_numeric.min(so.expired_on);
-                    Self::update_merchant_punishment(&order_id, &reward_block, &so.status);
+                    let mut payment_block = current_block_numeric.min(so.expired_on);
+                    Self::update_sorder_punishment(&order_id, &payment_block, &so.status);
 
-                    let reward_ratio = Self::get_reward_ratio(&order_id);
+                    let (payment_ratio, slash_ratio) = Self::get_payment_and_slash_ratio(&order_id);
                     let mut slash_value = Zero::zero();
-                    // If it's the badest situation.
-                    if reward_ratio.is_zero() {
-                        slash_value = (Perbill::from_percent(50)) * so.amount;
+                    // If we do need slash the merchant of this sorder.
+                    if !slash_ratio.is_zero() {
+                        slash_value = slash_ratio * so.amount;
                         Self::slash_pledge(&so.merchant, slash_value);
-                        // Set the reward block to the expired on to trigger closing the order
-                        reward_block = so.expired_on;
+                        // Set the payment block to the expired on to trigger closing the order
+                        payment_block = so.expired_on;
                     }
                     // Do the payment
-                    let reward_amount = Perbill::from_rational_approximation(reward_block - so.claimed_at, so.expired_on - so.completed_on) * so.amount;
-                    T::Currency::unreserve(&so.client, reward_amount);
-                    if T::Currency::transfer(&so.client, &so.merchant, reward_ratio * reward_amount, ExistenceRequirement::AllowDeath).is_ok() {
-                        if reward_block >= so.expired_on {
+                    let payment_amount = Perbill::from_rational_approximation(payment_block - so.claimed_at, so.expired_on - so.completed_on) * so.amount;
+                    T::Currency::unreserve(&so.client, payment_amount);
+                    if T::Currency::transfer(&so.client, &so.merchant, payment_ratio * payment_amount, ExistenceRequirement::AllowDeath).is_ok() {
+                        if payment_block >= so.expired_on {
                             Self::close_sorder(&order_id, so.amount - slash_value);
                         } else {
-                            so.claimed_at = reward_block;
+                            so.claimed_at = payment_block;
                             <StorageOrders<T>>::insert(order_id, so);
                         }
                     }
@@ -601,7 +601,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    pub fn update_merchant_punishment(order_id: &T::Hash, current_block: &BlockNumber, so_status: &OrderStatus) {
+    pub fn update_sorder_punishment(order_id: &T::Hash, current_block: &BlockNumber, so_status: &OrderStatus) {
         if let Some(mut p) = Self::sorder_punishments(order_id) {
             match so_status {
                 OrderStatus::Success => p.success += current_block - p.updated_at,
@@ -774,25 +774,27 @@ impl<T: Trait> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn get_reward_ratio(order_id: &T::Hash) -> Perbill {
-        let mut reward_ratio: Perbill = Perbill::one();
+    fn get_payment_and_slash_ratio(order_id: &T::Hash) -> (Perbill, Perbill) {
+        let mut payment_ratio: Perbill = Perbill::one();
+        let mut slash_ratio: Perbill = Perbill::zero();
         if let Some(punishment) = Self::sorder_punishments(order_id) {
             let punishment_ratio: f64 = punishment.success as f64 / (punishment.success + punishment.failed) as f64;
             if punishment_ratio >= 0.99 {
-                reward_ratio = Perbill::one();
+                payment_ratio = Perbill::one();
             } else if punishment_ratio >= 0.98 {
-                reward_ratio = Perbill::from_percent(95);
+                payment_ratio = Perbill::from_percent(95);
             } else if punishment_ratio >= 0.95 {
-                reward_ratio = Perbill::from_percent(90);
+                payment_ratio = Perbill::from_percent(90);
             } else if punishment_ratio >= 0.90 {
-                reward_ratio = Perbill::from_percent(80);
+                payment_ratio = Perbill::from_percent(80);
             } else if punishment_ratio >= 0.85 {
-                reward_ratio = Perbill::from_percent(50);
+                payment_ratio = Perbill::from_percent(50);
             } else {
-                reward_ratio = Perbill::zero();
+                payment_ratio = Perbill::zero();
+                slash_ratio = Perbill::from_percent(50);
             }
         }
-        reward_ratio
+        (payment_ratio, slash_ratio)
     }
 }
 

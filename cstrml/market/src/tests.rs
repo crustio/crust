@@ -638,13 +638,13 @@ fn test_for_update_punishment_for_merchant() {
             failed: 0,
             updated_at: 50
         });
-        Market::update_merchant_punishment(&order_id, &100, &OrderStatus::Success);
+        Market::update_sorder_punishment(&order_id, &100, &OrderStatus::Success);
         assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 50,
             failed: 0,
             updated_at: 100
         });
-        Market::update_merchant_punishment(&order_id, &120, &OrderStatus::Failed);
+        Market::update_sorder_punishment(&order_id, &120, &OrderStatus::Failed);
         assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 50,
             failed: 20,
@@ -698,8 +698,8 @@ fn test_for_pay_sorders() {
         so.status = OrderStatus::Success;
         <StorageOrders<Test>>::insert(order_id.clone(), so);
         // 91% SLA
-        Market::update_merchant_punishment(&order_id, &141, &OrderStatus::Success);
-        Market::update_merchant_punishment(&order_id, &150, &OrderStatus::Failed);
+        Market::update_sorder_punishment(&order_id, &141, &OrderStatus::Success);
+        Market::update_sorder_punishment(&order_id, &150, &OrderStatus::Failed);
         assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 91,
             failed: 9,
@@ -713,8 +713,8 @@ fn test_for_pay_sorders() {
         assert_eq!(Balances::free_balance(&source), 402000);
 
         // 95% SLA
-        Market::update_merchant_punishment(&order_id, &249, &OrderStatus::Success);
-        Market::update_merchant_punishment(&order_id, &250, &OrderStatus::Failed);
+        Market::update_sorder_punishment(&order_id, &249, &OrderStatus::Success);
+        Market::update_sorder_punishment(&order_id, &250, &OrderStatus::Failed);
         assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 190,
             failed: 10,
@@ -728,7 +728,7 @@ fn test_for_pay_sorders() {
         assert_eq!(Balances::free_balance(&source), 403000);
 
         // ~50% SLA
-        Market::update_merchant_punishment(&order_id, &450, &OrderStatus::Failed);
+        Market::update_sorder_punishment(&order_id, &450, &OrderStatus::Failed);
         assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 190,
             failed: 210,

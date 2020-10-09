@@ -6,7 +6,7 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use crate::{StorageOrder, MerchantInfo, MerchantPunishment};
+use crate::{StorageOrder, MerchantInfo, SorderPunishment};
 use sp_core::H256;
 
 #[test]
@@ -508,7 +508,7 @@ fn test_for_close_sorder() {
             used: 0
         });
         assert!(!<StorageOrders<Test>>::contains_key(&order_id));
-        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
+        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
         assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
             address_info: address_info.clone(),
             storage_price: fee,
@@ -524,7 +524,7 @@ fn test_for_close_sorder() {
             used: 0
         });
         assert!(!<StorageOrders<Test>>::contains_key(&order_id));
-        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
+        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
     });
 }
 
@@ -633,19 +633,19 @@ fn test_for_update_punishment_for_merchant() {
             status: OrderStatus::Success,
             claimed_at: 50
         });
-        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 0,
             failed: 0,
             updated_at: 50
         });
         Market::update_merchant_punishment(&order_id, &100, &OrderStatus::Success);
-        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 50,
             failed: 0,
             updated_at: 100
         });
         Market::update_merchant_punishment(&order_id, &120, &OrderStatus::Failed);
-        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 50,
             failed: 20,
             updated_at: 120
@@ -654,7 +654,7 @@ fn test_for_update_punishment_for_merchant() {
 }
 
 #[test]
-fn test_for_sorder_payment() {
+fn test_for_pay_sorders() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -700,7 +700,7 @@ fn test_for_sorder_payment() {
         // 91% SLA
         Market::update_merchant_punishment(&order_id, &141, &OrderStatus::Success);
         Market::update_merchant_punishment(&order_id, &150, &OrderStatus::Failed);
-        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 91,
             failed: 9,
             updated_at: 150
@@ -708,14 +708,14 @@ fn test_for_sorder_payment() {
         run_to_block(150);
         assert_eq!(Balances::free_balance(&merchant), 500000);
         assert_eq!(Balances::free_balance(&source), 400000);
-        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
         assert_eq!(Balances::free_balance(&merchant), 508000);
         assert_eq!(Balances::free_balance(&source), 402000);
 
         // 95% SLA
         Market::update_merchant_punishment(&order_id, &249, &OrderStatus::Success);
         Market::update_merchant_punishment(&order_id, &250, &OrderStatus::Failed);
-        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 190,
             failed: 10,
             updated_at: 250
@@ -723,13 +723,13 @@ fn test_for_sorder_payment() {
         run_to_block(250);
         assert_eq!(Balances::free_balance(&merchant), 508000);
         assert_eq!(Balances::free_balance(&source), 402000);
-        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
         assert_eq!(Balances::free_balance(&merchant), 517000);
         assert_eq!(Balances::free_balance(&source), 403000);
 
         // ~50% SLA
         Market::update_merchant_punishment(&order_id, &450, &OrderStatus::Failed);
-        assert_eq!(Market::merchant_punishments(&order_id).unwrap(), MerchantPunishment {
+        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
             success: 190,
             failed: 210,
             updated_at: 450
@@ -741,7 +741,7 @@ fn test_for_sorder_payment() {
             total: 500000,
             used: 100000
         });
-        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
         // 50% pledge is slashed
         assert_eq!(Balances::free_balance(&merchant), 467000);
         assert_eq!(Balances::free_balance(&source), 483000);
@@ -750,12 +750,12 @@ fn test_for_sorder_payment() {
             used: 0
         });
         assert!(!<StorageOrders<Test>>::contains_key(&order_id));
-        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
+        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
     });
 }
 
 #[test]
-fn test_for_sorder_payment_for_out_dated_order() {
+fn test_for_pay_sorders_for_out_dated_order() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -806,7 +806,7 @@ fn test_for_sorder_payment_for_out_dated_order() {
             total: 500000,
             used: 100000
         });
-        assert_ok!(Market::sorder_payment(Origin::signed(source), vec![order_id]));
+        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
         // 50% pledge is slashed
         assert_eq!(Balances::free_balance(&merchant), 600000);
         assert_eq!(Balances::free_balance(&source), 400000);
@@ -815,6 +815,6 @@ fn test_for_sorder_payment_for_out_dated_order() {
             used: 0
         });
         assert!(!<StorageOrders<Test>>::contains_key(&order_id));
-        assert!(!<MerchantPunishments<Test>>::contains_key(&order_id));
+        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
     });
 }

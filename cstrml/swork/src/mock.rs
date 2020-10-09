@@ -11,7 +11,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-use market::{MerchantInfo, StorageOrder, MerchantPunishment};
+use market::{MerchantInfo, StorageOrder, SorderPunishment};
 use primitives::{MerkleRoot, Hash};
 use balances::AccountData;
 use std::{cell::RefCell};
@@ -412,10 +412,10 @@ fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os
     };
     <market::Merchants<Test>>::insert(who, provision);
     <market::StorageOrders<Test>>::insert(sorder_id.clone(), sorder);
-    let punishment = MerchantPunishment {
+    let punishment = SorderPunishment {
         success: 0,
         failed: 0,
         updated_at: 50
     };
-    <market::MerchantPunishments<Test>>::insert(sorder_id, punishment);
+    <market::SorderPunishments<Test>>::insert(sorder_id, punishment);
 }

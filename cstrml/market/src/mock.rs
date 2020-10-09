@@ -273,10 +273,10 @@ pub fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32
     };
     <Merchants<Test>>::insert(who, provision);
     <StorageOrders<Test>>::insert(sorder_id.clone(), sorder);
-    let punishment = MerchantPunishment {
+    let punishment = SorderPunishment {
         success: 0,
         failed: 0,
         updated_at: 50
     };
-    <MerchantPunishments<Test>>::insert(sorder_id, punishment);
+    <SorderPunishments<Test>>::insert(sorder_id, punishment);
 }

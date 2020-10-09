@@ -78,15 +78,15 @@ pub enum OrderStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct MerchantPunishment {
+pub struct SorderPunishment {
     pub success: BlockNumber,
     pub failed: BlockNumber,
     pub updated_at: BlockNumber
 }
 
-impl Default for MerchantPunishment {
+impl Default for SorderPunishment {
     fn default() -> Self {
-        MerchantPunishment {
+        SorderPunishment {
             success: 0,
             failed: 0,
             updated_at: 0
@@ -234,8 +234,8 @@ decl_storage! {
         map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
 
         /// Order status counts used for punishment
-        pub MerchantPunishments get(fn merchant_punishments):
-        map hasher(twox_64_concat) T::Hash => Option<MerchantPunishment>;
+        pub SorderPunishments get(fn sorder_punishments):
+        map hasher(twox_64_concat) T::Hash => Option<SorderPunishment>;
 
         /// Pledge details iterated by merchant id
         pub Pledges get(fn pledges):
@@ -545,14 +545,14 @@ decl_module! {
 
         /// Do storage order payment
         #[weight = 1_000_000]
-        pub fn sorder_payment(
+        pub fn pay_sorders(
             origin,
             order_ids: Vec<T::Hash>
         ) {
             let who = ensure_signed(origin)?;
 
             // The length of order_ids cannot be too long.
-            ensure!(order_ids.len()<=T::MaxRewardLength::get().try_into().unwrap(), Error::<T>::RewardLengthTooLong);
+            ensure!(order_ids.len() <= T::MaxRewardLength::get().try_into().unwrap(), Error::<T>::RewardLengthTooLong);
 
             let current_block_numeric = Self::get_current_block_number();
             for order_id in order_ids.iter() {
@@ -585,7 +585,7 @@ decl_module! {
                     }
                 }
             }
-            Self::deposit_event(RawEvent::PaymentSuccess(who));
+            Self::deposit_event(RawEvent::PaysOrderSuccess(who));
         }
     }
 }
@@ -595,21 +595,21 @@ impl<T: Trait> Module<T> {
     pub fn maybe_set_sorder(order_id: &T::Hash, so: &StorageOrder<T::AccountId, BalanceOf<T>>) {
         if let Some(old_sorder) = Self::storage_orders(order_id) {
             if &old_sorder != so {
-                // 1. Update storage order first(`pay_sorder` depends on the newest `completed_on`)
+                // 1. Update storage order first(`pay_sorders` depends on the newest `completed_on`)
                 <StorageOrders<T>>::insert(order_id, so);
             }
         }
     }
 
     pub fn update_merchant_punishment(order_id: &T::Hash, current_block: &BlockNumber, so_status: &OrderStatus) {
-        if let Some(mut p) = Self::merchant_punishments(order_id) {
+        if let Some(mut p) = Self::sorder_punishments(order_id) {
             match so_status {
                 OrderStatus::Success => p.success += current_block - p.updated_at,
                 OrderStatus::Failed => p.failed += current_block - p.updated_at,
                 OrderStatus::Pending => {}
             };
             p.updated_at = *current_block;
-            <MerchantPunishments<T>>::insert(order_id, p);
+            <SorderPunishments<T>>::insert(order_id, p);
         }
     }
 
@@ -670,12 +670,12 @@ impl<T: Trait> Module<T> {
             });
 
             // 3. Add OrderSlashRecord
-            let merchant_punishment = MerchantPunishment {
+            let merchant_punishment = SorderPunishment {
                 success: 0,
                 failed: 0,
                 updated_at: so.created_on
             };
-            <MerchantPunishments<T>>::insert(&order_id, merchant_punishment);
+            <SorderPunishments<T>>::insert(&order_id, merchant_punishment);
 
             Some(order_id)
         }
@@ -717,7 +717,7 @@ impl<T: Trait> Module<T> {
             Self::upsert_pledge(&so.merchant, &pledge);
 
             // 3. Remove Merchant Punishment
-            <MerchantPunishments<T>>::remove(order_id);
+            <SorderPunishments<T>>::remove(order_id);
 
             // 4. Remove storage order
             <StorageOrders<T>>::remove(order_id);
@@ -776,7 +776,7 @@ impl<T: Trait> Module<T> {
 
     fn get_reward_ratio(order_id: &T::Hash) -> Perbill {
         let mut reward_ratio: Perbill = Perbill::one();
-        if let Some(punishment) = Self::merchant_punishments(order_id) {
+        if let Some(punishment) = Self::sorder_punishments(order_id) {
             let punishment_ratio: f64 = punishment.success as f64 / (punishment.success + punishment.failed) as f64;
             if punishment_ratio >= 0.99 {
                 reward_ratio = Perbill::one();
@@ -806,6 +806,6 @@ decl_event!(
         RegisterSuccess(AccountId),
         PledgeSuccess(AccountId),
         SetAliasSuccess(AccountId, FileAlias, FileAlias),
-        PaymentSuccess(AccountId),
+        PaysOrderSuccess(AccountId),
     }
 );

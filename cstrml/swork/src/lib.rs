@@ -589,7 +589,6 @@ impl<T: Trait> Module<T> {
                         if current_block_numeric > sorder.expired_on {
                             continue;
                         }
-                        T::MarketInterface::update_sorder_punishment(&sorder_id, &current_block_numeric, &sorder.status);
                         // b. Change sOrder
                         if !is_added {
                             sorder.status = OrderStatus::Failed;
@@ -603,7 +602,7 @@ impl<T: Trait> Module<T> {
                             sorder.status = OrderStatus::Success;
                         }
                         // c. Set sOrder
-                        T::MarketInterface::maybe_set_sorder(sorder_id, &sorder);
+                        T::MarketInterface::maybe_set_sorder(sorder_id, &sorder, &current_block_numeric);
                     }
                     Some((f_id.clone(), *size))
                 } else {

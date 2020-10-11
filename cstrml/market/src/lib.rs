@@ -143,9 +143,7 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
     /// Get storage order
     fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
     /// (Maybe) set storage order's status
-    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>);
-    /// Update merchant punishment
-    fn update_sorder_punishment(order_id: &Hash, current_block: &BlockNumber, so_status: &OrderStatus);
+    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>, current_block: &BlockNumber);
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
@@ -157,11 +155,7 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
         None
     }
 
-    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId, Balance>) {
-
-    }
-
-    fn update_sorder_punishment(_: &Hash, _: &BlockNumber, _: &OrderStatus) {
+    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId, Balance>, _: &BlockNumber) {
 
     }
 }
@@ -180,14 +174,9 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
     }
 
     fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
-                        so: &StorageOrder<<T as system::Trait>::AccountId, BalanceOf<T>>) {
-        Self::maybe_set_sorder(order_id, so);
-    }
-
-    fn update_sorder_punishment(order_id: &<T as system::Trait>::Hash,
-                                  current_block: &BlockNumber,
-                                  so_status: &OrderStatus) {
-        Self::update_sorder_punishment(order_id, current_block, so_status);
+                        so: &StorageOrder<<T as system::Trait>::AccountId, BalanceOf<T>>,
+                        current_block: &BlockNumber) {
+        Self::maybe_set_sorder(order_id, so, current_block);
     }
 }
 
@@ -600,10 +589,14 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     // MUTABLE PUBLIC
-    pub fn maybe_set_sorder(order_id: &T::Hash, so: &StorageOrder<T::AccountId, BalanceOf<T>>) {
+    pub fn maybe_set_sorder(order_id: &T::Hash,
+                            so: &StorageOrder<T::AccountId, BalanceOf<T>>,
+                            current_block: &BlockNumber) {
         if let Some(old_sorder) = Self::storage_orders(order_id) {
             if &old_sorder != so {
-                // 1. Update storage order first(`pay_sorders` depends on the newest `completed_on`)
+                // 1. Update sorder punishment
+                Self::update_sorder_punishment(order_id, current_block, &so.status);
+                // 2. Update storage order (`pay_sorders` depends on the newest `completed_on`)
                 <StorageOrders<T>>::insert(order_id, so);
             }
         }

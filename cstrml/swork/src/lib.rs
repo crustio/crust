@@ -584,25 +584,25 @@ impl<T: Trait> Module<T> {
                 if let Some(sorder_ids) = file_map.get(f_id) {
                     // a. Loop storage orders(same file)
                     for sorder_id in sorder_ids {
-                        let mut sorder =
-                            T::MarketInterface::maybe_get_sorder(sorder_id).unwrap_or_default();
-                        if current_block_numeric > sorder.expired_on {
-                            continue;
+                        if let Some(mut so_status) = T::MarketInterface::maybe_get_sorder_status(sorder_id) {
+                            if so_status.status != OrderStatus::Pending && current_block_numeric > so_status.expired_on {
+                                continue;
+                            }
+                            // b. Change sOrder
+                            if !is_added {
+                                so_status.status = OrderStatus::Failed;
+                            } else if is_added && so_status.status == OrderStatus::Pending {
+                                // go panic if `current_block_numeric` > `created_on`
+                                so_status.expired_on += current_block_numeric - so_status.completed_on;
+                                so_status.completed_on = current_block_numeric;
+                                so_status.claimed_at = current_block_numeric;
+                                so_status.status = OrderStatus::Success;
+                            } else {
+                                so_status.status = OrderStatus::Success;
+                            }
+                            // c. Set sOrder
+                            T::MarketInterface::maybe_set_sorder_status(sorder_id, &so_status, &current_block_numeric);
                         }
-                        // b. Change sOrder
-                        if !is_added {
-                            sorder.status = OrderStatus::Failed;
-                        } else if is_added && sorder.status == OrderStatus::Pending {
-                            // go panic if `current_block_numeric` > `created_on`
-                            sorder.expired_on += current_block_numeric - sorder.created_on;
-                            sorder.completed_on = current_block_numeric;
-                            sorder.claimed_at = current_block_numeric;
-                            sorder.status = OrderStatus::Success;
-                        } else {
-                            sorder.status = OrderStatus::Success;
-                        }
-                        // c. Set sOrder
-                        T::MarketInterface::maybe_set_sorder(sorder_id, &sorder, &current_block_numeric);
                     }
                     Some((f_id.clone(), *size))
                 } else {

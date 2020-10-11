@@ -6,7 +6,7 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use crate::{StorageOrder, MerchantInfo, SorderPunishment};
+use crate::{SorderStatus, SorderInfo, MerchantInfo, SorderPunishment};
 use sp_core::H256;
 
 #[test]
@@ -61,15 +61,18 @@ fn test_for_storage_order_should_work() {
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
         assert_eq!(Market::clients(&client, file_alias).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
             file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
-            completed_on: 50,
-            expired_on: 50+10*10,
             merchant,
             client,
             amount,
+            duration: 100
+        });
+        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
+            completed_on: 50,
+            expired_on: 50+10*10,
             status: OrderStatus::Pending,
             claimed_at: 50
         });
@@ -392,16 +395,19 @@ fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
         assert_eq!(Market::clients(&0, file_alias).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::storage_orders(order_id).unwrap(), StorageOrder {
-            file_identifier,
+        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
+            file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
-            completed_on: 50,
-            expired_on: 50+60*10,
-            merchant: 100,
-            client: 0,
+            merchant,
+            client: source.clone(),
             amount,
-            status: Default::default(),
+            duration: duration*10
+        });
+        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
+            completed_on: 50,
+            expired_on: 50+duration*10,
+            status: OrderStatus::default(),
             claimed_at: 50
         });
         assert_eq!(Market::pledges(merchant), Pledge {
@@ -486,15 +492,18 @@ fn test_for_close_sorder() {
         ));
 
         let order_id = H256::default();
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
             file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
-            completed_on: 50,
-            expired_on: 50+10*10,
             merchant,
             client,
             amount,
+            duration: 100
+        });
+        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
+            completed_on: 50,
+            expired_on: 50+10*10,
             status: OrderStatus::Pending,
             claimed_at: 50
         });
@@ -507,7 +516,8 @@ fn test_for_close_sorder() {
             total: 60,
             used: 0
         });
-        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
+        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
         assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
         assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
             address_info: address_info.clone(),
@@ -523,7 +533,8 @@ fn test_for_close_sorder() {
             total: 60,
             used: 0
         });
-        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
+        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
         assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
     });
 }
@@ -569,15 +580,18 @@ fn test_scenario_for_file_alias_should_work() {
             file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
         });
         assert_eq!(Market::clients(&client, &file_alias).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
             file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
-            completed_on: 50,
-            expired_on: 50+10*10,
             merchant,
             client,
             amount,
+            duration: 100
+        });
+        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
+            completed_on: 50,
+            expired_on: 50+10*10,
             status: OrderStatus::Pending,
             claimed_at: 50
         });
@@ -621,15 +635,18 @@ fn test_for_update_punishment_for_merchant() {
         insert_sorder(&merchant, &file_identifier, 0, 1000, OrderStatus::Success);
 
         let order_id = Hash::repeat_byte(0);
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
             file_identifier: file_identifier.clone(),
             file_size: 0,
             created_on: 0,
-            completed_on: 0,
-            expired_on: 1000,
             merchant,
             client: 100,
             amount: 10,
+            duration: 50
+        });
+        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
+            completed_on: 0,
+            expired_on: 1000,
             status: OrderStatus::Success,
             claimed_at: 50
         });
@@ -682,21 +699,24 @@ fn test_for_pay_sorders() {
         ));
 
         let order_id = H256::default();
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
             file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
-            completed_on: 50,
-            expired_on: 50+duration*10,
             merchant,
             client,
             amount,
+            duration: duration*10
+        });
+        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
+            completed_on: 50,
+            expired_on: 50+duration*10,
             status: OrderStatus::Pending,
             claimed_at: 50
         });
-        let mut so = Market::storage_orders(&order_id).unwrap();
+        let mut so = Market::sorder_statuses(&order_id).unwrap();
         so.status = OrderStatus::Success;
-        <StorageOrders<Test>>::insert(order_id.clone(), so);
+        <SorderStatuses<Test>>::insert(order_id.clone(), so);
         // 91% SLA
         Market::update_sorder_punishment(&order_id, &141, &OrderStatus::Success);
         Market::update_sorder_punishment(&order_id, &150, &OrderStatus::Failed);
@@ -749,7 +769,8 @@ fn test_for_pay_sorders() {
             total: 450000,
             used: 0
         });
-        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
+        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
         assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
     });
 }
@@ -783,21 +804,24 @@ fn test_for_pay_sorders_for_out_dated_order() {
         ));
 
         let order_id = H256::default();
-        assert_eq!(Market::storage_orders(&order_id).unwrap(), StorageOrder {
+        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
             file_identifier: file_identifier.clone(),
             file_size: 16,
             created_on: 50,
-            completed_on: 50,
-            expired_on: 50+duration*10,
             merchant,
             client,
             amount,
+            duration: duration*10
+        });
+        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
+            completed_on: 50,
+            expired_on: 50+duration*10,
             status: OrderStatus::Pending,
             claimed_at: 50
         });
-        let mut so = Market::storage_orders(&order_id).unwrap();
+        let mut so = Market::sorder_statuses(&order_id).unwrap();
         so.status = OrderStatus::Success;
-        <StorageOrders<Test>>::insert(order_id.clone(), so);
+        <SorderStatuses<Test>>::insert(order_id.clone(), so);
         
         run_to_block(1050);
         assert_eq!(Balances::free_balance(&merchant), 500000);
@@ -814,7 +838,8 @@ fn test_for_pay_sorders_for_out_dated_order() {
             total: 500000,
             used: 0
         });
-        assert!(!<StorageOrders<Test>>::contains_key(&order_id));
+        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
+        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
         assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
     });
 }

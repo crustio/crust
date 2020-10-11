@@ -55,15 +55,21 @@ pub type EraIndex = u32;
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct StorageOrder<AccountId, Balance> {
+pub struct SorderInfo<AccountId, Balance> {
     pub file_identifier: MerkleRoot,
     pub file_size: u64,
     pub created_on: BlockNumber,
-    pub completed_on: BlockNumber,
-    pub expired_on: BlockNumber,
     pub merchant: AccountId,
     pub client: AccountId,
     pub amount: Balance,
+    pub duration: BlockNumber
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct SorderStatus {
+    pub completed_on: BlockNumber,
+    pub expired_on: BlockNumber,
     pub status: OrderStatus,
     pub claimed_at: BlockNumber
 }
@@ -141,9 +147,9 @@ pub trait MarketInterface<AccountId, Hash, Balance> {
     /// MerchantInfo{files} will be used for swork module.
     fn merchants(account_id: &AccountId) -> Option<MerchantInfo<Hash, Balance>>;
     /// Get storage order
-    fn maybe_get_sorder(order_id: &Hash) -> Option<StorageOrder<AccountId, Balance>>;
+    fn maybe_get_sorder_status(order_id: &Hash) -> Option<SorderStatus>;
     /// (Maybe) set storage order's status
-    fn maybe_set_sorder(order_id: &Hash, so: &StorageOrder<AccountId, Balance>, current_block: &BlockNumber);
+    fn maybe_set_sorder_status(order_id: &Hash, so_status: &SorderStatus, current_block: &BlockNumber);
 }
 
 impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
@@ -151,11 +157,11 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
         None
     }
 
-    fn maybe_get_sorder(_: &Hash) -> Option<StorageOrder<AId, Balance>> {
+    fn maybe_get_sorder_status(_: &Hash) -> Option<SorderStatus> {
         None
     }
 
-    fn maybe_set_sorder(_: &Hash, _: &StorageOrder<AId, Balance>, _: &BlockNumber) {
+    fn maybe_set_sorder_status(_: &Hash, _: &SorderStatus, _: &BlockNumber) {
 
     }
 }
@@ -168,15 +174,15 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
         Self::merchants(account_id)
     }
 
-    fn maybe_get_sorder(order_id: &<T as system::Trait>::Hash)
-        -> Option<StorageOrder<<T as system::Trait>::AccountId, BalanceOf<T>>> {
-        Self::storage_orders(order_id)
+    fn maybe_get_sorder_status(order_id: &<T as system::Trait>::Hash)
+        -> Option<SorderStatus> {
+        Self::sorder_statuses(order_id)
     }
 
-    fn maybe_set_sorder(order_id: &<T as system::Trait>::Hash,
-                        so: &StorageOrder<<T as system::Trait>::AccountId, BalanceOf<T>>,
+    fn maybe_set_sorder_status(order_id: &<T as system::Trait>::Hash,
+                        so_status: &SorderStatus,
                         current_block: &BlockNumber) {
-        Self::maybe_set_sorder(order_id, so, current_block);
+        Self::maybe_set_sorder_status(order_id, so_status, current_block);
     }
 }
 
@@ -218,9 +224,13 @@ decl_storage! {
         pub Clients get(fn clients):
         double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) FileAlias => Option<Vec<T::Hash>>;
 
-        /// Order details iterated by order id
-        pub StorageOrders get(fn storage_orders):
-        map hasher(twox_64_concat) T::Hash => Option<StorageOrder<T::AccountId, BalanceOf<T>>>;
+        /// Order basic information iterated by order id
+        pub SorderInfos get(fn sorder_infos):
+        map hasher(twox_64_concat) T::Hash => Option<SorderInfo<T::AccountId, BalanceOf<T>>>;
+
+        /// Order status iterated by order id
+        pub SorderStatuses get(fn sorder_statuses):
+        map hasher(twox_64_concat) T::Hash => Option<SorderStatus>;
 
         /// Order status counts used for punishment
         pub SorderPunishments get(fn sorder_punishments):
@@ -478,21 +488,26 @@ decl_module! {
             // 9. Construct storage order
             let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
             let expired_on = created_on + duration*10;
-            let storage_order = StorageOrder::<T::AccountId, BalanceOf<T>> {
+            let sorder_info = SorderInfo::<T::AccountId, BalanceOf<T>> {
                 file_identifier,
                 file_size,
                 created_on,
-                completed_on: created_on, // Not fixed, this will be changed, when `status` become `Success`
-                expired_on, // Not fixed, this will be changed, when `status` become `Success`
                 merchant: merchant.clone(),
                 client: who.clone(),
                 amount,
+                duration: duration * 10
+            };
+
+            let sorder_status = SorderStatus {
+                completed_on: created_on, // Not fixed, this will be changed, when `status` become `Success`
+                expired_on, // Not fixed, this will be changed, when `status` become `Success`
                 status: OrderStatus::Pending,
                 claimed_at: created_on
             };
 
+
             // 10. Pay the order and (maybe) add storage order
-            if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &storage_order) {
+            if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &sorder_info, &sorder_status) {
                 // a. update pledge
                 <Pledges<T>>::mutate(&merchant, |pledge| {
                         pledge.used += amount;
@@ -506,7 +521,7 @@ decl_module! {
                     }
                 });
                 // c. emit storage order success event
-                Self::deposit_event(RawEvent::StorageOrderSuccess(who, storage_order));
+                Self::deposit_event(RawEvent::StorageOrderSuccess(who, sorder_info));
             } else {
                 // d. emit error
                 Err(Error::<T>::GenerateOrderIdFailed)?
@@ -553,31 +568,33 @@ decl_module! {
 
             let current_block_numeric = Self::get_current_block_number();
             for order_id in order_ids.iter() {
-                if let Some(mut so) = Self::storage_orders(order_id) {
-                    if so.status == OrderStatus::Pending {
-                        continue;
-                    }
-                    let mut payment_block = current_block_numeric.min(so.expired_on);
-                    Self::update_sorder_punishment(&order_id, &payment_block, &so.status);
-
-                    let (payment_ratio, slash_ratio) = Self::get_payment_and_slash_ratio(&order_id);
-                    let mut slash_value = Zero::zero();
-                    // If we do need slash the merchant of this sorder.
-                    if !slash_ratio.is_zero() {
-                        slash_value = slash_ratio * so.amount;
-                        Self::slash_pledge(&so.merchant, slash_value);
-                        // Set the payment block to the expired on to trigger closing the order
-                        payment_block = so.expired_on;
-                    }
-                    // Do the payment
-                    let payment_amount = Perbill::from_rational_approximation(payment_block - so.claimed_at, so.expired_on - so.completed_on) * so.amount;
-                    T::Currency::unreserve(&so.client, payment_amount);
-                    if T::Currency::transfer(&so.client, &so.merchant, payment_ratio * payment_amount, ExistenceRequirement::AllowDeath).is_ok() {
-                        if payment_block >= so.expired_on {
-                            Self::close_sorder(&order_id, so.amount - slash_value);
-                        } else {
-                            so.claimed_at = payment_block;
-                            <StorageOrders<T>>::insert(order_id, so);
+                if let Some(mut so_status) = Self::sorder_statuses(order_id) {
+                    if let Some(so_info) = Self::sorder_infos(order_id) {
+                        if so_status.status == OrderStatus::Pending {
+                            continue;
+                        }
+                        let mut payment_block = current_block_numeric.min(so_status.expired_on);
+                        Self::update_sorder_punishment(&order_id, &payment_block, &so_status.status);
+    
+                        let (payment_ratio, slash_ratio) = Self::get_payment_and_slash_ratio(&order_id);
+                        let mut slash_value = Zero::zero();
+                        // If we do need slash the merchant of this sorder.
+                        if !slash_ratio.is_zero() {
+                            slash_value = slash_ratio * so_info.amount;
+                            Self::slash_pledge(&so_info.merchant, slash_value);
+                            // Set the payment block to the expired on to trigger closing the order
+                            payment_block = so_status.expired_on;
+                        }
+                        // Do the payment
+                        let payment_amount = Perbill::from_rational_approximation(payment_block - so_status.claimed_at, so_status.expired_on - so_status.completed_on) * so_info.amount;
+                        T::Currency::unreserve(&so_info.client, payment_amount);
+                        if T::Currency::transfer(&so_info.client, &so_info.merchant, payment_ratio * payment_amount, ExistenceRequirement::AllowDeath).is_ok() {
+                            if payment_block >= so_status.expired_on {
+                                Self::close_sorder(&order_id, so_info.amount - slash_value);
+                            } else {
+                                so_status.claimed_at = payment_block;
+                                <SorderStatuses<T>>::insert(order_id, so_status);
+                            }
                         }
                     }
                 }
@@ -589,15 +606,15 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     // MUTABLE PUBLIC
-    pub fn maybe_set_sorder(order_id: &T::Hash,
-                            so: &StorageOrder<T::AccountId, BalanceOf<T>>,
-                            current_block: &BlockNumber) {
-        if let Some(old_sorder) = Self::storage_orders(order_id) {
-            if &old_sorder != so {
+    pub fn maybe_set_sorder_status(order_id: &T::Hash,
+                                   so_status: &SorderStatus,
+                                   current_block: &BlockNumber) {
+        if let Some(old_sorder_status) = Self::sorder_statuses(order_id) {
+            if &old_sorder_status != so_status {
                 // 1. Update sorder punishment
-                Self::update_sorder_punishment(order_id, current_block, &so.status);
+                Self::update_sorder_punishment(order_id, current_block, &old_sorder_status.status);
                 // 2. Update storage order (`pay_sorders` depends on the newest `completed_on`)
-                <StorageOrders<T>>::insert(order_id, so);
+                <SorderStatuses<T>>::insert(order_id, so_status);
             }
         }
     }
@@ -634,17 +651,18 @@ impl<T: Trait> Module<T> {
     fn maybe_insert_sorder(client: &T::AccountId,
                            merchant: &T::AccountId,
                            amount: BalanceOf<T>,
-                           so: &StorageOrder<T::AccountId, BalanceOf<T>>
+                           so_info: &SorderInfo<T::AccountId, BalanceOf<T>>,
+                           so_status: &SorderStatus
                         ) -> Option<T::Hash> {
         let order_id = Self::generate_sorder_id(client, merchant);
 
         // This should be false, cause we don't allow duplicated `order_id`
-        if <StorageOrders<T>>::contains_key(&order_id) {
+        if <SorderInfos<T>>::contains_key(&order_id) {
             None
         } else {
             // 0. If reserve client's balance failed return error
             // TODO: return different error type
-            if !T::Currency::reserve(&so.client, amount).is_ok() {
+            if !T::Currency::reserve(&so_info.client, amount).is_ok() {
                 log!(
                     debug,
                     "🏢 Cannot reserve currency for sorder {:?}",
@@ -654,19 +672,20 @@ impl<T: Trait> Module<T> {
             }
 
             // 1. Add new storage order
-            <StorageOrders<T>>::insert(&order_id, so);
+            <SorderInfos<T>>::insert(&order_id, so_info);
+            <SorderStatuses<T>>::insert(&order_id, so_status);
 
             // 2. Add `file_identifier` -> `order_id`s to merchant's file_map
             <Merchants<T>>::mutate(merchant, |maybe_minfo| {
                 // `minfo` cannot be None
                 if let Some(minfo) = maybe_minfo {
                     let mut order_ids: Vec::<T::Hash> = vec![];
-                    if let Some(o_ids) = minfo.file_map.get(&so.file_identifier) {
+                    if let Some(o_ids) = minfo.file_map.get(&so_info.file_identifier) {
                         order_ids = o_ids.clone();
                     }
 
                     order_ids.push(order_id);
-                    minfo.file_map.insert(so.file_identifier.clone(), order_ids.clone());
+                    minfo.file_map.insert(so_info.file_identifier.clone(), order_ids.clone());
                 }
             });
 
@@ -674,7 +693,7 @@ impl<T: Trait> Module<T> {
             let merchant_punishment = SorderPunishment {
                 success: 0,
                 failed: 0,
-                updated_at: so.created_on
+                updated_at: so_info.created_on
             };
             <SorderPunishments<T>>::insert(&order_id, merchant_punishment);
 
@@ -687,41 +706,42 @@ impl<T: Trait> Module<T> {
         order_id: &<T as system::Trait>::Hash,
         free_pledge: BalanceOf<T>
     ) {
-        if let Some(so) = Self::storage_orders(order_id) {
+        if let Some(so_info) = Self::sorder_infos(order_id) {
             // 1. Remove `file_identifier` -> `order_id`s from merchant's file_map
-            <Merchants<T>>::mutate(&so.merchant, |maybe_minfo| {
+            <Merchants<T>>::mutate(&so_info.merchant, |maybe_minfo| {
                 // `minfo` cannot be None
                 if let Some(minfo) = maybe_minfo {
                     let mut sorder_ids: Vec<T::Hash> = minfo
                         .file_map
-                        .get(&so.file_identifier)
+                        .get(&so_info.file_identifier)
                         .unwrap_or(&vec![])
                         .clone();
                     sorder_ids.retain(|&id| {&id != order_id});
 
                     if sorder_ids.is_empty() {
-                        minfo.file_map.remove(&so.file_identifier);
+                        minfo.file_map.remove(&so_info.file_identifier);
                     } else {
-                        minfo.file_map.insert(so.file_identifier.clone(), sorder_ids.clone());
+                        minfo.file_map.insert(so_info.file_identifier.clone(), sorder_ids.clone());
                     }
                 }
             });
 
             // 2. Update `Pledge` for merchant
-            let mut pledge = Self::pledges(&so.merchant);
+            let mut pledge = Self::pledges(&so_info.merchant);
             // `checked_sub`, prevent overflow
             if free_pledge >= pledge.used {
                 pledge.used = Zero::zero();
             } else {
                 pledge.used -= free_pledge;
             }
-            Self::upsert_pledge(&so.merchant, &pledge);
+            Self::upsert_pledge(&so_info.merchant, &pledge);
 
             // 3. Remove Merchant Punishment
             <SorderPunishments<T>>::remove(order_id);
 
-            // 4. Remove storage order
-            <StorageOrders<T>>::remove(order_id);
+            // 4. Remove storage order info and status
+            <SorderInfos<T>>::remove(order_id);
+            <SorderStatuses<T>>::remove(order_id);
         }
     }
 
@@ -805,7 +825,7 @@ decl_event!(
         AccountId = <T as system::Trait>::AccountId,
         Balance = BalanceOf<T>
     {
-        StorageOrderSuccess(AccountId, StorageOrder<AccountId, Balance>),
+        StorageOrderSuccess(AccountId, SorderInfo<AccountId, Balance>),
         RegisterSuccess(AccountId),
         PledgeSuccess(AccountId),
         SetAliasSuccess(AccountId, FileAlias, FileAlias),

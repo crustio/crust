@@ -11,7 +11,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-use market::{MerchantInfo, StorageOrder, SorderPunishment};
+use market::{MerchantInfo, SorderStatus, SorderInfo, SorderPunishment};
 use primitives::{MerkleRoot, Hash};
 use balances::AccountData;
 use std::{cell::RefCell};
@@ -387,15 +387,18 @@ pub fn add_success_sorders(who: &AccountId) {
 fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
     let mut file_map = Market::merchants(who).unwrap_or_default().file_map;
     let sorder_id: Hash = Hash::repeat_byte(rd);
-    let sorder = StorageOrder {
+    let sorder_info = SorderInfo {
         file_identifier: f_id.clone(),
         file_size: 0,
         created_on: 0,
-        completed_on: 0,
-        expired_on,
         merchant: who.clone(),
         client: who.clone(),
         amount: 10,
+        duration: 50
+    };
+    let sorder_status = SorderStatus {
+        completed_on: 0,
+        expired_on,
         status: os,
         claimed_at: 0
     };
@@ -411,7 +414,8 @@ fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os
         file_map
     };
     <market::Merchants<Test>>::insert(who, provision);
-    <market::StorageOrders<Test>>::insert(sorder_id.clone(), sorder);
+    <market::SorderInfos<Test>>::insert(sorder_id.clone(), sorder_info);
+    <market::SorderStatuses<Test>>::insert(sorder_id.clone(), sorder_status);
     let punishment = SorderPunishment {
         success: 0,
         failed: 0,

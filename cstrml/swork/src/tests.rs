@@ -273,10 +273,10 @@ fn report_works_should_work() {
             assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
 
             // Check same file all been confirmed
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(2)).unwrap_or_default().status, OrderStatus::Success);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 1303);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(2)).unwrap_or_default().expired_on, 1303);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(2)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().expired_on, 1303);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(2)).unwrap_or_default().expired_on, 1303);
         });
 }
 
@@ -626,8 +626,8 @@ fn incremental_report_should_work_with_files_change() {
             // Check same file all been confirmed
             // We only test Success -> Failed here
             // Another case(Pending -> Success) already tested in `report_works_should_work` case
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
         });
 }
 
@@ -802,8 +802,8 @@ fn update_identities_should_work() {
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
         });
 }
 
@@ -836,16 +836,16 @@ fn resuming_report_should_work() {
             Swork::update_identities();
 
             // 2. No works reported, but orders should still be ok
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
 
             // 3. Runs to 606
             run_to_block(606);
             Swork::update_identities();
 
             // 4. Storage order should still be success
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
 
             // 5. Runs to 909, work report is outdated
             run_to_block(909);
@@ -868,8 +868,8 @@ fn resuming_report_should_work() {
             ));
 
             // 7. Orders should reset back
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Success);
         });
 }
 
@@ -1060,9 +1060,9 @@ fn ab_upgrade_should_work() {
 
             // 12. Corresponding sorder should work
             // 5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(0)).unwrap_or_default().status, OrderStatus::Success);
             // 99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f
-            assert_eq!(Market::storage_orders(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
+            assert_eq!(Market::sorder_statuses(Hash::repeat_byte(1)).unwrap_or_default().status, OrderStatus::Failed);
         });
 }
 

@@ -521,7 +521,7 @@ decl_module! {
                     }
                 });
                 // c. emit storage order success event
-                Self::deposit_event(RawEvent::StorageOrderSuccess(who, sorder_info));
+                Self::deposit_event(RawEvent::StorageOrderSuccess(who, sorder_info, sorder_status));
             } else {
                 // d. emit error
                 Err(Error::<T>::GenerateOrderIdFailed)?
@@ -555,7 +555,7 @@ decl_module! {
         /// 3. If the slash ratio is not zero, do slash and prepare for closing sorder
         /// 4. Calculate total payment amount, unreserve the payment amount
         /// 5. Transfer the payment ratio * payment amount currency
-        /// 6. Close the sorder or update the sorder
+        /// 6. Close the sorder or update the sorder status
         #[weight = 1_000_000]
         pub fn pay_sorders(
             origin,
@@ -586,7 +586,7 @@ decl_module! {
                             payment_block = so_status.expired_on;
                         }
                         // Do the payment
-                        let payment_amount = Perbill::from_rational_approximation(payment_block - so_status.claimed_at, so_status.expired_on - so_status.completed_on) * so_info.amount;
+                        let payment_amount = Perbill::from_rational_approximation(payment_block - so_status.claimed_at, so_info.duration) * so_info.amount;
                         T::Currency::unreserve(&so_info.client, payment_amount);
                         if T::Currency::transfer(&so_info.client, &so_info.merchant, payment_ratio * payment_amount, ExistenceRequirement::AllowDeath).is_ok() {
                             if payment_block >= so_status.expired_on {
@@ -613,7 +613,7 @@ impl<T: Trait> Module<T> {
             if &old_sorder_status != so_status {
                 // 1. Update sorder punishment
                 Self::update_sorder_punishment(order_id, current_block, &old_sorder_status.status);
-                // 2. Update storage order (`pay_sorders` depends on the newest `completed_on`)
+                // 2. Update storage order status (`pay_sorders` depends on the newest `completed_on`)
                 <SorderStatuses<T>>::insert(order_id, so_status);
             }
         }
@@ -671,7 +671,7 @@ impl<T: Trait> Module<T> {
                 return None
             }
 
-            // 1. Add new storage order
+            // 1. Add new storage order basic info and status
             <SorderInfos<T>>::insert(&order_id, so_info);
             <SorderStatuses<T>>::insert(&order_id, so_status);
 
@@ -825,7 +825,7 @@ decl_event!(
         AccountId = <T as system::Trait>::AccountId,
         Balance = BalanceOf<T>
     {
-        StorageOrderSuccess(AccountId, SorderInfo<AccountId, Balance>),
+        StorageOrderSuccess(AccountId, SorderInfo<AccountId, Balance>, SorderStatus),
         RegisterSuccess(AccountId),
         PledgeSuccess(AccountId),
         SetAliasSuccess(AccountId, FileAlias, FileAlias),

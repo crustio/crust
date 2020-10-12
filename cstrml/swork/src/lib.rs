@@ -588,7 +588,7 @@ impl<T: Trait> Module<T> {
                             if so_status.status != OrderStatus::Pending && current_block_numeric > so_status.expired_on {
                                 continue;
                             }
-                            // b. Change sOrder
+                            // b. Change sOrder status
                             if !is_added {
                                 so_status.status = OrderStatus::Failed;
                             } else if is_added && so_status.status == OrderStatus::Pending {
@@ -600,7 +600,7 @@ impl<T: Trait> Module<T> {
                             } else {
                                 so_status.status = OrderStatus::Success;
                             }
-                            // c. Set sOrder
+                            // c. Set sOrder status
                             T::MarketInterface::maybe_set_sorder_status(sorder_id, &so_status, &current_block_numeric);
                         }
                     }

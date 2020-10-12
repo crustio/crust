@@ -307,15 +307,15 @@ parameter_types! {
 impl pallet_identity::Trait for Runtime {
     type Event = Event;
     type Currency = Balances;
-    type Slashed = Treasury;
     type BasicDeposit = BasicDeposit;
     type FieldDeposit = FieldDeposit;
     type SubAccountDeposit = SubAccountDeposit;
     type MaxSubAccounts = MaxSubAccounts;
     type MaxAdditionalFields = MaxAdditionalFields;
     type MaxRegistrars = MaxRegistrars;
-    type RegistrarOrigin = MoreThanHalfCouncil;
+    type Slashed = Treasury;
     type ForceOrigin = MoreThanHalfCouncil;
+    type RegistrarOrigin = MoreThanHalfCouncil;
     type WeightInfo = ();
 }
 
@@ -538,6 +538,14 @@ impl balances::Trait for Runtime {
     type WeightInfo = ();
 }
 
+impl pallet_assets::Trait for Runtime {
+    type Event = Event;
+    type Balance = Balance;
+    type AssetId = u32;
+}
+
+impl candy::Trait for Runtime {}
+
 // TODO: better way to deal with fee(s)
 parameter_types! {
     pub const TransactionBaseFee: Balance = 1 * CENTS;
@@ -545,7 +553,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Trait for Runtime {
-    type Currency = balances::Module<Runtime>;
+    type Currency = Balances;
     type OnTransactionPayment = DealWithFees;
     type TransactionByteFee = TransactionByteFee;
     type WeightToFee = IdentityFee<Balance>;
@@ -647,6 +655,10 @@ construct_runtime! {
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
+
+        // Token candy
+        Assets: pallet_assets::{Module, Storage, Event<T>},
+        Candy: candy::{Module, Call},
     }
 }
 

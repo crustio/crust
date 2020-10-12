@@ -1551,16 +1551,16 @@ impl<T: Trait> Module<T> {
             decl_storage! {
                 pub trait Store for Module<T: Trait> as Staking {
                     /// The currently elected validator set keyed by stash account ID.
-					pub CurrentElected: Vec<T::AccountId>;
+                    pub CurrentElected: Vec<T::AccountId>;
 
-					/// The start of the current era.
-					pub CurrentEraStart: Moment;
+                    /// The start of the current era.
+                    pub CurrentEraStart: Moment;
 
-					/// The session index at which the current era started.
-					pub CurrentEraStartSessionIndex: SessionIndex;
+                    /// The session index at which the current era started.
+                    pub CurrentEraStartSessionIndex: SessionIndex;
 
-					/// Rewards for the current era. Using indices of current elected set.
-					pub CurrentEraPointsEarned: EraPoints;
+                    /// Rewards for the current era. Using indices of current elected set.
+                    pub CurrentEraPointsEarned: EraPoints;
                 }
             }
         }

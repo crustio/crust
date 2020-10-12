@@ -19,6 +19,7 @@ serde = { features = ['derive'], optional = true, version = '1.0.106' }
 static_assertions = "1.1.0"
 
 # substrate frame dependencies
+pallet-assets = { default-features = false, version = '2.0.0-rc6' }
 pallet-authorship = { default-features = false, version = '2.0.0-rc6' }
 pallet-authority-discovery = { default-features = false, version = '2.0.0-rc6' }
 pallet-babe = { default-features = false, version = '2.0.0-rc6' }
@@ -73,11 +74,13 @@ staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-feat
 market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
 payment = { package = 'cstrml-payment', path = '../cstrml/payment', default-features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
-balances = { default-features = false, package = 'cstrml-balances', path = '../cstrml/balances' }
+balances = { package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
+candy = { package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
 
 [features]
 default = ['std']
 std = [
+    'pallet-assets/std',
     'pallet-authorship/std',
     'authority-discovery-primitives/std',
     'pallet-authority-discovery/std',
@@ -116,15 +119,16 @@ std = [
     'pallet-offences/std',
     'pallet-treasury/std',
     'pallet-elections-phragmen/std',
+    'pallet-transaction-payment-rpc-runtime-api/std',
+    'pallet-utility/std',
+    'pallet-identity/std',
     'sp-runtime-interface/std',
     'swork/std',
     'staking/std',
     'market/std',
     'payment/std',
     'primitives/std',
-    'pallet-transaction-payment-rpc-runtime-api/std',
-    'pallet-utility/std',
-    'pallet-identity/std'
+    'candy/std'
 ]
 runtime-benchmarks = [
     "frame-benchmarking",

@@ -986,6 +986,7 @@ version = "0.8.1"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
+ "cstrml-candy",
  "cstrml-market",
  "cstrml-payment",
  "cstrml-staking",
@@ -996,6 +997,7 @@ dependencies = [
  "frame-system",
  "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
+ "pallet-assets",
  "pallet-authority-discovery",
  "pallet-authorship",
  "pallet-babe",
@@ -1085,6 +1087,16 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+]
+
+[[package]]
+name = "cstrml-candy"
+version = "0.8.1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-assets",
+ "parity-scale-codec",
 ]
 
 [[package]]
@@ -3805,6 +3817,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ae962014118ae1621d13f011e14902223013b1b4151922c3a682a233a967ddb"
 dependencies = [
  "elliptic-curve",
+]
+
+[[package]]
+name = "pallet-assets"
+version = "2.0.0-rc6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b1cb91f596a6e9ee1df465566c0ae9943249cd0160445a51ffd7f2a228833b8"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-runtime",
 ]
 
 [[package]]

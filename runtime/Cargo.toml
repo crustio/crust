@@ -71,7 +71,6 @@ sp-runtime-interface = { default-features = false, version = '2.0.0' }
 swork = { package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
 market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
-payment = { package = 'cstrml-payment', path = '../cstrml/payment', default-features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
 balances = { default-features = false, package = 'cstrml-balances', path = '../cstrml/balances' }
 
@@ -120,7 +119,6 @@ std = [
     'swork/std',
     'staking/std',
     'market/std',
-    'payment/std',
     'primitives/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'pallet-utility/std',

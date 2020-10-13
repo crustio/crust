@@ -8,10 +8,10 @@ use frame_support::{
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup, Zero},
+    traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-use market::{MerchantInfo, StorageOrder, MerchantPunishment};
+use market::{MerchantInfo, SorderStatus, SorderInfo, SorderPunishment};
 use primitives::{MerkleRoot, Hash};
 use balances::AccountData;
 use std::{cell::RefCell};
@@ -123,20 +123,8 @@ impl balances::Trait for Test {
     type MaxLocks = ();
 }
 
-impl market::Payment<<Test as system::Trait>::AccountId,
-    <Test as system::Trait>::Hash, BalanceOf<Test>> for Swork
-{
-    fn reserve_sorder(_: &Hash, _: &AccountId, _: Balance) -> bool {
-        true
-    }
-
-    fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
-
-    fn close_sorder(_: &Hash, _: &AccountId, _: &BlockNumber) { }
-}
-
 parameter_types! {
-    pub const PunishDuration: market::EraIndex = 100;
+    pub const ClaimLimit: u32 = 100;
 }
 
 impl market::Trait for Test {
@@ -144,11 +132,10 @@ impl market::Trait for Test {
     type CurrencyToBalance = ();
     type Event = ();
     type Randomness = TestRandomness;
-    type Payment = Swork;
     type OrderInspector = Swork;
     type MinimumStoragePrice = ();
     type MinimumSorderDuration = ();
-    type PunishDuration = PunishDuration;
+    type ClaimLimit = ClaimLimit;
 }
 
 impl Trait for Test {
@@ -382,7 +369,7 @@ pub fn add_pending_sorders(who: &AccountId) {
     ].to_vec();
 
     for (idx, file) in files.iter().enumerate() {
-        insert_sorder(who, file, idx as u8, 350, OrderStatus::Pending);
+        insert_sorder(who, file, idx as u8, 1000, OrderStatus::Pending);
     }
 }
 
@@ -393,23 +380,27 @@ pub fn add_success_sorders(who: &AccountId) {
     ].to_vec();
 
     for (idx, file) in files.iter().enumerate() {
-        insert_sorder(who, file, idx as u8, 350, OrderStatus::Success);
+        insert_sorder(who, file, idx as u8, 1000, OrderStatus::Success);
     }
 }
 
 fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
     let mut file_map = Market::merchants(who).unwrap_or_default().file_map;
     let sorder_id: Hash = Hash::repeat_byte(rd);
-    let sorder = StorageOrder {
+    let sorder_info = SorderInfo {
         file_identifier: f_id.clone(),
         file_size: 0,
         created_on: 0,
-        completed_on: 0,
-        expired_on,
         merchant: who.clone(),
         client: who.clone(),
         amount: 10,
-        status: os
+        duration: 50
+    };
+    let sorder_status = SorderStatus {
+        completed_on: 0,
+        expired_on,
+        status: os,
+        claimed_at: 0
     };
     if let Some(orders) = file_map.get_mut(f_id) {
         orders.push(sorder_id.clone())
@@ -423,11 +414,12 @@ fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os
         file_map
     };
     <market::Merchants<Test>>::insert(who, provision);
-    <market::StorageOrders<Test>>::insert(sorder_id.clone(), sorder);
-    let punishment = MerchantPunishment {
+    <market::SorderInfos<Test>>::insert(sorder_id.clone(), sorder_info);
+    <market::SorderStatuses<Test>>::insert(sorder_id.clone(), sorder_status);
+    let punishment = SorderPunishment {
         success: 0,
         failed: 0,
-        value: Zero::zero()
+        updated_at: 50
     };
-    <market::MerchantPunishments<Test>>::insert(sorder_id, punishment);
+    <market::SorderPunishments<Test>>::insert(sorder_id, punishment);
 }

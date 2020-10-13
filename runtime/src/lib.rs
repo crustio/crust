@@ -579,7 +579,7 @@ parameter_types! {
     pub const MinimumStoragePrice: Balance = 40;
     /// Unit is minute
     pub const MinimumSorderDuration: u32 = 30;
-    pub const PunishDuration: market::EraIndex = 300;
+    pub const ClaimLimit: u32 = 1000;
     pub const Frequency: BlockNumber = 10 * MINUTES;
 }
 
@@ -589,21 +589,10 @@ impl market::Trait for Runtime {
     type Event = Event;
     type Randomness = RandomnessCollectiveFlip;
     // TODO: Bonding with balance module(now we impl inside Market)
-    type Payment = Payment;
     type OrderInspector = Swork;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
-    type PunishDuration = PunishDuration;
-}
-
-impl payment::Trait for Runtime {
-    type Proposal = Call;
-    type Currency = Balances;
-    type Event = Event;
-    type CurrencyToBalance = CurrencyToVoteHandler;
-    // TODO: Bonding with balance module(now we impl inside Market)
-    type MarketInterface = Market;
-    type Frequency = Frequency;
+    type ClaimLimit = ClaimLimit;
 }
 
 construct_runtime! {
@@ -652,7 +641,6 @@ construct_runtime! {
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config},
         Market: market::{Module, Call, Storage, Event<T>},
-        Payment: payment::{Module, Call, Storage, Event<T>},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},

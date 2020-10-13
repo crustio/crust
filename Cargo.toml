@@ -7,7 +7,6 @@ members = [
     'cstrml/staking',
     'cstrml/swork',
     'cstrml/market',
-    'cstrml/payment',
     'runtime',
     'rpc',
     'node',

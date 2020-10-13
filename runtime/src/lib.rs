@@ -538,13 +538,10 @@ impl balances::Trait for Runtime {
     type WeightInfo = ();
 }
 
-impl pallet_assets::Trait for Runtime {
+impl candy::Trait for Runtime {
     type Event = Event;
     type Balance = Balance;
-    type AssetId = u32;
 }
-
-impl candy::Trait for Runtime {}
 
 // TODO: better way to deal with fee(s)
 parameter_types! {
@@ -657,8 +654,7 @@ construct_runtime! {
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
 
         // Token candy
-        Assets: pallet_assets::{Module, Storage, Event<T>},
-        Candy: candy::{Module, Call},
+        Candy: candy::{Module, Call, Storage, Event<T>},
     }
 }
 

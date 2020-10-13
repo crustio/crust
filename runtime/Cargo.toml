@@ -19,7 +19,6 @@ serde = { features = ['derive'], optional = true, version = '1.0.106' }
 static_assertions = "1.1.0"
 
 # substrate frame dependencies
-pallet-assets = { default-features = false, version = '2.0.0-rc6' }
 pallet-authorship = { default-features = false, version = '2.0.0-rc6' }
 pallet-authority-discovery = { default-features = false, version = '2.0.0-rc6' }
 pallet-babe = { default-features = false, version = '2.0.0-rc6' }
@@ -80,7 +79,6 @@ candy = { package = 'cstrml-candy', path = '../cstrml/candy', default-features =
 [features]
 default = ['std']
 std = [
-    'pallet-assets/std',
     'pallet-authorship/std',
     'authority-discovery-primitives/std',
     'pallet-authority-discovery/std',

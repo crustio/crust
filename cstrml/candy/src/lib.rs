@@ -177,7 +177,7 @@ mod tests {
         type Event = ();
         type Balance = u64;
     }
-    type Assets = Module<Test>;
+    type Candy = Module<Test>;
 
     fn new_test_ext() -> sp_io::TestExternalities {
         frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
@@ -186,86 +186,92 @@ mod tests {
     #[test]
     fn issuing_asset_units_to_issuer_should_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 1), 100);
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(1), 100);
+            assert_eq!(Candy::total(), 100);
+
+            // Issue again should work
+            assert_ok!(Candy::issue(Origin::root(), 2, 100));
+            assert_eq!(Candy::balances(2), 100);
+            assert_eq!(Candy::total(), 200);
         });
     }
 
     #[test]
     fn querying_total_supply_should_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 1), 100);
-            assert_ok!(Assets::transfer(Origin::signed(1), 0, 2, 50));
-            assert_eq!(Assets::balance(0, 1), 50);
-            assert_eq!(Assets::balance(0, 2), 50);
-            assert_ok!(Assets::transfer(Origin::signed(2), 0, 3, 31));
-            assert_eq!(Assets::balance(0, 1), 50);
-            assert_eq!(Assets::balance(0, 2), 19);
-            assert_eq!(Assets::balance(0, 3), 31);
-            assert_ok!(Assets::destroy(Origin::signed(3), 0));
-            assert_eq!(Assets::total_supply(0), 69);
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(1), 100);
+            assert_ok!(Candy::transfer(Origin::signed(1), 2, 50));
+            assert_eq!(Candy::balances(1), 50);
+            assert_eq!(Candy::balances(2), 50);
+            assert_ok!(Candy::transfer(Origin::signed(2), 3, 31));
+            assert_eq!(Candy::balances(1), 50);
+            assert_eq!(Candy::balances(2), 19);
+            assert_eq!(Candy::balances(3), 31);
+            assert_ok!(Candy::burn(Origin::root(), 3, 31));
+            assert_eq!(Candy::total(), 69);
         });
     }
 
     #[test]
     fn transferring_amount_above_available_balance_should_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 1), 100);
-            assert_ok!(Assets::transfer(Origin::signed(1), 0, 2, 50));
-            assert_eq!(Assets::balance(0, 1), 50);
-            assert_eq!(Assets::balance(0, 2), 50);
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(1), 100);
+            assert_ok!(Candy::transfer(Origin::signed(1), 2, 50));
+            assert_eq!(Candy::balances(1), 50);
+            assert_eq!(Candy::balances(2), 50);
         });
     }
 
     #[test]
     fn transferring_amount_more_than_available_balance_should_not_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 1), 100);
-            assert_ok!(Assets::transfer(Origin::signed(1), 0, 2, 50));
-            assert_eq!(Assets::balance(0, 1), 50);
-            assert_eq!(Assets::balance(0, 2), 50);
-            assert_ok!(Assets::destroy(Origin::signed(1), 0));
-            assert_eq!(Assets::balance(0, 1), 0);
-            assert_noop!(Assets::transfer(Origin::signed(1), 0, 1, 50), Error::<Test>::BalanceLow);
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(1), 100);
+            assert_ok!(Candy::transfer(Origin::signed(1), 2, 50));
+            assert_eq!(Candy::balances(1), 50);
+            assert_eq!(Candy::balances(2), 50);
+            assert_ok!(Candy::burn(Origin::root(), 1, 50));
+            assert_eq!(Candy::balances(1), 0);
+            assert_noop!(Candy::transfer(Origin::signed(1), 1, 50), Error::<Test>::BalanceLow);
         });
     }
 
     #[test]
     fn transferring_less_than_one_unit_should_not_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 1), 100);
-            assert_noop!(Assets::transfer(Origin::signed(1), 0, 2, 0), Error::<Test>::AmountZero);
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(1), 100);
+            assert_noop!(Candy::transfer(Origin::signed(1), 2, 0), Error::<Test>::AmountZero);
         });
     }
 
     #[test]
     fn transferring_more_units_than_total_supply_should_not_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 1), 100);
-            assert_noop!(Assets::transfer(Origin::signed(1), 0, 2, 101), Error::<Test>::BalanceLow);
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(1), 100);
+            assert_noop!(Candy::transfer(Origin::signed(1), 2, 101), Error::<Test>::BalanceLow);
         });
     }
 
     #[test]
-    fn destroying_asset_balance_with_positive_balance_should_work() {
+    fn burning_asset_balance_with_positive_balance_should_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 1), 100);
-            assert_ok!(Assets::destroy(Origin::signed(1), 0));
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(1), 100);
+            assert_ok!(Candy::burn(Origin::root(), 1, 100));
         });
     }
 
     #[test]
-    fn destroying_asset_balance_with_zero_balance_should_not_work() {
+    fn burning_asset_balance_with_zero_balance_should_not_work() {
         new_test_ext().execute_with(|| {
-            assert_ok!(Assets::issue(Origin::signed(1), 100));
-            assert_eq!(Assets::balance(0, 2), 0);
-            assert_noop!(Assets::destroy(Origin::signed(2), 0), Error::<Test>::BalanceZero);
+            assert_ok!(Candy::issue(Origin::root(), 1, 100));
+            assert_eq!(Candy::balances(2), 0);
+            assert_noop!(Candy::burn(Origin::root(), 2, 0), Error::<Test>::BalanceZero);
         });
     }
 }

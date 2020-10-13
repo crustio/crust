@@ -73,3 +73,9 @@ jobs:
           use-cross: false
           command: test
           args: --package cstrml-balances --lib tests
+      - name: Cargo test candy
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: test
+          args: --package cstrml-candy --lib tests

@@ -118,6 +118,9 @@ pub trait Trait: system::Trait {
 
     /// Interface for interacting with a market module.
     type MarketInterface: MarketInterface<Self::AccountId, Self::Hash, BalanceOf<Self>>;
+
+    /// Max bonds restriction per account.
+    type MaxBondsLimit: Get<u32>;
 }
 
 decl_storage! {
@@ -182,11 +185,16 @@ decl_error! {
         ABUpgradeFailed,
         /// Files change not legal
         IllegalFilesTransition,
+        /// Exceed the maximum bonding relation per account
+        ExceedBondsLimit,
     }
 }
 
 decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        /// The maximum bond limitation per account
+        const MaxBondsLimit: u32 = T::MaxBondsLimit::get();
+
         type Error = Error<T>;
 
         // Initializing events
@@ -243,11 +251,14 @@ decl_module! {
             let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalIdentity);
 
-            //3. Upsert new id
+            // 3. Ensure `id_bonds` still available
+            ensure!((Self::id_bonds(&who).len() as u32) < T::MaxBondsLimit::get(), Error::<T>::ExceedBondsLimit);
+
+            // 4. Upsert new id
             let pk = maybe_pk.unwrap();
             Self::maybe_upsert_id(&applier, &pk, &Self::code());
 
-            // 4. Emit event
+            // 5. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())

@@ -567,11 +567,16 @@ impl pallet_sudo::Trait for Runtime {
     type Call = Call;
 }
 
+parameter_types! {
+    pub const MaxBondsLimit: u32 = 10;
+}
+
 impl swork::Trait for Runtime {
     type Currency = Balances;
     type Event = Event;
     type Works = Staking;
     type MarketInterface = Market;
+    type MaxBondsLimit = MaxBondsLimit;
 }
 
 parameter_types! {

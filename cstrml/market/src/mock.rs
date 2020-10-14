@@ -135,6 +135,7 @@ impl swork::Trait for Test {
     type Event = ();
     type Works = ();
     type MarketInterface = ();
+    type MaxBondsLimit = ();
 }
 
 parameter_types! {

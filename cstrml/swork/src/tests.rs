@@ -1222,7 +1222,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
 /// Star network test cases
 /// As for the star network, more should be tested in market module(space size) and staking module(stake limit)
 #[test]
-fn multiple_bond_should_work() {
+fn multiple_bonds_should_work() {
     ExtBuilder::default()
         .build()
         .execute_with(|| {
@@ -1236,5 +1236,35 @@ fn multiple_bond_should_work() {
             register(&reporter, &pk2, &LegalCode::get());
 
             assert_eq!(Swork::id_bonds(&reporter), vec![pk1.clone(), pk2.clone()]);
+        });
+}
+
+#[test]
+fn bonds_limit_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let applier = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                .expect("valid ss58 address");
+            let legal_register_info = legal_register_info();
+
+            register(&applier, &vec![], &LegalCode::get());
+            register(&applier, &vec![], &LegalCode::get());
+
+            assert_noop!(
+                Swork::register(
+                    Origin::signed(applier.clone()),
+                    legal_register_info.ias_sig,
+                    legal_register_info.ias_cert,
+                    legal_register_info.account_id,
+                    legal_register_info.isv_body,
+                    legal_register_info.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 8,
+                    message: Some("ExceedBondsLimit"),
+                }
+            );
         });
 }

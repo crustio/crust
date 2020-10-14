@@ -7296,8 +7296,25 @@ dependencies = [
 
 [[package]]
 name = "substrate-test-utils"
-version = "2.0.0-alpha.5"
-source = "git+https://github.com/paritytech/substrate.git?rev=d1b9ccad107e4899978858de5ddd2868b9777aab#d1b9ccad107e4899978858de5ddd2868b9777aab"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d93cb52c2d55475c7f6bcfceb743b536cf0b3bd8834c2831eba0666d04949d25"
+dependencies = [
+ "futures 0.3.5",
+ "substrate-test-utils-derive",
+ "tokio 0.2.22",
+]
+
+[[package]]
+name = "substrate-test-utils-derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26be90f4f05677c9a42fc3ecf441d34129abe451d48c239008ec301959f93a9e"
+dependencies = [
+ "proc-macro-crate",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "substrate-wasm-builder-runner"
@@ -7515,6 +7532,7 @@ dependencies = [
  "pin-project-lite",
  "signal-hook-registry",
  "slab",
+ "tokio-macros",
  "winapi 0.3.9",
 ]
 
@@ -7591,6 +7609,17 @@ dependencies = [
  "bytes 0.4.12",
  "futures 0.1.29",
  "log",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0c3acc6aa564495a0f2e1d59fab677cd7f81a19994cfc7f3ad0e64301560389"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

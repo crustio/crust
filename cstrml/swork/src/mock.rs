@@ -125,6 +125,7 @@ impl balances::Trait for Test {
 
 parameter_types! {
     pub const ClaimLimit: u32 = 100;
+    pub const MaxBondsLimit: u32 = 2;
 }
 
 impl market::Trait for Test {
@@ -143,6 +144,7 @@ impl Trait for Test {
     type Event = ();
     type Works = ();
     type MarketInterface = Market;
+    type MaxBondsLimit = MaxBondsLimit;
 }
 
 pub type Swork = Module<Test>;

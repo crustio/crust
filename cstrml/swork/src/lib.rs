@@ -353,7 +353,6 @@ decl_module! {
                     reported_files_size,
                     &added_files,
                     &deleted_files,
-                    &reported_srd_root,
                     &reported_files_root
                 ),
                 Error::<T>::IllegalFilesTransition
@@ -650,7 +649,6 @@ impl<T: Trait> Module<T> {
         new_files_size: u64,
         reported_added_files: &Vec<(MerkleRoot, u64)>,
         reported_deleted_files: &Vec<(MerkleRoot, u64)>,
-        reported_srd_root: &MerkleRoot,
         reported_files_root: &MerkleRoot
     ) -> bool {
         if let Some(prev_wr) = Self::work_reports(&prev_pk) {
@@ -660,7 +658,7 @@ impl<T: Trait> Module<T> {
 
             // File size change should equal between before and after
             return if old_files_size == new_files_size {
-                reported_srd_root == &prev_wr.reported_srd_root && reported_files_root == &prev_wr.reported_files_root
+                reported_files_root == &prev_wr.reported_files_root
             } else {
                 old_files_size.saturating_add(added_files_size).saturating_sub(deleted_files_size) == new_files_size
             }

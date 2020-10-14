@@ -12,8 +12,8 @@ use sp_runtime::{
     Perbill,
 };
 use std::{cell::RefCell};
-use primitives::Hash;
 use balances::AccountData;
+pub use primitives::{MerkleRoot, Hash};
 
 pub type AccountId = u64;
 pub type Balance = u64;
@@ -137,20 +137,8 @@ impl swork::Trait for Test {
     type MarketInterface = ();
 }
 
-impl Payment<<Test as system::Trait>::AccountId,
-    <Test as system::Trait>::Hash, BalanceOf<Test>> for Market
-{
-    fn reserve_sorder(_: &Hash, _: &AccountId, _: Balance) -> bool {
-        true
-    }
-
-    fn pay_sorder(_: &<Test as system::Trait>::Hash) { }
-
-    fn close_sorder(_: &Hash, _: &AccountId, _: &BlockNumber) { }
-}
-
 parameter_types! {
-    pub const TestPunishDuration: EraIndex = 100;
+    pub const TestClaimLimit: u32 = 100;
 }
 
 impl Trait for Test {
@@ -158,11 +146,10 @@ impl Trait for Test {
     type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();
     type Randomness = TestRandomness;
-    type Payment = Market;
     type OrderInspector = TestOrderInspector;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
-    type PunishDuration = TestPunishDuration;
+    type ClaimLimit = TestClaimLimit;
 }
 
 pub type Market = Module<Test>;
@@ -256,4 +243,44 @@ pub fn run_to_block(n: u64) {
         System::set_block_number(System::block_number() + 1);
         System::on_initialize(System::block_number());
     }
+}
+
+pub fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
+    let mut file_map = Market::merchants(who).unwrap_or_default().file_map;
+    let sorder_id: Hash = Hash::repeat_byte(rd);
+    let sorder_info = SorderInfo {
+        file_identifier: f_id.clone(),
+        file_size: 0,
+        created_on: 0,
+        merchant: who.clone(),
+        client: who.clone(),
+        amount: 10,
+        duration: 50
+    };
+    let sorder_status = SorderStatus {
+        completed_on: 0,
+        expired_on,
+        status: os,
+        claimed_at: 50
+    };
+    if let Some(orders) = file_map.get_mut(f_id) {
+        orders.push(sorder_id.clone())
+    } else {
+        file_map.insert(f_id.clone(), vec![sorder_id.clone()]);
+    }
+
+    let provision = MerchantInfo {
+        address_info: vec![],
+        storage_price: 1,
+        file_map
+    };
+    <Merchants<Test>>::insert(who, provision);
+    <SorderInfos<Test>>::insert(sorder_id.clone(), sorder_info);
+    <SorderStatuses<Test>>::insert(sorder_id.clone(), sorder_status);
+    let punishment = SorderPunishment {
+        success: 0,
+        failed: 0,
+        updated_at: 50
+    };
+    <SorderPunishments<Test>>::insert(sorder_id, punishment);
 }

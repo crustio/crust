@@ -149,8 +149,8 @@ mod tests {
     impl frame_system::Trait for Test {
         type BaseCallFilter = ();
         type Origin = Origin;
-        type Index = u64;
         type Call = ();
+        type Index = u64;
         type BlockNumber = u64;
         type Hash = H256;
         type Hashing = BlakeTwo256;
@@ -164,14 +164,14 @@ mod tests {
         type BlockExecutionWeight = ();
         type ExtrinsicBaseWeight = ();
         type MaximumExtrinsicWeight = MaximumBlockWeight;
-        type AvailableBlockRatio = AvailableBlockRatio;
         type MaximumBlockLength = MaximumBlockLength;
+        type AvailableBlockRatio = AvailableBlockRatio;
         type Version = ();
+        type PalletInfo = ();
         type AccountData = ();
         type OnNewAccount = ();
         type OnKilledAccount = ();
         type SystemWeightInfo = ();
-        type ModuleToIndex = ();
     }
     impl Trait for Test {
         type Event = ();

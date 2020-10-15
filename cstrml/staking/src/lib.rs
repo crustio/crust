@@ -46,9 +46,8 @@ use sp_runtime::{Deserialize, Serialize};
 use swork;
 use primitives::{
     constants::{currency::*, time::*},
-    traits::TransferrableCurrency
+    traits::TransferrableCurrency, Moment
 };
-
 use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -445,6 +444,21 @@ impl Default for Forcing {
     }
 }
 
+// A value placed in storage that represents the current version of the Staking storage. This value
+// is used by the `on_runtime_upgrade` logic to determine whether we run storage migration logic.
+// This should match directly with the semantic versions of the Rust crate.
+#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug)]
+enum Releases {
+    V1,
+    V2,
+}
+
+impl Default for Releases {
+    fn default() -> Self {
+        Releases::V2
+    }
+}
+
 decl_storage! {
     trait Store for Module<T: Trait> as Staking {
         /// Number of eras to keep in history.
@@ -601,8 +615,11 @@ decl_storage! {
         /// The earliest era for which we have a pending, unapplied slash.
         EarliestUnappliedSlash: Option<EraIndex>;
 
-        /// The version of storage for upgrade.
-        StorageVersion: u32;
+        /// True if network has been upgraded to this version.
+        /// Storage version of the pallet.
+        ///
+        /// This is set to v2 for new networks.
+        StorageVersion build(|_: &GenesisConfig<T>| Releases::V2): Releases;
     }
     add_extra_genesis {
         config(stakers):
@@ -713,16 +730,27 @@ decl_module! {
         /// Number of eras that staked funds must remain bonded for.
         const BondingDuration: EraIndex = T::BondingDuration::get();
 
+        /// Number of eras that slashes are deferred by, after computation.
+        ///
+        /// This should be less than the bonding duration.
+        /// Set to 0 if slashes should be applied immediately, without opportunity for
+        /// intervention.
+        const SlashDeferDuration: EraIndex = T::SlashDeferDuration::get();
+        
         /// The maximum number of guarantors rewarded for each validator.
         ///
         /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
         /// their reward. This used to limit the i/o cost for the guarantor payout.
         const MaxGuarantorRewardedPerValidator: u32 = T::MaxGuarantorRewardedPerValidator::get();
 
-
         type Error = Error<T>;
 
         fn deposit_event() = default;
+
+        fn on_runtime_upgrade() -> Weight {
+            Self::do_upgrade();
+            10_000
+        }
 
         fn on_finalize() {
             // Set the start of the first era.
@@ -1531,6 +1559,84 @@ impl<T: Trait> Module<T> {
 
     // PRIVATE MUTABLE (DANGEROUS)
 
+    /// Upgrade storage to current version
+    /// In old version the staking module has several issue about handling session delay, the
+    /// current era was always considered the active one.
+    ///
+    /// After the migration the current era will still be considered the active one for the era of
+    /// the upgrade. And the delay issue will be fixed when planning the next era.
+    /// * create:
+    ///   * ActiveEraStart
+    ///   * ActiveEra
+    ///   * ErasRewardPoints
+    ///   * ErasStartSessionIndex
+    /// * removal of:
+    ///   * CurrentEraStart
+    ///   * CurrentEraStartSessionIndex
+    ///   * CurrentEraPointsEarned
+    fn do_upgrade() {
+        // Deprecated storages used for migration only
+        mod deprecated {
+            use crate::{Trait, Moment, SessionIndex};
+            use codec::{Encode, Decode};
+            use frame_support::{decl_module, decl_storage};
+            use sp_std::prelude::*;
+
+            /// Reward points of an era. Used to split era total payout between validators.
+            #[derive(Encode, Decode, Default)]
+            pub struct EraPoints {
+                /// Total number of points. Equals the sum of reward points for each validator.
+                pub total: u32,
+                /// The reward points earned by a given validator. The index of this vec corresponds to the
+                /// index into the current validator set.
+                pub individual: Vec<u32>,
+            }
+
+            decl_module! {
+                pub struct Module<T: Trait> for enum Call where origin: T::Origin {}
+            }
+
+            decl_storage! {
+                pub trait Store for Module<T: Trait> as Staking {
+                    /// The currently elected validator set keyed by stash account ID.
+                    pub CurrentElected: Vec<T::AccountId>;
+
+                    /// The start of the current era.
+                    pub CurrentEraStart: Moment;
+
+                    /// The session index at which the current era started.
+                    pub CurrentEraStartSessionIndex: SessionIndex;
+
+                    /// Rewards for the current era. Using indices of current elected set.
+                    pub CurrentEraPointsEarned: EraPoints;
+                }
+            }
+        }
+
+        // 1. Migrate ActiveEra and ErasStartSessionIndex
+        let current_era_start_index = deprecated::CurrentEraStartSessionIndex::get();
+        let current_era = <Module<T> as Store>::CurrentEra::get().unwrap_or(0);
+        let current_era_start = deprecated::CurrentEraStart::get();
+        <Module<T> as Store>::ErasStartSessionIndex::insert(current_era, current_era_start_index);
+        <Module<T> as Store>::ActiveEra::put(ActiveEraInfo {
+            index: current_era,
+            start: Some(current_era_start),
+        });
+
+        // 2. Migrate ErasRewardPoints
+        let current_elected = deprecated::CurrentElected::<T>::get();
+        let points = deprecated::CurrentEraPointsEarned::get();
+        <Module<T> as Store>::ErasRewardPoints::insert(current_era, EraRewardPoints {
+            total: points.total,
+            individual: current_elected.iter().cloned().zip(points.individual.iter().cloned()).collect(),
+        });
+
+        // 3. Kill old storages
+        deprecated::CurrentEraStart::kill();
+        deprecated::CurrentEraStartSessionIndex::kill();
+        deprecated::CurrentEraPointsEarned::kill();
+    }
+
     /// Insert new or update old stake limit
     fn upsert_stake_limit(account_id: &T::AccountId, limit: BalanceOf<T>) {
         <StakeLimit<T>>::insert(account_id, limit);
@@ -2035,6 +2141,7 @@ impl<T: Trait> Module<T> {
             elected_stashes.len(),
             current_era,
         );
+
         // V. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);

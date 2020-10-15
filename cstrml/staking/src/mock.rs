@@ -4,7 +4,7 @@ use crate::*;
 use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     StorageValue, IterableStorageMap,
-    traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize},
+    traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize, TestRandomness},
     weights::{Weight, constants::RocksDbWeight},
 };
 use sp_core::{crypto::key_types, H256};
@@ -137,7 +137,7 @@ impl frame_system::Trait for Test {
     type MaximumBlockLength = MaximumBlockLength;
     type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
-    type ModuleToIndex = ();
+    type PalletInfo = ();
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
@@ -154,6 +154,7 @@ impl balances::Trait for Test {
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
+    type MaxLocks = ();
 }
 parameter_types! {
     pub const Period: BlockNumber = 1;
@@ -208,14 +209,16 @@ impl swork::Trait for Test {
     type Event = ();
     type Works = TestStaking;
     type MarketInterface = ();
+    type MaxBondsLimit = ();
 }
 
 parameter_types! {
     pub const SessionsPerEra: SessionIndex = 3;
     pub const BondingDuration: EraIndex = 3;
-    pub const MaxNominatorRewardedPerValidator: u32 = 64;
+    pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
 }
+
 impl Trait for Test {
     type Currency = balances::Module<Self>;
     type UnixTime = pallet_timestamp::Module<Self>;
@@ -224,8 +227,10 @@ impl Trait for Test {
     type Event = ();
     type Slash = ();
     type Reward = ();
+    type Randomness = TestRandomness;
     type SessionsPerEra = SessionsPerEra;
     type BondingDuration = BondingDuration;
+    type MaxGuarantorRewardedPerValidator = MaxGuarantorRewardedPerValidator;
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
@@ -366,8 +371,6 @@ impl ExtBuilder {
             vec![]
         };
 
-        // swork genesis
-        let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
         let _ = GenesisConfig::<Test> {
             stakers: vec![
                 // (stash, controller, staked_amount, status)
@@ -415,38 +418,17 @@ impl ExtBuilder {
         }
         .assimilate_storage(&mut storage);
 
-        let work_reports: Vec<(u64, swork::WorkReport)> = identities
-            .iter()
-            .map(|id| {
-                (
-                    *id,
-                    swork::WorkReport {
-                        block_number: 0,
-                        used: 0,
-                        reserved: 20000000000000,
-                        cached_reserved: 0,
-                        files: vec![]
-                    },
-                )
-            })
-            .collect();
-
-        let _ = swork::GenesisConfig::<Test> {
-            current_report_slot: 0,
+        let _ = swork::GenesisConfig {
             code: vec![],
-            identities: identities
-                .iter()
-                .map(|id| (*id, Default::default()))
-                .collect(),
-            work_reports
-        }
-        .assimilate_storage(&mut storage);
+        }.assimilate_storage(&mut storage);
 
         let mut ext = sp_io::TestExternalities::from(storage);
         ext.execute_with(|| {
+            init_swork_setup();
             let validators = Session::validators();
             SESSION.with(|x| *x.borrow_mut() = (validators.clone(), HashSet::new()));
         });
+
         ext
     }
 }
@@ -644,4 +626,49 @@ pub fn payout_all_stakers(era_index: EraIndex) {
     Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap();
     Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap();
     Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap();
+}
+
+fn init_swork_setup() {
+    let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6];
+    let id_map: Vec<(u64, Vec<u8>)> = identities.iter().map(|account| (*account, account.to_be_bytes().to_vec())).collect();
+    let code: Vec<u8> = vec![];
+
+    for (id, pk) in id_map {
+        <swork::IdBonds<Test>>::insert(id, vec![pk.clone()]);
+        <swork::Identities>::insert(pk.clone(), code.clone());
+        <swork::WorkReports>::insert(pk.clone(), swork::WorkReport {
+            report_slot: 0,
+            used: 0,
+            free: 20000000000000,
+            files: Default::default(),
+            reported_files_size: 0,
+            reported_srd_root: vec![],
+            reported_files_root: vec![]
+        });
+    }
+
+    // Test star network
+    let pk_100 = 100_u64.to_be_bytes().to_vec();
+    let pk_101 = 101_u64.to_be_bytes().to_vec();
+    <swork::Identities>::insert(pk_100.clone(), code.clone());
+    <swork::Identities>::insert(pk_101.clone(), code.clone());
+    <swork::IdBonds<Test>>::insert(100, vec![pk_100.clone(), pk_101.clone()]);
+    <swork::WorkReports>::insert(pk_100.clone(), swork::WorkReport {
+        report_slot: 0,
+        used: 0,
+        free: 10000000000000,
+        files: Default::default(),
+        reported_files_size: 0,
+        reported_srd_root: vec![],
+        reported_files_root: vec![]
+    });
+    <swork::WorkReports>::insert(pk_101.clone(), swork::WorkReport {
+        report_slot: 0,
+        used: 0,
+        free: 10000000000000,
+        files: Default::default(),
+        reported_files_size: 0,
+        reported_srd_root: vec![],
+        reported_files_root: vec![]
+    });
 }

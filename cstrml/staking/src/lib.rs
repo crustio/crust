@@ -19,7 +19,7 @@ use frame_support::{
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
-        UnixTime, EnsureOrigin
+        UnixTime, EnsureOrigin, Randomness
     },
     dispatch::DispatchResult
 };
@@ -28,7 +28,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug, SaturatedConversion,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd
+        CheckedAdd, TrailingZeroInput
     },
 };
 use sp_staking::{
@@ -48,11 +48,24 @@ use primitives::{
     constants::{currency::*, time::*},
     traits::TransferrableCurrency, Moment
 };
+use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
 const MAX_GUARANTEE: usize = 16;
 const STAKING_ID: LockIdentifier = *b"staking ";
+
+pub(crate) const LOG_TARGET: &'static str = "staking";
+
+#[macro_export]
+macro_rules! log {
+    ($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+        frame_support::debug::$level!(
+            target: crate::LOG_TARGET,
+            $patter $(, $values)*
+        )
+    };
+}
 
 /// Counter for the number of eras that have passed.
 pub type EraIndex = u32;
@@ -62,7 +75,7 @@ pub type RewardPoint = u32;
 
 /// Reward points of an era. Used to split era total payout between validators.
 ///
-/// This points will be used to reward validators and their respective nominators.
+/// This points will be used to reward validators and their respective guarantors.
 #[derive(PartialEq, Encode, Decode, Default, RuntimeDebug)]
 pub struct EraRewardPoints<AccountId: Ord> {
     /// Total number of points. Equals the sum of reward points for each validator.
@@ -104,7 +117,7 @@ impl Default for RewardDestination {
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 pub struct ValidatorPrefs {
     /// Reward that validator takes up-front; only the rest is split between themselves and
-    /// nominators.
+    /// guarantors.
     #[codec(compact)]
     pub fee: Perbill,
 }
@@ -378,11 +391,20 @@ pub trait Trait: frame_system::Trait {
     /// Handler for the unbalanced increment when rewarding a staker.
     type Reward: OnUnbalanced<PositiveImbalanceOf<Self>>;
 
+    /// Something that provides randomness in the runtime.	
+    type Randomness: Randomness<Self::Hash>;
+
     /// Number of sessions per era.
     type SessionsPerEra: Get<SessionIndex>;
 
     /// Number of eras that staked funds must remain bonded for.
     type BondingDuration: Get<EraIndex>;
+
+    /// The maximum number of guarantors rewarded for each validator.
+    ///
+    /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
+    /// their reward. This used to limit the i/o cost for the guarantor payout.
+    type MaxGuarantorRewardedPerValidator: Get<u32>;
 
     /// Number of eras that slashes are deferred by, after computation. This
     /// should be less than the bonding duration. Set to 0 if slashes should be
@@ -477,6 +499,21 @@ decl_storage! {
         pub ErasStakers get(fn eras_stakers):
             double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
             => Exposure<T::AccountId, BalanceOf<T>>;
+
+        /// Clipped Exposure of validator at era.
+        ///
+        /// This is similar to [`ErasStakers`] but number of guarantors exposed is reduced to the
+        /// `T::MaxGuarantorRewardedPerValidator` biggest stakers.
+        /// (Note: the field `total` and `own` of the exposure remains unchanged).
+        /// This is used to limit the i/o cost for the guarantor payout.
+        ///
+        /// This is keyed fist by the era index to allow bulk deletion and then the stash account.
+        ///
+        /// Is it removed after `HISTORY_DEPTH` eras.
+        /// If stakers hasn't been set or has been removed then empty exposure is returned.
+        pub ErasStakersClipped get(fn eras_stakers_clipped):
+        double_map hasher(twox_64_concat) EraIndex, hasher(twox_64_concat) T::AccountId
+        => Exposure<T::AccountId, BalanceOf<T>>;
             
         /// Similar to `ErasStakers`, this holds the preferences of validators.
         ///
@@ -699,6 +736,12 @@ decl_module! {
 		/// Set to 0 if slashes should be applied immediately, without opportunity for
 		/// intervention.
 		const SlashDeferDuration: EraIndex = T::SlashDeferDuration::get();
+        
+        /// The maximum number of guarantors rewarded for each validator.
+        ///
+        /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
+        /// their reward. This used to limit the i/o cost for the guarantor payout.
+        const MaxGuarantorRewardedPerValidator: u32 = T::MaxGuarantorRewardedPerValidator::get();
 
         type Error = Error<T>;
 
@@ -1293,7 +1336,7 @@ decl_module! {
         /// Base Weight: 75.94 µs
         /// DB Weight:
         /// - Reads: Stash Account, Bonded, Slashing Spans, Locks
-        /// - Writes: Bonded, Ledger, Payee, Validators, Nominators, Stash Account, Locks
+        /// - Writes: Bonded, Ledger, Payee, Validators, guarantors, Stash Account, Locks
         /// # </weight>
         #[weight = T::DbWeight::get().reads_writes(4, 7)
             .saturating_add(76 * WEIGHT_PER_MICROS)]
@@ -1305,8 +1348,8 @@ decl_module! {
 
         /// Pay out all the stakers behind a single validator for a single era.
         ///
-        /// - `validator_stash` is the stash account of the validator. Their nominators, up to
-        ///   `T::MaxNominatorRewardedPerValidator`, will also receive their rewards.
+        /// - `validator_stash` is the stash account of the validator. Their guarantors, up to
+        ///   `T::MaxGuarantorRewardedPerValidator`, will also receive their rewards.
         /// - `era` may be any era between `[current_era - history_depth; current_era]`.
         ///
         /// The origin of this call must be _Signed_. Any account can call this function, even if
@@ -1391,6 +1434,11 @@ impl<T: Trait> Module<T> {
             let mut update = false;
 
             if real_votes <= Zero::zero() {
+                log!(
+                    debug,
+                    "💸 Staking limit of validator {:?} is zero.",
+                    v_stash
+                );
                 return None
             }
 
@@ -1663,7 +1711,7 @@ impl<T: Trait> Module<T> {
             Err(pos) => ledger.claimed_rewards.insert(pos, era),
         }
         /* Input data seems good, no errors allowed after this point */
-        let exposure = <ErasStakers<T>>::get(&era, &ledger.stash);
+        let exposure = <ErasStakersClipped<T>>::get(&era, &ledger.stash);
         <Ledger<T>>::insert(&controller, &ledger);
 
         // 2. Pay authoring reward
@@ -1715,13 +1763,13 @@ impl<T: Trait> Module<T> {
 
             let era_length = session_index.checked_sub(current_era_start_session_index)
                 .unwrap_or(0); // Must never happen.
-            // TODO: remove ForceNew? cause this will make work report update invalid
             match ForceEra::get() {
                 Forcing::ForceNew => ForceEra::kill(),
                 Forcing::ForceAlways => (),
                 Forcing::NotForcing if era_length >= T::SessionsPerEra::get() => (),
                 _ => return None,
             }
+
             // New era
             Self::new_era(session_index)
         } else {
@@ -1742,6 +1790,11 @@ impl<T: Trait> Module<T> {
             *s = Some(s.map(|s| s + 1).unwrap_or(0));
             s.unwrap()
         });
+        log!(
+            trace,
+            "💸 Plan a new era {:?}",
+            current_era,
+        );
         ErasStartSessionIndex::insert(&current_era, &start_session_index);
 
         // Clean old era information.
@@ -1750,6 +1803,8 @@ impl<T: Trait> Module<T> {
         }
 
         // Set staking information for new era.
+        // TODO: move this update 1 session in advance
+        T::SworkInterface::update_identities();
         let maybe_new_validators = Self::select_and_update_validators(current_era);
 
         maybe_new_validators
@@ -1798,7 +1853,11 @@ impl<T: Trait> Module<T> {
             });
             new_index
         });
-
+        log!(
+            trace,
+            "💸 Start the era {:?}",
+            active_era,
+        );
         let bonding_duration = T::BondingDuration::get();
 
         BondedEras::mutate(|bonded| {
@@ -1829,6 +1888,11 @@ impl<T: Trait> Module<T> {
     /// Compute payout for era.
     fn end_era(active_era: ActiveEraInfo, _session_index: SessionIndex) {
         // Note: active_era_start can be None if end era is called during genesis config.
+        log!(
+            trace,
+            "💸 End the era {:?}",
+            active_era.index,
+        );
         if let Some(active_era_start) = active_era.start {
             let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
 
@@ -1865,6 +1929,7 @@ impl<T: Trait> Module<T> {
         /// Clear all era information for given era.
     fn clear_era_information(era_index: EraIndex) {
         <ErasStakers<T>>::remove_prefix(era_index);
+        <ErasStakersClipped<T>>::remove_prefix(era_index);
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
         <ErasStakingPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
@@ -1935,11 +2000,7 @@ impl<T: Trait> Module<T> {
     ///
     /// This should only be called at the end of an era.
     fn select_and_update_validators(current_era: EraIndex) -> Option<Vec<T::AccountId>> {
-        // I. Update all swork identities work report and clear stakers
-        // TODO: this actually should already be prepared in the swork module
-        T::SworkInterface::update_identities();
-
-        // II. Ensure minimum validator count
+        // I. Ensure minimum validator count
         let validator_count = <Validators<T>>::iter().count();
         let minimum_validator_count = Self::minimum_validator_count().max(1) as usize;
 
@@ -1957,9 +2018,15 @@ impl<T: Trait> Module<T> {
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
         let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
-        // III. Construct and fill in the V/G graph
+        // II. Construct and fill in the V/G graph
         // TC is O(V + G*1), V means validator's number, G means guarantor's number
         // DB try is 2
+
+        log!(
+            debug,
+            "💸 Construct and fill in the V/G graph for the era {:?}.",
+            current_era,
+        );
         let mut vg_graph: BTreeMap<T::AccountId, Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>> =
             <Validators<T>>::iter().map(|(v_stash, _)|
                 (v_stash, Vec::<IndividualExposure<T::AccountId, BalanceOf<T>>>::new())
@@ -1986,11 +2053,16 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        // IV. This part will cover
+        // III. This part will cover
         // 1. Get `ErasStakers` with `stake_limit` and `vg_graph`
         // 2. Get `ErasValidatorPrefs`
         // 3. Get `total_valid_stakes`
         // 4. Fill in `validator_stakes`
+        log!(
+            debug,
+            "💸 Build the erasStakers for the era {:?}.",
+            current_era,
+        );
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
@@ -2034,37 +2106,43 @@ impl<T: Trait> Module<T> {
 
             // 4. Update snapshots
             <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
+            let exposure_total = new_exposure.total;
+            let mut exposure_clipped = new_exposure;
+            let clipped_max_len = T::MaxGuarantorRewardedPerValidator::get() as usize;
+            if exposure_clipped.others.len() > clipped_max_len {
+                exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
+                exposure_clipped.others.truncate(clipped_max_len);
+            }
+            <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
+
             <ErasValidatorPrefs<T>>::insert(&current_era, &v_stash, Self::validators(&v_stash).clone());
-            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&new_exposure.total) {
+            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&exposure_total) {
                 eras_total_stakes = maybe_total_stakes;
             } else {
                 eras_total_stakes = to_balance(u64::max_value() as u128);
             }
 
             // 5. Push validator stakes
-            validators_stakes.push((v_stash.clone(), to_votes(new_exposure.total)))
+            validators_stakes.push((v_stash.clone(), to_votes(exposure_total)))
         }
 
-        // V. TopDown Election Algorithm
-        // Select new validators by top-down their total `valid` stakes
-        // - time complex is O(2n)
-        // - DB try is 1
-        // 1. Populate elections and figure out the minimum stake behind a slot.
-        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
-
+        // IV. TopDown Election Algorithm with Randomlization
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
-        // 2. If there's no validators, be as same as little validators
+        // If there's no validators, be as same as little validators
         if to_elect < minimum_validator_count {
             return None;
         }
 
-        let elected_stashes = validators_stakes[0..to_elect]
-            .iter()
-            .map(|(who, _stakes)| who.clone())
-            .collect::<Vec<T::AccountId>>();
+        let elected_stashes= Self::do_election(validators_stakes, to_elect);
+        log!(
+            info,
+            "💸 new validator set of size {:?} has been elected via for era {:?}",
+            elected_stashes.len(),
+            current_era,
+        );
 
-        // VI. Update general staking storage
+        // V. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
 
@@ -2143,6 +2221,56 @@ impl<T: Trait> Module<T> {
             _ => ForceEra::put(Forcing::ForceNew),
         }
     }
+
+    fn do_election(	
+        mut validators_stakes: Vec<(T::AccountId, u128)>,	
+        to_elect: usize) -> Vec<T::AccountId> {	
+        // Select new validators by top-down their total `valid` stakes	
+        // then randomly choose some of them from the top validators	
+
+        let candidate_to_elect = validators_stakes.len().min(to_elect * 2);	
+        // sort by 'valid' stakes	
+        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));	
+
+        // choose top candidate_to_elect number of validators	
+        let mut candidate_stashes = validators_stakes[0..candidate_to_elect]	
+        .iter()	
+        .map(|(who, stakes)| (who.clone(), *stakes))	
+        .collect::<Vec<(T::AccountId, u128)>>();	
+
+        // shuffle it	
+        Self::shuffle_candidates(&mut candidate_stashes);	
+
+        // choose elected_stashes number of validators	
+        let elected_stashes = candidate_stashes[0..to_elect]	
+        .iter()	
+        .map(|(who, _stakes)| who.clone())	
+        .collect::<Vec<T::AccountId>>();	
+        elected_stashes	
+    }	
+
+    fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {	
+        // 1. Construct random seed, 👼 bless the randomness	
+        // seed = [ block_hash, phrase ]	
+        let phrase = b"candidates_shuffle";	
+        let bn = <frame_system::Module<T>>::block_number();	
+        let bh: T::Hash = <frame_system::Module<T>>::block_hash(bn);	
+        let seed = [	
+            &bh.as_ref()[..],	
+            &phrase.encode()[..]	
+        ].concat();	
+
+        // we'll need a random seed here.	
+        let seed = T::Randomness::random(seed.as_slice());	
+        // seed needs to be guaranteed to be 32 bytes.	
+        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))	
+            .expect("input is padded with zeroes; qed");	
+        let mut rng = ChaChaRng::from_seed(seed);	
+        for i in (0..candidates_stakes.len()).rev() {	
+            let random_index = (rng.next_u32() % (i as u32 + 1)) as usize;	
+            candidates_stakes.swap(random_index, i);	
+        }	
+    }
 }
 
 /// In this implementation `new_session(session)` must be called before `end_session(session-1)`
@@ -2154,11 +2282,11 @@ impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
     fn new_session(new_index: SessionIndex) -> Option<Vec<T::AccountId>> {
         Self::new_session(new_index)
     }
-    fn start_session(start_index: SessionIndex) {
-        Self::start_session(start_index)
-    }
     fn end_session(end_index: SessionIndex) {
         Self::end_session(end_index)
+    }
+    fn start_session(start_index: SessionIndex) {
+        Self::start_session(start_index)
     }
 }
 
@@ -2332,12 +2460,12 @@ for Module<T> where
             });
 
             if let Some(mut unapplied) = unapplied {
-                let nominators_len = unapplied.others.len() as u64;
+                let guarantors_len = unapplied.others.len() as u64;
                 let reporters_len = details.reporters.len() as u64;
 
                 {
-                    let upper_bound = 1 /* Validator/NominatorSlashInEra */ + 2 /* fetch_spans */;
-                    let rw = upper_bound + nominators_len * upper_bound;
+                    let upper_bound = 1 /* Validator/guarantorSlashInEra */ + 2 /* fetch_spans */;
+                    let rw = upper_bound + guarantors_len * upper_bound;
                     add_db_reads_writes(rw, rw);
                 }
                 unapplied.reporters = details.reporters.clone();
@@ -2348,8 +2476,8 @@ for Module<T> where
                         let slash_cost = (6, 5);
                         let reward_cost = (2, 2);
                         add_db_reads_writes(
-                            (1 + nominators_len) * slash_cost.0 + reward_cost.0 * reporters_len,
-                            (1 + nominators_len) * slash_cost.1 + reward_cost.1 * reporters_len
+                            (1 + guarantors_len) * slash_cost.0 + reward_cost.0 * reporters_len,
+                            (1 + guarantors_len) * slash_cost.1 + reward_cost.1 * reporters_len
                         );
                     }
                 } else {

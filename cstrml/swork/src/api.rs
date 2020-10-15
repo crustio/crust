@@ -10,7 +10,10 @@ use signatory::{
 };
 #[cfg(feature = "std")]
 use signatory_ring::ecdsa::p256::{PublicKey, Verifier};
-use primitives::MerkleRoot;
+use primitives::{
+    MerkleRoot, SworkerPubKey, SworkerSignature,
+    IASSig, SworkerCert, ISVBody, SworkerCode
+};
 
 #[cfg(feature = "std")]
 use openssl::{
@@ -25,12 +28,12 @@ use serde_json::{Result as JsonResult, Value};
 #[runtime_interface]
 pub trait Crypto {
     fn verify_identity(
-        ias_sig: &Vec<u8>,
-        ias_cert: &Vec<u8>,
+        ias_sig: &IASSig,
+        ias_cert: &SworkerCert,
         account_id: &Vec<u8>,
-        isv_body: &Vec<u8>,
-        sig: &Vec<u8>,
-        enclave_code: &Vec<u8>
+        isv_body: &ISVBody,
+        sig: &SworkerSignature,
+        enclave_code: &SworkerCode
     ) -> Option<Vec<u8>> {
         // 0. Define this fucking big root certificate💩
         let root_ca: Vec<u8> = "-----BEGIN CERTIFICATE-----
@@ -138,37 +141,54 @@ DaVzWh5aiEx+idkSGMnX
     }
 
     fn verify_work_report_sig(
-        pk: &Vec<u8>,
-        bn: u64,
+        curr_pk: &SworkerPubKey,
+        prev_pk: &SworkerPubKey,
+        block_number: u64,
         block_hash: &Vec<u8>,
-        rsv: u64,
-        fs: &Vec<(MerkleRoot, u64)>,
-        sig: &Vec<u8>,
+        free: u64,
+        used: u64,
+        srd_root: &MerkleRoot,
+        files_root: &MerkleRoot,
+        added_files: &Vec<(MerkleRoot, u64)>,
+        deleted_files: &Vec<(MerkleRoot, u64)>,
+        sig: &SworkerSignature,
     ) -> bool {
-        // 1. Encode u64
-        let block_number = bn.to_string().as_bytes().to_vec();
-        let reserved = rsv.to_string().as_bytes().to_vec();
-        let files_byes = encode_files(fs);
+        // 1. Encode
+        let block_number_bytes = block_number.to_string().as_bytes().to_vec();
+        let free_bytes = free.to_string().as_bytes().to_vec();
+        let used_bytes = used.to_string().as_bytes().to_vec();
+        let added_files_bytes = encode_files(added_files);
+        let deleted_files_bytes = encode_files(deleted_files);
 
-        // 2. Construct identity data
+        // 2. Construct work report data
         //{
-        //    pub_key: PubKey,
-        //    block_number: u64,
+        //    curr_pk: SworkerPubKey,
+        //    prev_pk: SworkerPubKey,
+        //    block_number: u64, -> Vec<u8>
         //    block_hash: Vec<u8>,
-        //    reserved: u64,
-        //    files: Vec<(MerkleRoot, u64)> -> Vec<u8>
+        //    free: u64, -> Vec<u8>
+        //    used: u64, -> Vec<u8>
+        //    free_root: MerkleRoot,
+        //    used_root: MerkleRoot,
+        //    added_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
+        //    deleted_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
         //}
         let data: Vec<u8> = [
-            &pk[..],
-            &block_number[..],
+            &curr_pk[..],
+            &prev_pk[..],
+            &block_number_bytes[..],
             &block_hash[..],
-            &reserved[..],
-            &files_byes[..],
+            &free_bytes[..],
+            &used_bytes[..],
+            &srd_root[..],
+            &files_root[..],
+            &added_files_bytes[..],
+            &deleted_files_bytes[..]
         ]
         .concat();
 
         // 3. do p256 sig check
-        verify_p256_sig(pk, &data, sig)
+        verify_p256_sig(curr_pk, &data, sig)
     }
 
     fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {

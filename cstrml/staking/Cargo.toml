@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-staking"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -14,31 +14,32 @@ safe-mix = { version = "1.0.0", default-features = false }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
 
 # substrate frame dependencies
-frame-support = { version = '2.0.0-rc6', default-features = false }
-frame-system = { version = '2.0.0-rc6', default-features = false }
-pallet-session = { version = '2.0.0-rc6', features = ["historical"], default-features = false }
-pallet-authorship = { version = '2.0.0-rc6', default-features = false }
+frame-support = { version = '2.0.0', default-features = false }
+frame-system = { version = '2.0.0', default-features = false }
+pallet-session = { version = '2.0.0', features = ["historical"], default-features = false }
+pallet-authorship = { version = '2.0.0', default-features = false }
 
 # substrate primitives
-sp-keyring = { optional = true, version = '2.0.0-rc6' }
-sp-std = { version = '2.0.0-rc6', default-features = false }
-sp-io ={ version = '2.0.0-rc6', default-features = false }
-sp-runtime = { version = '2.0.0-rc6', default-features = false }
-sp-staking = { version = '2.0.0-rc6', default-features = false }
-frame-benchmarking = { version = '2.0.0-rc6', default-features = false, optional = true }
+sp-keyring = { optional = true, version = '2.0.0' }
+sp-std = { version = '2.0.0', default-features = false }
+sp-io ={ version = '2.0.0', default-features = false }
+sp-runtime = { version = '2.0.0', default-features = false }
+sp-staking = { version = '2.0.0', default-features = false }
+frame-benchmarking = { version = '2.0.0', default-features = false, optional = true }
+rand_chacha = { version = "0.2", default-features = false }
 
 # crust runtime modules
 swork = { package = "cstrml-swork", path = "../swork", default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-sp-core = '2.0.0-rc6'
+sp-core = '2.0.0'
 balances = { package = 'cstrml-balances', path = '../balances' }
-pallet-timestamp = '2.0.0-rc6'
-frame-benchmarking = { version = '2.0.0-rc6' }
+pallet-timestamp = '2.0.0'
+frame-benchmarking = { version = '2.0.0' }
 
 # private crate inside substrate
-substrate-test-utils = { version = '2.0.0-alpha.5', git = 'https://github.com/paritytech/substrate.git', rev = 'd1b9ccad107e4899978858de5ddd2868b9777aab'}
+substrate-test-utils = '2.0.0'
 
 [features]
 equalize = []

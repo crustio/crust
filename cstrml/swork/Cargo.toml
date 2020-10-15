@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-swork"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -19,25 +19,25 @@ base64 = "0.12.2"
 openssl = { optional = true, version = "0.10.29" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = '2.0.0-rc6' }
-frame-system = { default-features = false, version = '2.0.0-rc6' }
+frame-support = { default-features = false, version = '2.0.0' }
+frame-system = { default-features = false, version = '2.0.0' }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0-rc6' }
-sp-io = { default-features = false, version = '2.0.0-rc6' }
-sp-runtime = { default-features = false, version = '2.0.0-rc6' }
-sp-runtime-interface = { default-features = false, version = '2.0.0-rc6' }
-sp-std = { default-features = false, version = '2.0.0-rc6' }
-frame-benchmarking = { version = '2.0.0-rc6', default-features = false, optional = true }
+sp-core = { default-features = false, version = '2.0.0' }
+sp-io = { default-features = false, version = '2.0.0' }
+sp-runtime = { default-features = false, version = '2.0.0' }
+sp-runtime-interface = { default-features = false, version = '2.0.0' }
+sp-std = { default-features = false, version = '2.0.0' }
+frame-benchmarking = { version = '2.0.0', default-features = false, optional = true }
 
 # crust runtime modules
 market = { package = 'cstrml-market', path = '../market', default-features = false }
 primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-keyring = { package = "sp-keyring", version = '2.0.0-rc6' }
+keyring = { package = "sp-keyring", version = '2.0.0' }
 balances = { package = 'cstrml-balances', path = '../balances' }
-frame-benchmarking = { version = '2.0.0-rc6' }
+frame-benchmarking = { version = '2.0.0' }
 
 [features]
 default = ['std']

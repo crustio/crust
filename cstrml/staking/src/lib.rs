@@ -2247,7 +2247,7 @@ impl<T: Trait> Module<T> {
         .map(|(who, _stakes)| who.clone())
         .collect::<Vec<T::AccountId>>();
         elected_stashes
-    }	
+    }
 
     fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {
         // 1. Construct random seed, 👼 bless the randomness

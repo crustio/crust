@@ -17,6 +17,12 @@ benchmarks! {
         let u in 1 .. MAX_USER_INDEX => ();
     }
 
+    upgrade {
+        let u in ...;
+        let code: Vec<u8> = vec![226,86,171,76,181,233,19,107,193,193,17,80,136,252,64,202,31,65,130,84,94,167,87,105,87,140,32,216,67,2,140,213];    
+        let expire_block: T::BlockNumber = BLOCK_NUMBER.into();
+    }: _(RawOrigin::Root, code, expire_block)
+
     register {
         let u in ...;
         let code: Vec<u8> = vec![226,86,171,76,181,233,19,107,193,193,17,80,136,252,64,202,31,65,130,84,94,167,87,105,87,140,32,216,67,2,140,213];    

@@ -313,15 +313,15 @@ parameter_types! {
 impl pallet_identity::Trait for Runtime {
     type Event = Event;
     type Currency = Balances;
-    type Slashed = Treasury;
     type BasicDeposit = BasicDeposit;
     type FieldDeposit = FieldDeposit;
     type SubAccountDeposit = SubAccountDeposit;
     type MaxSubAccounts = MaxSubAccounts;
     type MaxAdditionalFields = MaxAdditionalFields;
     type MaxRegistrars = MaxRegistrars;
-    type RegistrarOrigin = MoreThanHalfCouncil;
+    type Slashed = Treasury;
     type ForceOrigin = MoreThanHalfCouncil;
+    type RegistrarOrigin = MoreThanHalfCouncil;
     type WeightInfo = ();
 }
 
@@ -547,6 +547,11 @@ impl balances::Trait for Runtime {
     type MaxLocks = MaxLocks;
 }
 
+impl candy::Trait for Runtime {
+    type Event = Event;
+    type Balance = Balance;
+}
+
 // TODO: better way to deal with fee(s)
 parameter_types! {
     pub const TransactionBaseFee: Balance = 1 * CENTS;
@@ -554,7 +559,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Trait for Runtime {
-    type Currency = balances::Module<Runtime>;
+    type Currency = Balances;
     type OnTransactionPayment = DealWithFees;
     type TransactionByteFee = TransactionByteFee;
     type WeightToFee = IdentityFee<Balance>;
@@ -623,7 +628,7 @@ construct_runtime! {
         Staking: staking::{Module, Call, Storage, Config<T>, Event<T>},
         Historical: session_historical::{Module},
         Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
-        FinalityTracker: pallet_finality_tracker::{Module, Call, Inherent},
+        FinalityTracker: pallet_finality_tracker::{Module, Call, Storage, Inherent},
         Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event, ValidateUnsigned},
         ImOnline: pallet_im_online::{Module, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
         AuthorityDiscovery: pallet_authority_discovery::{Module, Call, Config},
@@ -649,6 +654,9 @@ construct_runtime! {
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
+
+        // Token candy
+        Candy: candy::{Module, Call, Storage, Event<T>},
     }
 }
 

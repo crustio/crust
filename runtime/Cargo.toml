@@ -72,7 +72,8 @@ swork = { package = 'cstrml-swork', path = '../cstrml/swork', default-features =
 staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
 market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
 primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
-balances = { default-features = false, package = 'cstrml-balances', path = '../cstrml/balances' }
+balances = { package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
+candy = { package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
 
 [features]
 default = ['std']
@@ -115,14 +116,15 @@ std = [
     'pallet-offences/std',
     'pallet-treasury/std',
     'pallet-elections-phragmen/std',
+    'pallet-transaction-payment-rpc-runtime-api/std',
+    'pallet-utility/std',
+    'pallet-identity/std',
     'sp-runtime-interface/std',
     'swork/std',
     'staking/std',
     'market/std',
     'primitives/std',
-    'pallet-transaction-payment-rpc-runtime-api/std',
-    'pallet-utility/std',
-    'pallet-identity/std'
+    'candy/std'
 ]
 runtime-benchmarks = [
     "frame-benchmarking",

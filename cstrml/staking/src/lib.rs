@@ -391,7 +391,7 @@ pub trait Trait: frame_system::Trait {
     /// Handler for the unbalanced increment when rewarding a staker.
     type Reward: OnUnbalanced<PositiveImbalanceOf<Self>>;
 
-    /// Something that provides randomness in the runtime.	
+    /// Something that provides randomness in the runtime.
     type Randomness: Randomness<Self::Hash>;
 
     /// Number of sessions per era.
@@ -616,10 +616,10 @@ decl_storage! {
         EarliestUnappliedSlash: Option<EraIndex>;
 
         /// True if network has been upgraded to this version.
-		/// Storage version of the pallet.
-		///
-		/// This is set to v2 for new networks.
-		StorageVersion build(|_: &GenesisConfig<T>| Releases::V2): Releases;
+        /// Storage version of the pallet.
+        ///
+        /// This is set to v2 for new networks.
+        StorageVersion build(|_: &GenesisConfig<T>| Releases::V2): Releases;
     }
     add_extra_genesis {
         config(stakers):
@@ -731,11 +731,11 @@ decl_module! {
         const BondingDuration: EraIndex = T::BondingDuration::get();
 
         /// Number of eras that slashes are deferred by, after computation.
-		///
-		/// This should be less than the bonding duration.
-		/// Set to 0 if slashes should be applied immediately, without opportunity for
-		/// intervention.
-		const SlashDeferDuration: EraIndex = T::SlashDeferDuration::get();
+        ///
+        /// This should be less than the bonding duration.
+        /// Set to 0 if slashes should be applied immediately, without opportunity for
+        /// intervention.
+        const SlashDeferDuration: EraIndex = T::SlashDeferDuration::get();
         
         /// The maximum number of guarantors rewarded for each validator.
         ///
@@ -2222,54 +2222,54 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn do_election(	
-        mut validators_stakes: Vec<(T::AccountId, u128)>,	
-        to_elect: usize) -> Vec<T::AccountId> {	
-        // Select new validators by top-down their total `valid` stakes	
-        // then randomly choose some of them from the top validators	
+    fn do_election(
+        mut validators_stakes: Vec<(T::AccountId, u128)>,
+        to_elect: usize) -> Vec<T::AccountId> {
+        // Select new validators by top-down their total `valid` stakes
+        // then randomly choose some of them from the top validators
 
-        let candidate_to_elect = validators_stakes.len().min(to_elect * 2);	
-        // sort by 'valid' stakes	
-        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));	
+        let candidate_to_elect = validators_stakes.len().min(to_elect * 2);
+        // sort by 'valid' stakes
+        validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
 
-        // choose top candidate_to_elect number of validators	
-        let mut candidate_stashes = validators_stakes[0..candidate_to_elect]	
-        .iter()	
-        .map(|(who, stakes)| (who.clone(), *stakes))	
-        .collect::<Vec<(T::AccountId, u128)>>();	
+        // choose top candidate_to_elect number of validators
+        let mut candidate_stashes = validators_stakes[0..candidate_to_elect]
+        .iter()
+        .map(|(who, stakes)| (who.clone(), *stakes))
+        .collect::<Vec<(T::AccountId, u128)>>();
 
-        // shuffle it	
-        Self::shuffle_candidates(&mut candidate_stashes);	
+        // shuffle it
+        Self::shuffle_candidates(&mut candidate_stashes);
 
-        // choose elected_stashes number of validators	
-        let elected_stashes = candidate_stashes[0..to_elect]	
-        .iter()	
-        .map(|(who, _stakes)| who.clone())	
-        .collect::<Vec<T::AccountId>>();	
-        elected_stashes	
+        // choose elected_stashes number of validators
+        let elected_stashes = candidate_stashes[0..to_elect]
+        .iter()
+        .map(|(who, _stakes)| who.clone())
+        .collect::<Vec<T::AccountId>>();
+        elected_stashes
     }	
 
-    fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {	
-        // 1. Construct random seed, 👼 bless the randomness	
-        // seed = [ block_hash, phrase ]	
-        let phrase = b"candidates_shuffle";	
-        let bn = <frame_system::Module<T>>::block_number();	
-        let bh: T::Hash = <frame_system::Module<T>>::block_hash(bn);	
-        let seed = [	
-            &bh.as_ref()[..],	
-            &phrase.encode()[..]	
-        ].concat();	
+    fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {
+        // 1. Construct random seed, 👼 bless the randomness
+        // seed = [ block_hash, phrase ]
+        let phrase = b"candidates_shuffle";
+        let bn = <frame_system::Module<T>>::block_number();
+        let bh: T::Hash = <frame_system::Module<T>>::block_hash(bn);
+        let seed = [
+            &bh.as_ref()[..],
+            &phrase.encode()[..]
+        ].concat();
 
-        // we'll need a random seed here.	
-        let seed = T::Randomness::random(seed.as_slice());	
-        // seed needs to be guaranteed to be 32 bytes.	
-        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))	
-            .expect("input is padded with zeroes; qed");	
-        let mut rng = ChaChaRng::from_seed(seed);	
-        for i in (0..candidates_stakes.len()).rev() {	
-            let random_index = (rng.next_u32() % (i as u32 + 1)) as usize;	
-            candidates_stakes.swap(random_index, i);	
-        }	
+        // we'll need a random seed here.
+        let seed = T::Randomness::random(seed.as_slice());
+        // seed needs to be guaranteed to be 32 bytes.
+        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))
+            .expect("input is padded with zeroes; qed");
+        let mut rng = ChaChaRng::from_seed(seed);
+        for i in (0..candidates_stakes.len()).rev() {
+            let random_index = (rng.next_u32() % (i as u32 + 1)) as usize;
+            candidates_stakes.swap(random_index, i);
+        }
     }
 }
 

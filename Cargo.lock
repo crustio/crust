@@ -1054,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-candy"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -1100,6 +1100,7 @@ dependencies = [
  "pallet-session",
  "pallet-timestamp",
  "parity-scale-codec",
+ "rand_chacha 0.2.2",
  "safe-mix",
  "serde",
  "sp-core",

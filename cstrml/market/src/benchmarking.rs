@@ -63,5 +63,20 @@ benchmarks! {
         let file: Vec<u8> = vec![91,183,6,50,10,252,99,59,251,132,49,8,228,146,25,43,23,210,182,185,217,238,11,121,94,233,84,23,254,8,182,96];
         let file_alias = "/test/file1".as_bytes().to_vec();
     }: _(RawOrigin::Signed(stash), target_lookup, file.into(), 134289408, 100, file_alias)
+
+    set_file_alias {
+        let u in ...;
+        let stash = create_funded_user::<T>("stash",u);
+        let target = create_funded_user::<T>("target",u);
+        let target_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(target.clone());
+        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let amount = T::Currency::minimum_balance() * 100000.into();
+        Market::<T>::pledge(RawOrigin::Signed(target.clone()).into(), amount).expect("pledge failed");
+        Market::<T>::register(RawOrigin::Signed(target.clone()).into(), address_info, T::Currency::minimum_balance() * 2.into()).expect("Register failed");
+        let file: Vec<u8> = vec![91,183,6,50,10,252,99,59,251,132,49,8,228,146,25,43,23,210,182,185,217,238,11,121,94,233,84,23,254,8,182,96];
+        let file_alias = "/test/file1".as_bytes().to_vec();
+        Market::<T>::place_storage_order(RawOrigin::Signed(stash.clone()).into(), target_lookup, file.into(), 134289408, 100, file_alias.clone()).expect("Place sorder failed");
+        let new_file_alias = "/test/file2".as_bytes().to_vec();
+    }: _(RawOrigin::Signed(stash), file_alias, new_file_alias)
 }
 

@@ -15,7 +15,7 @@ use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
     Perbill,
-    traits::{StaticLookup, Zero, CheckedMul, Convert}
+    traits::{StaticLookup, Zero, CheckedMul, Convert, TrailingZeroInput}
 };
 
 #[cfg(feature = "std")]
@@ -507,7 +507,7 @@ decl_module! {
 
 
             // 10. Pay the order and (maybe) add storage order
-            if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &sorder_info, &sorder_status) {
+            if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &sorder_info, &sorder_status, &file_alias) {
                 // a. update pledge
                 <Pledges<T>>::mutate(&merchant, |pledge| {
                         pledge.used += amount;
@@ -652,9 +652,10 @@ impl<T: Trait> Module<T> {
                            merchant: &T::AccountId,
                            amount: BalanceOf<T>,
                            so_info: &SorderInfo<T::AccountId, BalanceOf<T>>,
-                           so_status: &SorderStatus
-                        ) -> Option<T::Hash> {
-        let order_id = Self::generate_sorder_id(client, merchant);
+                           so_status: &SorderStatus,
+                           file_alias: &FileAlias,
+                          ) -> Option<T::Hash> {
+        let order_id = Self::generate_sorder_id(client, merchant, file_alias);
 
         // This should be false, cause we don't allow duplicated `order_id`
         if <SorderInfos<T>>::contains_key(&order_id) {
@@ -762,19 +763,20 @@ impl<T: Trait> Module<T> {
 
     // IMMUTABLE PRIVATE
     // Generate the storage order id by using the on-chain randomness
-    fn generate_sorder_id(client: &T::AccountId, merchant: &T::AccountId) -> T::Hash {
+    fn generate_sorder_id(client: &T::AccountId, merchant: &T::AccountId, file_alias: &FileAlias) -> T::Hash {
         // 1. Construct random seed, 👼 bless the randomness
         // seed = [ block_hash, client_account, merchant_account ]
         let bn = <system::Module<T>>::block_number();
         let bh: T::Hash = <system::Module<T>>::block_hash(bn);
         let seed = [
-            &bh.as_ref()[..],
+            &file_alias.encode()[..],
             &client.encode()[..],
             &merchant.encode()[..],
         ].concat();
 
         // 2. It can cover most cases, for the "real" random
-        T::Randomness::random(seed.as_slice())
+        T::Hash::decode(&mut TrailingZeroInput::new(&seed[..])).unwrap_or_default()
+        // T::Randomness::random(seed.as_slice())
     }
 
     // Calculate storage order's amount

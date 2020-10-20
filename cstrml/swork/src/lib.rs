@@ -470,7 +470,7 @@ impl<T: Trait> Module<T> {
     /// This function will (maybe) insert or update a identity, in details:
     /// 1. Add to `identities`
     /// 2. Add to `id_bond`
-    fn maybe_upsert_id(who: &T::AccountId, pk: &SworkerPubKey, code: &SworkerCode) {
+    pub fn maybe_upsert_id(who: &T::AccountId, pk: &SworkerPubKey, code: &SworkerCode) {
         // 1. Add to `identities`
         Identities::insert(pk, code);
 

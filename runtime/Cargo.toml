@@ -75,6 +75,8 @@ primitives = { package = 'cst-primitives', path = '../primitives', default-featu
 balances = { package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
 candy = { package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
 
+integration-benchmark = {package = 'cstrml-integration-benchmarking', path = '../cstrml/integration-benchmark', default-features = false, optional = true }
+
 [features]
 default = ['std']
 std = [
@@ -137,4 +139,5 @@ runtime-benchmarks = [
     "staking/runtime-benchmarks",
     "market/runtime-benchmarks",
     "swork/runtime-benchmarks",
+    "integration-benchmark/runtime-benchmarks"
 ]

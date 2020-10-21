@@ -16,5 +16,5 @@
 /.cargo
 /docker/crust/crust
 
-## Macbook Pro
+## OS X
 **/*.DS_Store

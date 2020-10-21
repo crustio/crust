@@ -749,6 +749,7 @@ impl<T: Trait> Module<T> {
         deleted_files: &Vec<(MerkleRoot, u64)>,
         sig: &SworkerSignature
     ) -> bool {
+        let block_number_bytes = block_number.to_be_bytes();
         api::crypto::verify_work_report_sig(
             curr_pk,
             prev_pk,

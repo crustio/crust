@@ -670,8 +670,8 @@ impl<T: Trait> Module<T> {
             let deleted_files_size = reported_deleted_files.iter().fold(0, |acc, (_, size)| acc+*size);
 
             // File size change should equal between before and after
-            return if old_files_size == new_files_size {
-                reported_files_root == &prev_wr.reported_files_root
+            return if reported_files_root == &prev_wr.reported_files_root {
+                old_files_size == new_files_size
             } else {
                 old_files_size.saturating_add(added_files_size).saturating_sub(deleted_files_size) == new_files_size
             }

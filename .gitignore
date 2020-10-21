@@ -15,3 +15,6 @@
 /docker/.cache
 /.cargo
 /docker/crust/crust
+
+## Macbook Pro
+**/*.DS_Store

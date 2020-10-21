@@ -320,6 +320,65 @@ fn report_works_should_work_without_sorders() {
 }
 
 #[test]
+fn report_works_should_work_with_added_and_deleted_files() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // Generate 303 blocks first
+            run_to_block(303);
+
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_wr_info = legal_work_report();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+
+            register(&reporter, &legal_pk, &LegalCode::get());
+
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+            // Generate 606 blocks
+            run_to_block(606);
+
+            // TODO: use `same size added and deleted files` work report test case
+            // FAKE Pass.
+            let legal_wr_info_with_added_and_deleted_files = legal_work_report_with_added_and_deleted_files();
+            assert_noop!(
+                Swork::report_works(
+                    Origin::signed(reporter),
+                    legal_wr_info_with_added_and_deleted_files.curr_pk,
+                    legal_wr_info_with_added_and_deleted_files.prev_pk,
+                    legal_wr_info_with_added_and_deleted_files.block_number,
+                    legal_wr_info_with_added_and_deleted_files.block_hash,
+                    legal_wr_info_with_added_and_deleted_files.free,
+                    legal_wr_info_with_added_and_deleted_files.used,
+                    legal_wr_info_with_added_and_deleted_files.added_files,
+                    legal_wr_info_with_added_and_deleted_files.deleted_files,
+                    legal_wr_info_with_added_and_deleted_files.srd_root,
+                    legal_wr_info_with_added_and_deleted_files.files_root,
+                    legal_wr_info_with_added_and_deleted_files.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 5,
+                    message: Some("IllegalWorkReportSig"),
+                }
+            );
+        });
+}
+
+#[test]
 fn report_works_should_failed_with_not_registered() {
     ExtBuilder::default()
         .build()

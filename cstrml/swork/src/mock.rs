@@ -326,6 +326,20 @@ pub fn ab_upgrade_work_report() -> ReportWorksInfo {
     legal_wr
 }
 
+pub fn legal_work_report_with_added_and_deleted_files() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 600;
+    legal_wr.added_files = vec![
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+    ];
+    legal_wr.deleted_files = vec![
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+    ];
+    legal_wr.files_root = hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+    legal_wr.sig = hex::decode("3949297f56d65adacb6f5837b63a050c2aaf2f5674c425792b37823f78a36254a67a259ab5e03bbfab31d8d716db101036cc42cfb1fbb126c04772763c44486d").unwrap();
+    legal_wr
+}
+
 pub fn continuous_ab_upgrade_work_report() -> ReportWorksInfo {
     let mut legal_wr = ab_upgrade_work_report();
     legal_wr.block_number = 900;

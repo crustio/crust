@@ -15,3 +15,6 @@
 /docker/.cache
 /.cargo
 /docker/crust/crust
+
+## OS X
+**/*.DS_Store

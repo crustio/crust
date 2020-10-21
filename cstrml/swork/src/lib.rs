@@ -784,16 +784,32 @@ impl<T: Trait> Module<T> {
         ].concat();
 
         api::crypto::verify_p256_sig(curr_pk, &data, sig)
+        // api::crypto::verify_work_report_sig(
+        //     curr_pk,
+        //     prev_pk,
+        //     block_number,
+        //     block_hash,
+        //     reserved,
+        //     used,
+        //     srd_root,
+        //     files_root,
+        //     added_files,
+        //     deleted_files,
+        //     sig
+        // )
     }
 
     // 127 -> "127" -> 49 50 55
     fn encode_u64_to_string_vec_u8(number: u64) -> Vec<u8> {
         let mut value = number;
         let mut encoded_number: Vec<u8> = [].to_vec();
-        while value != 0 {
+        loop {
             encoded_number.push((value%10) as u8 + 48u8); // "0" is 48u8
             value /= 10;
-        };
+            if value == 0 {
+                break;
+            }
+        }
         encoded_number.reverse();
         encoded_number
     }

@@ -60,7 +60,7 @@ fn encode_file_root(fs: Vec<u8>) -> Vec<u8> {
 // then encode this string to vec u8
 // eg. 91 -> 5b -> "5b" -> 53 98
 fn encode_u8_to_hex_string_to_bytes(number: u8) -> Vec<u8> {
-    let upper_value = number / 16 as u8;
+    let upper_value = number / 16 as u8; // 16 is due to hex based
     let lower_value = number % 16 as u8;
     [encode_u8_to_hex_char_to_u8(upper_value), encode_u8_to_hex_char_to_u8(lower_value)].to_vec()
 }
@@ -71,8 +71,8 @@ fn encode_u8_to_hex_string_to_bytes(number: u8) -> Vec<u8> {
 // eg. 11 -> "b" -> 98
 fn encode_u8_to_hex_char_to_u8(number: u8) -> u8 {
     if number < 10u8 {
-        return number + 48u8;
+        return number + 48u8; // '0' is 48u8
     } else {
-        return number - 10u8 + 97u8;
+        return number - 10u8 + 97u8; // 'a' is 97u8
     }
 }

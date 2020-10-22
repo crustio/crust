@@ -11,7 +11,7 @@ use signatory::{
 #[cfg(feature = "std")]
 use signatory_ring::ecdsa::p256::{PublicKey, Verifier};
 use primitives::{
-    MerkleRoot, SworkerPubKey, SworkerSignature,
+    SworkerSignature,
     IASSig, SworkerCert, ISVBody, SworkerCode
 };
 
@@ -138,74 +138,6 @@ DaVzWh5aiEx+idkSGMnX
         }
 
         None
-    }
-
-    fn verify_work_report_sig(
-        curr_pk: &SworkerPubKey,
-        prev_pk: &SworkerPubKey,
-        block_number: u64,
-        block_hash: &Vec<u8>,
-        free: u64,
-        used: u64,
-        srd_root: &MerkleRoot,
-        files_root: &MerkleRoot,
-        added_files: &Vec<(MerkleRoot, u64)>,
-        deleted_files: &Vec<(MerkleRoot, u64)>,
-        sig: &SworkerSignature,
-    ) -> bool {
-        // 1. Encode
-        let block_number_bytes = block_number.to_string().as_bytes().to_vec();
-        let free_bytes = free.to_string().as_bytes().to_vec();
-        let used_bytes = used.to_string().as_bytes().to_vec();
-        let added_files_bytes = encode_files(added_files);
-        let deleted_files_bytes = encode_files(deleted_files);
-
-        // 2. Construct work report data
-        //{
-        //    curr_pk: SworkerPubKey,
-        //    prev_pk: SworkerPubKey,
-        //    block_number: u64, -> Vec<u8>
-        //    block_hash: Vec<u8>,
-        //    free: u64, -> Vec<u8>
-        //    used: u64, -> Vec<u8>
-        //    free_root: MerkleRoot,
-        //    used_root: MerkleRoot,
-        //    added_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
-        //    deleted_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
-        //}
-        let data: Vec<u8> = [
-            &curr_pk[..],
-            &prev_pk[..],
-            &block_number_bytes[..],
-            &block_hash[..],
-            &free_bytes[..],
-            &used_bytes[..],
-            &srd_root[..],
-            &files_root[..],
-            &added_files_bytes[..],
-            &deleted_files_bytes[..]
-        ]
-        .concat();
-
-        // 3. do p256 sig check
-        verify_p256_sig(curr_pk, &data, sig)
-    }
-
-    fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
-        let mut rst  = "[".to_string();
-        let len = fs.len();
-        for (pos, (hash, size)) in fs.iter().enumerate() {
-            rst += "{\"hash\":\"";
-            rst += hex::encode(hash).as_str();
-            rst += "\",\"size\":";
-            rst += size.to_string().as_str();
-            rst += "}";
-            if pos != len-1 { rst += "," }
-        }
-
-        rst += "]";
-
-        rst.into_bytes()
     }
 
     fn verify_p256_sig(be_pk: &Vec<u8>, data: &Vec<u8>, be_sig: &Vec<u8>) -> bool {

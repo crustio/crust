@@ -31,6 +31,9 @@ use sp_std::collections::btree_map::BTreeMap;
 /// Provides crypto and other std functions by implementing `runtime_interface`
 pub mod api;
 
+/// Provides util functions
+pub mod utils;
+
 #[cfg(test)]
 mod mock;
 
@@ -749,19 +752,40 @@ impl<T: Trait> Module<T> {
         deleted_files: &Vec<(MerkleRoot, u64)>,
         sig: &SworkerSignature
     ) -> bool {
-        api::crypto::verify_work_report_sig(
-            curr_pk,
-            prev_pk,
-            block_number,
-            block_hash,
-            reserved,
-            used,
-            srd_root,
-            files_root,
-            added_files,
-            deleted_files,
-            sig
-        )
+        // 1. Encode
+        let block_number_bytes = utils::encode_u64_to_string_to_bytes(block_number);
+        let reserved_bytes = utils::encode_u64_to_string_to_bytes(reserved);
+        let used_bytes = utils::encode_u64_to_string_to_bytes(used);
+        let added_files_bytes = utils::encode_files(added_files);
+        let deleted_files_bytes = utils::encode_files(deleted_files);
+
+        // 2. Construct work report data
+        //{
+        //    curr_pk: SworkerPubKey,
+        //    prev_pk: SworkerPubKey,
+        //    block_number: u64, -> Vec<u8>
+        //    block_hash: Vec<u8>,
+        //    free: u64, -> Vec<u8>
+        //    used: u64, -> Vec<u8>
+        //    free_root: MerkleRoot,
+        //    used_root: MerkleRoot,
+        //    added_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
+        //    deleted_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
+        //}
+        let data: Vec<u8> = [
+            &curr_pk[..],
+            &prev_pk[..],
+            &block_number_bytes[..],
+            &block_hash[..],
+            &reserved_bytes[..],
+            &used_bytes[..],
+            &srd_root[..],
+            &files_root[..],
+            &added_files_bytes[..],
+            &deleted_files_bytes[..]
+        ].concat();
+
+        api::crypto::verify_p256_sig(curr_pk, &data, sig)
     }
 
     fn get_current_block_number() -> BlockNumber {

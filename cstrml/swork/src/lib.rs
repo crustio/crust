@@ -753,9 +753,9 @@ impl<T: Trait> Module<T> {
         sig: &SworkerSignature
     ) -> bool {
         // 1. Encode
-        let block_number_bytes = utils::encode_u64_to_string_to_vec_u8(block_number);
-        let reserved_bytes = utils::encode_u64_to_string_to_vec_u8(reserved);
-        let used_bytes = utils::encode_u64_to_string_to_vec_u8(used);
+        let block_number_bytes = utils::encode_u64_to_string_to_bytes(block_number);
+        let reserved_bytes = utils::encode_u64_to_string_to_bytes(reserved);
+        let used_bytes = utils::encode_u64_to_string_to_bytes(used);
         let added_files_bytes = utils::encode_files(added_files);
         let deleted_files_bytes = utils::encode_files(deleted_files);
 

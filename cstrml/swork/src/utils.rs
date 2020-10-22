@@ -1,3 +1,5 @@
+use sp_std::prelude::*;
+
 pub fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
     // "["
     let open_square_brackets_bytes: Vec<u8> = [91].to_vec();
@@ -17,7 +19,7 @@ pub fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
         rst.extend(hash_bytes.clone());
         rst.extend(encode_file_root(hash.clone()));
         rst.extend(size_bytes.clone());
-        rst.extend(encode_u64_to_string_to_vec_u8(*size));
+        rst.extend(encode_u64_to_string_to_bytes(*size));
         rst.extend(close_curly_brackets_bytes.clone());
         if pos != len-1 { rst.extend(comma_bytes.clone()) }
     }
@@ -29,7 +31,7 @@ pub fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
 
 // Simulate the process u64.to_string().as_bytes().to_vec()
 // eg. 127 -> "127" -> 49 50 55
-pub fn encode_u64_to_string_to_vec_u8(number: u64) -> Vec<u8> {
+pub fn encode_u64_to_string_to_bytes(number: u64) -> Vec<u8> {
     let mut value = number;
     let mut encoded_number: Vec<u8> = [].to_vec();
     loop {
@@ -49,7 +51,7 @@ pub fn encode_u64_to_string_to_vec_u8(number: u64) -> Vec<u8> {
 fn encode_file_root(fs: Vec<u8>) -> Vec<u8> {
     let mut rst: Vec<u8> = [].to_vec();
     for v in fs.iter() {
-        rst.extend(encode_u8_to_hex_string_to_vec_u8(*v));
+        rst.extend(encode_u8_to_hex_string_to_bytes(*v));
     }
     rst
 }
@@ -57,7 +59,7 @@ fn encode_file_root(fs: Vec<u8>) -> Vec<u8> {
 // encode one u8 value to hex based string
 // then encode this string to vec u8
 // eg. 91 -> 5b -> "5b" -> 53 98
-fn encode_u8_to_hex_string_to_vec_u8(number: u8) -> Vec<u8> {
+fn encode_u8_to_hex_string_to_bytes(number: u8) -> Vec<u8> {
     let upper_value = number / 16 as u8;
     let lower_value = number % 16 as u8;
     [encode_u8_to_hex_char_to_u8(upper_value), encode_u8_to_hex_char_to_u8(lower_value)].to_vec()

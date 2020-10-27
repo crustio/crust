@@ -5,7 +5,7 @@ use primitives::{
     SworkerPubKey
 };
 use serde_json::Value;
-use super::api;
+use p256::ecdsa::{VerifyKey, signature::{Verifier, Signature}};
 
 pub static IAS_SERVER_ROOTS: webpki::TLSServerTrustAnchors = webpki::TLSServerTrustAnchors(&[
     /*
@@ -135,7 +135,7 @@ pub fn verify_identity (
         ].concat();
 
         // 8. Verify signature
-        let is_legal_sig = api::crypto::verify_p256_sig(&pk, &data, &sig);
+        let is_legal_sig = verify_p256_sig(&pk, &data, &sig);
 
         if !is_legal_sig {
             return None;
@@ -174,6 +174,26 @@ pub fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
     rst.extend(close_square_brackets_bytes.clone());
 
     rst
+}
+
+pub fn verify_p256_sig(be_pk: &Vec<u8>, data: &Vec<u8>, be_sig: &Vec<u8>) -> bool {
+    let mut pk = be_pk.clone();
+    let mut sig = be_sig.clone();
+
+    pk[0..32].reverse();
+    pk[32..].reverse();
+
+    sig[0..32].reverse();
+    sig[32..].reverse();
+
+    let pk_with_prefix: Vec<u8> = [
+        &vec![4][..],
+        &pk[..]
+    ].concat();
+
+    let p256_sig = Signature::from_bytes(&sig).unwrap();
+    let verify_key = VerifyKey::new(&pk_with_prefix[..]).unwrap();
+    verify_key.verify(data, &p256_sig).is_ok()
 }
 
 // Simulate the process u64.to_string().as_bytes().to_vec()

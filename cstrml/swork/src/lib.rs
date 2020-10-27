@@ -28,9 +28,6 @@ use primitives::{
 use market::{OrderStatus, MarketInterface, OrderInspector};
 use sp_std::collections::btree_map::BTreeMap;
 
-/// Provides crypto and other std functions by implementing `runtime_interface`
-pub mod api;
-
 /// Provides util functions
 pub mod utils;
 
@@ -788,7 +785,7 @@ impl<T: Trait> Module<T> {
             &deleted_files_bytes[..]
         ].concat();
 
-        api::crypto::verify_p256_sig(curr_pk, &data, sig)
+        utils::verify_p256_sig(curr_pk, &data, sig)
     }
 
     fn get_current_block_number() -> BlockNumber {

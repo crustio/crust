@@ -694,7 +694,7 @@ impl<T: Trait> Module<T> {
         let enclave_code = Self::code();
         let applier = account_id.encode();
 
-        api::crypto::verify_identity(
+        utils::verify_identity(
             ias_sig,
             ias_cert,
             &applier,

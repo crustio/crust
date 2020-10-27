@@ -1,5 +1,5 @@
 [package]
-name = "serde"
+name = "serde_no_std"
 version = "1.0.117" # remember to update html_root_url and serde_derive dependency
 authors = ["Erick Tryzelaar <erick.tryzelaar@gmail.com>", "David Tolnay <dtolnay@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -14,10 +14,10 @@ include = ["build.rs", "src/**/*.rs", "crates-io.md", "README.md", "LICENSE-APAC
 build = "build.rs"
 
 [dependencies]
-serde_derive = { version = "=1.0.117", optional = true, path = "../serde_derive" }
+serde_derive = { package = "serde_derive_no_std", version = "=1.0.117", optional = true, path = "../serde_derive_no_std" }
 
 [dev-dependencies]
-serde_derive = { version = "1.0", path = "../serde_derive" }
+serde_derive = { package = "serde_derive_no_std", version = "1.0", path = "../serde_derive_no_std" }
 
 [package.metadata.playground]
 features = ["derive", "rc"]
@@ -29,14 +29,10 @@ targets = ["x86_64-unknown-linux-gnu"]
 ### FEATURES #################################################################
 
 [features]
-default = ["std"]
+default = ["alloc"]
 
 # Provide derive(Serialize, Deserialize) macros.
 derive = ["serde_derive"]
-
-# Provide impls for common standard library types like Vec<T> and HashMap<K, V>.
-# Requires a dependency on the Rust standard library.
-std = []
 
 # Provide impls for types that require unstable functionality. For tracking and
 # discussion of unstable functionality please refer to this issue:

@@ -65,6 +65,7 @@ pub fn verify_identity (
     sig: &SworkerSignature,
     enclave_code: &SworkerCode
 ) -> Option<Vec<u8>> {
+    // 1. Decode ias cert from base64
     let ias_cert_dec = match base64::decode_config(&ias_cert, base64::STANDARD) {
         Ok(c) => c,
         Err(_) => return None,
@@ -77,6 +78,7 @@ pub fn verify_identity (
     let chain: Vec<&[u8]> = Vec::new();
     let now_func = webpki::Time::from_seconds_since_unix_epoch(1573419050);
 
+    // 2. Verify ias cert
     match sig_cert.verify_is_valid_tls_server_cert(
         SUPPORTED_SIG_ALGS,
         &IAS_SERVER_ROOTS,
@@ -91,6 +93,8 @@ pub fn verify_identity (
         Ok(x) => x,
         Err(_) => panic!("decode sig failed")
     };
+
+    // 3. Verify isv body signature
     match sig_cert.verify_signature(
         &webpki::RSA_PKCS1_2048_8192_SHA256,
         isv_body,
@@ -100,13 +104,14 @@ pub fn verify_identity (
         Err(_e) => return None,
     };
 
-    // parse isv body
+    // 4. Parse isv body
     let maybe_isv_body: Value = match serde_json::from_slice(isv_body) {
         Ok(body) => body,
         Err(_) => return None,
     };
 
     if let Value::String(maybe_isv_quote_body) = &maybe_isv_body["isvEnclaveQuoteBody"] {
+        // 5. Decode isv quote body
         let decoded_quote_body = match base64::decode(&maybe_isv_quote_body) {
             Ok(decoded_qb) => decoded_qb,
             Err(_) => return None,

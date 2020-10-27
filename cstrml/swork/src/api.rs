@@ -10,13 +10,6 @@ use signatory::{
 };
 #[cfg(feature = "std")]
 use signatory_ring::ecdsa::p256::{PublicKey, Verifier};
-use primitives::{
-    SworkerSignature,
-    IASSig, SworkerCert, ISVBody, SworkerCode
-};
-
-#[cfg(feature = "std")]
-use serde_json::{Result as JsonResult, Value};
 
 #[runtime_interface]
 pub trait Crypto {
@@ -44,6 +37,5 @@ pub trait Crypto {
 
         result.is_ok()
     }
-    // ✅ 1. use wasm version, (p256 -> scep256k1 | x509 -> wasm version)
-    // 2. offchain_worker? forkless upgrade?
+    // TODO: use wasm version or (p256 -> scep256k1)
 }

@@ -1,7 +1,8 @@
 use sp_std::prelude::*;
 use primitives::{
     SworkerSignature,
-    IASSig, SworkerCert, ISVBody, SworkerCode
+    IASSig, SworkerCert, ISVBody, SworkerCode,
+    SworkerPubKey
 };
 use serde_json::Value;
 use super::api;
@@ -60,6 +61,7 @@ pub fn verify_identity (
     ias_cert: &SworkerCert,
     account_id: &Vec<u8>,
     isv_body: &ISVBody,
+    ab_upgrade_pk: &SworkerPubKey,
     sig: &SworkerSignature,
     enclave_code: &SworkerCode
 ) -> Option<Vec<u8>> {
@@ -124,6 +126,7 @@ pub fn verify_identity (
             &ias_sig[..],
             &isv_body[..],
             &account_id[..],
+            &ab_upgrade_pk[..],
         ].concat();
 
         // 8. Verify signature

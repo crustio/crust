@@ -26,6 +26,7 @@ fn register_should_work() {
             register_info.ias_cert,
             register_info.account_id,
             register_info.isv_body,
+            register_info.ab_upgrade_pk,
             register_info.sig
         ));
 
@@ -56,6 +57,7 @@ fn register_should_failed_with_unmatched_reporter() {
                 register_info.ias_cert,
                 register_info.account_id,
                 register_info.isv_body,
+                register_info.ab_upgrade_pk,
                 register_info.sig
             ),
             DispatchError::Module {
@@ -86,6 +88,7 @@ fn register_should_failed_with_illegal_cert() {
                 register_info.ias_cert,
                 register_info.account_id,
                 register_info.isv_body,
+                register_info.ab_upgrade_pk,
                 register_info.sig
             ),
             DispatchError::Module {
@@ -118,6 +121,7 @@ fn register_should_failed_with_illegal_isv_body() {
                 register_info.ias_cert,
                 register_info.account_id,
                 register_info.isv_body,
+                register_info.ab_upgrade_pk,
                 register_info.sig
             ),
             DispatchError::Module {
@@ -149,6 +153,7 @@ fn register_should_failed_with_illegal_id_sig() {
                 register_info.ias_cert,
                 register_info.account_id,
                 register_info.isv_body,
+                register_info.ab_upgrade_pk,
                 register_info.sig
             ),
             DispatchError::Module {
@@ -180,6 +185,7 @@ fn register_should_failed_with_illegal_ias_sig() {
                 register_info.ias_cert,
                 register_info.account_id,
                 register_info.isv_body,
+                register_info.ab_upgrade_pk,
                 register_info.sig
             ),
             DispatchError::Module {
@@ -209,6 +215,7 @@ fn register_should_failed_with_wrong_code() {
                     register_info.ias_cert,
                     register_info.account_id,
                     register_info.isv_body,
+                    register_info.ab_upgrade_pk,
                     register_info.sig
                 ),
                 DispatchError::Module {
@@ -1317,6 +1324,7 @@ fn bonds_limit_should_work() {
                     legal_register_info.ias_cert,
                     legal_register_info.account_id,
                     legal_register_info.isv_body,
+                    legal_register_info.ab_upgrade_pk,
                     legal_register_info.sig
                 ),
                 DispatchError::Module {

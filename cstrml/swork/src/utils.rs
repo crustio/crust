@@ -75,14 +75,14 @@ pub fn verify_identity (
         Err(_) => return None,
     };
 
-    let chain: Vec<&[u8]> = Vec::new();
-    let now_func = webpki::Time::from_seconds_since_unix_epoch(1573419050);
+    let intermediate_certs: Vec<&[u8]> = Vec::new();
+    let now_func = webpki::Time::from_seconds_since_unix_epoch(1603843200); // 2020-10-28 12:00:00 (UTC)
 
     // 2. Verify ias cert
     match sig_cert.verify_is_valid_tls_server_cert(
         SUPPORTED_SIG_ALGS,
         &IAS_SERVER_ROOTS,
-        &chain,
+        &intermediate_certs,
         now_func
     ) {
         Ok(()) => {},

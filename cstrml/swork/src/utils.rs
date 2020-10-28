@@ -186,6 +186,7 @@ pub fn verify_p256_sig(be_pk: &Vec<u8>, data: &Vec<u8>, be_sig: &Vec<u8>) -> boo
     sig[0..32].reverse();
     sig[32..].reverse();
 
+    // VerifyKey need pk with prefix 0x04
     let pk_with_prefix: Vec<u8> = [
         &vec![4][..],
         &pk[..]
@@ -193,6 +194,7 @@ pub fn verify_p256_sig(be_pk: &Vec<u8>, data: &Vec<u8>, be_sig: &Vec<u8>) -> boo
 
     let p256_sig = Signature::from_bytes(&sig).unwrap();
     let verify_key = VerifyKey::new(&pk_with_prefix[..]).unwrap();
+
     verify_key.verify(data, &p256_sig).is_ok()
 }
 

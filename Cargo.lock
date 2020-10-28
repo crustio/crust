@@ -1155,7 +1155,6 @@ dependencies = [
  "sp-runtime",
  "sp-runtime-interface",
  "sp-std",
- "untrusted",
  "webpki 0.21.0",
 ]
 

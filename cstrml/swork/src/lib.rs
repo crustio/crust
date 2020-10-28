@@ -243,6 +243,7 @@ decl_module! {
             ias_cert: SworkerCert,
             applier: T::AccountId,
             isv_body: ISVBody,
+            ab_upgrade_pk: SworkerPubKey,
             sig: SworkerSignature
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -251,7 +252,7 @@ decl_module! {
             ensure!(&who == &applier, Error::<T>::IllegalApplier);
 
             // 2. Ensure unparsed_identity trusted chain is legal, including signature and sworker code
-            let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
+            let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &ab_upgrade_pk, &sig);
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalIdentity);
 
             // 3. Ensure `id_bonds` still available
@@ -689,16 +690,18 @@ impl<T: Trait> Module<T> {
         ias_cert: &SworkerCert,
         account_id: &T::AccountId,
         isv_body: &ISVBody,
+        ab_upgrade_pk: &SworkerPubKey,
         sig: &SworkerSignature
     ) -> Option<Vec<u8>> {
         let enclave_code = Self::code();
         let applier = account_id.encode();
 
-        api::crypto::verify_identity(
+        utils::verify_identity(
             ias_sig,
             ias_cert,
             &applier,
             isv_body,
+            ab_upgrade_pk,
             sig,
             &enclave_code,
         )

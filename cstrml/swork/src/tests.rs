@@ -1327,3 +1327,52 @@ fn bonds_limit_should_work() {
             );
         });
 }
+
+#[test]
+fn bonds_limit_during_upgrade_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let applier = AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                .expect("valid ss58 address");
+            let failed_legal_register_info = legal_register_info();
+
+            register(&applier, &vec![0], &LegalCode::get());
+            register(&applier, &vec![1], &LegalCode::get());
+
+            assert_noop!(
+                Swork::register(
+                    Origin::signed(applier.clone()),
+                    failed_legal_register_info.ias_sig,
+                    failed_legal_register_info.ias_cert,
+                    failed_legal_register_info.account_id,
+                    failed_legal_register_info.isv_body,
+                    failed_legal_register_info.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 8,
+                    message: Some("ExceedBondsLimit"),
+                }
+            );
+
+            assert_ok!(Swork::upgrade(Origin::root(), hex::decode("0011").unwrap(), 500));
+            // TODO: Use success register info later. Fake the test for now.
+            let legal_register_info = legal_register_info();
+            assert_noop!(
+                Swork::register(
+                    Origin::signed(applier.clone()),
+                    legal_register_info.ias_sig,
+                    legal_register_info.ias_cert,
+                    legal_register_info.account_id,
+                    legal_register_info.isv_body,
+                    legal_register_info.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 1,
+                    message: Some("IllegalIdentity"),
+                }
+            );
+        });
+}

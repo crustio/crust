@@ -252,7 +252,15 @@ decl_module! {
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalIdentity);
 
             // 3. Ensure `id_bonds` still available
-            ensure!((Self::id_bonds(&who).len() as u32) < T::MaxBondsLimit::get(), Error::<T>::ExceedBondsLimit);
+            let legal_bonds_count: u32 = Self::id_bonds(&who).iter().fold(0u32, |acc, pk| {
+                if let Some(code) = Self::identities(&pk) {
+                    if code == Self::code(){
+                       return acc + 1;
+                    }
+                }
+                0
+            });
+            ensure!(legal_bonds_count < T::MaxBondsLimit::get(), Error::<T>::ExceedBondsLimit);
 
             // 4. Upsert new id
             let pk = maybe_pk.unwrap();

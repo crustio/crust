@@ -14,10 +14,10 @@ include = ["build.rs", "src/**/*.rs", "crates-io.md", "README.md", "LICENSE-APAC
 build = "build.rs"
 
 [dependencies]
-serde_derive = { package = "serde_derive_no_std", version = "=1.0.117", optional = true, path = "../serde_derive_no_std" }
+serde_derive = { package = "serde_derive_no_std", version = "1.0.117", optional = true, path = "../serde_derive_no_std" }
 
 [dev-dependencies]
-serde_derive = { package = "serde_derive_no_std", version = "1.0", path = "../serde_derive_no_std" }
+serde_derive = { package = "serde_derive_no_std", version = "1.0.117", path = "../serde_derive_no_std" }
 
 [package.metadata.playground]
 features = ["derive", "rc"]

@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-balances"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["Crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -18,7 +18,7 @@ sp-runtime = { default-features = false, version = '2.0.0' }
 frame-benchmarking = { version = "2.0.0", default-features = false, optional = true }
 frame-support = { version = "2.0.0", default-features = false }
 frame-system = { version = "2.0.0", default-features = false }
-primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
+primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
 sp-io = "2.0.0"

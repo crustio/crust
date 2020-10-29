@@ -2,7 +2,7 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-rpc'
-version = '0.9.0'
+version = '0.10.0'
 license = "GPL-3.0"
 homepage = "https://crust.network"
 repository = "https://github.com/crustio/crust/"
@@ -33,5 +33,5 @@ pallet-transaction-payment-rpc = "2.0.0"
 sp-block-builder = "2.0.0"
 
 # crust dependent
-crust-primitives = { package = 'cst-primitives', path='../primitives' }
-crust-runtime = { package = 'crust-runtime', path = '../runtime' }
+crust-primitives = { version = "0.10.0", package = 'cst-primitives', path='../primitives' }
+crust-runtime = { version = "0.10.0", package = 'crust-runtime', path = '../runtime' }

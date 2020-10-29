@@ -2,7 +2,7 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-runtime'
-version = '0.9.0'
+version = '0.10.0'
 build = 'build.rs'
 license = "GPL-3.0"
 homepage = "https://crust.network"
@@ -68,12 +68,12 @@ sp-version = { default-features = false, version = '2.0.0' }
 sp-runtime-interface = { default-features = false, version = '2.0.0' }
 
 # crust runtime modules
-swork = { package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
-staking = { package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
-market = { package = 'cstrml-market', path = '../cstrml/market', default-features = false }
-primitives = { package = 'cst-primitives', path = '../primitives', default-features = false }
-balances = { package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
-candy = { package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
+swork = { version = "0.10.0", package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
+staking = { version = "0.10.0", package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
+market = { version = "0.10.0", package = 'cstrml-market', path = '../cstrml/market', default-features = false }
+primitives = { version = "0.10.0", package = 'cst-primitives', path = '../primitives', default-features = false }
+balances = { version = "0.10.0", package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
+candy = { version = "0.10.0", package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
 
 [features]
 default = ['std']

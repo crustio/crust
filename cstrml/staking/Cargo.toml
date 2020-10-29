@@ -29,12 +29,12 @@ frame-benchmarking = { version = '2.0.0', default-features = false, optional = t
 rand_chacha = { version = "0.2", default-features = false }
 
 # crust runtime modules
-swork = { package = "cstrml-swork", path = "../swork", default-features = false }
-primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
+swork = { version = "0.10.0", package = "cstrml-swork", path = "../swork", default-features = false }
+primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
 sp-core = '2.0.0'
-balances = { package = 'cstrml-balances', path = '../balances' }
+balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
 pallet-timestamp = '2.0.0'
 frame-benchmarking = { version = '2.0.0' }
 

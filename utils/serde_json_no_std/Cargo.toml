@@ -13,7 +13,7 @@ include = ["build.rs", "src/**/*.rs", "README.md", "LICENSE-APACHE", "LICENSE-MI
 edition = "2018"
 
 [dependencies]
-serde = { path = "../serde_no_std", package = "serde_no_std", version = "1.0.100", default-features = false }
+serde = { path = "../serde_no_std", package = "serde_no_std", version = "1.0.117", default-features = false }
 indexmap = { version = "1.5", optional = true }
 itoa = { version = "0.4.3", default-features = false }
 ryu = "1.0"

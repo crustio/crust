@@ -1357,6 +1357,7 @@ fn bonds_limit_during_upgrade_should_work() {
             );
 
             assert_ok!(Swork::upgrade(Origin::root(), hex::decode("0011").unwrap(), 500));
+
             // TODO: Use success register info later. Fake the test for now.
             let legal_register_info = legal_register_info();
             assert_noop!(

@@ -15,8 +15,7 @@ use sc_consensus::LongestChain;
 native_executor_instance!(
     pub Executor,
     crust_runtime::api::dispatch,
-    crust_runtime::native_version,
-    cstrml_swork::api::crypto::HostFunctions
+    crust_runtime::native_version
 );
 
 type FullBackend = sc_service::TFullBackend<Block>;

@@ -258,7 +258,7 @@ decl_module! {
                        return acc + 1;
                     }
                 }
-                0
+                acc
             });
             ensure!(legal_bonds_count < T::MaxBondsLimit::get(), Error::<T>::ExceedBondsLimit);
 

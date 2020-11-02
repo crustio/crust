@@ -248,14 +248,14 @@ fn chill_idbond_should_work() {
 
             // pk is invalid
             assert_noop!(
-                Swork::chill_idbond(
+                Swork::chill_pk(
                     Origin::signed(applier.clone()),
                     vec![1]
                 ),
                 DispatchError::Module {
                     index: 0,
-                    error: 2,
-                    message: Some("IllegalReporter"),
+                    error: 9,
+                    message: Some("IllegalPubKey"),
                 }
             );
 
@@ -263,19 +263,19 @@ fn chill_idbond_should_work() {
 
             // applier is not registered before
             assert_noop!(
-                Swork::chill_idbond(
+                Swork::chill_pk(
                     Origin::signed(bob),
                     vec![1]
                 ),
                 DispatchError::Module {
                     index: 0,
-                    error: 0,
-                    message: Some("IllegalApplier"),
+                    error: 9,
+                    message: Some("IllegalPubKey"),
                 }
             );
 
             assert_ok!(
-                Swork::chill_idbond(
+                Swork::chill_pk(
                     Origin::signed(applier.clone()),
                     legal_pk.clone()
                 )

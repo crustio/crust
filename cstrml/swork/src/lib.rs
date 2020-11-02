@@ -187,6 +187,8 @@ decl_error! {
         IllegalFilesTransition,
         /// Exceed the maximum bonding relation per account
         ExceedBondsLimit,
+        /// Illegal pubkey
+        IllegalPubKey,
     }
 }
 
@@ -254,7 +256,7 @@ decl_module! {
             // 3. Ensure `id_bonds` still available
             let legal_bonds_count: u32 = Self::id_bonds(&who).iter().fold(0u32, |acc, pk| {
                 if let Some(code) = Self::identities(&pk) {
-                    if code == Self::code(){
+                    if code == Self::code() {
                        return acc + 1;
                     }
                 }
@@ -415,20 +417,20 @@ decl_module! {
         /// 2. Remove `id_bond`
         /// 3. Remove `work_report`
         #[weight = 1_000_000]
-        pub fn chill_idbond(
+        pub fn chill_pk(
             origin,
             pk: SworkerPubKey
         ) -> DispatchResult {
             let applier = ensure_signed(origin)?;
 
             // 1. Ensure the applier is registered
-            ensure!(<IdBonds<T>>::contains_key(&applier), Error::<T>::IllegalApplier);
+            ensure!(<IdBonds<T>>::contains_key(&applier), Error::<T>::IllegalPubKey);
 
             // 2. Ensure the reporter is registered
-            ensure!(Identities::contains_key(&pk), Error::<T>::IllegalReporter);
+            ensure!(Identities::contains_key(&pk), Error::<T>::IllegalPubKey);
 
             // 3. Ensure the applier has bonded to the reporter
-            ensure!(Self::id_bonds(&applier).contains(&pk), Error::<T>::IllegalReporter);
+            ensure!(Self::id_bonds(&applier).contains(&pk), Error::<T>::IllegalPubKey);
 
             // 4. Chill pubKey and unbond it from the applier
             Self::chill(&applier, &pk);

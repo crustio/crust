@@ -201,6 +201,7 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
+        // upgrade for 0.10.0
         fn on_runtime_upgrade() -> Weight {
             Self::do_upgrade();
             10_000

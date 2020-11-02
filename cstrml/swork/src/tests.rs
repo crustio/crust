@@ -220,6 +220,71 @@ fn register_should_failed_with_wrong_code() {
         });
 }
 
+#[test]
+fn chill_idbond_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let applier: AccountId =
+                AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                    .expect("valid ss58 address");
+            let register_info = legal_register_info();
+
+            assert_ok!(Swork::register(
+            Origin::signed(applier.clone()),
+            register_info.ias_sig,
+            register_info.ias_cert,
+            register_info.account_id,
+            register_info.isv_body,
+            register_info.sig
+        ));
+
+            let legal_code = LegalCode::get();
+            let legal_pk = LegalPK::get();
+            let legal_bonded_ids = vec![legal_pk.clone()];
+
+            assert_eq!(Swork::identities(legal_pk.clone()).unwrap(), legal_code);
+            assert_eq!(Swork::id_bonds(applier.clone()), legal_bonded_ids);
+
+            // pk is invalid
+            assert_noop!(
+                Swork::chill_pk(
+                    Origin::signed(applier.clone()),
+                    vec![1]
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 9,
+                    message: Some("IllegalPubKey"),
+                }
+            );
+
+            let bob: AccountId = Sr25519Keyring::Bob.to_account_id();
+
+            // applier is not registered before
+            assert_noop!(
+                Swork::chill_pk(
+                    Origin::signed(bob),
+                    vec![1]
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 9,
+                    message: Some("IllegalPubKey"),
+                }
+            );
+
+            assert_ok!(
+                Swork::chill_pk(
+                    Origin::signed(applier.clone()),
+                    legal_pk.clone()
+                )
+            );
+            assert!(!Identities::contains_key(legal_pk.clone()));
+            assert!(!<IdBonds<Test>>::contains_key(applier.clone()));
+        });
+}
+
 /// Report works test cases
 #[test]
 fn report_works_should_work() {

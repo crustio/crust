@@ -246,6 +246,7 @@ fn chill_idbond_should_work() {
             assert_eq!(Swork::identities(legal_pk.clone()).unwrap(), legal_code);
             assert_eq!(Swork::id_bonds(applier.clone()), legal_bonded_ids);
 
+            // pk is invalid
             assert_noop!(
                 Swork::chill_idbond(
                     Origin::signed(applier.clone()),
@@ -260,6 +261,7 @@ fn chill_idbond_should_work() {
 
             let bob: AccountId = Sr25519Keyring::Bob.to_account_id();
 
+            // applier is not registered before
             assert_noop!(
                 Swork::chill_idbond(
                     Origin::signed(bob),

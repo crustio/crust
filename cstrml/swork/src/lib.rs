@@ -430,7 +430,7 @@ decl_module! {
             // 3. Ensure the applier has bonded to the reporter
             ensure!(Self::id_bonds(&applier).contains(&pk), Error::<T>::IllegalReporter);
 
-            // 4. Chill PubKey
+            // 4. Chill pubKey and unbond it from the applier
             Self::chill(&applier, &pk);
 
             Self::deposit_event(RawEvent::ChillSuccess(applier, pk));

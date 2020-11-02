@@ -408,6 +408,36 @@ decl_module! {
 
             Ok(())
         }
+
+        /// Expose private chill function as an extrinsic.
+        /// This function will (maybe) remove identity, id_bond and work report in details:
+        /// 1. Remove `identities`
+        /// 2. Remove `id_bond`
+        /// 3. Remove `work_report`
+        #[weight = 1_000_000]
+        pub fn chill_idbond(
+            origin,
+            pk: SworkerPubKey
+        ) -> DispatchResult {
+            let applier = ensure_signed(origin)?;
+
+            // 1. Ensure the applier is registered
+            ensure!(<IdBonds<T>>::contains_key(&applier), Error::<T>::IllegalApplier);
+
+            // 2. Ensure the reporter is registered
+            ensure!(Identities::contains_key(&pk), Error::<T>::IllegalReporter);
+
+            // 3. Ensure the applier has bonded to the reporter
+            ensure!(Self::id_bonds(&applier).contains(&pk), Error::<T>::IllegalReporter);
+
+            // 4. Chill PubKey
+            Self::chill(&applier, &pk);
+
+            Self::deposit_event(RawEvent::ChillSuccess(applier, pk));
+
+            Ok(())
+        }
+
     }
 }
 
@@ -813,5 +843,6 @@ decl_event!(
         RegisterSuccess(AccountId, SworkerPubKey),
         WorksReportSuccess(AccountId, SworkerPubKey),
         ABUpgradeSuccess(AccountId),
+        ChillSuccess(AccountId, SworkerPubKey),
     }
 );

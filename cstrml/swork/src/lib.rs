@@ -8,12 +8,14 @@ use frame_support::{
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
-        DispatchClass, constants::WEIGHT_PER_MICROS
+        DispatchClass, constants::WEIGHT_PER_MICROS, Weight
     }
 };
 use sp_runtime::traits::Saturating;
 use sp_std::{str, convert::TryInto, prelude::*};
 use frame_system::{self as system, ensure_root, ensure_signed};
+
+use frame_support::storage::migration::remove_storage_prefix;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -820,42 +822,16 @@ impl<T: Trait> Module<T> {
     fn do_upgrade() {
         // Deprecated storages used for migration only
         mod deprecated {
-            use crate::{Trait, Moment, SessionIndex};
-            use codec::{Encode, Decode};
+            use crate::Trait;
             use frame_support::{decl_module, decl_storage};
             use sp_std::prelude::*;
-
-            /// Reward points of an era. Used to split era total payout between validators.
-            #[derive(Encode, Decode, Default)]
-            pub struct EraPoints {
-                /// Total number of points. Equals the sum of reward points for each validator.
-                pub total: u32,
-                /// The reward points earned by a given validator. The index of this vec corresponds to the
-                /// index into the current validator set.
-                pub individual: Vec<u32>,
-            }
 
             decl_module! {
                 pub struct Module<T: Trait> for enum Call where origin: T::Origin {}
             }
 
             decl_storage! {
-                pub trait Store for Module<T: Trait> as SStaking {
-                    /// The sWorker identities, mapping from controller to an optional identity tuple
-                    /// (elder_id, current_id) = (before-upgrade identity, upgraded identity)
-                    pub Identities:
-                        map hasher(blake2_128_concat) T::AccountId => (Option<Identity>, Option<Identity>);
-
-                    /// Node's work report, mapping from controller to an optional work report
-                    pub WorkReports:
-                        map hasher(blake2_128_concat) T::AccountId  => Option<WorkReport>;
-
-                    /// Recording whether the validator reported works of each era
-                    /// We leave it keep all era's report info
-                    /// cause B-tree won't build index on key2(ReportSlot)
-                    /// value (bool, bool) represent two id (elder_reported, current_reported)
-                    pub ReportedInSlot: double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) ReportSlot => (bool, bool) = (false, false);
-
+                pub trait Store for Module<T: Trait> as Swork {
                     /// The used workload, used for calculating stake limit in the end of era
                     /// default is 0
                     pub Used: u128;
@@ -868,9 +844,9 @@ impl<T: Trait> Module<T> {
         }
 
         // 1. Kill old storages
-        deprecated::Identities::kill();
-        deprecated::WorkReports::kill();
-        deprecated::ReportedInSlot::kill();
+        remove_storage_prefix(b"Swork", b"Identities", &[]);
+        remove_storage_prefix(b"Swork", b"WorkReports", &[]);
+        remove_storage_prefix(b"Swork", b"ReportedInSlot", &[]);
         deprecated::Used::kill();
         deprecated::Reserved::kill();
     }

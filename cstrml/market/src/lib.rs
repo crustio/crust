@@ -9,7 +9,9 @@ use frame_support::{
         Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
         WithdrawReasons, Get, ExistenceRequirement
     },
-    weights::constants::WEIGHT_PER_MICROS
+    weights::{
+        Weight, constants::WEIGHT_PER_MICROS
+    }
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use frame_system::{self as system, ensure_signed};
@@ -17,6 +19,8 @@ use sp_runtime::{
     Perbill,
     traits::{StaticLookup, Zero, CheckedMul, Convert}
 };
+
+use frame_support::storage::migration::remove_storage_prefix;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -281,6 +285,12 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
+
+        // upgrade for 0.10.0
+        fn on_runtime_upgrade() -> Weight {
+            Self::do_upgrade();
+            10_000
+        }
 
         /// Register to be a merchant, you should provide your storage layer's address info,
         /// this will require you to pledge first, complexity depends on `Pledges`(P) and `swork.WorkReports`(W).
@@ -816,6 +826,15 @@ impl<T: Trait> Module<T> {
             }
         }
         (payment_ratio, slash_ratio)
+    }
+
+    /// Upgrade storage to current version to support DSM 1.0
+    /// * removal of:
+    ///   * StorageOrders
+    ///   * MerchantPunishments
+    fn do_upgrade() {
+        remove_storage_prefix(b"Market", b"StorageOrders", &[]);
+        remove_storage_prefix(b"Market", b"MerchantPunishments", &[]);
     }
 }
 

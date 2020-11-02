@@ -277,9 +277,11 @@ fn chill_idbond_should_work() {
             assert_ok!(
                 Swork::chill_idbond(
                     Origin::signed(applier.clone()),
-                    legal_pk
+                    legal_pk.clone()
                 )
             );
+            assert!(!Identities::contains_key(legal_pk.clone()));
+            assert!(!<IdBonds<Test>>::contains_key(applier.clone()));
         });
 }
 

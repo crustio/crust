@@ -9,7 +9,7 @@ use frame_support::{
         Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
         WithdrawReasons, Get, ExistenceRequirement
     },
-    weights::constants::WEIGHT_PER_MICROS
+    weights::Weight
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
 use frame_system::{self as system, ensure_signed};
@@ -26,6 +26,8 @@ use primitives::{
     AddressInfo, MerkleRoot, BlockNumber, FileAlias,
     traits::TransferrableCurrency
 };
+
+pub mod weight;
 
 #[cfg(test)]
 mod mock;
@@ -48,6 +50,15 @@ macro_rules! log {
             $patter $(, $values)*
         )
     };
+}
+
+pub trait WeightInfo {
+    fn pledge() -> Weight;
+    fn pledge_extra() -> Weight;
+    fn cut_pledge() -> Weight;
+    fn register() -> Weight;
+    fn place_storage_order() -> Weight;
+    fn set_file_alias() -> Weight;
 }
 
 /// Counter for the number of eras that have passed.
@@ -211,6 +222,9 @@ pub trait Trait: system::Trait {
 
     /// Max limit for the length of sorders in each payment claim
     type ClaimLimit: Get<u32>;
+
+    /// Weight information for extrinsics in this pallet.
+    type WeightInfo: WeightInfo;
 }
 
 // This module's storage items.
@@ -287,11 +301,11 @@ decl_module! {
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Base: 30.26 µs
+        /// - Base: 34 µs
         /// - Read: Pledge
         /// - Write: WorkReports, Merchants
         /// # </weight>
-        #[weight = 30 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 3)]
+        #[weight = T::WeightInfo::register()]
         pub fn register(
             origin,
             address_info: AddressInfo,
@@ -335,11 +349,11 @@ decl_module! {
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Base: 69.86 µs
+        /// - Base: 46 µs
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = 70 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
+        #[weight = T::WeightInfo::pledge()]
         pub fn pledge(
             origin,
             #[compact] value: BalanceOf<T>
@@ -378,7 +392,7 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = 67 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
+        #[weight = T::WeightInfo::pledge_extra()]
         pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -412,7 +426,7 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = 73 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(7, 5)]
+        #[weight = T::WeightInfo::cut_pledge()]
         pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -446,7 +460,7 @@ decl_module! {
 
         /// Place a storage order
         // TODO: Reconsider this weight
-        #[weight = 1_000_000]
+        #[weight = T::WeightInfo::place_storage_order()]
         pub fn place_storage_order(
             origin,
             target: <T::Lookup as StaticLookup>::Source,
@@ -531,7 +545,7 @@ decl_module! {
         }
 
         /// Rename the file path for a storage order
-        #[weight = 1_000_000]
+        #[weight = T::WeightInfo::set_file_alias()]
         pub fn set_file_alias(
             origin,
             old_file_alias: FileAlias,

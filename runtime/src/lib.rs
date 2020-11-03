@@ -603,6 +603,7 @@ impl market::Trait for Runtime {
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
     type ClaimLimit = ClaimLimit;
+    type WeightInfo = market::weight::WeightInfo;
 }
 
 construct_runtime! {

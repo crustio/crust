@@ -301,7 +301,7 @@ decl_module! {
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Base: 46 µs
+        /// - Base: 34 µs
         /// - Read: Pledge
         /// - Write: WorkReports, Merchants
         /// # </weight>
@@ -349,7 +349,7 @@ decl_module! {
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Base: 69.86 µs
+        /// - Base: 46 µs
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>

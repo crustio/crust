@@ -151,6 +151,7 @@ impl Trait for Test {
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
     type ClaimLimit = TestClaimLimit;
+    type WeightInfo = weight::WeightInfo;
 }
 
 pub type Market = Module<Test>;

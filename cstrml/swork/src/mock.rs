@@ -137,6 +137,7 @@ impl market::Trait for Test {
     type MinimumStoragePrice = ();
     type MinimumSorderDuration = ();
     type ClaimLimit = ClaimLimit;
+    type WeightInfo = market::weight::WeightInfo;
 }
 
 impl Trait for Test {

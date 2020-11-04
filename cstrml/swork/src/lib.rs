@@ -8,12 +8,14 @@ use frame_support::{
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
-        DispatchClass, constants::WEIGHT_PER_MICROS
+        DispatchClass, constants::WEIGHT_PER_MICROS, Weight
     }
 };
 use sp_runtime::traits::Saturating;
 use sp_std::{str, convert::TryInto, prelude::*};
 use frame_system::{self as system, ensure_root, ensure_signed};
+
+use frame_support::storage::migration::remove_storage_prefix;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -200,6 +202,12 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
+
+        // upgrade for 0.10.0
+        fn on_runtime_upgrade() -> Weight {
+            Self::do_upgrade();
+            10_000
+        }
 
         /// AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`
@@ -802,6 +810,45 @@ impl<T: Trait> Module<T> {
         let current_block_numeric = Self::get_current_block_number() as u64;
         let current_report_index = current_block_numeric / REPORT_SLOT;
         current_report_index * REPORT_SLOT
+    }
+
+    /// Upgrade storage to current version to support new MPoW
+    /// * removal of:
+    ///   * Identities
+    ///   * WorkReports
+    ///   * ReportedInSlot
+    ///   * Used
+    ///   * Reserved
+    fn do_upgrade() {
+        // Deprecated storages used for migration only
+        mod deprecated {
+            use crate::Trait;
+            use frame_support::{decl_module, decl_storage};
+            use sp_std::prelude::*;
+
+            decl_module! {
+                pub struct Module<T: Trait> for enum Call where origin: T::Origin {}
+            }
+
+            decl_storage! {
+                pub trait Store for Module<T: Trait> as Swork {
+                    /// The used workload, used for calculating stake limit in the end of era
+                    /// default is 0
+                    pub Used: u128;
+
+                    /// The reserved workload, used for calculating stake limit in the end of era
+                    /// default is 0
+                    pub Reserved: u128;
+                }
+            }
+        }
+
+        // 1. Kill old storages
+        remove_storage_prefix(b"Swork", b"Identities", &[]);
+        remove_storage_prefix(b"Swork", b"WorkReports", &[]);
+        remove_storage_prefix(b"Swork", b"ReportedInSlot", &[]);
+        deprecated::Used::kill();
+        deprecated::Reserved::kill();
     }
 }
 

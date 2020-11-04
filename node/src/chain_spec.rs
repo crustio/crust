@@ -4,7 +4,8 @@ use crust_runtime::{
     AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
     AuthorityDiscoveryConfig, SessionConfig, SessionKeys, StakerStatus,
     StakingConfig, IndicesConfig, SystemConfig, SworkConfig, SudoConfig,
-    ElectionsConfig, CouncilConfig, WASM_BINARY
+    ElectionsConfig, CouncilConfig, TechnicalCommitteeConfig, DemocracyConfig,
+    WASM_BINARY
 };
 use cstrml_staking::Forcing;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
@@ -262,6 +263,15 @@ fn testnet_genesis(
 						.map(|member| (member, STASH))
 						.collect(),
 		}),
+        pallet_collective_Instance2: Some(TechnicalCommitteeConfig {
+            members: endowed_accounts.iter()
+                .take((num_endowed_accounts + 1) / 2)
+                .cloned()
+                .collect(),
+            phantom: Default::default(),
+        }),
+        pallet_democracy: Some(DemocracyConfig::default()),
+        pallet_membership_Instance1: Some(Default::default()),
     }
 }
 
@@ -370,6 +380,15 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
 						.map(|member| (member, STASH))
 						.collect(),
 		}),
+        pallet_collective_Instance2: Some(TechnicalCommitteeConfig {
+            members: endowed_accounts.iter()
+                .take((num_endowed_accounts + 1) / 2)
+                .cloned()
+                .collect(),
+            phantom: Default::default(),
+        }),
+        pallet_democracy: Some(DemocracyConfig::default()),
+        pallet_membership_Instance1: Some(Default::default()),
     }
 }
 
@@ -482,5 +501,14 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
 						.map(|member| (member, STASH))
 						.collect(),
 		}),
+        pallet_collective_Instance2: Some(TechnicalCommitteeConfig {
+            members: endowed_accounts.iter()
+                .take((num_endowed_accounts + 1) / 2)
+                .cloned()
+                .collect(),
+            phantom: Default::default(),
+        }),
+        pallet_democracy: Some(DemocracyConfig::default()),
+        pallet_membership_Instance1: Some(Default::default()),
     }
 }

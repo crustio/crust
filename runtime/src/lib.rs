@@ -572,7 +572,6 @@ parameter_types! {
 	// One cent: $10,000 / MB
 	pub const PreimageByteDeposit: Balance = 1 * CENTS;
 	pub const MaxVotes: u32 = 100;
-	pub const MaxProposals: u32 = 100;
 }
 
 impl pallet_democracy::Trait for Runtime {
@@ -598,14 +597,6 @@ impl pallet_democracy::Trait for Runtime {
     type FastTrackVotingPeriod = FastTrackVotingPeriod;
     // To cancel a proposal which has been passed, 2/3 of the council must agree to it.
     type CancellationOrigin = pallet_collective::EnsureProportionAtLeast<_2, _3, AccountId, CouncilCollective>;
-    // To cancel a proposal before it has been passed, the technical committee must be unanimous or
-    // Root must agree.
-    type CancelProposalOrigin = EnsureOneOf<
-        AccountId,
-        EnsureRoot<AccountId>,
-        pallet_collective::EnsureProportionAtLeast<_1, _1, AccountId, TechnicalCollective>,
-    >;
-    type BlacklistOrigin = EnsureRoot<AccountId>;
     // Any single technical committee member may veto a coming council proposal, however they can
     // only do it once and it lasts only for the cooloff period.
     type VetoOrigin = pallet_collective::EnsureMember<AccountId, TechnicalCollective>;
@@ -617,7 +608,6 @@ impl pallet_democracy::Trait for Runtime {
     type PalletsOrigin = OriginCaller;
     type MaxVotes = MaxVotes;
     type WeightInfo = ();
-    type MaxProposals = MaxProposals;
 }
 
 pub type NegativeImbalance<T> = <balances::Module<T> as Currency<<T as frame_system::Trait>::AccountId>>::NegativeImbalance;

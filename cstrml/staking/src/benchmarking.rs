@@ -109,15 +109,11 @@ pub fn create_one_validator_with_one_guarantor<T: Trait>(n: u32) -> Result<(T::A
 }
 
 benchmarks! {
-    _{
-        // User account seed
-        let u in 0 .. 1000 => ();
-    }
+    _{}
 
     bond {
-        let u in ...;
-        let stash = create_funded_user::<T>("stash",u);
-        let controller = create_funded_user::<T>("controller", u);
+        let stash = create_funded_user::<T>("stash",100);
+        let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller);
         let reward_destination = RewardDestination::Staked;
         let amount = T::Currency::minimum_balance() * 10.into();
@@ -125,8 +121,7 @@ benchmarks! {
 
 
     bond_extra {
-        let u in ...;
-        let (stash, controller) = create_stash_controller::<T>(u)?;
+        let (stash, controller) = create_stash_controller::<T>(100)?;
         Staking::<T>::upsert_stake_limit(&stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
         Staking::<T>::validate(RawOrigin::Signed(controller.clone()).into(), Default::default())?;
         let max_additional = T::Currency::minimum_balance() * 10.into();
@@ -134,9 +129,8 @@ benchmarks! {
 
 
     unbond {
-        let u in ...;
-        let stash = create_funded_user::<T>("stash",u);
-        let controller = create_funded_user::<T>("controller", u);
+        let stash = create_funded_user::<T>("stash",100);
+        let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
         let max_additional = T::Currency::minimum_balance() * 10.into();
         let reward_destination = RewardDestination::Staked;
@@ -145,32 +139,60 @@ benchmarks! {
     }: _(RawOrigin::Signed(controller), max_additional)
 
 
+    // Withdraw only updates the ledger
+    withdraw_unbonded {
+        let stash = create_funded_user::<T>("stash",100);
+        let controller = create_funded_user::<T>("controller", 100);
+        let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
+        let max_additional = T::Currency::minimum_balance() * 10.into();
+        let reward_destination = RewardDestination::Staked;
+        let amount = T::Currency::minimum_balance() * 10.into();
+        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
+        Staking::<T>::unbond(RawOrigin::Signed(controller.clone()).into(), max_additional)?;
+    }: _(RawOrigin::Signed(controller.clone()))
+
+
     validate {
-        let u in ...;
-        let (stash, controller) = create_stash_controller::<T>(u)?;
+        let (stash, controller) = create_stash_controller::<T>(100)?;
         let prefs = Default::default();
         Staking::<T>::upsert_stake_limit(&stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
     }: _(RawOrigin::Signed(controller), prefs)
 
 
     guarantee {
-        let v in 1 .. 2;
-        let n in 1 .. 2;
-        let m in 1 .. MAX_GUARANTEE.try_into().unwrap();
         MinimumValidatorCount::put(1);
-        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), m)?;
+        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(100, 1000, MAX_GUARANTEE.try_into().unwrap())?;
     }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10.into()))
 
 
     cut_guarantee {
-        let v in 1 .. 2;
-        let n in 1 .. 2;
-        let m in 1 .. MAX_GUARANTEE.try_into().unwrap();
         MinimumValidatorCount::put(1);
-        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(10u32.pow(v), 10u32.pow(n), m)?;
+        let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(100, 1000, MAX_GUARANTEE.try_into().unwrap())?;
         Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
         (v_lookup.clone(), T::Currency::minimum_balance() * 10.into()))?;
     }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10.into()))
+
+
+    chill {
+        let (_, controller) = create_stash_controller::<T>(100)?;
+    }: _(RawOrigin::Signed(controller))
+
+    set_payee {
+        let (stash, controller) = create_stash_controller::<T>(100)?;
+        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Staked);
+    }: _(RawOrigin::Signed(controller), RewardDestination::Controller)
+    verify {
+        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Controller);
+    }
+
+    set_controller {
+        let (stash, _) = create_stash_controller::<T>(100)?;
+        let new_controller = create_funded_user::<T>("new_controller", 100);
+        let new_controller_lookup = T::Lookup::unlookup(new_controller.clone());
+    }: _(RawOrigin::Signed(stash), new_controller_lookup)
+    verify {
+        assert!(Ledger::<T>::contains_key(&new_controller));
+    }
 
 
     new_era {
@@ -194,43 +216,6 @@ benchmarks! {
     }: {
         Staking::<T>::select_and_update_validators(0);
     }
-
-    chill {
-        let u in ...;
-        let (_, controller) = create_stash_controller::<T>(u)?;
-    }: _(RawOrigin::Signed(controller))
-
-    set_payee {
-        let u in ...;
-        let (stash, controller) = create_stash_controller::<T>(u)?;
-        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Staked);
-    }: _(RawOrigin::Signed(controller), RewardDestination::Controller)
-    verify {
-        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Controller);
-    }
-
-    set_controller {
-        let u in ...;
-        let (stash, _) = create_stash_controller::<T>(u)?;
-        let new_controller = create_funded_user::<T>("new_controller", u);
-        let new_controller_lookup = T::Lookup::unlookup(new_controller.clone());
-    }: _(RawOrigin::Signed(stash), new_controller_lookup)
-    verify {
-        assert!(Ledger::<T>::contains_key(&new_controller));
-    }
-
-    // Withdraw only updates the ledger
-    withdraw_unbonded {
-        let u in ...;
-        let stash = create_funded_user::<T>("stash",u);
-        let controller = create_funded_user::<T>("controller", u);
-        let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
-        let max_additional = T::Currency::minimum_balance() * 10.into();
-        let reward_destination = RewardDestination::Staked;
-        let amount = T::Currency::minimum_balance() * 10.into();
-        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
-        Staking::<T>::unbond(RawOrigin::Signed(controller.clone()).into(), max_additional)?;
-    }: _(RawOrigin::Signed(controller.clone()))
 }
 
 #[cfg(test)]

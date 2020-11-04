@@ -225,8 +225,9 @@ decl_module! {
         #[weight = (T::WeightInfo::upgrade(), DispatchClass::Operational)]
         pub fn upgrade(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
             ensure_root(origin)?;
-            <Code>::put(new_code);
-            <ABExpire<T>>::put(expire_block);
+            <Code>::put(&new_code);
+            <ABExpire<T>>::put(&expire_block);
+            Self::deposit_event(RawEvent::EnclaveUpgrade(new_code, expire_block));
         }
 
         /// Register as new trusted node, can only called from sWorker.
@@ -851,10 +852,12 @@ decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as system::Trait>::AccountId,
+        BlockNumber = <T as system::Trait>::BlockNumber,
     {
         RegisterSuccess(AccountId, SworkerPubKey),
         WorksReportSuccess(AccountId, SworkerPubKey),
         ABUpgradeSuccess(AccountId),
         ChillSuccess(AccountId, SworkerPubKey),
+        EnclaveUpgrade(SworkerCode, BlockNumber),
     }
 );

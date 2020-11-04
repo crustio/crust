@@ -38,6 +38,8 @@ pallet-sudo = { default-features = false, version = '2.0.0' }
 pallet-offences = { default-features = false, version = '2.0.0' }
 pallet-treasury = { default-features = false, version = '2.0.0' }
 pallet-elections-phragmen = { default-features = false, version = '2.0.0' }
+pallet-democracy = { default-features = false, version = '2.0.0' }
+pallet-membership = { default-features = false, version = '2.0.0' }
 pallet-identity = { default-features = false, version = '2.0.0'}
 pallet-utility = { default-features = false, version = '2.0.0' }
 
@@ -117,6 +119,8 @@ std = [
     'pallet-treasury/std',
     'pallet-elections-phragmen/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
+    'pallet-democracy/std',
+    'pallet-membership/std',
     'pallet-utility/std',
     'pallet-identity/std',
     'sp-runtime-interface/std',
@@ -136,5 +140,5 @@ runtime-benchmarks = [
     "frame-system-benchmarking",
     "staking/runtime-benchmarks",
     "market/runtime-benchmarks",
-    "swork/runtime-benchmarks",
+    "swork/runtime-benchmarks"
 ]

@@ -8,7 +8,7 @@ use frame_support::{
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
-        DispatchClass, constants::WEIGHT_PER_MICROS
+        Weight, DispatchClass
     }
 };
 use sp_runtime::traits::Saturating;
@@ -27,6 +27,8 @@ use primitives::{
 };
 use market::{OrderStatus, MarketInterface, OrderInspector};
 use sp_std::collections::btree_map::BTreeMap;
+
+pub mod weight;
 
 /// Provides util functions
 pub mod utils;
@@ -53,6 +55,13 @@ macro_rules! log {
             $patter $(, $values)*
         )
     };
+}
+
+pub trait WeightInfo {
+    fn upgrade() -> Weight;
+    fn register() -> Weight;
+    fn report_works() -> Weight;
+    fn chill_pk() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -121,6 +130,9 @@ pub trait Trait: system::Trait {
 
     /// Max bonds restriction per account.
     type MaxBondsLimit: Get<u32>;
+
+    /// Weight information for extrinsics in this pallet.
+    type WeightInfo: WeightInfo;
 }
 
 decl_storage! {
@@ -210,7 +222,7 @@ decl_module! {
         /// - O(1)
         /// - 2 DB try
         /// # </weight>
-        #[weight = 1_000_000]
+        #[weight = (T::WeightInfo::upgrade(), DispatchClass::Operational)]
         pub fn upgrade(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
             ensure_root(origin)?;
             <Code>::put(new_code);
@@ -230,12 +242,11 @@ decl_module! {
         /// - DB try depends on identities' number.
         ///
         /// ------------------
-        /// Base Weight: 154.8 µs
         /// DB Weight:
         /// - Read: Identities
         /// - Write: 3
         /// # </weight>
-        #[weight = (154 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(13, 3), DispatchClass::Operational)]
+        #[weight = (T::WeightInfo::register(), DispatchClass::Operational)]
         pub fn register(
             origin,
             ias_sig: IASSig,
@@ -287,12 +298,11 @@ decl_module! {
         /// - DB try depends on identities and market.Merchant.file_map
         ///
         /// ------------------
-        /// Base Weight: 212 µs
         /// DB Weight:
         /// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
         /// - Write: WorkReport, ReportedInSlot, market.SOrder
         /// # </weight>
-        #[weight = (212 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(26, 7), DispatchClass::Operational)]
+        #[weight = (T::WeightInfo::report_works(), DispatchClass::Operational)]
         pub fn report_works(
             origin,
             curr_pk: SworkerPubKey,
@@ -416,7 +426,7 @@ decl_module! {
         /// 1. Remove `identities`
         /// 2. Remove `id_bond`
         /// 3. Remove `work_report`
-        #[weight = 1_000_000]
+        #[weight = T::WeightInfo::chill_pk()]
         pub fn chill_pk(
             origin,
             pk: SworkerPubKey

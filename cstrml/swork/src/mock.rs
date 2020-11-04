@@ -146,6 +146,7 @@ impl Trait for Test {
     type Works = ();
     type MarketInterface = Market;
     type MaxBondsLimit = MaxBondsLimit;
+    type WeightInfo = weight::WeightInfo;
 }
 
 pub type Swork = Module<Test>;

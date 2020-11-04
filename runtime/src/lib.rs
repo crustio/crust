@@ -409,6 +409,7 @@ impl staking::Trait for Runtime {
     type SessionInterface = Self;
     type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type WeightInfo = staking::weight::WeightInfo;
 }
 
 parameter_types! {
@@ -665,6 +666,7 @@ impl swork::Trait for Runtime {
     type Works = Staking;
     type MarketInterface = Market;
     type MaxBondsLimit = MaxBondsLimit;
+    type WeightInfo = swork::weight::WeightInfo;
 }
 
 parameter_types! {

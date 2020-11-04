@@ -42,6 +42,8 @@ use frame_system::{ensure_root, ensure_signed};
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
 
+pub mod weight;
+
 // Crust runtime modules
 use swork;
 use primitives::{
@@ -65,6 +67,22 @@ macro_rules! log {
             $patter $(, $values)*
         )
     };
+}
+
+pub trait WeightInfo {
+    fn bond() -> Weight;
+    fn bond_extra() -> Weight;
+    fn unbond() -> Weight;
+    fn withdraw_unbonded() -> Weight;
+    fn validate() -> Weight;
+    fn guarantee() -> Weight;
+    fn cut_guarantee() -> Weight;
+    fn chill() -> Weight;
+    fn set_payee() -> Weight;
+    fn set_controller() -> Weight;
+    // The following two doesn't used to generate weight info
+    fn new_era(v: u32, n: u32, m: u32, ) -> Weight;
+    fn select_and_update_validators(v: u32, n: u32, m: u32, ) -> Weight;
 }
 
 /// Counter for the number of eras that have passed.
@@ -422,6 +440,9 @@ pub trait Trait: frame_system::Trait {
 
     /// Storage power ratio for crust network phase 1
     type SPowerRatio: Get<u128>;
+
+    /// Weight information for extrinsics in this pallet.
+    type WeightInfo: WeightInfo;
 }
 
 /// Mode of era-forcing.
@@ -782,12 +803,11 @@ decl_module! {
         /// NOTE: Two of the storage writes (`Self::bonded`, `Self::payee`) are _never_ cleaned
         /// unless the `origin` falls below _existential deposit_ and gets removed as dust.
         /// ------------------
-        /// Base Weight: 67.87 µs
         /// DB Weight:
         /// - Read: Bonded, Ledger, [Origin Account], Current Era, Locks
         /// - Write: Bonded, Payee, [Origin Account], Ledger, Locks
         /// # </weight>
-        #[weight = 67 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(4, 5)]
+        #[weight = T::WeightInfo::bond()]
         fn bond(origin,
             controller: <T::Lookup as StaticLookup>::Source,
             #[compact] value: BalanceOf<T>,
@@ -849,12 +869,11 @@ decl_module! {
         /// - O(1).
         /// - One DB entry.
         /// ------------
-        /// Base Weight: 77 µs
         /// DB Weight:
         /// - Read: Bonded, Ledger, [Origin Account], Locks
         /// - Write: [Origin Account], Locks, Ledger
         /// # </weight>
-        #[weight = 77 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(6, 3)]
+        #[weight = T::WeightInfo::bond_extra()]
         fn bond_extra(origin, #[compact] max_additional: BalanceOf<T>) {
             let stash = ensure_signed(origin)?;
 
@@ -899,12 +918,11 @@ decl_module! {
         ///   `withdraw_unbonded`.
         /// - One DB entry.
         /// ----------
-        /// Base Weight: 50.66 µs
         /// DB Weight:
         /// - Read: Ledger, Current Era, Locks, [Origin Account]
         /// - Write: [Origin Account], Locks, Ledger
         /// </weight>
-        #[weight = 50 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 3)]
+        #[weight = T::WeightInfo::unbond()]
         fn unbond(origin, #[compact] value: BalanceOf<T>) {
             let controller = ensure_signed(origin)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -952,19 +970,16 @@ decl_module! {
         /// - Writes are limited to the `origin` account key.
         /// ---------------
         /// Complexity O(S) where S is the number of slashing spans to remove
-        /// Base Weight:
-        /// Update: 50.52 + .028 * S µs
+        /// Update:
         /// - Reads: EraElectionStatus, Ledger, Current Era, Locks, [Origin Account]
         /// - Writes: [Origin Account], Locks, Ledger
-        /// Kill: 79.41 + 2.366 * S µs
+        /// Kill:
         /// - Reads: EraElectionStatus, Ledger, Current Era, Bonded, [Origin Account], Locks
         /// - Writes: Bonded, Slashing Spans (if S > 0), Ledger, Payee, Validators, Guarantors, [Origin Account], Locks
         /// - Writes Each: SpanSlash * S
         /// NOTE: Weight annotation is the kill scenario, we refund otherwise.
         /// # </weight>
-        #[weight = T::DbWeight::get().reads_writes(6, 6)
-            .saturating_add(80 * WEIGHT_PER_MICROS)
-        ]
+        #[weight = T::WeightInfo::withdraw_unbonded()]
         fn withdraw_unbonded(origin) {
             let controller = ensure_signed(origin)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -1005,12 +1020,11 @@ decl_module! {
         /// - Contains a limited number of reads.
         /// - Writes are limited to the `origin` account key.
         /// -----------
-        /// Base Weight: 27.8 µs
         /// DB Weight:
         /// - Read: Ledger, StakeLimit
         /// - Write: Guarantors, Validators
         /// # </weight>
-        #[weight = 27 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(4, 1)]
+        #[weight = T::WeightInfo::validate()]
         fn validate(origin, prefs: ValidatorPrefs) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -1028,13 +1042,11 @@ decl_module! {
         /// `guarantors`, `guarantee_rel`
         /// - Both the reads and writes follow a similar pattern.
         /// ---------
-        /// Base Weight: 1260 µs (For 100 validators and for each contains 10 guarantors)
         /// DB Weight:
         /// - Reads: Guarantors, Ledger, Current Era
         /// - Writes: Guarantors
         /// # </weight>
-        // TODO: reconsider this weight value for the V_G Graph
-        #[weight = 1260 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(8, 4)]
+        #[weight = T::WeightInfo::guarantee()]
         fn guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
             // 1. Get ledger
             let controller = ensure_signed(origin)?;
@@ -1071,12 +1083,11 @@ decl_module! {
         /// `guarantors`, `guarantee_rel`
         /// - Both the reads and writes follow a similar pattern.
         /// ---------
-        /// Base Weight: 1324 µs (For 100 validators and for each contains 10 guarantors)
         /// DB Weight:
         /// - Reads: Guarantors, Ledger, Current Era
         /// - Writes: Validators, Guarantors
         /// # </weight>
-        #[weight = 1324 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(5, 4)]
+        #[weight = T::WeightInfo::cut_guarantee()]
         fn cut_guarantee(origin, target: (<T::Lookup as StaticLookup>::Source, BalanceOf<T>)) {
             // 1. Get ledger
             let controller = ensure_signed(origin)?;
@@ -1111,12 +1122,11 @@ decl_module! {
         /// - Contains one read.
         /// - Writes are limited to the `origin` account key.
         /// --------
-        /// Base Weight: 22.12 µs
         /// DB Weight:
         /// - Read: Ledger
         /// - Write: Validators, Guarantors
         /// # </weight>
-        #[weight = 22 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(3, 1)]
+        #[weight = T::WeightInfo::chill()]
         fn chill(origin) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -1134,12 +1144,11 @@ decl_module! {
         /// - Contains a limited number of reads.
         /// - Writes are limited to the `origin` account key.
         /// ---------
-        /// - Base Weight: 11.33 µs
         /// - DB Weight:
         ///     - Read: Ledger
         ///     - Write: Payee
         /// # </weight>
-        #[weight = 11 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(1, 1)]
+        #[weight = T::WeightInfo::set_payee()]
         fn set_payee(origin, payee: RewardDestination) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
@@ -1158,12 +1167,11 @@ decl_module! {
         /// - Contains a limited number of reads.
         /// - Writes are limited to the `origin` account key.
         /// ----------
-        /// Base Weight: 36.2 µs
         /// DB Weight:
         /// - Read: Bonded, Ledger New Controller, Ledger Old Controller
         /// - Write: Bonded, Ledger New Controller, Ledger Old Controller
         /// # </weight>
-        #[weight = 36 * WEIGHT_PER_MICROS + T::DbWeight::get().reads_writes(3, 3)]
+        #[weight = T::WeightInfo::set_controller()]
         fn set_controller(origin, controller: <T::Lookup as StaticLookup>::Source) {
             let stash = ensure_signed(origin)?;
             let old_controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
@@ -1177,6 +1185,21 @@ decl_module! {
                     <Ledger<T>>::insert(&controller, l);
                 }
             }
+        }
+
+        /// Pay out all the stakers behind a single validator for a single era.
+        ///
+        /// - `validator_stash` is the stash account of the validator. Their guarantors, up to
+        ///   `T::MaxGuarantorRewardedPerValidator`, will also receive their rewards.
+        /// - `era` may be any era between `[current_era - history_depth; current_era]`.
+        ///
+        /// The origin of this call must be _Signed_. Any account can call this function, even if
+        /// it is not one of the stakers.
+        /// TODO: Add weight for this one
+        #[weight = 120 * WEIGHT_PER_MICROS]
+        fn reward_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
+            ensure_signed(origin)?;
+            Self::do_reward_stakers(validator_stash, era)
         }
 
         // ----- Root Calls ------
@@ -1344,21 +1367,6 @@ decl_module! {
             ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
             Self::kill_stash(&stash)?;
             T::Currency::remove_lock(STAKING_ID, &stash);
-        }
-
-        /// Pay out all the stakers behind a single validator for a single era.
-        ///
-        /// - `validator_stash` is the stash account of the validator. Their guarantors, up to
-        ///   `T::MaxGuarantorRewardedPerValidator`, will also receive their rewards.
-        /// - `era` may be any era between `[current_era - history_depth; current_era]`.
-        ///
-        /// The origin of this call must be _Signed_. Any account can call this function, even if
-        /// it is not one of the stakers.
-        /// TODO: Add weight for this one
-        #[weight = 120 * WEIGHT_PER_MICROS]
-        fn reward_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
-            ensure_signed(origin)?;
-            Self::do_reward_stakers(validator_stash, era)
         }
     }
 }

@@ -227,7 +227,7 @@ decl_module! {
             ensure_root(origin)?;
             <Code>::put(&new_code);
             <ABExpire<T>>::put(&expire_block);
-            Self::deposit_event(RawEvent::SetCodeSuccess(new_code, expire_block));
+            Self::deposit_event(RawEvent::EnclaveUpgrade(new_code, expire_block));
         }
 
         /// Register as new trusted node, can only called from sWorker.
@@ -858,6 +858,6 @@ decl_event!(
         WorksReportSuccess(AccountId, SworkerPubKey),
         ABUpgradeSuccess(AccountId),
         ChillSuccess(AccountId, SworkerPubKey),
-        SetCodeSuccess(SworkerCode, BlockNumber),
+        EnclaveUpgrade(SworkerCode, BlockNumber),
     }
 );

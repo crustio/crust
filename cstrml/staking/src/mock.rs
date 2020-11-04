@@ -210,6 +210,7 @@ impl swork::Trait for Test {
     type Works = TestStaking;
     type MarketInterface = ();
     type MaxBondsLimit = ();
+    type WeightInfo = swork::weight::WeightInfo;
 }
 
 parameter_types! {

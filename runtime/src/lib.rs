@@ -582,6 +582,7 @@ impl swork::Trait for Runtime {
     type Works = Staking;
     type MarketInterface = Market;
     type MaxBondsLimit = MaxBondsLimit;
+    type WeightInfo = swork::weight::WeightInfo;
 }
 
 parameter_types! {

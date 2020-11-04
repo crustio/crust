@@ -409,6 +409,7 @@ impl staking::Trait for Runtime {
     type SessionInterface = Self;
     type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type WeightInfo = staking::weight::WeightInfo;
 }
 
 parameter_types! {

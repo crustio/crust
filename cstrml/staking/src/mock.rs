@@ -237,6 +237,7 @@ impl Trait for Test {
     type SessionInterface = Self;
     type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type WeightInfo = weight::WeightInfo;
 }
 
 pub struct ExtBuilder {

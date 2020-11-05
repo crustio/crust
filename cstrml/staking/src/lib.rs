@@ -48,7 +48,7 @@ pub mod weight;
 use swork;
 use primitives::{
     constants::{currency::*, time::*},
-    traits::TransferrableCurrency, Moment
+    traits::TransferrableCurrency
 };
 use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
 

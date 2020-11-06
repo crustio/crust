@@ -83,7 +83,7 @@ decl_module! {
 		/// - 2 storage mutations (codec `O(1)`).
 		/// - 1 event.
 		/// # </weight>
-		#[weight = 0]
+		#[weight = 1_000_000]
 		fn transfer(origin,
 			target: <T::Lookup as StaticLookup>::Source,
 			#[compact] amount: T::Balance

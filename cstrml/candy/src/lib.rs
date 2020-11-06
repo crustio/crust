@@ -1,7 +1,7 @@
 // Ensure we're `no_std` when compiling for Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::{Parameter, decl_module, decl_event, decl_storage, decl_error, ensure};
+use frame_support::{Parameter, decl_module, decl_event, decl_storage, decl_error, ensure, traits::Vec};
 use sp_runtime::traits::{Member, AtLeast32BitUnsigned, Zero, StaticLookup};
 use frame_system::{ensure_signed, ensure_root};
 

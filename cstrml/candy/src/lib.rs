@@ -14,6 +14,9 @@ pub trait Trait: frame_system::Trait {
     type Balance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
 }
 
+// ETH Address
+type ETHAddress = Vec<u8>;
+
 decl_event! {
 	pub enum Event<T> where
 		<T as frame_system::Trait>::AccountId,
@@ -25,6 +28,8 @@ decl_event! {
 		CandyTransferred(AccountId, AccountId, Balance),
 		/// Some assets were burned. \[from, balance\]
 		CandyBurned(AccountId, Balance),
+		/// ETH address was bonded
+		BondEthSuccess(AccountId, ETHAddress),
 	}
 }
 
@@ -45,6 +50,8 @@ decl_storage! {
 		Balances get(fn balances): map hasher(blake2_128_concat) T::AccountId => T::Balance;
 		/// The total unit supply of candy.
 		Total get(fn total): T::Balance;
+		/// The bonded eth address to any given account.
+		BondedEth get(fn bonded_eth): map hasher(blake2_128_concat) T::AccountId => Option<ETHAddress>;
 	}
 }
 
@@ -122,6 +129,22 @@ decl_module! {
 
 			<Total<T>>::mutate(|total_supply| *total_supply -= burned_balances);
 			<Balances<T>>::insert(target, remains - burned_balances);
+		}
+
+		/// Register one ETH address for an given account
+		///
+		/// # <weight>
+		/// - `O(1)`
+		/// - 1 storage mutations (codec `O(1)`).
+		/// - 1 event.
+		/// # </weight>
+		#[weight = 1_000_000]
+		fn bond_eth(origin, address: ETHAddress) {
+			let who = ensure_signed(origin)?;
+
+			<BondedEth<T>>::insert(&who, &address);
+
+			Self::deposit_event(RawEvent::BondEthSuccess(who, address));
 		}
 	}
 }
@@ -272,6 +295,13 @@ mod tests {
             assert_ok!(Candy::issue(Origin::root(), 1, 100));
             assert_eq!(Candy::balances(2), 0);
             assert_noop!(Candy::burn(Origin::root(), 2, 0), Error::<Test>::BalanceZero);
+        });
+    }
+
+    #[test]
+    fn bond_eth_should_work() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(Candy::bond_eth(Origin::signed(1), hex::decode("0000000000000000000000000000000000000000").unwrap()));
         });
     }
 }

@@ -20,6 +20,7 @@ sp-runtime = { default-features = false, version = '2.0.0' }
 sp-core = '2.0.0'
 sp-std = '2.0.0'
 sp-io = '2.0.0'
+hex = '0.4.2'
 
 [features]
 default = ["std"]

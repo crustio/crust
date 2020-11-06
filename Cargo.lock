@@ -1081,6 +1081,7 @@ version = "0.10.0"
 dependencies = [
  "frame-support",
  "frame-system",
+ "hex",
  "parity-scale-codec",
  "serde",
  "sp-core",

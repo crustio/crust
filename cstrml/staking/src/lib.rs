@@ -665,7 +665,10 @@ decl_storage! {
 }
 
 decl_event!(
-    pub enum Event<T> where Balance = BalanceOf<T>, <T as frame_system::Trait>::AccountId {
+    pub enum Event<T> where
+        Balance = BalanceOf<T>,
+        <T as frame_system::Trait>::AccountId
+    {
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
         Reward(AccountId, Balance),
@@ -686,7 +689,14 @@ decl_event!(
         /// An account has called `withdraw_unbonded` and removed unbonding chunks worth `Balance`
         /// from the unlocking queue. [stash, amount]
         Withdrawn(AccountId, Balance),
-        // TODO: add stake limitation change event
+        /// An account has called `validate` and set guarantee fee.
+        ValidateSuccess(AccountId, ValidatorPrefs),
+        /// An account has called `guarantee` and vote for one validator.
+        GuaranteeSuccess(AccountId, AccountId, Balance),
+        /// An account has been chilled from its stash
+        ChillSuccess(AccountId, AccountId),
+        /// Update the identities success. The stake limit of each identity would be updated.
+        UpdateIdentitiesSuccess(EraIndex),
     }
 );
 
@@ -1004,7 +1014,8 @@ decl_module! {
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let v_stash = &ledger.stash;
             <Guarantors<T>>::remove(v_stash);
-            <Validators<T>>::insert(v_stash, prefs);
+            <Validators<T>>::insert(v_stash, &prefs);
+            Self::deposit_event(RawEvent::ValidateSuccess(controller, prefs));
         }
 
         /// Declare the desire to guarantee `targets` for the origin controller.
@@ -1044,6 +1055,7 @@ decl_module! {
 
             <Validators<T>>::remove(g_stash);
             <Guarantors<T>>::insert(g_stash, guarantee);
+            Self::deposit_event(RawEvent::GuaranteeSuccess(controller, v_stash, votes));
         }
 
         /// Declare the desire to cut guarantee for the origin controller.
@@ -1083,6 +1095,7 @@ decl_module! {
             let guarantee = guarantee.unwrap();
 
             <Guarantors<T>>::insert(g_stash, guarantee);
+            Self::deposit_event(RawEvent::GuaranteeSuccess(controller, v_stash, votes));
         }
 
         /// Declare no desire to either validate or guarantee.
@@ -1707,6 +1720,7 @@ impl<T: Trait> Module<T> {
         // Set staking information for new era.
         // TODO: move this update 1 session in advance
         T::SworkInterface::update_identities();
+        Self::deposit_event(RawEvent::UpdateIdentitiesSuccess(current_era.clone()));
         let maybe_new_validators = Self::select_and_update_validators(current_era);
 
         maybe_new_validators

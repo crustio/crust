@@ -227,7 +227,7 @@ decl_module! {
             ensure_root(origin)?;
             <Code>::put(&new_code);
             <ABExpire<T>>::put(&expire_block);
-            Self::deposit_event(RawEvent::EnclaveUpgrade(new_code, expire_block));
+            Self::deposit_event(RawEvent::EnclaveUpgradeSuccess(new_code, expire_block));
         }
 
         /// Register as new trusted node, can only called from sWorker.
@@ -408,15 +408,16 @@ decl_module! {
                 &reported_srd_root,
                 &reported_files_root,
                 slot,
-                &ab_upgrade_pk
             );
 
             // 9. Emit work report event
-            Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk));
+            Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
             // 10. Emit A/B upgrade event
             if is_ab_upgrade {
-                Self::deposit_event(RawEvent::ABUpgradeSuccess(reporter));
+                // 11. Delete old A's storage status
+                Self::chill(reporter.clone(), ab_upgrade_pk.clone());
+                Self::deposit_event(RawEvent::ABUpgradeSuccess(reporter, ab_upgrade_pk, curr_pk));
             }
 
             Ok(())
@@ -444,9 +445,7 @@ decl_module! {
             ensure!(Self::id_bonds(&applier).contains(&pk), Error::<T>::IllegalPubKey);
 
             // 4. Chill pubKey and unbond it from the applier
-            Self::chill(&applier, &pk);
-
-            Self::deposit_event(RawEvent::ChillSuccess(applier, pk));
+            Self::chill(applier, pk);
 
             Ok(())
         }
@@ -536,7 +535,7 @@ impl<T: Trait> Module<T> {
     /// 1. Remove `identities`
     /// 2. Remove `id_bond`
     /// 3. Remove `work_report`
-    fn chill(who: &T::AccountId, pk: &SworkerPubKey) {
+    fn chill(who: T::AccountId, pk: SworkerPubKey) {
         // 1. Remove from `identities`
         Identities::remove(&pk);
 
@@ -545,12 +544,14 @@ impl<T: Trait> Module<T> {
 
         // 3. Remove from `id_bonds`
         <IdBonds<T>>::mutate(
-            who,
-            move |bonds| bonds.retain(|bond| bond != pk)
+            &who,
+            |bonds| bonds.retain(|bond| bond != &pk)
         );
-        if Self::id_bonds(who).is_empty() {
-            <IdBonds<T>>::remove(who);
+        if Self::id_bonds(&who).is_empty() {
+            <IdBonds<T>>::remove(&who);
         }
+
+        Self::deposit_event(RawEvent::ChillSuccess(who, pk));
     }
 
     /// This function will (maybe) update or insert a work report, in details:
@@ -569,7 +570,6 @@ impl<T: Trait> Module<T> {
         reported_srd_root: &MerkleRoot,
         reported_files_root: &MerkleRoot,
         report_slot: u64,
-        ab_upgrade_pk: &SworkerPubKey
     ) {
         let mut old_used: u128 = 0;
         let mut old_free: u128 = 0;
@@ -624,11 +624,6 @@ impl<T: Trait> Module<T> {
 
         Used::put(total_used);
         Free::put(total_free);
-
-        // 8. Delete old A's storage status
-        if !ab_upgrade_pk.is_empty() {
-            Self::chill(reporter, ab_upgrade_pk);
-        }
     }
 
     /// Update sOrder information based on changed files, return the real changed files
@@ -856,8 +851,8 @@ decl_event!(
     {
         RegisterSuccess(AccountId, SworkerPubKey),
         WorksReportSuccess(AccountId, SworkerPubKey),
-        ABUpgradeSuccess(AccountId),
+        ABUpgradeSuccess(AccountId, SworkerPubKey, SworkerPubKey),
         ChillSuccess(AccountId, SworkerPubKey),
-        EnclaveUpgrade(SworkerCode, BlockNumber),
+        EnclaveUpgradeSuccess(SworkerCode, BlockNumber),
     }
 );

@@ -11,8 +11,8 @@ use frame_support::{
         Weight, DispatchClass
     }
 };
-use sp_runtime::traits::Saturating;
-use sp_std::{str, convert::TryInto, prelude::*};
+use sp_runtime::traits::StaticLookup;
+use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_root, ensure_signed};
 
 #[cfg(feature = "std")]
@@ -23,9 +23,9 @@ use primitives::{
     constants::swork::*,
     MerkleRoot, SworkerPubKey, SworkerSignature,
     ReportSlot, BlockNumber, IASSig,
-    ISVBody, SworkerCert, SworkerCode
+    ISVBody, SworkerCert, SworkerCode, SworkerAnchor
 };
-use market::{OrderStatus, MarketInterface, OrderInspector};
+use market_v2::{MarketInterface, SworkerInspector};
 use sp_std::collections::btree_map::BTreeMap;
 
 pub mod weight;
@@ -73,12 +73,25 @@ pub struct WorkReport {
     /// Storage information
     pub used: u64, // Real file(mapping with sOrder) size
     pub free: u64,
-    pub files: BTreeMap<MerkleRoot, u64>, // Only recorded the sOrder file
 
     /// Assist judgement
     pub reported_files_size: u64, // Reported files size
     pub reported_srd_root: MerkleRoot, // Srd hash root
     pub reported_files_root: MerkleRoot, // Reported files hash root
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct PKInfo {
+    code: SworkerCode,
+    anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct Identity<AccountId> {
+    anchor: SworkerAnchor,
+    group: Option<AccountId>
 }
 
 /// An event handler for reporting works
@@ -90,26 +103,29 @@ impl<AId> Works<AId> for () {
     fn report_works(_: &AId, _: u128, _: u128) {}
 }
 
-/// Implement market's order inspector, bonding with work report
-/// and return if the order is legality
-impl<T: Trait> OrderInspector<T::AccountId> for Module<T> {
-    fn check_works(merchant: &T::AccountId, file_size: u64) -> bool {
-        let mut free = 0;
+/// Implement market's file inspector
+impl<T: Trait> SworkerInspector<T::AccountId> for Module<T> {
+    /// check wr existing or not
+    fn check_wr(anchor: &SworkerAnchor) -> bool {
+        let current_rs = Self::get_current_block_number() as u64;
+        let prev_rs = current_rs.saturating_sub(1);
+        Self::reported_in_slot(&anchor, prev_rs)
+    }
 
-        // Loop and sum all pks
-        for pk in Self::id_bonds(merchant) {
-            if let Some(wr) = Self::work_reports(pk) {
-                // Pruning
-                if wr.free > file_size { return true }
-                free = free.saturating_add(wr.free);
-            }
+    /// decrease the used value due to deleted files or dump trash
+    fn decrease_used(anchor: &SworkerAnchor, used: u64) {
+        if let Some(mut wr) = Self::work_reports(anchor) {
+            wr.used = wr.used.saturating_sub(used);
+            WorkReports::insert(anchor, wr);
         }
+    }
 
-        if cfg!(feature = "runtime-benchmarks") {
-            true
-        } else {
-            free > file_size
+    /// check whether the account id and the anchor is valid or not
+    fn check_anchor(who: &T::AccountId, anchor: &SworkerAnchor) -> bool {
+        if let Some(identity) = Self::identities(who) {
+            return identity.anchor == *anchor;
         }
+        false
     }
 }
 
@@ -126,10 +142,7 @@ pub trait Trait: system::Trait {
     type Works: Works<Self::AccountId>;
 
     /// Interface for interacting with a market module.
-    type MarketInterface: MarketInterface<Self::AccountId, Self::Hash, BalanceOf<Self>>;
-
-    /// Max bonds restriction per account.
-    type MaxBondsLimit: Get<u32>;
+    type MarketInterface: MarketInterface<Self::AccountId>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -143,20 +156,23 @@ decl_storage! {
         /// The AB upgrade expired block, this should be managed by sudo/democracy
         pub ABExpire get(fn ab_expire): Option<T::BlockNumber>;
 
-        /// The bond relationship between AccountId <-> SworkerPubKeys
-        /// e.g. 5HdZ269vAbuoZRK7GT67px6RmwFw2NrWsAbh2wENDqtb5WMN -> ['0x123', '0x456', ...]
-        pub IdBonds get(fn id_bonds):
-            map hasher(blake2_128_concat) T::AccountId => Vec<SworkerPubKey>;
-
-        /// The sWorker identities, mapping from sWorker public key to an optional identity tuple
+        /// The bond relationship between AccountId <-> Identity
         pub Identities get(fn identities):
-            map hasher(twox_64_concat) SworkerPubKey => Option<SworkerCode>;
+            map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
-        /// Node's work report, mapping from sWorker public key to an optional work report
+        /// The sWorker information, mapping from sWorker public key to an optional pubkey information
+        pub PubKeys get(fn pub_keys):
+            map hasher(twox_64_concat) SworkerPubKey => PKInfo;
+
+        /// The group information
+        pub Groups get(fn groups):
+            map hasher(blake2_128_concat) T::AccountId => BTreeSet<T::AccountId>;
+
+        /// Node's work report, mapping from sWorker anchor to an optional work report
         /// WorkReport only been replaced, it won't get removed cause we need to check the
         /// status transition from off-chain sWorker
         pub WorkReports get(fn work_reports):
-            map hasher(twox_64_concat) SworkerPubKey  => Option<WorkReport>;
+            map hasher(twox_64_concat) SworkerAnchor => Option<WorkReport>;
 
         /// The current report slot block number, this value should be a multiple of era block
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
@@ -165,8 +181,8 @@ decl_storage! {
         /// We leave it keep all era's report info
         /// cause B-tree won't build index on key2(ReportSlot)
         /// value represent if reported in this slot
-        pub ReportedInSlot get(fn reported_in_slot) :
-            double_map hasher(twox_64_concat) SworkerPubKey, hasher(twox_64_concat) ReportSlot => bool = false;
+        pub ReportedInSlot get(fn reported_in_slot):
+            double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => bool = false;
 
         /// The used workload, used for calculating stake limit in the end of era
         /// default is 0
@@ -201,14 +217,19 @@ decl_error! {
         ExceedBondsLimit,
         /// Illegal pubkey
         IllegalPubKey,
+        /// Identity doesn't exist
+        IdentityNotExist,
+        /// Already joined one group
+        DoubleGroup,
+        /// Not a owner,
+        NotOwner,
+        /// Used is not zero,
+        InvalidUsed
     }
 }
 
 decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-        /// The maximum bond limitation per account
-        const MaxBondsLimit: u32 = T::MaxBondsLimit::get();
-
         type Error = Error<T>;
 
         // Initializing events
@@ -265,22 +286,11 @@ decl_module! {
             let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalIdentity);
 
-            // 3. Ensure `id_bonds` still available
-            let legal_bonds_count: u32 = Self::id_bonds(&who).iter().fold(0u32, |acc, pk| {
-                if let Some(code) = Self::identities(&pk) {
-                    if code == Self::code() {
-                       return acc + 1;
-                    }
-                }
-                acc
-            });
-            ensure!(legal_bonds_count < T::MaxBondsLimit::get(), Error::<T>::ExceedBondsLimit);
-
-            // 4. Upsert new id
+            // 3. Insert new pub key info
             let pk = maybe_pk.unwrap();
-            Self::maybe_upsert_id(&applier, &pk, &Self::code());
+            Self::insert_pk_info(pk.clone(), Self::code());
 
-            // 5. Emit event
+            // 4. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())
@@ -320,29 +330,43 @@ decl_module! {
         ) -> DispatchResult {
             let reporter = ensure_signed(origin)?;
             let mut prev_pk = curr_pk.clone();
+            let mut is_ab_upgrade = false;
+            let mut is_new_entry = false;
 
-            // 1. Already reported with same pub key in the same slot, return immediately
-            if Self::reported_in_slot(&curr_pk, slot) {
-                log!(
-                    trace,
-                    "🔒 Already reported with same pub key {:?} in the same slot {:?}.",
-                    curr_pk,
-                    slot
-                );
-                return Ok(())
+            // 1. Ensure reporter is registered
+            ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
+
+            // Decide which scenario
+            if let Some(anchor) = Self::pub_keys(&curr_pk).anchor {
+                // Normally report works.
+                // Ensure Identity's anchor be same with current pk's anchor
+                ensure!(Self::identities(&reporter).unwrap_or_default().anchor == anchor, Error::<T>::IllegalReporter);
+                // 2. Already reported with same pub key in the same slot, return immediately
+                if Self::reported_in_slot(&anchor, slot) {
+                    log!(
+                        trace,
+                        "🔒 Already reported with same pub key {:?} in the same slot {:?}.",
+                        curr_pk,
+                        slot
+                    );
+                    return Ok(())
+                }
+            } else if !ab_upgrade_pk.is_empty() {
+                // no need to check since added_files and deleted_files must be empty
+                is_ab_upgrade = true;
+            } else {
+                is_new_entry = true;
             }
-
-            // 2. Ensure reporter is registered
-            ensure!(Identities::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
             // 3. Ensure reporter's code is legal
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
             // 4. Ensure A/B upgrade is legal
-            let is_ab_upgrade = !ab_upgrade_pk.is_empty() && Self::work_reports(&curr_pk).is_none();
             if is_ab_upgrade {
                 // 4.1 Previous pk should already reported works
-                let maybe_prev_wr = Self::work_reports(&ab_upgrade_pk);
+                ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
+                // unwrap_or_default is a small tricky solution
+                let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
 
                 // 4.2 Current work report should NOT be changed at all
@@ -390,17 +414,47 @@ decl_module! {
                 Error::<T>::IllegalFilesTransition
             );
 
-            // 8. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
+            // 8. Finish register
+            if is_ab_upgrade {
+                // 11. Transfer A's status to B and delete old A's storage status
+                let prev_pk_info = Self::pub_keys(&prev_pk);
+                PubKeys::mutate(&curr_pk, |curr_pk_info| {
+                    curr_pk_info.anchor = prev_pk_info.anchor;
+                });
+                Self::chill_pk(&ab_upgrade_pk);
+                Self::deposit_event(RawEvent::ABUpgradeSuccess(reporter.clone(), ab_upgrade_pk, curr_pk.clone()));
+            } else if is_new_entry {
+                let mut pk_info = Self::pub_keys(&curr_pk);
+                match Self::identities(&reporter) {
+                    // re-entry scenario
+                    Some(mut identity) => {
+                        Self::chill_anchor(&identity.anchor);
+                        identity.anchor = curr_pk.clone(); // new anchor => zero used. No need to change group here.
+                        <Identities<T>>::insert(&reporter, identity);
+                    },
+                    // totally new entry
+                    None => {
+                        let identity = Identity {
+                            anchor: curr_pk.clone(),
+                            group: None
+                        };
+                        <Identities<T>>::insert(&reporter, identity);
+                    }
+                }
+                pk_info.anchor = Some(curr_pk.clone());
+                PubKeys::insert(&curr_pk, pk_info);
+            }
+
+            // 9. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
             // a. Upsert work report
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
             // d. Update `report_in_slot`
             // e. Update total spaces(used and reserved)
-            // f. [If A/B] Delete A's identity and work report
+            let anchor = Self::pub_keys(&curr_pk).anchor.unwrap();
             Self::maybe_upsert_work_report(
                 &reporter,
-                &curr_pk,
-                &prev_pk,
+                &anchor,
                 reported_srd_size,
                 reported_files_size,
                 &added_files,
@@ -410,48 +464,53 @@ decl_module! {
                 slot,
             );
 
-            // 9. Emit work report event
+            // 10. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
-            // 10. Emit A/B upgrade event
-            if is_ab_upgrade {
-                // 11. Transfer A's old status to B
-                let current_rs = Self::current_report_slot();
-                ReportedInSlot::swap(&curr_pk, &current_rs, &ab_upgrade_pk, &current_rs);
-                // 12. Delete old A's storage status
-                Self::chill(reporter.clone(), ab_upgrade_pk.clone());
-                Self::deposit_event(RawEvent::ABUpgradeSuccess(reporter, ab_upgrade_pk, curr_pk));
+            Ok(())
+        }
+
+        #[weight = 1000]
+        pub fn join_group(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let owner = T::Lookup::lookup(target)?;
+
+            // 1. Ensure who has identity information
+            ensure!(Self::identities(&who).is_some(), Error::<T>::IdentityNotExist);
+            let identity = Self::identities(&who).unwrap();
+
+            // 2. Ensure who didn't join group right now
+            ensure!(identity.group.is_none(), Error::<T>::DoubleGroup);
+
+            if who != owner {
+                // 3. Ensure owner has identity information
+                ensure!(Self::identities(&owner).is_some(), Error::<T>::IdentityNotExist);
+                // 4. Ensure owner's group is itself
+                ensure!(Self::identities(&owner).unwrap().group.unwrap_or_default() == owner, Error::<T>::NotOwner);
+                // 5. Ensure who's wr's used is zero
+                ensure!(Self::work_reports(identity.anchor).unwrap().used == 0, Error::<T>::InvalidUsed);
             }
 
-            Ok(())
-        }
+            // 6. Join the group
+            <Groups<T>>::mutate(&owner, |group| {
+                group.insert(who.clone());
+            });
 
-        /// Expose private chill function as an extrinsic.
-        /// This function will (maybe) remove identity, id_bond and work report in details:
-        /// 1. Remove `identities`
-        /// 2. Remove `id_bond`
-        /// 3. Remove `work_report`
-        #[weight = T::WeightInfo::chill_pk()]
-        pub fn chill_pk(
-            origin,
-            pk: SworkerPubKey
-        ) -> DispatchResult {
-            let applier = ensure_signed(origin)?;
+            let mut identity = Self::identities(&who).unwrap();
+            identity.group = Some(owner.clone());
+            <Identities<T>>::insert(&who, identity);
 
-            // 1. Ensure the applier is registered
-            ensure!(<IdBonds<T>>::contains_key(&applier), Error::<T>::IllegalPubKey);
-
-            // 2. Ensure the reporter is registered
-            ensure!(Identities::contains_key(&pk), Error::<T>::IllegalPubKey);
-
-            // 3. Ensure the applier has bonded to the reporter
-            ensure!(Self::id_bonds(&applier).contains(&pk), Error::<T>::IllegalPubKey);
-
-            // 4. Chill pubKey and unbond it from the applier
-            Self::chill(applier, pk);
+            // 7. Emit event
+            Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
 
             Ok(())
         }
+
+        // TODO: quit the group
+        // TODO: chill anchor, identity and pk
 
     }
 }
@@ -477,8 +536,8 @@ impl<T: Trait> Module<T> {
             return;
         }
 
-        let mut total_used = 0;
-        let mut total_free = 0;
+        let mut total_used = 0u128;
+        let mut total_free = 0u128;
 
         log!(
             trace,
@@ -486,21 +545,19 @@ impl<T: Trait> Module<T> {
             reported_rs
         );
         // 2. Loop all identities and get the workload map
-        // TODO: avoid iterate all identities
-        let workload_map: Vec<(T::AccountId, u128)> = <IdBonds<T>>::iter().map(|(reporter, ids)| {
-            let mut workload = 0;
-            for id in ids {
-                // 2.1 Calculate reporter's own reserved and used space
-                let (free, used) = Self::get_workload(&reporter, &id, current_rs);
-
-                // 2.2 Update total
-                total_used = total_used.saturating_add(used);
-                total_free = total_free.saturating_add(free);
-                workload = workload.saturating_add(used).saturating_add(free);
+        let mut workload_map= BTreeMap::new();
+        for (reporter, id) in <Identities<T>>::iter() {
+            let (free, used) = Self::get_workload(&reporter, &id.anchor, current_rs);
+            total_used = total_used.saturating_add(used);
+            total_free = total_free.saturating_add(free);
+            let mut owner = reporter;
+            if let Some(group) = id.group {
+                owner = group;
             }
+            let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(used).saturating_add(free);
+            workload_map.insert(owner, workload);
 
-            (reporter.clone(), workload)
-        }).collect();
+        }
 
         Used::put(total_used);
         Free::put(total_free);
@@ -514,50 +571,38 @@ impl<T: Trait> Module<T> {
             trace,
             "🔒 Update stake limit for all reporters."
         );
-        for (reporter, own_workload) in workload_map {
-            T::Works::report_works(&reporter, own_workload, total_workload);
+        for (reporter, own_workload) in workload_map.iter() {
+            T::Works::report_works(&reporter, *own_workload, total_workload);
         }
     }
 
     // PRIVATE MUTABLES
-    /// This function will (maybe) insert or update a identity, in details:
-    /// 1. Add to `identities`
-    /// 2. Add to `id_bond`
-    fn maybe_upsert_id(who: &T::AccountId, pk: &SworkerPubKey, code: &SworkerCode) {
-        // 1. Add to `identities`
-        Identities::insert(pk, code);
+    /// This function will insert a new pk
+    fn insert_pk_info(pk: SworkerPubKey, code: SworkerCode) {
+        let pk_info = PKInfo {
+            code,
+            anchor: None
+        };
 
-        // 2. Add to `id_bond`
-        <IdBonds<T>>::mutate(
-            who,
-            move |bonds| bonds.push(pk.clone())
-        );
+        PubKeys::insert(pk, pk_info);
     }
 
-    /// This function will (maybe) remove identity, id_bond and work report in details:
-    /// 1. Remove `identities`
-    /// 2. Remove `id_bond`
-    /// 3. Remove `work_report`
-    fn chill(who: T::AccountId, pk: SworkerPubKey) {
+    /// This function will (maybe) remove pub_keys
+    fn chill_pk(pk: &SworkerPubKey) {
+        // 1. Remove from `pub_keys`
+        PubKeys::remove(pk);
+    }
+
+    /// This function will (maybe) remove pub_keys
+    fn chill_identity(who: &T::AccountId) {
         // 1. Remove from `identities`
-        Identities::remove(&pk);
+        <Identities<T>>::remove(who);
+    }
 
-        // 2. Remove from `work_reports`
-        WorkReports::remove(&pk);
-
-        // 3. Remove from `id_bonds`
-        <IdBonds<T>>::mutate(
-            &who,
-            |bonds| bonds.retain(|bond| bond != &pk)
-        );
-        if Self::id_bonds(&who).is_empty() {
-            <IdBonds<T>>::remove(&who);
-        }
-
-        // 4. Remove from `reported_in_slot`
-        ReportedInSlot::remove_prefix(&pk);
-
-        Self::deposit_event(RawEvent::ChillSuccess(who, pk));
+    ///
+    fn chill_anchor(anchor: &SworkerAnchor) {
+        WorkReports::remove(anchor);
+        ReportedInSlot::remove_prefix(anchor);
     }
 
     /// This function will (maybe) update or insert a work report, in details:
@@ -567,8 +612,7 @@ impl<T: Trait> Module<T> {
     /// 4. call `Works::report_works` interface
     fn maybe_upsert_work_report(
         reporter: &T::AccountId,
-        curr_pk: &SworkerPubKey,
-        prev_pk: &SworkerPubKey,
+        anchor: &SworkerAnchor,
         reported_srd_size: u64,
         reported_files_size: u64,
         added_files: &Vec<(MerkleRoot, u64)>,
@@ -577,103 +621,80 @@ impl<T: Trait> Module<T> {
         reported_files_root: &MerkleRoot,
         report_slot: u64,
     ) {
-        let mut old_used: u128 = 0;
-        let mut old_free: u128 = 0;
-        let mut files: BTreeMap<MerkleRoot, u64> = BTreeMap::new();
+        let mut old_used: u64 = 0;
+        let mut old_free: u64 = 0;
 
         // 1. If contains work report
-        if let Some(old_wr) = Self::work_reports(prev_pk) {
-            old_used = old_wr.used as u128;
-            old_free = old_wr.free as u128;
-            files = old_wr.files.clone();
-
-            // If this is resuming reporting, set all files storage order status to success
-            if old_wr.report_slot < report_slot - REPORT_SLOT {
-                let old_files: Vec<(MerkleRoot, u64)> = old_wr.files.into_iter().collect();
-                let _ = Self::update_sorder(reporter, &old_files, true);
-            }
+        if let Some(old_wr) = Self::work_reports(&anchor) {
+            old_used = old_wr.used;
+            old_free = old_wr.free;
         }
 
-        // 2. Update sOrder and get changed size
-        let added_files = Self::update_sorder(reporter, added_files, true);
-        let deleted_files = Self::update_sorder(reporter, deleted_files, false);
+        // 2. Mark who has reported in this (report)slot
+        ReportedInSlot::insert(&anchor, report_slot, true);
 
-        // 3. Update files
-        for (added_file_id, added_file_size) in added_files {
-            files.insert(added_file_id, added_file_size);
-        }
-        for (deleted_file_id, _) in deleted_files {
-            files.remove(&deleted_file_id);
-        }
+        // 3. Update sOrder and get changed size
+        // loop added. if not exist, calculate used.
+        // loop deleted, need to check each key whether we should delete it or not
+        let added_files = Self::update_files(reporter, added_files, &anchor, true);
+        let deleted_files = Self::update_files(reporter, deleted_files, &anchor,false);
 
         // 4. Construct work report
-        let used = files.iter().fold(0, |acc, (_, f_size)| acc + *f_size);
+        let used = old_used.saturating_add(added_files.iter().fold(0, |acc, (_, f_size)| acc + *f_size)).saturating_sub(deleted_files.iter().fold(0, |acc, (_, f_size)| acc + *f_size));
         let wr = WorkReport {
             report_slot,
             used,
             free: reported_srd_size,
-            files,
             reported_files_size,
             reported_srd_root: reported_srd_root.clone(),
             reported_files_root: reported_files_root.clone()
         };
 
         // 5. Upsert work report
-        WorkReports::insert(curr_pk, wr);
+        WorkReports::insert(anchor, wr);
 
-        // 6. Mark who has reported in this (report)slot
-        ReportedInSlot::insert(curr_pk, report_slot, true);
-
-        // 7. Update workload
-        let total_used = Self::used().saturating_sub(old_used).saturating_add(used as u128);
-        let total_free = Self::free().saturating_sub(old_free).saturating_add(reported_srd_size as u128);
+        // 6. Update workload
+        let total_used = Self::used().saturating_sub(old_used as u128).saturating_add(used as u128);
+        let total_free = Self::free().saturating_sub(old_free as u128).saturating_add(reported_srd_size as u128);
 
         Used::put(total_used);
         Free::put(total_free);
     }
 
     /// Update sOrder information based on changed files, return the real changed files
-    fn update_sorder(reporter: &T::AccountId, changed_files: &Vec<(MerkleRoot, u64)>, is_added: bool) -> Vec<(MerkleRoot, u64)> {
+    fn update_files(
+        reporter: &T::AccountId,
+        changed_files: &Vec<(MerkleRoot, u64)>,
+        anchor: &SworkerPubKey,
+        is_added: bool) -> Vec<(MerkleRoot, u64)> {
         let mut real_files = vec![];
-        let current_block_numeric = Self::get_current_block_number();
+        let curr_bn = Self::get_current_block_number();
 
-        if let Some(mi) = T::MarketInterface::merchants(reporter) {
-            let file_map = mi.file_map;
-
-            // 1. Loop changed files
-            real_files = changed_files.iter().filter_map(|(f_id, size)| {
-                // 2. If mapping to storage orders
-                if let Some(sorder_ids) = file_map.get(f_id) {
-                    // a. Loop storage orders(same file)
-                    for sorder_id in sorder_ids {
-                        if let Some(mut so_status) = T::MarketInterface::maybe_get_sorder_status(sorder_id) {
-                            if so_status.status != OrderStatus::Pending && current_block_numeric > so_status.expired_on {
-                                continue;
-                            }
-                            // b. Change sOrder status
-                            if !is_added {
-                                so_status.status = OrderStatus::Failed;
-                            } else if is_added && so_status.status == OrderStatus::Pending {
-                                // go panic if `current_block_numeric` > `created_on`
-                                so_status.expired_on += current_block_numeric - so_status.completed_on;
-                                so_status.completed_on = current_block_numeric;
-                                so_status.claimed_at = current_block_numeric;
-                                so_status.status = OrderStatus::Success;
-                            } else {
-                                so_status.status = OrderStatus::Success;
-                            }
-                            // c. Set sOrder status
-                            T::MarketInterface::maybe_set_sorder_status(sorder_id, &so_status, &current_block_numeric);
-                        }
+        // 1. Loop changed files
+        if is_added {
+            real_files = changed_files.iter().filter_map(|(cid, size)| {
+                let mut is_counted = true;
+                if let Some(identity) = Self::identities(reporter) {
+                    if let Some(owner) = identity.group {
+                        is_counted = !T::MarketInterface::check_duplicate_in_group(cid, &Self::groups(owner));
                     }
-                    Some((f_id.clone(), *size))
+                };
+                if T::MarketInterface::upsert_payouts(reporter, cid, anchor, curr_bn, is_counted) {
+                    Some((cid.clone(), *size))
                 } else {
-                    // 3. Or invalid
+                    None
+                }
+            }).collect();
+        } else {
+            real_files = changed_files.iter().filter_map(|(cid, size)| {
+                // 2. If mapping to storage orders
+                if T::MarketInterface::delete_payouts(reporter, cid, anchor, curr_bn) {
+                    Some((cid.clone(), *size))
+                } else {
                     None
                 }
             }).collect();
         }
-
         real_files
     }
 
@@ -683,18 +704,11 @@ impl<T: Trait> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(reporter: &T::AccountId, pk: &SworkerPubKey, current_rs: u64) -> (u128, u128) {
+    fn get_workload(reporter: &T::AccountId, anchor: &SworkerAnchor, current_rs: u64) -> (u128, u128) {
         // Got work report
-        if let Some(wr) = Self::work_reports(pk) {
-            if Self::reported_in_slot(pk, current_rs) {
+        if let Some(wr) = Self::work_reports(anchor) {
+            if Self::reported_in_slot(anchor, current_rs) {
                 return (wr.free as u128, wr.used as u128)
-            } else {
-                // If it is the 1st time failed
-                if wr.report_slot == current_rs.saturating_sub(REPORT_SLOT) {
-                    let files: Vec<(MerkleRoot, u64)> = wr.files.into_iter().collect();
-                    let _ = Self::update_sorder(reporter, &files, false);
-                }
-                // Or is already fucked
             }
         }
         // Or nope, idk wtf? 🙂
@@ -716,21 +730,19 @@ impl<T: Trait> Module<T> {
         reported_deleted_files: &Vec<(MerkleRoot, u64)>,
         reported_files_root: &MerkleRoot
     ) -> bool {
-        if let Some(prev_wr) = Self::work_reports(&prev_pk) {
+        if let Some(prev_wr) = Self::work_reports(&Self::pub_keys(&prev_pk).anchor.unwrap_or_default()) {
             let old_files_size = prev_wr.reported_files_size;
             let added_files_size = reported_added_files.iter().fold(0, |acc, (_, size)| acc+*size);
             let deleted_files_size = reported_deleted_files.iter().fold(0, |acc, (_, size)| acc+*size);
-
             // File size change should equal between before and after
             return if added_files_size == 0 && deleted_files_size == 0 {
                 reported_files_root == &prev_wr.reported_files_root
             } else {
                 old_files_size.saturating_add(added_files_size).saturating_sub(deleted_files_size) == new_files_size
             }
-        } else {
-            // Or just return for the baby 👶🏼
-            true
         }
+        // Or just return for the baby 👶🏼
+        true
     }
 
     fn check_and_get_pk(
@@ -756,13 +768,8 @@ impl<T: Trait> Module<T> {
     /// This function is judging if the work report sworker code is legal,
     /// return `is_sworker_code_legal`
     fn reporter_code_check(pk: &SworkerPubKey, block_number: u64) -> bool {
-        if let Some(reporter_code) = Self::identities(pk) {
-            return reporter_code == Self::code() ||
-                (Self::ab_expire().is_some() && block_number <
-                    TryInto::<u64>::try_into(Self::ab_expire().unwrap()).ok().unwrap())
-        }
-
-        false
+        return Self::pub_keys(pk).code == Self::code() ||
+            (Self::ab_expire().is_some() && block_number < TryInto::<u64>::try_into(Self::ab_expire().unwrap()).ok().unwrap())
     }
 
     fn work_report_timing_check(
@@ -860,5 +867,6 @@ decl_event!(
         ABUpgradeSuccess(AccountId, SworkerPubKey, SworkerPubKey),
         ChillSuccess(AccountId, SworkerPubKey),
         EnclaveUpgradeSuccess(SworkerCode, BlockNumber),
+        JoinGroupSuccess(AccountId, AccountId),
     }
 );

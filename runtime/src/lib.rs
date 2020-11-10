@@ -656,39 +656,46 @@ impl pallet_sudo::Trait for Runtime {
     type Call = Call;
 }
 
-parameter_types! {
-    pub const MaxBondsLimit: u32 = 10;
-}
-
 impl swork::Trait for Runtime {
     type Currency = Balances;
     type Event = Event;
     type Works = Staking;
     type MarketInterface = Market;
-    type MaxBondsLimit = MaxBondsLimit;
     type WeightInfo = swork::weight::WeightInfo;
 }
 
 parameter_types! {
     /// Unit is pico
-    pub const MinimumStoragePrice: Balance = 40;
-    /// Unit is minute
-    pub const MinimumSorderDuration: u32 = 30;
+    pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
+    pub const FileDuration: BlockNumber = 15 * DAYS;
+    pub const FileBaseReplica: u32 = 4;
+    pub const FileBaseFee: Balance = 1 * MILLICENTS;
+    pub const FileInitPrice: Balance = 10000; // Need align with FileDuration and FileBaseReplica
     pub const ClaimLimit: u32 = 1000;
-    pub const Frequency: BlockNumber = 10 * MINUTES;
+    pub const StorageReferenceRatio: f64 = 0.5;
+    pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
+    pub const StakingRatio: Perbill = Perbill::from_percent(80);
+    pub const FileTrashMaxSize: u128 = 500_000;
 }
 
-impl market::Trait for Runtime {
+impl market_v2::Trait for Runtime {
+
+    /// The market's module id, used for deriving its sovereign account ID.
+    type ModuleId = MarketModuleId;
     type Currency = Balances;
     type CurrencyToBalance = CurrencyToVoteHandler;
+    type SworkerInspector = Swork;
     type Event = Event;
-    type Randomness = RandomnessCollectiveFlip;
-    // TODO: Bonding with balance module(now we impl inside Market)
-    type OrderInspector = Swork;
-    type MinimumStoragePrice = MinimumStoragePrice;
-    type MinimumSorderDuration = MinimumSorderDuration;
+    /// File duration.
+    type FileDuration = FileDuration;
+    type FileBaseReplica = FileBaseReplica;
+    type FileBaseFee = FileBaseFee;
+    type FileInitPrice = FileInitPrice;
     type ClaimLimit = ClaimLimit;
-    type WeightInfo = market::weight::WeightInfo;
+    type StorageReferenceRatio = StorageReferenceRatio;
+    type StorageIncreaseRatio = StorageIncreaseRatio;
+    type StakingRatio = StakingRatio;
+    type FileTrashMaxSize = FileTrashMaxSize;
 }
 
 construct_runtime! {
@@ -739,7 +746,7 @@ construct_runtime! {
 
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config},
-        Market: market::{Module, Call, Storage, Event<T>},
+        Market: market_v2::{Module, Call, Storage, Event<T>},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
@@ -973,7 +980,7 @@ impl_runtime_apis! {
             add_benchmark!(params, batches, balances, Balances);
             add_benchmark!(params, batches, system, SystemBench::<Runtime>);
             add_benchmark!(params, batches, staking, Staking);
-            add_benchmark!(params, batches, market, Market);
+            // add_benchmark!(params, batches, market, Market);
             add_benchmark!(params, batches, swork, Swork);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

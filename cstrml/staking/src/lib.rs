@@ -48,6 +48,7 @@ use primitives::{
     constants::{currency::*, time::*},
     traits::TransferrableCurrency
 };
+use frame_support::storage::migration::remove_storage_prefix;
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
@@ -724,6 +725,12 @@ decl_module! {
         type Error = Error<T>;
 
         fn deposit_event() = default;
+
+        // upgrade for 0.10.0 and spec 6
+        fn on_runtime_upgrade() -> Weight {
+            Self::do_upgrade();
+            10_000
+        }
 
         fn on_finalize() {
             // Set the start of the first era.
@@ -2141,6 +2148,14 @@ impl<T: Trait> Module<T> {
         .map(|(who, _stakes)| who.clone())
         .collect::<Vec<T::AccountId>>();
         elected_stashes
+    }
+
+    /// Upgrade storage to current version to support new MPoW
+    /// * clear of:
+    ///   * StakeLimit
+    fn do_upgrade() {
+        // 1. Kill old storages
+        remove_storage_prefix(b"Staking", b"StakeLimit", &[]);
     }
 
     // fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {

@@ -28,7 +28,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug, SaturatedConversion,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, TrailingZeroInput
+        CheckedAdd
     },
 };
 use sp_staking::{
@@ -50,7 +50,6 @@ use primitives::{
     constants::{currency::*, time::*},
     traits::TransferrableCurrency
 };
-use rand_chacha::{rand_core::{RngCore, SeedableRng}, ChaChaRng};
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
@@ -2149,13 +2148,14 @@ impl<T: Trait> Module<T> {
         validators_stakes.sort_by(|a, b| b.1.cmp(&a.1));
 
         // choose top candidate_to_elect number of validators
-        let mut candidate_stashes = validators_stakes[0..candidate_to_elect]
+        let candidate_stashes = validators_stakes[0..candidate_to_elect]
         .iter()
         .map(|(who, stakes)| (who.clone(), *stakes))
         .collect::<Vec<(T::AccountId, u128)>>();
 
-        // shuffle it
-        Self::shuffle_candidates(&mut candidate_stashes);
+        // TODO: enable it back when the network is stable
+        // // shuffle it
+        // Self::shuffle_candidates(&mut candidate_stashes);
 
         // choose elected_stashes number of validators
         let elected_stashes = candidate_stashes[0..to_elect]
@@ -2165,28 +2165,28 @@ impl<T: Trait> Module<T> {
         elected_stashes
     }
 
-    fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {
-        // 1. Construct random seed, 👼 bless the randomness
-        // seed = [ block_hash, phrase ]
-        let phrase = b"candidates_shuffle";
-        let bn = <frame_system::Module<T>>::block_number();
-        let bh: T::Hash = <frame_system::Module<T>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &phrase.encode()[..]
-        ].concat();
-
-        // we'll need a random seed here.
-        let seed = T::Randomness::random(seed.as_slice());
-        // seed needs to be guaranteed to be 32 bytes.
-        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))
-            .expect("input is padded with zeroes; qed");
-        let mut rng = ChaChaRng::from_seed(seed);
-        for i in (0..candidates_stakes.len()).rev() {
-            let random_index = (rng.next_u32() % (i as u32 + 1)) as usize;
-            candidates_stakes.swap(random_index, i);
-        }
-    }
+    // fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {
+    //     // 1. Construct random seed, 👼 bless the randomness
+    //     // seed = [ block_hash, phrase ]
+    //     let phrase = b"candidates_shuffle";
+    //     let bn = <frame_system::Module<T>>::block_number();
+    //     let bh: T::Hash = <frame_system::Module<T>>::block_hash(bn);
+    //     let seed = [
+    //         &bh.as_ref()[..],
+    //         &phrase.encode()[..]
+    //     ].concat();
+    //
+    //     // we'll need a random seed here.
+    //     let seed = T::Randomness::random(seed.as_slice());
+    //     // seed needs to be guaranteed to be 32 bytes.
+    //     let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed.as_ref()))
+    //         .expect("input is padded with zeroes; qed");
+    //     let mut rng = ChaChaRng::from_seed(seed);
+    //     for i in (0..candidates_stakes.len()).rev() {
+    //         let random_index = (rng.next_u32() % (i as u32 + 1)) as usize;
+    //         candidates_stakes.swap(random_index, i);
+    //     }
+    // }
 }
 
 /// In this implementation `new_session(session)` must be called before `end_session(session-1)`

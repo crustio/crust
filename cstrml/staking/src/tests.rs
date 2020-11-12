@@ -411,7 +411,7 @@ fn staking_should_work() {
         .build()
         .execute_with(|| {
             // remember + compare this along with the test.
-            assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+            assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // put some money in account that we'll use.
             for i in 1..5 {
@@ -431,13 +431,13 @@ fn staking_should_work() {
             assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
 
             // No effects will be seen so far.
-            assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+            assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // --- Block 2:
             start_session(2, false);
 
             // No effects will be seen so far. Era has not been yet triggered.
-            assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+            assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // --- Block 3: the validators will now be queued.
             start_session(3, false);
@@ -446,30 +446,30 @@ fn staking_should_work() {
             // --- Block 4: the validators will now be changed.
             start_session(4, false);
 
-            assert_eq_uvec!(validator_controllers(), vec![20, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![4, 20]);
             // --- Block 4: Unstake 4 as a validator, freeing up the balance stashed in 3
             // 4 will chill
-            Staking::chill(Origin::signed(30)).unwrap();
+            Staking::chill(Origin::signed(4)).unwrap();
 
             // --- Block 5: nothing. 4 is still there.
             start_session(5, false);
-            assert_eq_uvec!(validator_controllers(), vec![20, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![4, 20]);
 
             // --- Block 6: since we are using TestStaking instead of real Staking for Tee, 11 and 21 would still be in Validators.
             start_session(7, false);
             assert!(<Validators<Test>>::contains_key(&11));
             assert!(<Validators<Test>>::contains_key(&21));
-            assert!(!<Validators<Test>>::contains_key(&31));
+            assert!(!<Validators<Test>>::contains_key(&3));
             assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
             // Note: the stashed value of 4 is still lock, and valid will not be updated, cause all
             // validators gone
             assert_eq!(
-                Staking::ledger(&30),
+                Staking::ledger(&4),
                 Some(StakingLedger {
-                    stash: 31,
-                    total: 1,
-                    active: 1,
+                    stash: 3,
+                    total: 2500,
+                    active: 2500,
                     unlocking: vec![],
                     claimed_rewards: vec![],
                 })
@@ -553,7 +553,7 @@ fn guaranteeing_and_rewards_should_work() {
         .build()
         .execute_with(|| {
             // initial validators -- everyone is actually even.
-            assert_eq_uvec!(validator_controllers(), vec![10, 40]);
+            assert_eq_uvec!(validator_controllers(), vec![10, 20]);
 
             // Set payee to controller
             assert_ok!(Staking::set_payee(
@@ -630,8 +630,8 @@ fn guaranteeing_and_rewards_should_work() {
 
             start_era(1, true);
 
-            // 10 and 20 have more votes, they will be chosen by top-down.
-            assert_eq_uvec!(validator_controllers(), vec![40, 20]);
+            // 30 and 40 have more votes, they will be chosen by top-down.
+            assert_eq_uvec!(validator_controllers(), vec![30, 40]);
             assert_eq!(Staking::eras_total_stakes(1), 5998);
 
             payout_all_stakers(0);
@@ -1872,7 +1872,7 @@ fn switching_roles() {
                 ));
             }
 
-            assert_eq_uvec!(validator_controllers(), vec![30, 20]);
+            assert_eq_uvec!(validator_controllers(), vec![10, 20]);
 
             // put some money in account that we'll use.
             for i in 1..7 {
@@ -1927,19 +1927,19 @@ fn switching_roles() {
             start_session(1, false);
 
             // no change
-            assert_eq_uvec!(validator_controllers(), vec![30, 20]);
+            assert_eq_uvec!(validator_controllers(), vec![10, 20]);
 
             // new block
             start_session(2, false);
 
             // no change
-            assert_eq_uvec!(validator_controllers(), vec![30, 20]);
+            assert_eq_uvec!(validator_controllers(), vec![10, 20]);
 
             // new block --> ne era --> new validators
             start_session(3, false);
 
             // with current guarantors 10 and 5 have the most stake
-            assert_eq_uvec!(validator_controllers(), vec![10, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![6, 10]);
 
             // 2 decides to be a validator. Consequences:
             assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
@@ -1951,14 +1951,14 @@ fn switching_roles() {
             // Winners: 20 and 2
 
             start_session(4, false);
-            assert_eq_uvec!(validator_controllers(), vec![10, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![6, 10]);
 
             start_session(5, false);
-            assert_eq_uvec!(validator_controllers(), vec![10, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![6, 10]);
 
-            // ne era
+            // new era
             start_session(6, false);
-            assert_eq_uvec!(validator_controllers(), vec![20, 10]);
+            assert_eq_uvec!(validator_controllers(), vec![2, 20]);
 
             check_exposure_all();
             check_guarantor_all();
@@ -1972,7 +1972,7 @@ fn wrong_vote_is_null() {
         .validator_pool(true)
         .build()
         .execute_with(|| {
-            assert_eq_uvec!(validator_controllers(), vec![10, 40]);
+            assert_eq_uvec!(validator_controllers(), vec![10, 20]);
 
             // put some money in account that we'll use.
             for i in 1..3 {
@@ -2022,7 +2022,7 @@ fn wrong_vote_is_null() {
             // new block
             start_era(1, false);
 
-            assert_eq_uvec!(validator_controllers(), vec![40, 20]);
+            assert_eq_uvec!(validator_controllers(), vec![30, 40]);
         });
 }
 
@@ -2255,7 +2255,7 @@ fn topdown_should_not_overflow_validators() {
             // TODO: this will broken the stake limit of mock set
             start_era(1, false);
 
-            assert_eq_uvec!(validator_controllers(), vec![4, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![2, 4]);
 
             // This test will fail this. Will saturate.
             // check_exposure_all();
@@ -2280,7 +2280,7 @@ fn topdown_should_not_overflow_guarantors() {
 
             start_era(1, false);
 
-            assert_eq_uvec!(validator_controllers(), vec![4, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![2, 4]);
 
             // Saturate.
             // `new_era` will update stake limit
@@ -2295,7 +2295,7 @@ fn topdown_should_not_overflow_guarantors() {
                 vec![(3, u64::max_value() / 2), (5, u64::max_value() / 2)]);
             start_era(2, false);
 
-            assert_eq_uvec!(validator_controllers(), vec![4, 30]);
+            assert_eq_uvec!(validator_controllers(), vec![2, 4]);
         })
 }
 
@@ -2405,7 +2405,7 @@ fn reward_from_authorship_event_handler_works() {
         <Module<Test>>::note_uncle(11, 1);
 
         // Not mandatory but must be coherent with rewards
-        assert_eq_uvec!(Session::validators(), vec![31, 21]);
+        assert_eq_uvec!(Session::validators(), vec![11, 21]);
 
         // 21 is rewarded as an uncle producer
         // 11 is rewarded as a block producer and uncle referencer and uncle producer
@@ -2423,16 +2423,16 @@ fn reward_from_authorship_event_handler_works() {
 fn add_reward_points_fns_works() {
     ExtBuilder::default().build().execute_with(|| {
         // Not mandatory but must be coherent with rewards
-        assert_eq!(Session::validators(), vec![31, 21]);
+        assert_eq!(Session::validators(), vec![11, 21]);
 
         <Module<Test>>::reward_by_ids(vec![
-            (31, 1),
+            (11, 1),
             (21, 1),
             (21, 1),
         ]);
 
         <Module<Test>>::reward_by_ids(vec![
-            (31, 1),
+            (11, 1),
             (21, 1),
             (21, 1),
         ]);
@@ -2440,7 +2440,7 @@ fn add_reward_points_fns_works() {
         assert_eq!(
             ErasRewardPoints::<Test>::get(Staking::active_era().unwrap().index),
             EraRewardPoints {
-                individual: vec![(21, 4), (31, 2)].into_iter().collect(),
+                individual: vec![(21, 4), (11, 2)].into_iter().collect(),
                 total: 6,
             },
         );
@@ -3245,7 +3245,7 @@ fn update_stakers_should_work_new_era() {
         assert!(!<ErasStakers<Test>>::contains_key(0, &5));
 
         // remember + compare this along with the test.
-        assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+        assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
         // put some money in account that we'll use.
         for i in 1..10 {
@@ -3291,7 +3291,7 @@ fn update_stakers_should_work_new_era() {
         assert_ok!(Staking::guarantee(Origin::signed(8), (5, 500)));
 
         // No effects will be seen so far.
-        assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+        assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
         // --- Block 2:
         start_session(2, false);
@@ -3303,7 +3303,7 @@ fn update_stakers_should_work_new_era() {
         // --- Block 4: the validators will now be changed.
         start_session(4, false);
 
-        assert_eq_uvec!(validator_controllers(), vec![20, 30]);
+        assert_eq_uvec!(validator_controllers(), vec![20, 4]);
         assert_eq!(
             Staking::eras_stakers(1, &5),
             Exposure {
@@ -3336,7 +3336,7 @@ fn eras_stakers_clipped_should_work_new_era() {
         assert!(!<ErasStakers<Test>>::contains_key(0, &5));
 
         // remember + compare this along with the test.
-        assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+        assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
         // put some money in account that we'll use.
         for i in 110..120 {
@@ -3400,7 +3400,7 @@ fn eras_stakers_clipped_should_work_new_era() {
         assert_ok!(Staking::guarantee(Origin::signed(118), (5, 400)));
 
         // No effects will be seen so far.
-        assert_eq_uvec!(validator_controllers(), vec![30, 10]);
+        assert_eq_uvec!(validator_controllers(), vec![20, 10]);
 
         // --- Block 2:
         start_session(2, false);
@@ -3412,7 +3412,7 @@ fn eras_stakers_clipped_should_work_new_era() {
         // --- Block 4: the validators will now be changed.
         start_session(4, false);
 
-        assert_eq_uvec!(validator_controllers(), vec![20, 30]);
+        assert_eq_uvec!(validator_controllers(), vec![4, 20]);
         assert_eq!(
             Staking::eras_stakers(1, &5),
             Exposure {
@@ -3944,7 +3944,7 @@ fn new_era_with_stake_limit_should_work() {
                     others: vec![]
                 }
             );
-            assert_eq!(Staking::current_elected(), vec![21, 7, 11, 31]);
+            assert_eq!(Staking::current_elected(), vec![11, 21, 31, 7]);
         });
 }
 
@@ -4197,32 +4197,32 @@ fn era_clean_should_work() {
         });
 }
 
-#[test]
-fn randomly_select_validators_works() {
-    ExtBuilder::default()
-        .minimum_validator_count(1)
-        .validator_count(3)
-        .build()
-        .execute_with(|| {
-            assert_eq_uvec!(
-                Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400)], 2),
-                vec![4, 1]
-            );
-
-            assert_eq_uvec!(
-                Staking::do_election(vec![(1,500), (2,200), (3, 100), (4, 400)], 1),
-                vec![4]
-            );
-
-            assert_eq_uvec!(
-                Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400), (5, 500), (6, 600)], 2),
-                vec![6, 3]
-            );
-
-            assert_eq_uvec!(
-                Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400), (5, 500), (6, 600), (7,700), (8, 800)], 3),
-                vec![5, 6, 3]
-            );
-
-        });
-}
+// #[test]
+// fn randomly_select_validators_works() {
+//     ExtBuilder::default()
+//         .minimum_validator_count(1)
+//         .validator_count(3)
+//         .build()
+//         .execute_with(|| {
+//             assert_eq_uvec!(
+//                 Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400)], 2),
+//                 vec![4, 1]
+//             );
+//
+//             assert_eq_uvec!(
+//                 Staking::do_election(vec![(1,500), (2,200), (3, 100), (4, 400)], 1),
+//                 vec![4]
+//             );
+//
+//             assert_eq_uvec!(
+//                 Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400), (5, 500), (6, 600)], 2),
+//                 vec![6, 3]
+//             );
+//
+//             assert_eq_uvec!(
+//                 Staking::do_election(vec![(1,100), (2,200), (3, 300), (4, 400), (5, 500), (6, 600), (7,700), (8, 800)], 3),
+//                 vec![5, 6, 3]
+//             );
+//
+//         });
+// }

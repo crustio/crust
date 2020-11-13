@@ -5,7 +5,7 @@ authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
 license = "GPL-3.0"
-homepage = "https://crust.network"
+homepage = "https://crust.network11"
 repository = "https://github.com/crustio/crust/"
 
 [[bin]]

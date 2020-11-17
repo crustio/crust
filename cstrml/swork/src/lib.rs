@@ -417,7 +417,7 @@ decl_module! {
             if is_ab_upgrade {
                 // 11. Transfer A's old status to B
                 let current_rs = Self::current_report_slot();
-                ReportedInSlot::insert(&curr_pk, &current_rs, Self::reported_in_slot(&ab_upgrade_pk, &current_rs));
+                ReportedInSlot::swap(&curr_pk, &current_rs, &ab_upgrade_pk, &current_rs);
                 // 12. Delete old A's storage status
                 Self::chill(reporter.clone(), ab_upgrade_pk.clone());
                 Self::deposit_event(RawEvent::ABUpgradeSuccess(reporter, ab_upgrade_pk, curr_pk));

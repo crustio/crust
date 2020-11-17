@@ -1102,8 +1102,10 @@ fn ab_upgrade_should_work() {
             });
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
 
             // 4. Runs to 606, and do sWorker upgrade
+            Swork::update_identities();
             run_to_block(606);
             // Fake do upgrade
 
@@ -1141,11 +1143,14 @@ fn ab_upgrade_should_work() {
             });
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_in_slot(&b_pk, 300), true);
+            assert_eq!(Swork::reported_in_slot(&b_pk, 600), true);
 
             // 8. Check A is already be chilled
             assert_eq!(Swork::identities(&a_pk), None);
             assert_eq!(Swork::work_reports(&a_pk), None);
             assert_eq!(Swork::id_bonds(&reporter), vec![b_pk.clone()]);
+            assert_eq!(Swork::reported_in_slot(&a_pk, 300), false);
 
             // 9. Runs to 909
             run_to_block(909);

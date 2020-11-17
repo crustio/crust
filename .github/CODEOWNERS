@@ -1,0 +1,16 @@
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+
+* @zikunfan
+
+# Order is important; the last matching pattern takes the most
+# precedence.
+/utils/ @zikunfan @MyronFanQiu
+/scripts/ @zikunfan
+/runtime/ @zikunfan @MyronFanQiu
+/rpc/ @zikunfan
+/primitives/ @zikunfan @MyronFanQiu
+/node/ @zikunfan @MyronFanQiu
+/docs/ @zikunfan @MyronFanQiu
+/docker/ @zikunfan
+/cstrml/ @zikunfan @MyronFanQiu

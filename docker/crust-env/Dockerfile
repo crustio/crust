@@ -1,10 +1,15 @@
 # Build crust env image
-From "rust:latest"
+FROM rust:latest
 
 ARG TOOLCHAIN
-ENV RUSTUP_TOOLCHAIN ${TOOLCHAIN:-nightly-2020-07-12}
-RUN rustup update ${RUSTUP_TOOLCHAIN}
+ENV RUSTUP_TOOLCHAIN ${TOOLCHAIN:-nightly-2020-08-10}
+RUN apt-get update
+RUN apt-get -y install lsb-release wget software-properties-common
+RUN wget https://apt.llvm.org/llvm.sh
+RUN chmod +x llvm.sh
+RUN ./llvm.sh 10
+RUN rustup toolchain install ${RUSTUP_TOOLCHAIN}
 RUN rustup update stable
 RUN rustup target add wasm32-unknown-unknown --toolchain ${RUSTUP_TOOLCHAIN}
 RUN rustup default ${RUSTUP_TOOLCHAIN}
-RUN apt-get update && apt-get install -y llvm clang libclang-dev
+RUN rustc -vV

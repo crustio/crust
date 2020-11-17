@@ -415,7 +415,10 @@ decl_module! {
 
             // 10. Emit A/B upgrade event
             if is_ab_upgrade {
-                // 11. Delete old A's storage status
+                // 11. Transfer A's old status to B
+                let current_rs = Self::current_report_slot();
+                ReportedInSlot::insert(&curr_pk, &current_rs, Self::reported_in_slot(&ab_upgrade_pk, &current_rs));
+                // 12. Delete old A's storage status
                 Self::chill(reporter.clone(), ab_upgrade_pk.clone());
                 Self::deposit_event(RawEvent::ABUpgradeSuccess(reporter, ab_upgrade_pk, curr_pk));
             }
@@ -550,6 +553,9 @@ impl<T: Trait> Module<T> {
         if Self::id_bonds(&who).is_empty() {
             <IdBonds<T>>::remove(&who);
         }
+
+        // 4. Remove from `reported_in_slot`
+        ReportedInSlot::remove_prefix(&pk);
 
         Self::deposit_event(RawEvent::ChillSuccess(who, pk));
     }

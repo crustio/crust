@@ -383,8 +383,8 @@ parameter_types! {
     pub const BondingDuration: staking::EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).
     pub const SlashDeferDuration: staking::EraIndex = 28;
-    // 80_000 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `80_000`
-    pub const SPowerRatio: u128 = 80_000;
+    // 100 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `100`
+    pub const SPowerRatio: u128 = 100;
     // 64 guarantors for one validator.
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
 }

@@ -83,8 +83,8 @@ pub struct WorkReport {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PKInfo {
-    code: SworkerCode,
-    anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
+    pub code: SworkerCode,
+    pub anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -92,8 +92,8 @@ pub struct PKInfo {
 pub struct Identity<AccountId> {
     /// The unique identity associated to one account id.
     /// During the AB upgrade, this anchor would keep and won't change.
-    anchor: SworkerAnchor,
-    group: Option<AccountId>
+    pub anchor: SworkerAnchor,
+    pub group: Option<AccountId>
 }
 
 /// An event handler for reporting works

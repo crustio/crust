@@ -146,16 +146,16 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
                         FirstClassStorage::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
                     }
                 }
-                file_info.payouts.retain(|payout| {
-                    // This is a tricky solution
-                    if payout.who == *who && payout.anchor == *anchor && payout.is_counted {
-                        is_counted = true;
-                    }
-                    // Do we need check anchor here?
-                    payout.who != *who || payout.anchor != *anchor
-                });
-                <Files<T>>::insert(cid, file_info);
             }
+            file_info.payouts.retain(|payout| {
+                // This is a tricky solution
+                if payout.who == *who && payout.anchor == *anchor && payout.is_counted {
+                    is_counted = true;
+                }
+                // Do we need check anchor here?
+                payout.who != *who || payout.anchor != *anchor
+            });
+            <Files<T>>::insert(cid, file_info);
         }
         if let Some(file_info) = <FileTrashI<T>>::get(cid) {
             for payout in file_info.payouts.iter() {

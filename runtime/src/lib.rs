@@ -684,7 +684,7 @@ impl market_v2::Trait for Runtime {
     type ModuleId = MarketModuleId;
     type Currency = Balances;
     type CurrencyToBalance = CurrencyToVoteHandler;
-    type SworkerInspector = Swork;
+    type SworkerInterface = Swork;
     type Event = Event;
     /// File duration.
     type FileDuration = FileDuration;

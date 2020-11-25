@@ -23,9 +23,9 @@ use primitives::{
     constants::swork::*,
     MerkleRoot, SworkerPubKey, SworkerSignature,
     ReportSlot, BlockNumber, IASSig,
-    ISVBody, SworkerCert, SworkerCode, SworkerAnchor
+    ISVBody, SworkerCert, SworkerCode, SworkerAnchor,
+    traits::{MarketInterface, SworkerInterface}
 };
-use market_v2::{MarketInterface, SworkerInspector};
 use sp_std::collections::btree_map::BTreeMap;
 
 pub mod weight;
@@ -104,7 +104,7 @@ impl<AId> Works<AId> for () {
 }
 
 /// Implement market's file inspector
-impl<T: Trait> SworkerInspector<T::AccountId> for Module<T> {
+impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
     /// check wr existing or not
     fn check_wr(anchor: &SworkerAnchor) -> bool {
         let current_rs = Self::get_current_block_number() as u64;

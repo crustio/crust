@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 // Crust runtime modules
 use primitives::{
     MerkleRoot, BlockNumber,
-    traits::TransferrableCurrency, SworkerAnchor
+    traits::{TransferrableCurrency, MarketInterface, SworkerInterface}, SworkerAnchor
 };
 
 pub(crate) const LOG_TARGET: &'static str = "market";
@@ -67,45 +67,8 @@ pub struct MerchantLedger<Balance> {
     pub pledge: Balance
 }
 
-/// A trait for SworkerInspector
-/// This wanyi is an outer inspector to judge whether one pk reported wr in the last slot or not
-pub trait SworkerInspector<AccountId> {
-    fn check_wr(anchor: &SworkerAnchor) -> bool;
-
-    fn decrease_used(anchor: &SworkerAnchor, used: u64);
-
-    fn check_anchor(who: &AccountId, anchor: &SworkerAnchor) -> bool;
-}
-
 type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
-
-/// Means for interacting with a specialized version of the `market` trait.
-///
-/// This is needed because `sWork`
-/// 1. updates the `MerchantRecords` of the `market::Trait`
-pub trait MarketInterface<AccountId> {
-    // used for `added_files`
-    // return is_added
-    fn upsert_payouts(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber, is_counted: bool) -> bool;
-    // used for `delete_files`
-    // return is_deleted
-    fn delete_payouts(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool;
-    // check group used
-    fn check_duplicate_in_group(cid: &MerkleRoot, members: &BTreeSet<AccountId>) -> bool;
-}
-
-impl<AId> MarketInterface<AId> for () {
-    fn upsert_payouts(_: &AId, _: &MerkleRoot, _: &SworkerAnchor, _: BlockNumber, _: bool) -> bool { false }
-
-    fn delete_payouts(_: &AId, _: &MerkleRoot, _: &SworkerAnchor, _: BlockNumber) -> bool {
-        false
-    }
-
-    fn check_duplicate_in_group(_: &MerkleRoot, _: &BTreeSet<AId>) -> bool {
-        false
-    }
-}
 
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 {
@@ -139,7 +102,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
             // calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let is_closed = Self::calculate_payout(cid, curr_bn);
             if is_closed {
-                if T::SworkerInspector::check_wr(&anchor) {
+                if T::SworkerInterface::check_wr(&anchor) {
                     // decrease it due to deletion
                     file_info.reported_payouts -= 1;
                     if file_info.reported_payouts < file_info.expected_payouts {
@@ -184,7 +147,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
         if let Some(file_info) = <Files<T>>::get(cid) {
             for payout in file_info.payouts.iter() {
                 if payout.is_counted && members.contains(&payout.who) {
-                    if T::SworkerInspector::check_anchor(&payout.who, &payout.anchor) {
+                    if T::SworkerInterface::check_anchor(&payout.who, &payout.anchor) {
                         return true;
                     }
                 }
@@ -208,7 +171,7 @@ pub trait Trait: system::Trait {
     type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
 
     /// used to check work report
-    type SworkerInspector: SworkerInspector<Self::AccountId>;
+    type SworkerInterface: SworkerInterface<Self::AccountId>;
 
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -480,6 +443,24 @@ decl_module! {
             Ok(())
         }
 
+        #[weight = 1000]
+        pub fn get_staking_pot(
+            origin
+        ) -> DispatchResult {
+            let _ = ensure_signed(origin)?;
+            Self::deposit_event(RawEvent::PaysOrderSuccess(Self::staking_pot()));
+            Ok(())
+        }
+
+        #[weight = 1000]
+        pub fn get_storage_pot(
+            origin
+        ) -> DispatchResult {
+            let _ = ensure_signed(origin)?;
+            Self::deposit_event(RawEvent::PaysOrderSuccess(Self::storage_pot()));
+            Ok(())
+        }
+
         // TODO: add claim_reward
     }
 }
@@ -539,7 +520,7 @@ impl<T: Trait> Module<T> {
             // Loop payouts
             for payout in file_info.payouts.iter() {
                 // Didn't report in last slot
-                if !T::SworkerInspector::check_wr(&payout.anchor) {
+                if !T::SworkerInterface::check_wr(&payout.anchor) {
                     let mut invalid_payout = payout.clone();
                     // update the reported_at to the curr_bn
                     invalid_payout.reported_at = curr_bn;
@@ -630,7 +611,7 @@ impl<T: Trait> Module<T> {
 
     fn dump_file_trash_i() {
         for (anchor, used) in FileTrashUsedRecordsI::iter() {
-            T::SworkerInspector::decrease_used(&anchor, used);
+            T::SworkerInterface::decrease_used(&anchor, used);
         }
         remove_storage_prefix(FileTrashUsedRecordsI::module_prefix(), FileTrashUsedRecordsI::storage_prefix(), &[]);
         remove_storage_prefix(<FileTrashI<T>>::module_prefix(), <FileTrashI<T>>::storage_prefix(), &[]);
@@ -639,7 +620,7 @@ impl<T: Trait> Module<T> {
 
     fn dump_file_trash_ii() {
         for (anchor, used) in FileTrashUsedRecordsII::iter() {
-            T::SworkerInspector::decrease_used(&anchor, used);
+            T::SworkerInterface::decrease_used(&anchor, used);
         }
         remove_storage_prefix(FileTrashUsedRecordsII::module_prefix(), FileTrashUsedRecordsII::storage_prefix(), &[]);
         remove_storage_prefix(<FileTrashII<T>>::module_prefix(), <FileTrashII<T>>::storage_prefix(), &[]);

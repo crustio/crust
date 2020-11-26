@@ -98,7 +98,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 7,
+    spec_version: 8,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -383,8 +383,8 @@ parameter_types! {
     pub const BondingDuration: staking::EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).
     pub const SlashDeferDuration: staking::EraIndex = 28;
-    // 100 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `100`
-    pub const SPowerRatio: u128 = 100;
+    // 10 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `10`
+    pub const SPowerRatio: u128 = 10;
     // 64 guarantors for one validator.
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
 }

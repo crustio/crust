@@ -30,8 +30,7 @@ use sp_std::collections::btree_map::BTreeMap;
 
 pub mod weight;
 
-/// Provides util functions
-pub mod utils;
+pub mod api;
 
 #[cfg(test)]
 mod mock;
@@ -743,14 +742,7 @@ impl<T: Trait> Module<T> {
         let enclave_code = Self::code();
         let applier = account_id.encode();
 
-        utils::verify_identity(
-            ias_sig,
-            ias_cert,
-            &applier,
-            isv_body,
-            sig,
-            &enclave_code,
-        )
+        return None;
     }
 
     /// This function is judging if the work report sworker code is legal,
@@ -801,40 +793,7 @@ impl<T: Trait> Module<T> {
         deleted_files: &Vec<(MerkleRoot, u64)>,
         sig: &SworkerSignature
     ) -> bool {
-        // 1. Encode
-        let block_number_bytes = utils::encode_u64_to_string_to_bytes(block_number);
-        let reserved_bytes = utils::encode_u64_to_string_to_bytes(reserved);
-        let used_bytes = utils::encode_u64_to_string_to_bytes(used);
-        let added_files_bytes = utils::encode_files(added_files);
-        let deleted_files_bytes = utils::encode_files(deleted_files);
-
-        // 2. Construct work report data
-        //{
-        //    curr_pk: SworkerPubKey,
-        //    prev_pk: SworkerPubKey,
-        //    block_number: u64, -> Vec<u8>
-        //    block_hash: Vec<u8>,
-        //    free: u64, -> Vec<u8>
-        //    used: u64, -> Vec<u8>
-        //    free_root: MerkleRoot,
-        //    used_root: MerkleRoot,
-        //    added_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
-        //    deleted_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
-        //}
-        let data: Vec<u8> = [
-            &curr_pk[..],
-            &prev_pk[..],
-            &block_number_bytes[..],
-            &block_hash[..],
-            &reserved_bytes[..],
-            &used_bytes[..],
-            &srd_root[..],
-            &files_root[..],
-            &added_files_bytes[..],
-            &deleted_files_bytes[..]
-        ].concat();
-
-        utils::verify_p256_sig(curr_pk, &data, sig)
+        true
     }
 
     fn get_current_block_number() -> BlockNumber {

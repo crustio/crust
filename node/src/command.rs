@@ -112,9 +112,11 @@ pub fn run() -> sc_cli::Result<()> {
         },
         None => {
             let runner = cli.create_runner(&cli.run)?;
-            runner.run_node_until_exit( |config| match config.role {
-                Role::Light => new_light(config),
-                _ => new_full(config),
+            runner.run_node_until_exit(|config| async move  {
+                match config.role {
+                    Role::Light => new_light(config),
+                    _ => new_full(config),
+                }
             })
         }
     }

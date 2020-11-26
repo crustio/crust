@@ -1,9 +1,0 @@
-*~
-
-# Cargo Junk
-Cargo.lock
-target/
-
-# IntelliJ junk
-*.iml
-.idea

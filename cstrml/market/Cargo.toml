@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-market"
-version = "0.10.0"
+version = "0.10.2"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -10,23 +10,23 @@ repository = "https://github.com/crustio/crust/"
 [dependencies]
 # third party dependencies
 codec = { default-features = false, package = 'parity-scale-codec', version = '1.3.4', features = ["derive"] }
-serde = { optional = true, version = '1.0.106' }
+serde = { optional = true, version = '1.0.116' }
 serde_json = "1.0.51"
 
 # substrate frames
-frame-system = { default-features = false, version = '2.0.0' }
-frame-support = { default-features = false, version = '2.0.0' }
+frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
 
 # substrate primitives
-sp-core = { default-features = false, version = '2.0.0' }
-sp-io = { default-features = false, version = '2.0.0' }
-sp-runtime = { default-features = false, version = '2.0.0' }
-sp-std = { default-features = false, version = '2.0.0' }
+sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
 
-frame-benchmarking = { version = '2.0.0', default-features = false, optional = true }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652", default-features = false, optional = true }
 
 # crust runtime modules
-primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
+primitives = { version = "0.10.2", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [features]
 default = ['std']
@@ -47,6 +47,6 @@ runtime-benchmarks = [
 
 [dev-dependencies]
 hex = '0.4.2'
-swork = { version = "0.10.0", package = 'cstrml-swork', path = '../swork' }
-balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
-frame-benchmarking = { version = '2.0.0' }
+swork = { version = "0.10.2", package = 'cstrml-swork', path = '../swork' }
+balances = { version = "0.10.2", package = 'cstrml-balances', path = '../balances' }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }

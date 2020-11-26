@@ -15,7 +15,8 @@ use sc_consensus::LongestChain;
 native_executor_instance!(
     pub Executor,
     crust_runtime::api::dispatch,
-    crust_runtime::native_version
+    crust_runtime::native_version,
+    cstrml_swork::api::crypto::HostFunctions
 );
 
 type FullBackend = sc_service::TFullBackend<Block>;
@@ -46,7 +47,7 @@ pub fn new_partial(config: &Configuration) -> Result<
 
     let inherent_data_providers = InherentDataProviders::new();
 
-    let (client, backend, keystore, task_manager) =
+    let (client, backend, keystore_container, task_manager) =
         sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
     let client = Arc::new(client);
 
@@ -97,7 +98,7 @@ pub fn new_partial(config: &Configuration) -> Result<
 
     let rpc_extensions_builder = {
         let client = client.clone();
-        let keystore = keystore.clone();
+        let keystore = keystore_container.sync_keystore();
         let transaction_pool = transaction_pool.clone();
         let select_chain = select_chain.clone();
 
@@ -129,7 +130,7 @@ pub fn new_partial(config: &Configuration) -> Result<
         client,
         backend,
         task_manager,
-        keystore,
+        keystore_container,
         select_chain,
         import_queue,
         transaction_pool,
@@ -151,7 +152,13 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
     let name = config.network.node_name.clone();
 
     let sc_service::PartialComponents {
-        client, backend, mut task_manager, keystore, select_chain, import_queue, transaction_pool,
+        client,
+        backend,
+        mut task_manager,
+        keystore_container,
+        select_chain,
+        import_queue,
+        transaction_pool,
         inherent_data_providers,
         other: (rpc_extensions_builder, import_setup, rpc_setup)
     } = new_partial(&config)?;
@@ -185,7 +192,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
         config,
         backend: backend.clone(),
         client: client.clone(),
-        keystore: keystore.clone(),
+        keystore: keystore_container.sync_keystore(),
         network: network.clone(),
         rpc_extensions_builder: Box::new(rpc_extensions_builder),
         transaction_pool: transaction_pool.clone(),
@@ -201,6 +208,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
     if is_authority {
         let proposer =
             sc_basic_authorship::ProposerFactory::new(
+                task_manager.spawn_handle(),
                 client.clone(),
                 transaction_pool,
                 prometheus_registry.as_ref()
@@ -210,7 +218,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
             sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone());
 
         let babe_config = sc_consensus_babe::BabeParams {
-            keystore: keystore.clone(),
+            keystore: keystore_container.sync_keystore(),
             client: client.clone(),
             select_chain,
             env: proposer,
@@ -229,44 +237,42 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
         task_manager.spawn_essential_handle().spawn_blocking("babe", babe);
 
         // Authority discovery: this module runs to promise authorities' connection
-        // TODO: [Substrate]refine sentry mode using updated substrate code
-        if matches!(role, Role::Authority{..} | Role::Sentry{..}) {
-            let (sentries, authority_discovery_role) = match role {
-                Role::Authority { ref sentry_nodes } => (
-                    sentry_nodes.clone(),
-                    sc_authority_discovery::Role::Authority (
-                        keystore.clone(),
-                    ),
-                ),
-                Role::Sentry {..} => (
-                    vec![],
-                    sc_authority_discovery::Role::Sentry,
-                ),
-                _ => unreachable!("Due to outer matches! constraint; qed."),
+        let _ = if role.is_authority() {
+            use sc_network::Event;
+            use futures::StreamExt;
+
+            let authority_discovery_role = if role.is_authority() {
+                authority_discovery::Role::PublishAndDiscover(
+                    keystore_container.keystore(),
+                )
+            } else {
+                // don't publish our addresses when we're only a collator
+                authority_discovery::Role::Discover
             };
-            let network_event_stream = network.event_stream("authority-discovery");
-            let dht_event_stream = network_event_stream.filter_map(|e| async move {
-                match e {
+            let dht_event_stream = network.event_stream("authority-discovery")
+                .filter_map(|e| async move { match e {
                     Event::Dht(e) => Some(e),
                     _ => None,
-                }
-            }).boxed();
-            let (authority_discovery_worker, _service) = sc_authority_discovery::new_worker_and_service(
+                }});
+            let (worker, service) = authority_discovery::new_worker_and_service(
                 client.clone(),
                 network.clone(),
-                sentries,
-                dht_event_stream,
+                Box::pin(dht_event_stream),
                 authority_discovery_role,
                 prometheus_registry.clone(),
             );
-            task_manager.spawn_handle().spawn("authority-discovery-worker", authority_discovery_worker);
-        }
+
+            task_manager.spawn_handle().spawn("authority-discovery-worker", worker.run());
+            Some(service)
+        } else {
+            None
+        };
     }
 
     // if the node isn't actively participating in consensus then it doesn't
     // need a keystore, regardless of which protocol we use below.
     let keystore = if role.is_authority() {
-        Some(keystore as sp_core::traits::BareCryptoStorePtr)
+        Some(keystore_container.sync_keystore())
     } else {
         None
     };
@@ -295,8 +301,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
         let grandpa_config = sc_finality_grandpa::GrandpaParams {
             config: grandpa_config,
             link: grandpa_link,
-            network,
-            inherent_data_providers,
+            network: network.clone(),
             telemetry_on_connect: Some(telemetry_connection_sinks.on_connect_stream()),
             voting_rule: sc_finality_grandpa::VotingRulesBuilder::default().build(),
             prometheus_registry,
@@ -310,11 +315,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
             sc_finality_grandpa::run_grandpa_voter(grandpa_config)?
         );
     } else {
-        sc_finality_grandpa::setup_disabled_grandpa(
-            client.clone(),
-            &inherent_data_providers,
-            network,
-        )?;
+        sc_finality_grandpa::setup_disabled_grandpa(network)?;
     }
 
     network_starter.start_network();
@@ -403,7 +404,13 @@ pub fn new_light(config: Configuration) -> Result<TaskManager, ServiceError> {
         rpc_extensions_builder: Box::new(sc_service::NoopRpcExtensionBuilder(rpc_extensions)),
         task_manager: &mut task_manager,
         telemetry_connection_sinks: sc_service::TelemetryConnectionSinks::default(),
-        config, keystore, backend, transaction_pool, client, network, network_status_sinks,
+        config,
+        keystore: keystore.sync_keystore(),
+        backend,
+        transaction_pool,
+        client,
+        network,
+        network_status_sinks,
         system_rpc_tx,
     })?;
 

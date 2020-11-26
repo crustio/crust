@@ -2,36 +2,37 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-rpc'
-version = '0.10.0'
+version = '0.10.2'
 license = "GPL-3.0"
 homepage = "https://crust.network"
 repository = "https://github.com/crustio/crust/"
 
 [dependencies]
 jsonrpc-core = "15.0.0"
-frame-rpc-system = { package = "substrate-frame-rpc-system", version = "2.0.0"  }
+frame-rpc-system = { package = "substrate-frame-rpc-system", git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652"  }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false }
 
 # substrate client dependencies
-sc-client-api = "2.0.0"
-sc-rpc = "2.0.0"
-sc-consensus-babe = "0.8.0"
-sc-consensus-babe-rpc = "0.8.0"
-sc-consensus-epochs = "0.8.0"
-sc-finality-grandpa = "0.8.0"
-sc-finality-grandpa-rpc = "0.8.0"
-sc-keystore = "2.0.0"
+sc-client-api = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sc-rpc = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sc-consensus-babe  = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sc-consensus-babe-rpc  = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sc-consensus-epochs  = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sc-finality-grandpa  = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sc-finality-grandpa-rpc  = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sc-keystore = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
 
 # substrate pallet dependencies
-sp-blockchain = "2.0.0"
-sp-runtime = "2.0.0"
-sp-api = "2.0.0"
-sp-consensus = "0.8.0"
-sp-consensus-babe = "0.8.0"
-txpool-api = { package = "sp-transaction-pool", version = "2.0.0" }
-pallet-transaction-payment-rpc = "2.0.0"
-sp-block-builder = "2.0.0"
+sp-keystore = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-blockchain = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-api = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-consensus  = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-consensus-babe  = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+txpool-api = { package = "sp-transaction-pool", git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
+sp-block-builder = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
 
 # crust dependent
-crust-primitives = { version = "0.10.0", package = 'cst-primitives', path='../primitives' }
-crust-runtime = { version = "0.10.0", package = 'crust-runtime', path = '../runtime' }
+crust-primitives = { version = "0.10.2", package = 'cst-primitives', path='../primitives' }
+crust-runtime = { version = "0.10.2", package = 'crust-runtime', path = '../runtime' }

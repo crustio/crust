@@ -2,7 +2,11 @@
   "name": "Crust Maxwell CC2",
   "id": "mwlcc2",
   "chainType": "Live",
-  "bootNodes": [],
+  "bootNodes": [
+    "/dns/p2p.cc2-0.crust.network/tcp/30333/p2p/12D3KooWFAH5rQvLGsoRGmJN692Riegkr5ioU9YiXfrec6iQx1RW",
+    "/dns/p2p.cc2-1.crust.network/tcp/30333/p2p/12D3KooWGHah5fDkaNfC4iPzcfUycPy4wKLsRzEcqRdSeDS8NisM",
+    "/dns/p2p.cc2-2.crust.network/tcp/30333/p2p/12D3KooWKioETiNArFRHVWa4Qiu61X4VS12ZmoCzjJiaWLX3ypqg"
+  ],
   "telemetryEndpoints": [
     [
       "wss://telemetry.polkadot.io/submit/",

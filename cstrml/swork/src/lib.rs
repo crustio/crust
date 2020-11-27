@@ -107,8 +107,8 @@ impl<AId> Works<AId> for () {
 impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
     /// check wr existing or not
     fn check_wr(anchor: &SworkerAnchor) -> bool {
-        let current_rs = Self::get_current_block_number() as u64;
-        let prev_rs = current_rs.saturating_sub(1);
+        let current_rs = Self::get_current_reported_slot() as u64;
+        let prev_rs = current_rs.saturating_sub(REPORT_SLOT);
         Self::reported_in_slot(&anchor, prev_rs)
     }
 

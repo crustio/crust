@@ -2,7 +2,7 @@
 From "rust:latest"
 
 ARG TOOLCHAIN
-ENV RUSTUP_TOOLCHAIN ${TOOLCHAIN:-nightly-2020-07-12}
+ENV RUSTUP_TOOLCHAIN ${TOOLCHAIN:-nightly-2020-11-24}
 RUN rustup update ${RUSTUP_TOOLCHAIN}
 RUN rustup update stable
 RUN rustup target add wasm32-unknown-unknown --toolchain ${RUSTUP_TOOLCHAIN}

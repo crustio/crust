@@ -26,7 +26,7 @@ use primitives::{
     ISVBody, SworkerCert, SworkerCode
 };
 use market::{OrderStatus, MarketInterface, OrderInspector};
-use sp_std::collections::btree_map::BTreeMap;
+use sp_std::{collections::{btree_map::BTreeMap, btree_set::BTreeSet}, iter::FromIterator};
 
 pub mod weight;
 
@@ -494,7 +494,8 @@ impl<T: Trait> Module<T> {
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <IdBonds<T>>::iter().map(|(reporter, ids)| {
             let mut workload = 0;
-            for id in ids {
+            let ids_set = BTreeSet::from_iter(ids.iter());
+            for id in ids_set {
                 // 2.1 Calculate reporter's own reserved and used space
                 let (free, used) = Self::get_workload(&reporter, &id, current_rs);
 

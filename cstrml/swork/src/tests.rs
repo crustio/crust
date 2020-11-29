@@ -904,6 +904,9 @@ fn update_identities_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
+            // Check for duplicate pub keys scenario.
+            register(&reporter, &legal_pk, &LegalCode::get());
+            assert_eq!(Swork::id_bonds(&reporter).len(), 2);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 used: 2,

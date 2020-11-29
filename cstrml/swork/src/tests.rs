@@ -221,6 +221,43 @@ fn register_should_failed_with_wrong_code() {
 }
 
 #[test]
+fn register_should_fail_due_to_double_register() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let applier: AccountId =
+                AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                    .expect("valid ss58 address");
+            let register_info = legal_register_info();
+
+            assert_ok!(Swork::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ));
+            let register_info = legal_register_info();
+            assert_noop!(
+                Swork::register(
+                    Origin::signed(applier.clone()),
+                    register_info.ias_sig,
+                    register_info.ias_cert,
+                    register_info.account_id,
+                    register_info.isv_body,
+                    register_info.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 10,
+                    message: Some("AlreadyRegister"),
+                }
+            );
+        });
+}
+
+#[test]
 fn chill_idbond_should_work() {
     ExtBuilder::default()
         .build()
@@ -867,6 +904,9 @@ fn update_identities_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
 
             register(&reporter, &legal_pk, &LegalCode::get());
+            // Check for duplicate pub keys scenario.
+            register(&reporter, &legal_pk, &LegalCode::get());
+            assert_eq!(Swork::id_bonds(&reporter).len(), 2);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 used: 2,

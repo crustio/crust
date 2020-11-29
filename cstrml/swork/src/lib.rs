@@ -26,7 +26,7 @@ use primitives::{
     ISVBody, SworkerCert, SworkerCode
 };
 use market::{OrderStatus, MarketInterface, OrderInspector};
-use sp_std::collections::btree_map::BTreeMap;
+use sp_std::{collections::{btree_map::BTreeMap, btree_set::BTreeSet}, iter::FromIterator};
 
 pub mod weight;
 
@@ -201,6 +201,8 @@ decl_error! {
         ExceedBondsLimit,
         /// Illegal pubkey
         IllegalPubKey,
+        /// Already register the pub key before
+        AlreadyRegister
     }
 }
 
@@ -276,11 +278,14 @@ decl_module! {
             });
             ensure!(legal_bonds_count < T::MaxBondsLimit::get(), Error::<T>::ExceedBondsLimit);
 
-            // 4. Upsert new id
+            // 4. Ensure the pub key is fresh in id bonds.
             let pk = maybe_pk.unwrap();
+            ensure!(!Self::id_bonds(&who).contains(&pk), Error::<T>::AlreadyRegister);
+
+            // 5. Upsert new id
             Self::maybe_upsert_id(&applier, &pk, &Self::code());
 
-            // 5. Emit event
+            // 6. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())
@@ -489,7 +494,8 @@ impl<T: Trait> Module<T> {
         // TODO: avoid iterate all identities
         let workload_map: Vec<(T::AccountId, u128)> = <IdBonds<T>>::iter().map(|(reporter, ids)| {
             let mut workload = 0;
-            for id in ids {
+            let ids_set = BTreeSet::from_iter(ids.iter());
+            for id in ids_set {
                 // 2.1 Calculate reporter's own reserved and used space
                 let (free, used) = Self::get_workload(&reporter, &id, current_rs);
 

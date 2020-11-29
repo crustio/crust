@@ -201,6 +201,8 @@ decl_error! {
         ExceedBondsLimit,
         /// Illegal pubkey
         IllegalPubKey,
+        /// Already register the pub key before
+        AlreadyRegister
     }
 }
 
@@ -276,11 +278,14 @@ decl_module! {
             });
             ensure!(legal_bonds_count < T::MaxBondsLimit::get(), Error::<T>::ExceedBondsLimit);
 
-            // 4. Upsert new id
+            // 4. Ensure the pub key is fresh in id bonds.
             let pk = maybe_pk.unwrap();
+            ensure!(!Self::id_bonds(&who).contains(&pk), Error::<T>::AlreadyRegister);
+
+            // 5. Upsert new id
             Self::maybe_upsert_id(&applier, &pk, &Self::code());
 
-            // 5. Emit event
+            // 6. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())

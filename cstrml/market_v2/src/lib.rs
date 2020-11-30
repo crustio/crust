@@ -100,25 +100,26 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
         let mut is_counted = false;
         if let Some(mut file_info) = <Files<T>>::get(cid) {
             // calculate payouts. Try to close file and decrease first party storage(due to no wr)
-            let is_closed = Self::calculate_payout(cid, curr_bn);
+            let (is_closed, claimed_bn) = Self::calculate_payout(cid, curr_bn);
             if is_closed {
-                if T::SworkerInterface::check_wr(&anchor) {
+                if T::SworkerInterface::check_wr(&anchor, claimed_bn) {
                     // decrease it due to deletion
                     file_info.reported_payouts -= 1;
                     if file_info.reported_payouts < file_info.expected_payouts {
                         FirstClassStorage::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
                     }
                 }
+            } else {
+                file_info.payouts.retain(|payout| {
+                    // This is a tricky solution
+                    if payout.who == *who && payout.anchor == *anchor && payout.is_counted {
+                        is_counted = true;
+                    }
+                    // Do we need check anchor here?
+                    payout.who != *who || payout.anchor != *anchor
+                });
+                <Files<T>>::insert(cid, file_info);
             }
-            file_info.payouts.retain(|payout| {
-                // This is a tricky solution
-                if payout.who == *who && payout.anchor == *anchor && payout.is_counted {
-                    is_counted = true;
-                }
-                // Do we need check anchor here?
-                payout.who != *who || payout.anchor != *anchor
-            });
-            <Files<T>>::insert(cid, file_info);
         }
         if let Some(file_info) = <FileTrashI<T>>::get(cid) {
             for payout in file_info.payouts.iter() {
@@ -496,20 +497,21 @@ impl<T: Trait> Module<T> {
     ///     curr_bn: BlockNumber
     /// return:
     ///     is_closed: bool
-    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber) -> bool
+    ///     claimed_bn: BlockNumber
+    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber) -> (bool, BlockNumber)
     {
         // File must be valid
         if let Some(mut file_info) = Self::files(cid) {
             let mut is_closed = false;
             // Not start yet
             if file_info.expired_on <= file_info.claimed_at {
-                return is_closed;
+                return (is_closed, file_info.claimed_at);
             }
             // Store the previou first class storage count
             let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
             let claim_block = curr_bn.min(file_info.expired_on);
             let to_reward_count = file_info.payouts.len().min(file_info.expected_payouts as usize) as u32;
-            if to_reward_count == 0 { return is_closed; } // This should never happen. But it's ok to check.
+            if to_reward_count == 0 { return (is_closed, file_info.claimed_at); } // This should never happen. But it's ok to check.
             let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
                                                                         (file_info.expired_on - file_info.claimed_at) * to_reward_count) * file_info.amount;
             // Prepare some vars
@@ -520,7 +522,7 @@ impl<T: Trait> Module<T> {
             // Loop payouts
             for payout in file_info.payouts.iter() {
                 // Didn't report in last slot
-                if !T::SworkerInterface::check_wr(&payout.anchor) {
+                if !T::SworkerInterface::check_wr(&payout.anchor, claim_block) {
                     let mut invalid_payout = payout.clone();
                     // update the reported_at to the curr_bn
                     invalid_payout.reported_at = curr_bn;
@@ -557,9 +559,9 @@ impl<T: Trait> Module<T> {
                 Self::update_first_class_storage(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
                 <Files<T>>::insert(cid, file_info);
             }
-            return is_closed;
+            return (is_closed, claim_block);
         }
-        return false;
+        return (false, curr_bn);
     }
 
     fn update_first_class_storage(file_size: u64, prev_count: u32, curr_count: u32) {

@@ -106,8 +106,8 @@ impl<AId> Works<AId> for () {
 /// Implement market's file inspector
 impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
     /// check wr existing or not
-    fn check_wr(anchor: &SworkerAnchor) -> bool {
-        let current_rs = Self::get_current_reported_slot() as u64;
+    fn check_wr(anchor: &SworkerAnchor, bn: BlockNumber) -> bool {
+        let current_rs = Self::convert_bn_to_rs(bn);
         let prev_rs = current_rs.saturating_sub(REPORT_SLOT);
         Self::reported_in_slot(&anchor, prev_rs)
     }
@@ -853,6 +853,11 @@ impl<T: Trait> Module<T> {
         let current_block_numeric = Self::get_current_block_number() as u64;
         let current_report_index = current_block_numeric / REPORT_SLOT;
         current_report_index * REPORT_SLOT
+    }
+
+    fn convert_bn_to_rs(curr_bn: u32) -> u64 {
+        let report_index = curr_bn as u64 / REPORT_SLOT;
+        report_index * REPORT_SLOT
     }
 }
 

@@ -504,7 +504,7 @@ impl<T: Trait> Module<T> {
         if let Some(mut file_info) = Self::files(cid) {
             let mut is_closed = false;
             // Not start yet
-            if file_info.payouts.len() == 0 {
+            if file_info.expired_on <= file_info.claimed_at {
                 return (is_closed, file_info.claimed_at);
             }
             // Store the previou first class storage count
@@ -633,7 +633,9 @@ impl<T: Trait> Module<T> {
         // Extend expired_on or expected_payouts
         if let Some(mut file_info) = Self::files(cid) {
             let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
-            file_info.expired_on = curr_bn + T::FileDuration::get();
+            if file_info.expired_on > file_info.claimed_at { //if it's already live.
+                file_info.expired_on = curr_bn + T::FileDuration::get();
+            }
             file_info.amount += storage_amount.clone();
             if extend_replica {
                 // TODO: use 2 instead of 4

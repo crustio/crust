@@ -280,7 +280,14 @@ decl_module! {
 
             // 4. Ensure the pub key is fresh in id bonds.
             let pk = maybe_pk.unwrap();
-            ensure!(!Self::id_bonds(&who).contains(&pk), Error::<T>::AlreadyRegister);
+            if Self::id_bonds(&who).contains(&pk) {
+                log!(
+                    trace,
+                    "🔒 Already register with same pub key {:?}",
+                    pk,
+                );
+                return Ok(())
+            }
 
             // 5. Upsert new id
             Self::maybe_upsert_id(&applier, &pk, &Self::code());

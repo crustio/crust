@@ -239,21 +239,17 @@ fn register_should_fail_due_to_double_register() {
                 register_info.sig
             ));
             let register_info = legal_register_info();
-            assert_noop!(
-                Swork::register(
-                    Origin::signed(applier.clone()),
-                    register_info.ias_sig,
-                    register_info.ias_cert,
-                    register_info.account_id,
-                    register_info.isv_body,
-                    register_info.sig
-                ),
-                DispatchError::Module {
-                    index: 0,
-                    error: 10,
-                    message: Some("AlreadyRegister"),
-                }
-            );
+            assert_ok!(Swork::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ));
+            let legal_pk = LegalPK::get();
+            let legal_bonded_ids = vec![legal_pk.clone()];
+            assert_eq!(Swork::id_bonds(applier.clone()), legal_bonded_ids);
         });
 }
 

@@ -504,7 +504,7 @@ impl<T: Trait> Module<T> {
         if let Some(mut file_info) = Self::files(cid) {
             let mut is_closed = false;
             // Not start yet
-            if file_info.expired_on <= file_info.claimed_at {
+            if file_info.payouts.len() == 0 {
                 return (is_closed, file_info.claimed_at);
             }
             // Store the previou first class storage count

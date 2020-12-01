@@ -98,10 +98,11 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 
     fn delete_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
         let mut is_counted = false;
-        if let Some(mut file_info) = <Files<T>>::get(cid) {
+        if <Files<T>>::get(cid).is_some() {
             // calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let (is_closed, claimed_bn) = Self::calculate_payout(cid, curr_bn);
-            if is_closed {
+            if !is_closed {
+                let mut file_info = <Files<T>>::get(cid).unwrap();
                 if T::SworkerInterface::check_wr(&anchor, claimed_bn) {
                     // decrease it due to deletion
                     file_info.reported_payouts -= 1;
@@ -109,7 +110,6 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
                         FirstClassStorage::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
                     }
                 }
-            } else {
                 file_info.payouts.retain(|payout| {
                     // This is a tricky solution
                     if payout.who == *who && payout.anchor == *anchor && payout.is_counted {

@@ -91,7 +91,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
             <Files<T>>::insert(cid, file_info);
-            return true;
+            return is_counted;
         }
         false
     }

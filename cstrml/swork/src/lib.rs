@@ -491,7 +491,7 @@ decl_module! {
                 // 4. Ensure owner's group is itself
                 ensure!(Self::identities(&owner).unwrap().group.unwrap_or_default() == owner, Error::<T>::NotOwner);
                 // 5. Ensure who's wr's used is zero
-                ensure!(Self::work_reports(identity.anchor).unwrap().used == 0, Error::<T>::InvalidUsed);
+                ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::InvalidUsed);
             }
 
             // 6. Join the group

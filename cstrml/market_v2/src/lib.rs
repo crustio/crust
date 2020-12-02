@@ -511,44 +511,45 @@ impl<T: Trait> Module<T> {
             let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
             let claim_block = curr_bn.min(file_info.expired_on);
             let to_reward_count = file_info.payouts.len().min(file_info.expected_payouts as usize) as u32;
-            if to_reward_count == 0 { return (is_closed, file_info.claimed_at); } // This should never happen. But it's ok to check.
-            let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
-                                                                        (file_info.expired_on - file_info.claimed_at) * to_reward_count) * file_info.amount;
-            // Prepare some vars
-            let mut rewarded_amount = Zero::zero();
-            let mut rewarded_count = 0u32;
-            let mut new_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
-            let mut invalid_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
-            // Loop payouts
-            for payout in file_info.payouts.iter() {
-                // Didn't report in last slot
-                if !T::SworkerInterface::check_wr(&payout.anchor, claim_block) {
-                    let mut invalid_payout = payout.clone();
-                    // update the reported_at to the curr_bn
-                    invalid_payout.reported_at = curr_bn;
-                    // move it to the end of payout
-                    invalid_payouts.push(invalid_payout);
-                    continue;
+            if to_reward_count > 0 {
+                let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
+                                                                             (file_info.expired_on - file_info.claimed_at) * to_reward_count) * file_info.amount;
+                // Prepare some vars
+                let mut rewarded_amount = Zero::zero();
+                let mut rewarded_count = 0u32;
+                let mut new_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
+                let mut invalid_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
+                // Loop payouts
+                for payout in file_info.payouts.iter() {
+                    // Didn't report in last slot
+                    if !T::SworkerInterface::check_wr(&payout.anchor, claim_block) {
+                        let mut invalid_payout = payout.clone();
+                        // update the reported_at to the curr_bn
+                        invalid_payout.reported_at = curr_bn;
+                        // move it to the end of payout
+                        invalid_payouts.push(invalid_payout);
+                        continue;
+                    }
+                    // Keep the order
+                    new_payouts.push(payout.clone());
+                    if rewarded_count == to_reward_count {
+                        continue;
+                    }
+                    if Self::has_enough_pledge(&payout.who, &one_payout_amount) {
+                        <MerchantLedgers<T>>::mutate(&payout.who, |ledger| {
+                            ledger.reward += one_payout_amount.clone();
+                        });
+                        rewarded_amount += one_payout_amount.clone();
+                        rewarded_count +=1;
+                    }
                 }
-                // Keep the order
-                new_payouts.push(payout.clone());
-                if rewarded_count == to_reward_count {
-                    continue;
-                }
-                if Self::has_enough_pledge(&payout.who, &one_payout_amount) {
-                    <MerchantLedgers<T>>::mutate(&payout.who, |ledger| {
-                        ledger.reward += one_payout_amount.clone();
-                    });
-                    rewarded_amount += one_payout_amount.clone();
-                    rewarded_count +=1;
-                }
+                // Update file's information
+                file_info.claimed_at = claim_block;
+                file_info.amount -= rewarded_amount;
+                file_info.reported_payouts = new_payouts.len() as u32;
+                new_payouts.append(&mut invalid_payouts);
+                file_info.payouts = new_payouts;
             }
-            // Update file's information
-            file_info.claimed_at = claim_block;
-            file_info.amount -= rewarded_amount;
-            file_info.reported_payouts = new_payouts.len() as u32;
-            new_payouts.append(&mut invalid_payouts);
-            file_info.payouts = new_payouts;
 
             // If it's already expired.
             if file_info.expired_on <= curr_bn {

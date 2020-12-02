@@ -623,21 +623,20 @@ impl<T: Trait> Module<T> {
     ) {
         let mut old_used: u64 = 0;
         let mut old_free: u64 = 0;
-
-        // 1. If contains work report
-        if let Some(old_wr) = Self::work_reports(&anchor) {
-            old_used = old_wr.used;
-            old_free = old_wr.free;
-        }
-
-        // 2. Mark who has reported in this (report)slot
+        // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
 
-        // 3. Update sOrder and get changed size
+        // 2. Update sOrder and get changed size
         // loop added. if not exist, calculate used.
         // loop deleted, need to check each key whether we should delete it or not
         let added_files = Self::update_files(reporter, added_files, &anchor, true);
         let deleted_files = Self::update_files(reporter, deleted_files, &anchor,false);
+
+        // 3. If contains work report
+        if let Some(old_wr) = Self::work_reports(&anchor) {
+            old_used = old_wr.used;
+            old_free = old_wr.free;
+        }
 
         // 4. Construct work report
         let used = old_used.saturating_add(added_files.iter().fold(0, |acc, (_, f_size)| acc + *f_size)).saturating_sub(deleted_files.iter().fold(0, |acc, (_, f_size)| acc + *f_size));

@@ -4037,6 +4037,7 @@ fn chill_stash_should_work() {
         // 6 just temporarily out of validators
         assert_ok!(Staking::chill(Origin::signed(6)));
         assert!(!<Validators<Test>>::contains_key(&5));
+        assert!(!<StakeLimit<Test>>::contains_key(&5));
 
         // Guarantors should keep the same
         assert_eq!(

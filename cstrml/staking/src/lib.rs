@@ -1573,6 +1573,7 @@ impl<T: Trait> Module<T> {
 
     /// Chill a stash account.
     fn chill_stash(stash: &T::AccountId) {
+        <StakeLimit<T>>::remove(stash);
         <Validators<T>>::remove(stash);
         <Guarantors<T>>::remove(stash);
     }
@@ -2087,6 +2088,7 @@ impl<T: Trait> Module<T> {
         <Payee<T>>::remove(stash);
         <Validators<T>>::remove(stash);
         <Guarantors<T>>::remove(stash);
+        <StakeLimit<T>>::remove(stash);
 
         // TODO: this may update with `num_slashing_spans`?
         slashing::clear_stash_metadata::<T>(stash);

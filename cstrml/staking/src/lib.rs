@@ -1117,6 +1117,7 @@ decl_module! {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             Self::chill_stash(&ledger.stash);
+            Self::deposit_event(RawEvent::ChillSuccess(controller, ledger.stash));
         }
 
         /// (Re-)set the payment target for a controller.

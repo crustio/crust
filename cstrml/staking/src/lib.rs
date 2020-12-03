@@ -1117,6 +1117,7 @@ decl_module! {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             Self::chill_stash(&ledger.stash);
+            Self::deposit_event(RawEvent::ChillSuccess(controller, ledger.stash));
         }
 
         /// (Re-)set the payment target for a controller.
@@ -1573,6 +1574,7 @@ impl<T: Trait> Module<T> {
 
     /// Chill a stash account.
     fn chill_stash(stash: &T::AccountId) {
+        <StakeLimit<T>>::remove(stash);
         <Validators<T>>::remove(stash);
         <Guarantors<T>>::remove(stash);
     }
@@ -2087,6 +2089,7 @@ impl<T: Trait> Module<T> {
         <Payee<T>>::remove(stash);
         <Validators<T>>::remove(stash);
         <Guarantors<T>>::remove(stash);
+        <StakeLimit<T>>::remove(stash);
 
         // TODO: this may update with `num_slashing_spans`?
         slashing::clear_stash_metadata::<T>(stash);

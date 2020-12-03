@@ -314,7 +314,7 @@ fn chill_idbond_should_work() {
                 )
             );
             assert!(!Identities::contains_key(legal_pk.clone()));
-            assert!(!<IdBonds<Test>>::contains_key(applier.clone()));
+            assert!(<IdBonds<Test>>::contains_key(applier.clone()));
         });
 }
 

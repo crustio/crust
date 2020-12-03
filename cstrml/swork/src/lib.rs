@@ -563,9 +563,6 @@ impl<T: Trait> Module<T> {
             &who,
             |bonds| bonds.retain(|bond| bond != &pk)
         );
-        if Self::id_bonds(&who).is_empty() {
-            <IdBonds<T>>::remove(&who);
-        }
 
         // 4. Remove from `reported_in_slot`
         ReportedInSlot::remove_prefix(&pk);

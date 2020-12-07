@@ -1163,15 +1163,15 @@ decl_module! {
             let stash = ensure_signed(origin)?;
             let old_controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
             let controller = T::Lookup::lookup(controller)?;
-            if <Ledger<T>>::contains_key(&controller) {
-                Err(Error::<T>::AlreadyPaired)?
-            }
-            if controller != old_controller {
-                <Bonded<T>>::insert(&stash, &controller);
-                if let Some(l) = <Ledger<T>>::take(&old_controller) {
-                    <Ledger<T>>::insert(&controller, l);
-                }
-            }
+            // if <Ledger<T>>::contains_key(&controller) {
+            //     Err(Error::<T>::AlreadyPaired)?
+            // }
+            // if controller != old_controller {
+            //     <Bonded<T>>::insert(&stash, &controller);
+            //     if let Some(l) = <Ledger<T>>::take(&old_controller) {
+            //         <Ledger<T>>::insert(&controller, l);
+            //     }
+            // }
         }
 
         /// Pay out all the stakers behind a single validator for a single era.

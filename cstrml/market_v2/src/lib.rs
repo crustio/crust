@@ -15,7 +15,7 @@ use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
     Perbill, ModuleId,
-    traits::{Zero, CheckedMul, Convert, AccountIdConversion}
+    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
 };
 
 #[cfg(feature = "std")]
@@ -192,11 +192,14 @@ pub trait Trait: system::Trait {
     /// Max limit for the length of sorders in each payment claim.
     type ClaimLimit: Get<u32>;
 
-    /// Storage reference ratio.
-    type StorageReferenceRatio: Get<f64>;
+    /// Storage reference ratio. total / first class storage
+    type StorageReferenceRatio: Get<u128>;
 
-    /// Storage ratio.
+    /// Storage increase ratio.
     type StorageIncreaseRatio: Get<Perbill>;
+
+    /// Storage decrease ratio.
+    type StorageDecreaseRatio: Get<Perbill>;
 
     /// Storage/Staking ratio.
     type StakingRatio: Get<Perbill>;
@@ -687,7 +690,22 @@ impl<T: Trait> Module<T> {
     }
 
     fn update_storage_price() {
-        // TODO: implement here
+        let total = T::SworkerInterface::get_free_plus_used();
+        let mut file_price = Self::file_price();
+        if let Some(storage_ratio) = total.checked_div(Self::first_class_storage()) {
+            // Too much total => decrease the price
+            if storage_ratio > T::StorageReferenceRatio::get() {
+                let gap = T::StorageDecreaseRatio::get() * file_price;
+                file_price = file_price.saturating_sub(gap);
+            } else {
+                let gap = (T::StorageIncreaseRatio::get() * file_price).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
+                file_price = file_price.saturating_add(gap);
+            }
+        } else {
+            let gap = T::StorageDecreaseRatio::get() * file_price;
+            file_price = file_price.saturating_sub(gap);
+        }
+        <FilePrice<T>>::put(file_price);
     }
 
     // Calculate file's amount

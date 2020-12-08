@@ -127,6 +127,11 @@ impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
         }
         false
     }
+
+    /// get total used and free space
+    fn get_free_plus_used() -> u128 {
+        return Self::used().saturating_add(Self::free());
+    }
 }
 
 /// The module's configuration trait.

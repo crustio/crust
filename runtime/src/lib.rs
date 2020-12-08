@@ -669,11 +669,12 @@ parameter_types! {
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 15 * DAYS;
     pub const FileBaseReplica: u32 = 4;
-    pub const FileBaseFee: Balance = 1 * MILLICENTS;
-    pub const FileInitPrice: Balance = 10000; // Need align with FileDuration and FileBaseReplica
+    pub const FileBaseFee: Balance = CENTS / 20;  // roughly equal to 1RMB / month
+    pub const FileInitPrice: Balance = MILLICENTS / 10; // Need align with FileDuration and FileBaseReplica
     pub const ClaimLimit: u32 = 1000;
-    pub const StorageReferenceRatio: f64 = 0.5;
-    pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
+    pub const StorageReferenceRatio: u128 = 4; // 1/4 = 25%
+    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
+    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
     pub const FileTrashMaxSize: u128 = 500_000;
 }
@@ -693,6 +694,7 @@ impl market_v2::Trait for Runtime {
     type FileInitPrice = FileInitPrice;
     type ClaimLimit = ClaimLimit;
     type StorageReferenceRatio = StorageReferenceRatio;
+    type StorageDecreaseRatio = StorageDecreaseRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StakingRatio = StakingRatio;
     type FileTrashMaxSize = FileTrashMaxSize;

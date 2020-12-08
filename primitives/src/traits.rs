@@ -15,6 +15,8 @@ pub trait SworkerInterface<AccountId> {
 	fn decrease_used(anchor: &SworkerAnchor, used: u64);
     // Check whether the who and anchor is consistent with current status
 	fn check_anchor(who: &AccountId, anchor: &SworkerAnchor) -> bool;
+	// Get total used and free space
+	fn get_free_plus_used() -> u128;
 }
 
 /// Means for interacting with a specialized version of the `market` trait.

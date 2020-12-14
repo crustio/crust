@@ -553,7 +553,7 @@ impl<T: Trait> Module<T> {
     }
 
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) -> bool {
-        if let Some((file_info, used_info)) = <Files<T>>::take(cid) {
+        if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn {
                 Self::update_files_size(file_info.file_size, file_info.reported_payouts.min(file_info.expected_payouts), 0);
@@ -597,6 +597,7 @@ impl<T: Trait> Module<T> {
                 Self::dump_used_trash_i();
             }
         }
+        <Files<T>>::remove(&cid);
     }
 
     fn dump_used_trash_i() {

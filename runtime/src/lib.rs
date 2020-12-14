@@ -676,7 +676,7 @@ parameter_types! {
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
-    pub const FileTrashMaxSize: u128 = 500_000;
+    pub const UsedTrashMaxSize: u128 = 500_000;
 }
 
 impl market_v2::Trait for Runtime {
@@ -697,7 +697,7 @@ impl market_v2::Trait for Runtime {
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StakingRatio = StakingRatio;
-    type FileTrashMaxSize = FileTrashMaxSize;
+    type UsedTrashMaxSize = UsedTrashMaxSize;
 }
 
 construct_runtime! {

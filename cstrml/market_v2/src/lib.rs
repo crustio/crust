@@ -54,7 +54,7 @@ pub struct FileInfo<AccountId, Balance> {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PayoutInfo<AccountId> {
     pub who: AccountId,
-    pub reported_at: BlockNumber,
+    pub valid_at: BlockNumber,
     pub anchor: SworkerAnchor,
 }
 
@@ -77,11 +77,11 @@ type BalanceOf<T> =
 
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 {
-    fn upsert_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber, is_counted: bool) -> bool {
+    fn upsert_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, is_counted: bool) -> bool {
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
             let new_payout = PayoutInfo {
                 who: who.clone(),
-                reported_at: curr_bn,
+                valid_at,
                 anchor: anchor.clone(),
             };
             if is_counted {
@@ -110,7 +110,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
             let (is_closed, claimed_bn) = Self::calculate_payout(cid, curr_bn);
             if !is_closed {
                 if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
-                    if T::SworkerInterface::check_wr(&anchor, claimed_bn) {
+                    if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
                         // decrease it due to deletion
                         file_info.reported_payouts -= 1;
                         if file_info.reported_payouts < file_info.expected_payouts {
@@ -509,10 +509,10 @@ impl<T: Trait> Module<T> {
                 // Loop payouts
                 for payout in file_info.payouts.iter() {
                     // Didn't report in last slot
-                    if !T::SworkerInterface::check_wr(&payout.anchor, claim_block) {
+                    if !T::SworkerInterface::is_wr_reported(&payout.anchor, claim_block) {
                         let mut invalid_payout = payout.clone();
-                        // update the reported_at to the curr_bn
-                        invalid_payout.reported_at = curr_bn;
+                        // update the valid_at to the curr_bn
+                        invalid_payout.valid_at = curr_bn;
                         // move it to the end of payout
                         invalid_payouts.push(invalid_payout);
                     } else {
@@ -654,7 +654,7 @@ impl<T: Trait> Module<T> {
     fn insert_payout(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_payout: PayoutInfo<T::AccountId>) {
         let mut insert_index: usize = file_info.payouts.len();
         for (index, payout) in file_info.payouts.iter().enumerate() {
-            if new_payout.reported_at < payout.reported_at {
+            if new_payout.valid_at < payout.valid_at {
                 insert_index = index;
                 break;
             }

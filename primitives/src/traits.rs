@@ -10,7 +10,7 @@ pub trait TransferrableCurrency<AccountId>: LockableCurrency<AccountId> {
 /// Means for interacting with a specialized version of the `swork` trait.
 pub trait SworkerInterface<AccountId> {
 	// Check whether work report was reported in the last report slot according to given block number
-	fn check_wr(anchor: &SworkerAnchor, bn: BlockNumber) -> bool;
+	fn is_wr_reported(anchor: &SworkerAnchor, bn: BlockNumber) -> bool;
 	// Decrease the used value in anchor's work report
 	fn decrease_used(anchor: &SworkerAnchor, used: u64);
     // Check whether the who and anchor is consistent with current status

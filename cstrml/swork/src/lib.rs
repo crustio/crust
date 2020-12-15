@@ -106,7 +106,7 @@ impl<AId> Works<AId> for () {
 /// Implement market's file inspector
 impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
     /// check wr existing or not
-    fn check_wr(anchor: &SworkerAnchor, bn: BlockNumber) -> bool {
+    fn is_wr_reported(anchor: &SworkerAnchor, bn: BlockNumber) -> bool {
         let current_rs = Self::convert_bn_to_rs(bn);
         let prev_rs = current_rs.saturating_sub(REPORT_SLOT);
         Self::reported_in_slot(&anchor, prev_rs)
@@ -327,8 +327,8 @@ decl_module! {
             slot_hash: Vec<u8>,
             reported_srd_size: u64,
             reported_files_size: u64,
-            added_files: Vec<(MerkleRoot, u64)>,
-            deleted_files: Vec<(MerkleRoot, u64)>,
+            added_files: Vec<(MerkleRoot, u64, u64)>,
+            deleted_files: Vec<(MerkleRoot, u64, u64)>,
             reported_srd_root: MerkleRoot,
             reported_files_root: MerkleRoot,
             sig: SworkerSignature
@@ -620,8 +620,8 @@ impl<T: Trait> Module<T> {
         anchor: &SworkerAnchor,
         reported_srd_size: u64,
         reported_files_size: u64,
-        added_files: &Vec<(MerkleRoot, u64)>,
-        deleted_files: &Vec<(MerkleRoot, u64)>,
+        added_files: &Vec<(MerkleRoot, u64, u64)>,
+        deleted_files: &Vec<(MerkleRoot, u64, u64)>,
         reported_srd_root: &MerkleRoot,
         reported_files_root: &MerkleRoot,
         report_slot: u64,
@@ -635,7 +635,7 @@ impl<T: Trait> Module<T> {
         // loop added. if not exist, calculate used.
         // loop deleted, need to check each key whether we should delete it or not
         let added_files = Self::update_files(reporter, added_files, &anchor, true);
-        let deleted_files = Self::update_files(reporter, deleted_files, &anchor,false);
+        let deleted_files = Self::update_files(reporter, deleted_files, &anchor, false);
 
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
@@ -644,7 +644,7 @@ impl<T: Trait> Module<T> {
         }
 
         // 4. Construct work report
-        let used = old_used.saturating_add(added_files.iter().fold(0, |acc, (_, f_size)| acc + *f_size)).saturating_sub(deleted_files.iter().fold(0, |acc, (_, f_size)| acc + *f_size));
+        let used = old_used.saturating_add(added_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size)).saturating_sub(deleted_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size));
         let wr = WorkReport {
             report_slot,
             used,
@@ -668,32 +668,32 @@ impl<T: Trait> Module<T> {
     /// Update sOrder information based on changed files, return the real changed files
     fn update_files(
         reporter: &T::AccountId,
-        changed_files: &Vec<(MerkleRoot, u64)>,
+        changed_files: &Vec<(MerkleRoot, u64, u64)>,
         anchor: &SworkerPubKey,
-        is_added: bool) -> Vec<(MerkleRoot, u64)> {
+        is_added: bool) -> Vec<(MerkleRoot, u64, u64)> {
         let mut real_files = vec![];
-        let curr_bn = Self::get_current_block_number();
 
         // 1. Loop changed files
         if is_added {
-            real_files = changed_files.iter().filter_map(|(cid, size)| {
+            real_files = changed_files.iter().filter_map(|(cid, size, valid_at)| {
                 let mut is_counted = true;
                 if let Some(identity) = Self::identities(reporter) {
                     if let Some(owner) = identity.group {
                         is_counted = !T::MarketInterface::check_duplicate_in_group(cid, &Self::groups(owner));
                     }
                 };
-                if T::MarketInterface::upsert_payouts(reporter, cid, anchor, curr_bn, is_counted) {
-                    Some((cid.clone(), *size))
+                if T::MarketInterface::upsert_payouts(reporter, cid, anchor, TryInto::<u32>::try_into(valid_at).ok().unwrap(), is_counted) {
+                    Some((cid.clone(), *size, *valid_at))
                 } else {
                     None
                 }
             }).collect();
         } else {
-            real_files = changed_files.iter().filter_map(|(cid, size)| {
+            let curr_bn = Self::get_current_block_number();
+            real_files = changed_files.iter().filter_map(|(cid, size, _)| {
                 // 2. If mapping to storage orders
                 if T::MarketInterface::delete_payouts(reporter, cid, anchor, curr_bn) {
-                    Some((cid.clone(), *size))
+                    Some((cid.clone(), *size, *valid_at))
                 } else {
                     None
                 }
@@ -730,14 +730,14 @@ impl<T: Trait> Module<T> {
     fn files_transition_check(
         prev_pk: &SworkerPubKey,
         new_files_size: u64,
-        reported_added_files: &Vec<(MerkleRoot, u64)>,
-        reported_deleted_files: &Vec<(MerkleRoot, u64)>,
+        reported_added_files: &Vec<(MerkleRoot, u64, u64)>,
+        reported_deleted_files: &Vec<(MerkleRoot, u64, u64)>,
         reported_files_root: &MerkleRoot
     ) -> bool {
         if let Some(prev_wr) = Self::work_reports(&Self::pub_keys(&prev_pk).anchor.unwrap_or_default()) {
             let old_files_size = prev_wr.reported_files_size;
-            let added_files_size = reported_added_files.iter().fold(0, |acc, (_, size)| acc+*size);
-            let deleted_files_size = reported_deleted_files.iter().fold(0, |acc, (_, size)| acc+*size);
+            let added_files_size = reported_added_files.iter().fold(0, |acc, (_, size, _)| acc+*size);
+            let deleted_files_size = reported_deleted_files.iter().fold(0, |acc, (_, size, _)| acc+*size);
             // File size change should equal between before and after
             return if added_files_size == 0 && deleted_files_size == 0 {
                 reported_files_root == &prev_wr.reported_files_root
@@ -808,8 +808,8 @@ impl<T: Trait> Module<T> {
         used: u64,
         srd_root: &MerkleRoot,
         files_root: &MerkleRoot,
-        added_files: &Vec<(MerkleRoot, u64)>,
-        deleted_files: &Vec<(MerkleRoot, u64)>,
+        added_files: &Vec<(MerkleRoot, u64, u64)>,
+        deleted_files: &Vec<(MerkleRoot, u64, u64)>,
         sig: &SworkerSignature
     ) -> bool {
         // 1. Encode
@@ -829,8 +829,8 @@ impl<T: Trait> Module<T> {
         //    used: u64, -> Vec<u8>
         //    free_root: MerkleRoot,
         //    used_root: MerkleRoot,
-        //    added_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
-        //    deleted_files: Vec<(MerkleRoot, u64)>, -> Vec<u8>
+        //    added_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>
+        //    deleted_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>
         //}
         let data: Vec<u8> = [
             &curr_pk[..],

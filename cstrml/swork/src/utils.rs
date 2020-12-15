@@ -144,7 +144,7 @@ pub fn verify_identity (
     None
 }
 
-pub fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
+pub fn encode_files(fs: &Vec<(Vec<u8>, u64, u64)>) -> Vec<u8> {
     // "["
     let open_square_brackets_bytes: Vec<u8> = [91].to_vec();
     // "\"hash\":\""

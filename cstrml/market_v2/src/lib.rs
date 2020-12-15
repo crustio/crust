@@ -90,6 +90,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
             file_info.reported_payouts += 1;
             Self::insert_payout(&mut file_info, new_payout);
             // start file life cycle
+            let curr_bn = Self::get_current_block_number();
             if file_info.payouts.len() == 1 {
                 file_info.claimed_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
@@ -107,24 +108,22 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
         let mut is_counted = false;
         if <Files<T>>::get(cid).is_some() {
             // calculate payouts. Try to close file and decrease first party storage(due to no wr)
-            let (is_closed, claimed_bn) = Self::calculate_payout(cid, curr_bn);
-            if !is_closed {
-                if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
-                    if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
-                        // decrease it due to deletion
-                        file_info.reported_payouts -= 1;
-                        if file_info.reported_payouts < file_info.expected_payouts {
-                            FilesSize::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
-                        }
+            let claimed_bn = Self::calculate_payout(cid, curr_bn);
+            if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
+                if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
+                    // decrease it due to deletion
+                    file_info.reported_payouts -= 1;
+                    if file_info.reported_payouts < file_info.expected_payouts {
+                        FilesSize::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
                     }
-                    file_info.payouts.retain(|payout| {
-                        payout.who != *who
-                    });
-                    if used_info.anchors.take(anchor).is_some() {
-                        is_counted = true;
-                    }
-                    <Files<T>>::insert(cid, (file_info, used_info));
                 }
+                file_info.payouts.retain(|payout| {
+                    payout.who != *who
+                });
+                if used_info.anchors.take(anchor).is_some() {
+                    is_counted = true;
+                }
+                <Files<T>>::insert(cid, (file_info, used_info));
             }
         }
         if let Some(mut used_info) = UsedTrashI::get(cid) {
@@ -183,7 +182,7 @@ pub trait Trait: system::Trait {
     type FileDuration: Get<BlockNumber>;
 
     /// File base replica. Use 4 for now
-    type FileBaseReplica: Get<u32>;
+    type InitialReplica: Get<u32>;
 
     /// File Base Fee. Use 0.001 CRU for now
     type FileBaseFee: Get<BalanceOf<Self>>;
@@ -266,8 +265,8 @@ decl_error! {
         InsufficientPledge,
         /// Can not bond with value less than minimum balance.
         InsufficientValue,
-        /// Not Pledged before
-        NotPledged,
+        /// Not Register before
+        NotRegister,
         /// Pledged before
         AlreadyPledged,
         /// Reward length is too long
@@ -295,35 +294,35 @@ decl_module! {
         /// - Write: Pledge
         /// # </weight>
         #[weight = 1000]
-        pub fn pledge(
+        pub fn register(
             origin,
-            #[compact] value: BalanceOf<T>
+            #[compact] pledge: BalanceOf<T>
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Reject a pledge which is considered to be _dust_.
-            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+            ensure!(pledge >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Ensure merchant has enough currency.
-            ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(pledge <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if merchant has not pledged before.
             ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyPledged);
 
             // 4. Transfer from origin to pledge account.
-            T::Currency::transfer(&who, &Self::pledge_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&who, &Self::pledge_pot(), pledge.clone(), AllowDeath).expect("Something wrong during transferring");
 
-            // 4. Prepare new ledger
+            // 5. Prepare new ledger
             let ledger = MerchantLedger {
                 reward: Zero::zero(),
-                pledge: value
+                pledge: pledge.clone()s
             };
 
-            // 5. Upsert pledge.
+            // 6. Upsert pledge.
             <MerchantLedgers<T>>::insert(&who, ledger);
 
-            // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who.clone(), Self::merchant_ledgers(&who).pledge));
+            // 7. Emit success
+            Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), pledge));
 
             Ok(())
         }
@@ -343,7 +342,7 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if merchant has pledged before
-            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             // 3. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
@@ -352,10 +351,10 @@ decl_module! {
             <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.pledge += value.clone();});
 
             // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&who, &Self::pledge_pot(), value, AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&who, &Self::pledge_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who.clone(), Self::merchant_ledgers(&who).pledge));
+            Self::deposit_event(RawEvent::PledgeExtraSuccess(who.clone(), value));
 
             Ok(())
         }
@@ -375,7 +374,7 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if merchant has pledged before
-            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotPledged);
+            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             let mut ledger = Self::merchant_ledgers(&who);
 
@@ -387,10 +386,10 @@ decl_module! {
             <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
             // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&Self::pledge_pot(), &who, value, AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who, ledger.pledge));
+            Self::deposit_event(RawEvent::CutPledgeSuccess(who, value));
 
             Ok(())
         }
@@ -407,6 +406,7 @@ decl_module! {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
+            // TODO: 10% tax
             // 1. Calculate amount.
             let amount = T::FileBaseFee::get() + Self::get_file_amount(file_size) + tips;
 
@@ -483,67 +483,64 @@ impl<T: Trait> Module<T> {
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
     /// return:
-    ///     is_closed: bool
     ///     claimed_bn: BlockNumber
-    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber) -> (bool, BlockNumber)
+    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber) -> BlockNumber
     {
         // File must be valid
-        if let Some(mut file_info) = Self::get_file_info(cid) {
-            let mut is_closed = false;
-            // Not start yet
-            if file_info.expired_on <= file_info.claimed_at {
-                return (is_closed, file_info.claimed_at);
-            }
-            // Store the previou first class storage count
-            let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
-            let claim_block = curr_bn.min(file_info.expired_on);
-            let target_reward_count = file_info.payouts.len().min(file_info.expected_payouts as usize) as u32;
-            if target_reward_count > 0 {
-                let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
-                                                                            (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount;
-                // Prepare some vars
-                let mut rewarded_amount = Zero::zero();
-                let mut rewarded_count = 0u32;
-                let mut new_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
-                let mut invalid_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
-                // Loop payouts
-                for payout in file_info.payouts.iter() {
-                    // Didn't report in last slot
-                    if !T::SworkerInterface::is_wr_reported(&payout.anchor, claim_block) {
-                        let mut invalid_payout = payout.clone();
-                        // update the valid_at to the curr_bn
-                        invalid_payout.valid_at = curr_bn;
-                        // move it to the end of payout
-                        invalid_payouts.push(invalid_payout);
-                    } else {
-                        // Keep the order
-                        new_payouts.push(payout.clone());
-                        if rewarded_count == target_reward_count {
-                            continue;
-                        }
-                        if Self::has_enough_pledge(&payout.who, &one_payout_amount) {
-                            <MerchantLedgers<T>>::mutate(&payout.who, |ledger| {
-                                ledger.reward += one_payout_amount.clone();
-                            });
-                            rewarded_amount += one_payout_amount.clone();
-                            rewarded_count +=1;
-                        }
+        if Self::files(cid).is_none() { return curr_bn; }
+        // Not start yet
+        if let Some((file_info, _)) = Self::files(cid) && file_info.expired_on <= file_info.claimed_at { return file_info.claimed_at; }
+        // TODO: Restrict the frequency of calculate payout
+        let mut file_info = Self::files(cid).unwrap().0;
+        // Store the previous first class storage count
+        let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
+        let claim_block = curr_bn.min(file_info.expired_on);
+        let target_reward_count = file_info.payouts.len().min(file_info.expected_payouts as usize) as u32;
+        if target_reward_count > 0 {
+            let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
+                                                                        (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount;
+            // Prepare some vars
+            let mut rewarded_amount = Zero::zero();
+            let mut rewarded_count = 0u32;
+            let mut new_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
+            let mut invalid_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
+            // Loop payouts
+            for payout in file_info.payouts.iter() {
+                // Didn't report in last slot
+                if !T::SworkerInterface::is_wr_reported(&payout.anchor, claim_block) {
+                    let mut invalid_payout = payout.clone();
+                    // update the valid_at to the curr_bn
+                    invalid_payout.valid_at = curr_bn;
+                    // move it to the end of payout
+                    invalid_payouts.push(invalid_payout);
+                    // TODO: kick this anchor out of used info
+                } else {
+                    // Keep the order
+                    new_payouts.push(payout.clone());
+                    if rewarded_count == target_reward_count {
+                        continue;
+                    }
+                    if Self::has_enough_pledge(&payout.who, &one_payout_amount) {
+                        <MerchantLedgers<T>>::mutate(&payout.who, |ledger| {
+                            ledger.reward += one_payout_amount.clone();
+                        });
+                        rewarded_amount += one_payout_amount.clone();
+                        rewarded_count +=1;
                     }
                 }
-                // Update file's information
-                file_info.claimed_at = claim_block;
-                file_info.amount -= rewarded_amount;
-                file_info.reported_payouts = new_payouts.len() as u32;
-                new_payouts.append(&mut invalid_payouts);
-                file_info.payouts = new_payouts;
             }
-            Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
-            Self::update_file_info(cid, file_info);
-
-            is_closed = Self::try_to_close_file(cid, curr_bn);
-            return (is_closed, claim_block);
+            // Update file's information
+            file_info.claimed_at = claim_block;
+            file_info.amount -= rewarded_amount;
+            file_info.reported_payouts = new_payouts.len() as u32;
+            new_payouts.append(&mut invalid_payouts);
+            file_info.payouts = new_payouts;
         }
-        return (false, curr_bn);
+        Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
+        Self::update_file_info(cid, file_info);
+
+        Self::try_to_close_file(cid, curr_bn);
+        return claim_block;
     }
 
     fn update_files_size(file_size: u64, prev_count: u32, curr_count: u32) {
@@ -552,7 +549,7 @@ impl<T: Trait> Module<T> {
         });
     }
 
-    fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) -> bool {
+    fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn {
@@ -562,10 +559,8 @@ impl<T: Trait> Module<T> {
                     T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
                 }
                 Self::move_into_trash(cid, used_info);
-                return true
             };
         }
-        return false
     }
 
     fn move_into_trash(cid: &MerkleRoot, used_info: UsedInfo) {
@@ -579,7 +574,6 @@ impl<T: Trait> Module<T> {
                 })
             }
             // trash I is full => dump trash II
-            // Maybe we need do this by root or scheduler? Cannot do it in time
             if Self::used_trash_size_i() == T::UsedTrashMaxSize::get() {
                 Self::dump_used_trash_ii();
             }
@@ -618,17 +612,17 @@ impl<T: Trait> Module<T> {
         UsedTrashSizeII::mutate(|value| {*value = 0;});
     }
 
-    fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, storage_amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
+    fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_payouts
         if let Some(mut file_info) = Self::get_file_info(cid) {
             let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
-            file_info.amount += storage_amount.clone();
+            file_info.amount += amount.clone();
             if extend_replica {
                 // TODO: use 2 instead of 4
-                file_info.expected_payouts += T::FileBaseReplica::get();
+                file_info.expected_payouts += T::InitialReplica::get();
                 Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
             }
             Self::update_file_info(cid, file_info);
@@ -638,8 +632,8 @@ impl<T: Trait> Module<T> {
                 file_size,
                 expired_on: curr_bn.clone(), // Not fixed, this will be changed, when first file is reported
                 claimed_at: curr_bn.clone(),
-                amount: storage_amount.clone(),
-                expected_payouts: T::FileBaseReplica::get(),
+                amount: amount.clone(),
+                expected_payouts: T::InitialReplica::get(),
                 reported_payouts: 0u32,
                 payouts: vec![]
             };
@@ -763,7 +757,9 @@ decl_event!(
         Balance = BalanceOf<T>
     {
         FileSuccess(AccountId, FileInfo<AccountId, Balance>),
-        PledgeSuccess(AccountId, Balance),
+        RegisterSuccess(AccountId, Balance),
+        PledgeExtraSuccess(AccountId, Balance),
+        CutPledgeSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
     }

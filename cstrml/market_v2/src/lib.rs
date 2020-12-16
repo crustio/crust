@@ -272,8 +272,8 @@ decl_error! {
         InsufficientValue,
         /// Not Register before
         NotRegister,
-        /// Pledged before
-        AlreadyPledged,
+        /// Register before
+        AlreadyRegistered,
         /// Reward length is too long
         RewardLengthTooLong,
     }
@@ -311,8 +311,8 @@ decl_module! {
             // 2. Ensure merchant has enough currency.
             ensure!(pledge <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 3. Check if merchant has not pledged before.
-            ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyPledged);
+            // 3. Check if merchant has not register before.
+            ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
 
             // 4. Transfer from origin to pledge account.
             T::Currency::transfer(&who, &Self::pledge_pot(), pledge.clone(), AllowDeath).expect("Something wrong during transferring");

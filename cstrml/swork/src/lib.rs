@@ -6,7 +6,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::DispatchResult,
     storage::IterableStorageMap,
-    traits::{Currency, ReservableCurrency, Get},
+    traits::{Currency, ReservableCurrency},
     weights::{
         Weight, DispatchClass
     }
@@ -90,6 +90,8 @@ pub struct PKInfo {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Identity<AccountId> {
+    /// The unique identity associated to one account id.
+    /// During the AB upgrade, this anchor would keep and won't change.
     anchor: SworkerAnchor,
     group: Option<AccountId>
 }
@@ -113,11 +115,11 @@ impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
     }
 
     /// decrease the used value due to deleted files or dump trash
-    fn decrease_used(anchor: &SworkerAnchor, used: u64) {
-        if let Some(mut wr) = Self::work_reports(anchor) {
-            wr.used = wr.used.saturating_sub(used);
-            WorkReports::insert(anchor, wr);
-        }
+    fn decrease_used(anchor: &SworkerAnchor, anchor_used: u64) {
+        WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
+            Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_used),
+            ref mut i => *i = None,
+        });
     }
 
     /// check whether the account id and the anchor is valid or not
@@ -224,12 +226,12 @@ decl_error! {
         IllegalPubKey,
         /// Identity doesn't exist
         IdentityNotExist,
-        /// Already joined one group
-        DoubleGroup,
+        /// Already joint one group
+        AlreadyJoint,
         /// Not a owner,
         NotOwner,
         /// Used is not zero,
-        InvalidUsed
+        IllegalUsed
     }
 }
 
@@ -253,7 +255,7 @@ decl_module! {
             ensure_root(origin)?;
             <Code>::put(&new_code);
             <ABExpire<T>>::put(&expire_block);
-            Self::deposit_event(RawEvent::EnclaveUpgradeSuccess(new_code, expire_block));
+            Self::deposit_event(RawEvent::SworkerUpgradeSuccess(new_code, expire_block));
         }
 
         /// Register as new trusted node, can only called from sWorker.
@@ -335,18 +337,21 @@ decl_module! {
         ) -> DispatchResult {
             let reporter = ensure_signed(origin)?;
             let mut prev_pk = curr_pk.clone();
-            let mut is_ab_upgrade = false;
-            let mut is_new_entry = false;
 
             // 1. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
+            let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
 
-            // Decide which scenario
-            if let Some(anchor) = Self::pub_keys(&curr_pk).anchor {
+            // 2. Decide which scenario
+            let is_ab_upgrade = maybe_anchor.is_none() && !ab_upgrade_pk.is_empty();
+            let is_first_report = maybe_anchor.is_none() && ab_upgrade_pk.is_empty();
+
+            // 3. Unique Check for normal report work for curr pk
+            if let Some(anchor) = maybe_anchor {
                 // Normally report works.
-                // Ensure Identity's anchor be same with current pk's anchor
+                // 3.1 Ensure Identity's anchor be same with current pk's anchor
                 ensure!(Self::identities(&reporter).unwrap_or_default().anchor == anchor, Error::<T>::IllegalReporter);
-                // 2. Already reported with same pub key in the same slot, return immediately
+                // 3.2 Already reported with same pub key in the same slot, return immediately
                 if Self::reported_in_slot(&anchor, slot) {
                     log!(
                         trace,
@@ -356,35 +361,10 @@ decl_module! {
                     );
                     return Ok(())
                 }
-            } else if !ab_upgrade_pk.is_empty() {
-                // no need to check since added_files and deleted_files must be empty
-                is_ab_upgrade = true;
-            } else {
-                is_new_entry = true;
             }
 
-            // 3. Ensure reporter's code is legal
+            // 4. Ensure reporter's code is legal
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
-
-            // 4. Ensure A/B upgrade is legal
-            if is_ab_upgrade {
-                // 4.1 Previous pk should already reported works
-                ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
-                // unwrap_or_default is a small tricky solution
-                let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
-                ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
-
-                // 4.2 Current work report should NOT be changed at all
-                let prev_wr = maybe_prev_wr.unwrap();
-                ensure!(added_files.is_empty() &&
-                    deleted_files.is_empty() &&
-                    prev_wr.reported_files_root == reported_files_root &&
-                    prev_wr.reported_srd_root == reported_srd_root,
-                    Error::<T>::ABUpgradeFailed);
-
-                // 4.3 Set the real previous public key(contains work report);
-                prev_pk = ab_upgrade_pk.clone();
-            }
 
             // 5. Timing check
             ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
@@ -408,36 +388,55 @@ decl_module! {
             );
 
             // 7. Files storage status transition check
-            ensure!(
-                Self::files_transition_check(
-                    &prev_pk,
-                    reported_files_size,
-                    &added_files,
-                    &deleted_files,
-                    &reported_files_root
-                ),
-                Error::<T>::IllegalFilesTransition
-            );
+            if is_ab_upgrade {
+                // 7.1 Previous pk should already reported works
+                ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
+                // unwrap_or_default is a small tricky solution
+                let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
+                ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
+
+                // 7.2 Current work report should NOT be changed at all
+                let prev_wr = maybe_prev_wr.unwrap();
+                ensure!(added_files.is_empty() &&
+                    deleted_files.is_empty() &&
+                    prev_wr.reported_files_root == reported_files_root &&
+                    prev_wr.reported_srd_root == reported_srd_root,
+                    Error::<T>::ABUpgradeFailed);
+
+                // 7.3 Set the real previous public key(contains work report);
+                prev_pk = ab_upgrade_pk.clone();
+            } else {
+                ensure!(
+                    Self::files_transition_check(
+                        &prev_pk,
+                        reported_files_size,
+                        &added_files,
+                        &deleted_files,
+                        &reported_files_root
+                    ),
+                    Error::<T>::IllegalFilesTransition
+                );
+            }
 
             // 8. Finish register
             if is_ab_upgrade {
-                // 11. Transfer A's status to B and delete old A's storage status
+                // 8.1 Transfer A's status to B and delete old A's storage status
                 let prev_pk_info = Self::pub_keys(&prev_pk);
                 PubKeys::mutate(&curr_pk, |curr_pk_info| {
                     curr_pk_info.anchor = prev_pk_info.anchor;
                 });
                 Self::chill_pk(&ab_upgrade_pk);
                 Self::deposit_event(RawEvent::ABUpgradeSuccess(reporter.clone(), ab_upgrade_pk, curr_pk.clone()));
-            } else if is_new_entry {
+            } else if is_first_report {
                 let mut pk_info = Self::pub_keys(&curr_pk);
                 match Self::identities(&reporter) {
-                    // re-entry scenario
+                    // 8.2 re-register scenario
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
-                        identity.anchor = curr_pk.clone(); // new anchor => zero used. No need to change group here.
+                        identity.anchor = curr_pk.clone();
                         <Identities<T>>::insert(&reporter, identity);
                     },
-                    // totally new entry
+                    // 8.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),
@@ -488,7 +487,7 @@ decl_module! {
             let identity = Self::identities(&who).unwrap();
 
             // 2. Ensure who didn't join group right now
-            ensure!(identity.group.is_none(), Error::<T>::DoubleGroup);
+            ensure!(identity.group.is_none(), Error::<T>::AlreadyJoint);
 
             if who != owner {
                 // 3. Ensure owner has identity information
@@ -496,19 +495,21 @@ decl_module! {
                 // 4. Ensure owner's group is itself
                 ensure!(Self::identities(&owner).unwrap().group.unwrap_or_default() == owner, Error::<T>::NotOwner);
                 // 5. Ensure who's wr's used is zero
-                ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::InvalidUsed);
+                ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
             }
 
-            // 6. Join the group
-            <Groups<T>>::mutate(&owner, |group| {
-                group.insert(who.clone());
+            // 6. Join/Create the group
+            <Groups<T>>::mutate(&owner, |members| {
+                members.insert(who.clone());
             });
 
-            let mut identity = Self::identities(&who).unwrap();
-            identity.group = Some(owner.clone());
-            <Identities<T>>::insert(&who, identity);
+            // 7. Mark the group owner
+            <Identities<T>>::mutate_exists(&who, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut group, .. }) => *group = Some(owner.clone()),
+                ref mut i => *i = None,
+            });
 
-            // 7. Emit event
+            // 8. Emit event
             Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
 
             Ok(())
@@ -552,13 +553,14 @@ impl<T: Trait> Module<T> {
         // 2. Loop all identities and get the workload map
         let mut workload_map= BTreeMap::new();
         for (reporter, id) in <Identities<T>>::iter() {
-            let (free, used) = Self::get_workload(&reporter, &id.anchor, current_rs);
+            let (free, used) = Self::get_workload(&id.anchor, current_rs);
             total_used = total_used.saturating_add(used);
             total_free = total_free.saturating_add(free);
             let mut owner = reporter;
             if let Some(group) = id.group {
                 owner = group;
             }
+            // TODO: we may need to deal with free and used seperately in the future
             let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(used).saturating_add(free);
             workload_map.insert(owner, workload);
 
@@ -604,7 +606,7 @@ impl<T: Trait> Module<T> {
         <Identities<T>>::remove(who);
     }
 
-    ///
+    /// This function will chill WorkReports and ReportedInSlot
     fn chill_anchor(anchor: &SworkerAnchor) {
         WorkReports::remove(anchor);
         ReportedInSlot::remove_prefix(anchor);
@@ -676,13 +678,13 @@ impl<T: Trait> Module<T> {
         // 1. Loop changed files
         if is_added {
             real_files = changed_files.iter().filter_map(|(cid, size, valid_at)| {
-                let mut is_counted = true;
+                let mut members = None;
                 if let Some(identity) = Self::identities(reporter) {
                     if let Some(owner) = identity.group {
-                        is_counted = !T::MarketInterface::check_duplicate_in_group(cid, &Self::groups(owner));
+                        members= Some(Self::groups(owner));
                     }
                 };
-                if T::MarketInterface::upsert_payouts(reporter, cid, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), is_counted) {
+                if T::MarketInterface::upsert_payouts(reporter, cid, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members) {
                     Some((cid.clone(), *size, *valid_at))
                 } else {
                     None
@@ -708,7 +710,7 @@ impl<T: Trait> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(reporter: &T::AccountId, anchor: &SworkerAnchor, current_rs: u64) -> (u128, u128) {
+    fn get_workload(anchor: &SworkerAnchor, current_rs: u64) -> (u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(anchor) {
             if Self::reported_in_slot(anchor, current_rs) {
@@ -718,8 +720,8 @@ impl<T: Trait> Module<T> {
         // Or nope, idk wtf? 🙂
         log!(
             debug,
-            "🔒 No workload for reporter {:?} in slot {:?}",
-            reporter,
+            "🔒 No workload for anchor {:?} in slot {:?}",
+            anchor,
             current_rs
         );
         (0, 0)
@@ -875,7 +877,7 @@ decl_event!(
         WorksReportSuccess(AccountId, SworkerPubKey),
         ABUpgradeSuccess(AccountId, SworkerPubKey, SworkerPubKey),
         ChillSuccess(AccountId, SworkerPubKey),
-        EnclaveUpgradeSuccess(SworkerCode, BlockNumber),
+        SworkerUpgradeSuccess(SworkerCode, BlockNumber),
         JoinGroupSuccess(AccountId, AccountId),
     }
 );

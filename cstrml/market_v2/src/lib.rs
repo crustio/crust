@@ -41,34 +41,52 @@ macro_rules! log {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct FileInfo<AccountId, Balance> {
+    // The file size
     pub file_size: u64,
+    // The block number when the file would expire
     pub expired_on: BlockNumber,
+    // The last block number when the file's amount is claimed
     pub claimed_at: BlockNumber,
+    // The current amount of currency
     pub amount: Balance,
+    // The count of replica that client wants
     pub expected_payouts: u32,
+    // The latest # of account id who reported works
     pub reported_payouts: u32,
+    // The payout list
+    // TODO: restrict the length of this payout
     pub payouts: Vec<PayoutInfo<AccountId>>
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PayoutInfo<AccountId> {
+    // The account id
     pub who: AccountId,
+    // The last bloch number when the `who` reported works
     pub valid_at: BlockNumber,
+    // The anchor associated to the `who` for this file
     pub anchor: SworkerAnchor,
 }
 
+/// According to the definition, we should put this one into swork pallet.
+/// However, in consideration of performance,
+/// we put this in market to avoid too many keys in storage
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct UsedInfo {
+    // The size of used value in MPoW for this file
     pub used_size: u64,
+    // The anchors list which would be counted as contributor for this file
     pub anchors: BTreeSet<SworkerAnchor>
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct MerchantLedger<Balance> {
+    // The current reward amount.
     pub reward: Balance,
+    // The total pledge amount
     pub pledge: Balance
 }
 
@@ -77,39 +95,58 @@ type BalanceOf<T> =
 
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 {
-    fn upsert_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, is_counted: bool) -> bool {
+    fn upsert_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, members_some: &Option<BTreeSet<<T as system::Trait>::AccountId>>) -> bool {
+        // if the file doesn't exist, is_counted == false, doesn't increase the used because we don't care about it.
+        // if the file exist, is_counted == true, will change it later.
+        let mut is_counted = <Files<T>>::get(cid).is_some();
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
+            // 1. check if this file is unique in this group
+            if let Some(members) = members_some {
+                for payout in file_info.payouts.iter() {
+                    if used_info.anchors.contains(&payout.anchor) && members.contains(&payout.who) {
+                        if T::SworkerInterface::check_anchor(&payout.who, &payout.anchor) {
+                            // duplicated and set is_counted to false
+                            is_counted = false;
+                        }
+                    }
+                }
+            }
+            // 2. Prepare new payout info
             let new_payout = PayoutInfo {
                 who: who.clone(),
                 valid_at,
                 anchor: anchor.clone(),
             };
+            file_info.reported_payouts += 1;
+            Self::insert_payout(&mut file_info, new_payout);
+
+            // 3. Update used info
             if is_counted {
                 used_info.anchors.insert(anchor.clone());
             };
-            file_info.reported_payouts += 1;
-            Self::insert_payout(&mut file_info, new_payout);
-            // start file life cycle
+
+            // 4. start file life cycle
             let curr_bn = Self::get_current_block_number();
             if file_info.payouts.len() == 1 {
                 file_info.claimed_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
+            // 5. Update files size
             if file_info.reported_payouts <= file_info.expected_payouts {
                 FilesSize::mutate(|fcs| { *fcs = fcs.saturating_add(file_info.file_size as u128); });
             }
             <Files<T>>::insert(cid, (file_info, used_info));
-            return is_counted;
         }
-        false
+        return is_counted
     }
 
     fn delete_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
-        let mut is_counted = false;
         if <Files<T>>::get(cid).is_some() {
-            // calculate payouts. Try to close file and decrease first party storage(due to no wr)
+            // Calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
-            if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
+            // Update the file info
+            if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+                // If this anchor didn't report work, we already decrease the `reported_payouts` in `calculate_payout`
                 if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
                     // decrease it due to deletion
                     file_info.reported_payouts -= 1;
@@ -120,44 +157,12 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
                 file_info.payouts.retain(|payout| {
                     payout.who != *who
                 });
-                if used_info.anchors.take(anchor).is_some() {
-                    is_counted = true;
-                }
                 <Files<T>>::insert(cid, (file_info, used_info));
             }
         }
-        if let Some(mut used_info) = UsedTrashI::get(cid) {
-            if used_info.anchors.take(anchor).is_some() {
-                is_counted = true;
-                UsedTrashMappingI::mutate(anchor, |value| {
-                    *value -= used_info.used_size;
-                });
-            }
-        }
-        if let Some(mut used_info) = UsedTrashII::get(cid) {
-            if used_info.anchors.take(anchor).is_some() {
-                is_counted = true;
-                UsedTrashMappingII::mutate(anchor, |value| {
-                    *value -= used_info.used_size;
-                });
-            }
-        }
-        is_counted
-    }
 
-    fn check_duplicate_in_group(cid: &MerkleRoot, members: &BTreeSet<<T as system::Trait>::AccountId>) -> bool {
-        if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
-            for payout in file_info.payouts.iter() {
-                if used_info.anchors.contains(&payout.anchor) && members.contains(&payout.who) {
-                    if T::SworkerInterface::check_anchor(&payout.who, &payout.anchor) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-        // This result is useless
-        return true;
+        // delete anchors from used info and return is counted
+        Self::update_used_info(cid, anchor)
     }
 }
 
@@ -315,7 +320,7 @@ decl_module! {
             // 5. Prepare new ledger
             let ledger = MerchantLedger {
                 reward: Zero::zero(),
-                pledge: pledge.clone()s
+                pledge: pledge.clone()
             };
 
             // 6. Upsert pledge.
@@ -489,9 +494,9 @@ impl<T: Trait> Module<T> {
         // File must be valid
         if Self::files(cid).is_none() { return curr_bn; }
         // Not start yet
-        if let Some((file_info, _)) = Self::files(cid) && file_info.expired_on <= file_info.claimed_at { return file_info.claimed_at; }
+        let (mut file_info, used_info) = Self::files(cid).unwrap_or_default();
+        if file_info.expired_on <= file_info.claimed_at { return file_info.claimed_at; }
         // TODO: Restrict the frequency of calculate payout
-        let mut file_info = Self::files(cid).unwrap().0;
         // Store the previous first class storage count
         let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
         let claim_block = curr_bn.min(file_info.expired_on);
@@ -537,7 +542,7 @@ impl<T: Trait> Module<T> {
             file_info.payouts = new_payouts;
         }
         Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
-        Self::update_file_info(cid, file_info);
+        <Files<T>>::insert(cid, (file_info, used_info));
 
         Self::try_to_close_file(cid, curr_bn);
         return claim_block;
@@ -614,7 +619,7 @@ impl<T: Trait> Module<T> {
 
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_payouts
-        if let Some(mut file_info) = Self::get_file_info(cid) {
+        if let Some((mut file_info, used_info)) = Self::files(cid) {
             let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
@@ -625,7 +630,7 @@ impl<T: Trait> Module<T> {
                 file_info.expected_payouts += T::InitialReplica::get();
                 Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
             }
-            Self::update_file_info(cid, file_info);
+            <Files<T>>::insert(cid, (file_info, used_info));
         } else {
             // New file
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
@@ -723,30 +728,30 @@ impl<T: Trait> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn get_file_info(cid: &MerkleRoot) -> Option<FileInfo<T::AccountId, BalanceOf<T>>> {
-        match Self::files(cid) {
-            Some(tuple) => Some(tuple.0),
-            None => None
+    fn update_used_info(cid: &MerkleRoot, anchor: &SworkerAnchor) -> bool {
+        let mut is_counted = false;
+        if let Some((_, mut used_info)) = Self::files(cid) {
+            if used_info.anchors.take(anchor).is_some() {
+                is_counted = true;
+            }
         }
-    }
-
-    fn update_file_info(cid: &MerkleRoot, file_info: FileInfo<T::AccountId, BalanceOf<T>>) {
-        if let Some(file) = Self::files(cid) {
-            <Files<T>>::insert(cid, (file_info, file.1));
+        if let Some(mut used_info) = UsedTrashI::get(cid) {
+            if used_info.anchors.take(anchor).is_some() {
+                is_counted = true;
+                UsedTrashMappingI::mutate(anchor, |value| {
+                    *value -= used_info.used_size;
+                });
+            }
         }
-    }
-
-    fn get_used_info(cid: &MerkleRoot) -> Option<UsedInfo> {
-        match Self::files(cid) {
-            Some(tuple) => Some(tuple.1),
-            None => None
+        if let Some(mut used_info) = UsedTrashII::get(cid) {
+            if used_info.anchors.take(anchor).is_some() {
+                is_counted = true;
+                UsedTrashMappingII::mutate(anchor, |value| {
+                    *value -= used_info.used_size;
+                });
+            }
         }
-    }
-
-    fn update_used_info(cid: &MerkleRoot, used_info: UsedInfo) {
-        if let Some(file) = Self::files(cid) {
-            <Files<T>>::insert(cid, (file.0, used_info));
-        }
+        is_counted
     }
 }
 

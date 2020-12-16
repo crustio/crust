@@ -23,18 +23,14 @@ pub trait SworkerInterface<AccountId> {
 pub trait MarketInterface<AccountId> {
 	// used for `added_files`
 	// return is_added
-	fn upsert_payouts(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber, is_counted: bool) -> bool;
+	fn upsert_payouts(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> bool;
 	// used for `delete_files`
 	// return is_deleted
 	fn delete_payouts(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool;
-	// check group used
-	fn check_duplicate_in_group(cid: &MerkleRoot, members: &BTreeSet<AccountId>) -> bool;
 }
 
 impl<AId> MarketInterface<AId> for () {
-	fn upsert_payouts(_: &AId, _: &MerkleRoot, _: &SworkerAnchor, _: BlockNumber, _: bool) -> bool { false }
+	fn upsert_payouts(_: &AId, _: &MerkleRoot, _: &SworkerAnchor, _: BlockNumber, _: &Option<BTreeSet<AId>>) -> bool { false }
 
 	fn delete_payouts(_: &AId, _: &MerkleRoot, _: &SworkerAnchor, _: BlockNumber) -> bool { false }
-
-	fn check_duplicate_in_group(_: &MerkleRoot, _: &BTreeSet<AId>) -> bool { false }
 }

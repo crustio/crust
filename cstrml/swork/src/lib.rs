@@ -340,13 +340,16 @@ decl_module! {
 
             // 1. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
-            let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
+            
+            // 2. Ensure reporter's code is legal
+            ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
-            // 2. Decide which scenario
+            // 3. Decide which scenario
+            let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
             let is_ab_upgrade = maybe_anchor.is_none() && !ab_upgrade_pk.is_empty();
             let is_first_report = maybe_anchor.is_none() && ab_upgrade_pk.is_empty();
 
-            // 3. Unique Check for normal report work for curr pk
+            // 4. Unique Check for normal report work for curr pk
             if let Some(anchor) = maybe_anchor {
                 // Normally report works.
                 // 3.1 Ensure Identity's anchor be same with current pk's anchor
@@ -362,9 +365,6 @@ decl_module! {
                     return Ok(())
                 }
             }
-
-            // 4. Ensure reporter's code is legal
-            ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
             // 5. Timing check
             ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);

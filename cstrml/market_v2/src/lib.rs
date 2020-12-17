@@ -730,27 +730,37 @@ impl<T: Trait> Module<T> {
 
     fn update_used_info(cid: &MerkleRoot, anchor: &SworkerAnchor) -> bool {
         let mut is_counted = false;
-        if let Some((_, mut used_info)) = Self::files(cid) {
-            if used_info.anchors.take(anchor).is_some() {
-                is_counted = true;
-            }
-        }
-        if let Some(mut used_info) = UsedTrashI::get(cid) {
-            if used_info.anchors.take(anchor).is_some() {
-                is_counted = true;
-                UsedTrashMappingI::mutate(anchor, |value| {
-                    *value -= used_info.used_size;
-                });
-            }
-        }
-        if let Some(mut used_info) = UsedTrashII::get(cid) {
-            if used_info.anchors.take(anchor).is_some() {
-                is_counted = true;
-                UsedTrashMappingII::mutate(anchor, |value| {
-                    *value -= used_info.used_size;
-                });
-            }
-        }
+        <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
+            Some((_, ref mut used_info)) => {
+                if used_info.anchors.take(anchor).is_some() {
+                    is_counted = true;
+                }
+            },
+            None => {}
+        });
+        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.anchors.take(anchor).is_some() {
+                    is_counted = true;
+                    UsedTrashMappingI::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
+
+        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.anchors.take(anchor).is_some() {
+                    is_counted = true;
+                    UsedTrashMappingII::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
         is_counted
     }
 }

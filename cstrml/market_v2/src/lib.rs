@@ -55,12 +55,12 @@ pub struct FileInfo<AccountId, Balance> {
     pub reported_replica_count: u32,
     // The replica list
     // TODO: restrict the length of this replica
-    pub replicas: Vec<ReplicaInfo<AccountId>>
+    pub replicas: Vec<Replica<AccountId>>
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct ReplicaInfo<AccountId> {
+pub struct Replica<AccountId> {
     // Controller account
     pub who: AccountId,
     // The last bloch number when the node reported works
@@ -75,9 +75,9 @@ pub struct ReplicaInfo<AccountId> {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct UsedInfo {
-    // The size of used value in MPoW for this file
+    // The size of used value in MPoW
     pub used_size: u64,
-    // The anchors list which would be counted as contributor for this file
+    // Anchors which is counted as contributor for this file
     pub anchors: BTreeSet<SworkerAnchor>
 }
 
@@ -112,7 +112,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
                 }
             }
             // 2. Prepare new replica info
-            let new_replica = ReplicaInfo {
+            let new_replica = Replica {
                 who: who.clone(),
                 valid_at,
                 anchor: anchor.clone(),
@@ -507,8 +507,8 @@ impl<T: Trait> Module<T> {
             // Prepare some vars
             let mut rewarded_amount = Zero::zero();
             let mut rewarded_count = 0u32;
-            let mut new_replicas: Vec<ReplicaInfo<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
-            let mut invalid_replicas: Vec<ReplicaInfo<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
+            let mut new_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
+            let mut invalid_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
             // Loop replicas
             for replica in file_info.replicas.iter() {
                 // Didn't report in last slot
@@ -650,7 +650,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: ReplicaInfo<T::AccountId>) {
+    fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
         let mut insert_index: usize = file_info.replicas.len();
         for (index, replica) in file_info.replicas.iter().enumerate() {
             if new_replica.valid_at < replica.valid_at {

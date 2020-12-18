@@ -41,31 +41,31 @@ macro_rules! log {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct FileInfo<AccountId, Balance> {
-    // The file size
+    // The ordered file size, which declare by user
     pub file_size: u64,
-    // The block number when the file would expire
+    // The block number when the file goes invalide
     pub expired_on: BlockNumber,
     // The last block number when the file's amount is claimed
     pub claimed_at: BlockNumber,
-    // The current amount of currency
+    // The file value
     pub amount: Balance,
-    // The count of replica that client wants
-    pub expected_payouts: u32,
-    // The latest # of account id who reported works
-    pub reported_payouts: u32,
-    // The payout list
-    // TODO: restrict the length of this payout
-    pub payouts: Vec<PayoutInfo<AccountId>>
+    // The count of replica that user wants
+    pub expected_replica_count: u32,
+    // The count of valid replica each report slot
+    pub reported_replica_count: u32,
+    // The replica list
+    // TODO: restrict the length of this replica
+    pub replicas: Vec<ReplicaInfo<AccountId>>
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct PayoutInfo<AccountId> {
-    // The account id
+pub struct ReplicaInfo<AccountId> {
+    // Controller account
     pub who: AccountId,
-    // The last bloch number when the `who` reported works
+    // The last bloch number when the node reported works
     pub valid_at: BlockNumber,
-    // The anchor associated to the `who` for this file
+    // The anchor associated to the node mapping with file
     pub anchor: SworkerAnchor,
 }
 
@@ -95,30 +95,30 @@ type BalanceOf<T> =
 
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 {
-    fn upsert_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, members_some: &Option<BTreeSet<<T as system::Trait>::AccountId>>) -> bool {
+    fn upsert_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, members_some: &Option<BTreeSet<<T as system::Trait>::AccountId>>) -> bool {
         // if the file doesn't exist, is_counted == false, doesn't increase the used because we don't care about it.
         // if the file exist, is_counted == true, will change it later.
         let mut is_counted = <Files<T>>::get(cid).is_some();
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
             // 1. check if this file is unique in this group
             if let Some(members) = members_some {
-                for payout in file_info.payouts.iter() {
-                    if used_info.anchors.contains(&payout.anchor) && members.contains(&payout.who) {
-                        if T::SworkerInterface::check_anchor(&payout.who, &payout.anchor) {
+                for replica in file_info.replicas.iter() {
+                    if used_info.anchors.contains(&replica.anchor) && members.contains(&replica.who) {
+                        if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
                             // duplicated and set is_counted to false
                             is_counted = false;
                         }
                     }
                 }
             }
-            // 2. Prepare new payout info
-            let new_payout = PayoutInfo {
+            // 2. Prepare new replica info
+            let new_replica = ReplicaInfo {
                 who: who.clone(),
                 valid_at,
                 anchor: anchor.clone(),
             };
-            file_info.reported_payouts += 1;
-            Self::insert_payout(&mut file_info, new_payout);
+            file_info.reported_replica_count += 1;
+            Self::insert_replica(&mut file_info, new_replica);
 
             // 3. Update used info
             if is_counted {
@@ -127,12 +127,12 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 
             // 4. start file life cycle
             let curr_bn = Self::get_current_block_number();
-            if file_info.payouts.len() == 1 {
+            if file_info.replicas.len() == 1 {
                 file_info.claimed_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
             // 5. Update files size
-            if file_info.reported_payouts <= file_info.expected_payouts {
+            if file_info.reported_replica_count <= file_info.expected_replica_count {
                 FilesSize::mutate(|fcs| { *fcs = fcs.saturating_add(file_info.file_size as u128); });
             }
             <Files<T>>::insert(cid, (file_info, used_info));
@@ -140,22 +140,22 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
         return is_counted
     }
 
-    fn delete_payouts(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
+    fn delete_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
         if <Files<T>>::get(cid).is_some() {
-            // Calculate payouts. Try to close file and decrease first party storage(due to no wr)
+            // Calculate replicas. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
             // Update the file info
             if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
-                // If this anchor didn't report work, we already decrease the `reported_payouts` in `calculate_payout`
+                // If this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
                 if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
                     // decrease it due to deletion
-                    file_info.reported_payouts -= 1;
-                    if file_info.reported_payouts < file_info.expected_payouts {
+                    file_info.reported_replica_count -= 1;
+                    if file_info.reported_replica_count < file_info.expected_replica_count {
                         FilesSize::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
                     }
                 }
-                file_info.payouts.retain(|payout| {
-                    payout.who != *who
+                file_info.replicas.retain(|replica| {
+                    replica.who != *who
                 });
                 <Files<T>>::insert(cid, (file_info, used_info));
             }
@@ -498,35 +498,35 @@ impl<T: Trait> Module<T> {
         if file_info.expired_on <= file_info.claimed_at { return file_info.claimed_at; }
         // TODO: Restrict the frequency of calculate payout
         // Store the previous first class storage count
-        let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
+        let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
         let claim_block = curr_bn.min(file_info.expired_on);
-        let target_reward_count = file_info.payouts.len().min(file_info.expected_payouts as usize) as u32;
+        let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
         if target_reward_count > 0 {
             let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
                                                                         (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount;
             // Prepare some vars
             let mut rewarded_amount = Zero::zero();
             let mut rewarded_count = 0u32;
-            let mut new_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
-            let mut invalid_payouts: Vec<PayoutInfo<T::AccountId>> = Vec::with_capacity(file_info.payouts.len());
-            // Loop payouts
-            for payout in file_info.payouts.iter() {
+            let mut new_replicas: Vec<ReplicaInfo<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
+            let mut invalid_replicas: Vec<ReplicaInfo<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
+            // Loop replicas
+            for replica in file_info.replicas.iter() {
                 // Didn't report in last slot
-                if !T::SworkerInterface::is_wr_reported(&payout.anchor, claim_block) {
-                    let mut invalid_payout = payout.clone();
+                if !T::SworkerInterface::is_wr_reported(&replica.anchor, claim_block) {
+                    let mut invalid_replica = replica.clone();
                     // update the valid_at to the curr_bn
-                    invalid_payout.valid_at = curr_bn;
-                    // move it to the end of payout
-                    invalid_payouts.push(invalid_payout);
+                    invalid_replica.valid_at = curr_bn;
+                    // move it to the end of replica
+                    invalid_replicas.push(invalid_replica);
                     // TODO: kick this anchor out of used info
                 } else {
                     // Keep the order
-                    new_payouts.push(payout.clone());
+                    new_replicas.push(replica.clone());
                     if rewarded_count == target_reward_count {
                         continue;
                     }
-                    if Self::has_enough_pledge(&payout.who, &one_payout_amount) {
-                        <MerchantLedgers<T>>::mutate(&payout.who, |ledger| {
+                    if Self::has_enough_pledge(&replica.who, &one_replica_amount) {
+                        <MerchantLedgers<T>>::mutate(&replica.who, |ledger| {
                             ledger.reward += one_payout_amount.clone();
                         });
                         rewarded_amount += one_payout_amount.clone();
@@ -537,11 +537,11 @@ impl<T: Trait> Module<T> {
             // Update file's information
             file_info.claimed_at = claim_block;
             file_info.amount -= rewarded_amount;
-            file_info.reported_payouts = new_payouts.len() as u32;
-            new_payouts.append(&mut invalid_payouts);
-            file_info.payouts = new_payouts;
+            file_info.reported_replica_count = new_replicas.len() as u32;
+            new_replicas.append(&mut invalid_replicas);
+            file_info.replicas = new_replicas;
         }
-        Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
+        Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
         <Files<T>>::insert(cid, (file_info, used_info));
 
         Self::try_to_close_file(cid, curr_bn);
@@ -558,7 +558,7 @@ impl<T: Trait> Module<T> {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn {
-                Self::update_files_size(file_info.file_size, file_info.reported_payouts.min(file_info.expected_payouts), 0);
+                Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
                     T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
@@ -618,17 +618,17 @@ impl<T: Trait> Module<T> {
     }
 
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
-        // Extend expired_on or expected_payouts
+        // Extend expired_on or expected_replica_count
         if let Some((mut file_info, used_info)) = Self::files(cid) {
-            let prev_first_class_count = file_info.reported_payouts.min(file_info.expected_payouts);
+            let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
             file_info.amount += amount.clone();
             if extend_replica {
                 // TODO: use 2 instead of 4
-                file_info.expected_payouts += T::InitialReplica::get();
-                Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_payouts.min(file_info.expected_payouts));
+                file_info.expected_replica_count += T::InitialReplica::get();
+                Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         } else {
@@ -638,9 +638,9 @@ impl<T: Trait> Module<T> {
                 expired_on: curr_bn.clone(), // Not fixed, this will be changed, when first file is reported
                 claimed_at: curr_bn.clone(),
                 amount: amount.clone(),
-                expected_payouts: T::InitialReplica::get(),
-                reported_payouts: 0u32,
-                payouts: vec![]
+                expected_replica_count: T::InitialReplica::get(),
+                reported_replica_count: 0u32,
+                replicas: vec![]
             };
             let used_info = UsedInfo {
                 used_size: file_size,
@@ -650,15 +650,15 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn insert_payout(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_payout: PayoutInfo<T::AccountId>) {
-        let mut insert_index: usize = file_info.payouts.len();
-        for (index, payout) in file_info.payouts.iter().enumerate() {
-            if new_payout.valid_at < payout.valid_at {
+    fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: ReplicaInfo<T::AccountId>) {
+        let mut insert_index: usize = file_info.replicas.len();
+        for (index, replica) in file_info.replicas.iter().enumerate() {
+            if new_replica.valid_at < replica.valid_at {
                 insert_index = index;
                 break;
             }
         }
-        file_info.payouts.insert(insert_index, new_payout);
+        file_info.replicas.insert(insert_index, new_replica);
     }
 
     fn init_pot(account: fn() -> T::AccountId) {

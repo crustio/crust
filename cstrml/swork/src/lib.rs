@@ -684,7 +684,7 @@ impl<T: Trait> Module<T> {
                         members= Some(Self::groups(owner));
                     }
                 };
-                if T::MarketInterface::upsert_payouts(reporter, cid, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members) {
+                if T::MarketInterface::upsert_replicas(reporter, cid, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members) {
                     Some((cid.clone(), *size, *valid_at))
                 } else {
                     None
@@ -694,7 +694,7 @@ impl<T: Trait> Module<T> {
             let curr_bn = Self::get_current_block_number();
             real_files = changed_files.iter().filter_map(|(cid, size, _)| {
                 // 2. If mapping to storage orders
-                if T::MarketInterface::delete_payouts(reporter, cid, anchor, curr_bn) {
+                if T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn) {
                     Some((cid.clone(), *size, curr_bn as u64))
                 } else {
                     None

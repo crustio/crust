@@ -95,22 +95,28 @@ type BalanceOf<T> =
 
 impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 {
-    fn upsert_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, members_some: &Option<BTreeSet<<T as system::Trait>::AccountId>>) -> bool {
-        // if the file doesn't exist, is_counted == false, doesn't increase the used because we don't care about it.
+    /// Upsert new replica
+    /// Accept id(who, anchor), cid, valid_at and maybe_member
+    /// Returns whether this id is counted to a group/itself's stake limit
+    fn upsert_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, maybe_members: &Option<BTreeSet<<T as system::Trait>::AccountId>>) -> bool {
+        // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
+        // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
         let mut is_counted = <Files<T>>::get(cid).is_some();
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
-            // 1. check if this file is unique in this group
-            if let Some(members) = members_some {
+            
+            // 1. Check if the file is stored by other members
+            if let Some(members) = maybe_members {
                 for replica in file_info.replicas.iter() {
                     if used_info.anchors.contains(&replica.anchor) && members.contains(&replica.who) {
                         if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
-                            // duplicated and set is_counted to false
+                            // duplicated in group and set is_counted to false
                             is_counted = false;
                         }
                     }
                 }
             }
+
             // 2. Prepare new replica info
             let new_replica = Replica {
                 who: who.clone(),
@@ -120,33 +126,40 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
             file_info.reported_replica_count += 1;
             Self::insert_replica(&mut file_info, new_replica);
 
-            // 3. Update used info
+            // 3. Update used_info
             if is_counted {
                 used_info.anchors.insert(anchor.clone());
             };
 
-            // 4. start file life cycle
+            // 4. The first join the 
             let curr_bn = Self::get_current_block_number();
             if file_info.replicas.len() == 1 {
                 file_info.claimed_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
+
             // 5. Update files size
             if file_info.reported_replica_count <= file_info.expected_replica_count {
                 FilesSize::mutate(|fcs| { *fcs = fcs.saturating_add(file_info.file_size as u128); });
             }
+
+            // 6. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
         return is_counted
     }
 
+    /// Node who delete the replica
+    /// Accept id(who, anchor), cid and current block number
+    /// Return whether this id is counted to a group/itself's stake limit
     fn delete_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
         if <Files<T>>::get(cid).is_some() {
-            // Calculate replicas. Try to close file and decrease first party storage(due to no wr)
+            // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
-            // Update the file info
+            
+            // 2. Delete replica from file_info
             if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
-                // If this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
+                // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
                 if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
                     // decrease it due to deletion
                     file_info.reported_replica_count -= 1;
@@ -161,8 +174,8 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
             }
         }
 
-        // delete anchors from used info and return is counted
-        Self::update_used_info(cid, anchor)
+        // 3. Delete anchor from file_info/file_trash and return whether it is counted
+        Self::delete_used_anchor(cid, anchor)
     }
 }
 
@@ -443,7 +456,7 @@ decl_module! {
         /// Calculate the payout
         /// TODO: Reconsider this weight
         #[weight = 1000]
-        pub fn settle_file(
+        pub fn calculate_reward(
             origin,
             cid: MerkleRoot,
         ) -> DispatchResult {
@@ -483,7 +496,9 @@ impl<T: Trait> Module<T> {
         T::ModuleId::get().into_sub_account("rese")
     }
 
-    /// Important!!!! @zikunfan Please review review review
+    /// Calculate payout from file's replica
+    /// This function will calculate the file's reward, update replicas
+    /// and (maybe) insert file's status(files_size and delete file)
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
@@ -491,27 +506,34 @@ impl<T: Trait> Module<T> {
     ///     claimed_bn: BlockNumber
     fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber) -> BlockNumber
     {
-        // File must be valid
+        // 1. File must exist
         if Self::files(cid).is_none() { return curr_bn; }
-        // Not start yet
+        
+        // 2. File must already started
         let (mut file_info, used_info) = Self::files(cid).unwrap_or_default();
+        
+        // 3. File already expired
         if file_info.expired_on <= file_info.claimed_at { return file_info.claimed_at; }
-        // TODO: Restrict the frequency of calculate payout
-        // Store the previous first class storage count
+        
+        // TODO: Restrict the frequency of calculate payout(limit the duration of 2 claiming)
+        // Get the previous first class storage count
         let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
         let claim_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
+        
+        // 4. Calulate payouts, check replicas and update the file_info
         if target_reward_count > 0 {
+            // 4.1 Get 1 payout amount
             let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
                                                                         (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount;
-            // Prepare some vars
             let mut rewarded_amount = Zero::zero();
             let mut rewarded_count = 0u32;
             let mut new_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
             let mut invalid_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
-            // Loop replicas
+            
+            // 4.2. Loop replicas
             for replica in file_info.replicas.iter() {
-                // Didn't report in last slot
+                // a. didn't report in prev slot, push back to the end of replica
                 if !T::SworkerInterface::is_wr_reported(&replica.anchor, claim_block) {
                     let mut invalid_replica = replica.clone();
                     // update the valid_at to the curr_bn
@@ -519,12 +541,16 @@ impl<T: Trait> Module<T> {
                     // move it to the end of replica
                     invalid_replicas.push(invalid_replica);
                     // TODO: kick this anchor out of used info
+                // b. keep the replica's sequence
                 } else {
-                    // Keep the order
                     new_replicas.push(replica.clone());
+                    
+                    // if payouts is full, just continue
                     if rewarded_count == target_reward_count {
                         continue;
                     }
+                    
+                    // if that guy is poor, just pass him ☠️ 
                     if Self::has_enough_pledge(&replica.who, &one_replica_amount) {
                         <MerchantLedgers<T>>::mutate(&replica.who, |ledger| {
                             ledger.reward += one_payout_amount.clone();
@@ -534,26 +560,36 @@ impl<T: Trait> Module<T> {
                     }
                 }
             }
-            // Update file's information
+
+            // 4.3 Update file info
             file_info.claimed_at = claim_block;
             file_info.amount -= rewarded_amount;
             file_info.reported_replica_count = new_replicas.len() as u32;
             new_replicas.append(&mut invalid_replicas);
             file_info.replicas = new_replicas;
         }
-        Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
-        <Files<T>>::insert(cid, (file_info, used_info));
+        
+        // 5. Update files
+        <Files<T>>::insert(cid, (file_info.clone(), used_info));
 
+        // 6. Update first class storage size
+        Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
+        
+        // 7. Try to close file, judge if it is outdated
         Self::try_to_close_file(cid, curr_bn);
+
+        // 8. Return the claimed block
         return claim_block;
     }
 
+    /// Update the first class storage's size
     fn update_files_size(file_size: u64, prev_count: u32, curr_count: u32) {
         FilesSize::mutate(|size| {
             *size = size.saturating_sub((file_size * (prev_count as u64)) as u128).saturating_add((file_size * (curr_count as u64)) as u128);
         });
     }
 
+    /// Close file, maybe move into trash
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
@@ -568,6 +604,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    /// Trashbag operations
     fn move_into_trash(cid: &MerkleRoot, used_info: UsedInfo) {
         if Self::used_trash_size_i() < T::UsedTrashMaxSize::get() {
             UsedTrashI::insert(cid, used_info.clone());
@@ -713,8 +750,6 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// return:
-    ///     storage amount: BalanceOf<T>
     fn split_into_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
         let staking_amount = T::StakingRatio::get() * value;
         let storage_amount = value - staking_amount;
@@ -728,8 +763,10 @@ impl<T: Trait> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn update_used_info(cid: &MerkleRoot, anchor: &SworkerAnchor) -> bool {
+    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> bool {
         let mut is_counted = false;
+        
+        // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
             Some((_, ref mut used_info)) => {
                 if used_info.anchors.take(anchor).is_some() {
@@ -738,6 +775,9 @@ impl<T: Trait> Module<T> {
             },
             None => {}
         });
+        
+
+        // 2. Delete trashI's anchor
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.anchors.take(anchor).is_some() {
@@ -750,6 +790,7 @@ impl<T: Trait> Module<T> {
             None => {}
         });
 
+        // 3. Delete trashII's anchor
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.anchors.take(anchor).is_some() {
@@ -761,6 +802,7 @@ impl<T: Trait> Module<T> {
             },
             None => {}
         });
+
         is_counted
     }
 }

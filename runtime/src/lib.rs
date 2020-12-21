@@ -639,7 +639,7 @@ impl candy::Trait for Runtime {
 // TODO: better way to deal with fee(s)
 parameter_types! {
     pub const TransactionBaseFee: Balance = 1 * CENTS;
-    pub const TransactionByteFee: Balance = 10 * MILLICENTS;
+    pub const TransactionByteFee: Balance = 1 * MILLICENTS;
 }
 
 impl pallet_transaction_payment::Trait for Runtime {

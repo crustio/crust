@@ -1,3 +1,5 @@
+cargo-features = ["resolver"]
+
 [profile.release]
 panic = 'unwind'
 
@@ -19,3 +21,5 @@ members = [
     'rpc',
     'node',
 ]
+
+resolver = "2"

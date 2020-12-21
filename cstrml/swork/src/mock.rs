@@ -85,7 +85,7 @@ parameter_types! {
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
 }
 
-impl system::Trait for Test {
+impl system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
     type Call = ();
@@ -113,7 +113,7 @@ impl system::Trait for Test {
     type SystemWeightInfo = ();
 }
 
-impl balances::Trait for Test {
+impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = ();
@@ -128,7 +128,7 @@ parameter_types! {
     pub const MaxBondsLimit: u32 = 2;
 }
 
-impl market::Trait for Test {
+impl market::Config for Test {
     type Currency = balances::Module<Self>;
     type CurrencyToBalance = ();
     type Event = ();
@@ -140,7 +140,7 @@ impl market::Trait for Test {
     type WeightInfo = market::weight::WeightInfo;
 }
 
-impl Trait for Test {
+impl Config for Test {
     type Currency = balances::Module<Self>;
     type Event = ();
     type Works = ();

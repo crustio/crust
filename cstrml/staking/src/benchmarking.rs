@@ -31,14 +31,14 @@ const SEED: u32 = 0;
 const ACCOUNT_BALANCE_RATIO: u32 = 10000000;
 const STAKE_LIMIT_RATIO: u32 = 100000000;
 
-fn create_funded_user<T: Trait>(string: &'static str, n: u32) -> T::AccountId {
+fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     let user = account(string, n, SEED);
     let balance = T::Currency::minimum_balance() * ACCOUNT_BALANCE_RATIO.into();
     T::Currency::make_free_balance_be(&user, balance);
     user
 }
 
-pub fn create_stash_controller<T: Trait>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
+pub fn create_stash_controller<T: Config>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
     let stash = create_funded_user::<T>("stash", n);
     let controller = create_funded_user::<T>("controller", n);
     let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
@@ -49,7 +49,7 @@ pub fn create_stash_controller<T: Trait>(n: u32) -> Result<(T::AccountId, T::Acc
 }
 
 // This function generates v validators and n guarantor who are randomly nominating up to MAX_GUARANTEE.
-pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u32) -> Result<(T::AccountId, <T::Lookup as StaticLookup>::Source), &'static str> {
+pub fn create_validators_with_guarantors_for_era<T: Config>(v: u32, n: u32, m: u32) -> Result<(T::AccountId, <T::Lookup as StaticLookup>::Source), &'static str> {
     let mut validators: Vec<<T::Lookup as StaticLookup>::Source> = Vec::with_capacity(v as usize);
     let mut rng = ChaChaRng::from_seed(SEED.using_encoded(blake2_256));
 
@@ -98,7 +98,7 @@ pub fn create_validators_with_guarantors_for_era<T: Trait>(v: u32, n: u32, m: u3
 }
 
 // This function generates one validator and one guarantor
-pub fn create_one_validator_with_one_guarantor<T: Trait>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
+pub fn create_one_validator_with_one_guarantor<T: Config>(n: u32) -> Result<(T::AccountId, T::AccountId), &'static str> {
     let (v_stash, v_controller) = create_stash_controller::<T>(n)?;
     Staking::<T>::upsert_stake_limit(&v_stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
     Staking::<T>::validate(RawOrigin::Signed(v_controller.clone()).into(), Default::default())?;

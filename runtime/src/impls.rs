@@ -7,12 +7,12 @@ pub struct ToAuthor<R>(sp_std::marker::PhantomData<R>);
 
 impl<R> OnUnbalanced<NegativeImbalance<R>> for ToAuthor<R>
     where
-        R: balances::Trait + pallet_authorship::Trait,
-        <R as frame_system::Trait>::AccountId: From<primitives::AccountId>,
-        <R as frame_system::Trait>::AccountId: Into<primitives::AccountId>,
-        <R as frame_system::Trait>::Event: From<balances::RawEvent<
-            <R as frame_system::Trait>::AccountId,
-            <R as balances::Trait>::Balance,
+        R: balances::Config + pallet_authorship::Config,
+        <R as frame_system::Config>::AccountId: From<primitives::AccountId>,
+        <R as frame_system::Config>::AccountId: Into<primitives::AccountId>,
+        <R as frame_system::Config>::Event: From<balances::RawEvent<
+            <R as frame_system::Config>::AccountId,
+            <R as balances::Config>::Balance,
             balances::DefaultInstance>
         >,
 {

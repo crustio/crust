@@ -72,7 +72,7 @@ parameter_types! {
     pub const MinimumSorderDuration: u32 = 1;
 }
 
-impl system::Trait for Test {
+impl system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
     type Call = ();
@@ -120,7 +120,7 @@ impl OrderInspector<AccountId> for TestOrderInspector {
     }
 }
 
-impl balances::Trait for Test {
+impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = ();
@@ -130,7 +130,7 @@ impl balances::Trait for Test {
     type MaxLocks = ();
 }
 
-impl swork::Trait for Test {
+impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
     type Works = ();
@@ -143,7 +143,7 @@ parameter_types! {
     pub const TestClaimLimit: u32 = 100;
 }
 
-impl Trait for Test {
+impl Config for Test {
     type Currency = Balances;
     type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();

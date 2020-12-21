@@ -11,21 +11,21 @@ repository = "https://github.com/crustio/crust/"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-serde = { version = "1.0.101", optional = true }
+serde = { version = "1.0.116", optional = true }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
-sp-std = { version = "2.0.0", default-features = false }
-sp-runtime = { version = "2.0.0", default-features = false }
-frame-benchmarking = { version = "2.0.0", default-features = false, optional = true }
-frame-support = { version = "2.0.0", default-features = false }
-frame-system = { version = "2.0.0", default-features = false }
+sp-std = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false, optional = true }
+frame-support = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
+frame-system = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
 
 # crust runtime modules
 primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-sp-io = "2.0.0"
-sp-core = "2.0.0"
-pallet-transaction-payment = "2.0.0"
+sp-io = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
+sp-core = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
+pallet-transaction-payment = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
 
 [features]
 default = ["std"]

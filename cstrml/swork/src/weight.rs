@@ -13,12 +13,12 @@ impl crate::WeightInfo for WeightInfo {
 			.saturating_add(DbWeight::get().writes(4 as Weight))
 	}
 	fn register() -> Weight {
-		(229_659_000_00 as Weight)
+		(22_965_900_000 as Weight)
 			.saturating_add(DbWeight::get().reads(6 as Weight))
 			.saturating_add(DbWeight::get().writes(4 as Weight))
 	}
 	fn report_works() -> Weight {
-		(139_359_000_00 as Weight)
+		(13_935_900_000 as Weight)
 			.saturating_add(DbWeight::get().reads(12 as Weight))
 			.saturating_add(DbWeight::get().writes(6 as Weight))
 	}

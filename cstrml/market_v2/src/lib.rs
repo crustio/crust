@@ -551,7 +551,7 @@ impl<T: Trait> Module<T> {
                     }
                     
                     // if that guy is poor, just pass him ☠️ 
-                    if Self::has_enough_pledge(&replica.who, &one_replica_amount) {
+                    if Self::has_enough_pledge(&replica.who, &one_payout_amount) {
                         <MerchantLedgers<T>>::mutate(&replica.who, |ledger| {
                             ledger.reward += one_payout_amount.clone();
                         });

@@ -28,9 +28,3 @@ pub trait MarketInterface<AccountId> {
 	// return is_deleted
 	fn delete_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool;
 }
-
-impl<AId> MarketInterface<AId> for () {
-	fn upsert_replicas(_: &AId, _: &MerkleRoot, _: &SworkerAnchor, _: BlockNumber, _: &Option<BTreeSet<AId>>) -> bool { false }
-
-	fn delete_replicas(_: &AId, _: &MerkleRoot, _: &SworkerAnchor, _: BlockNumber) -> bool { false }
-}

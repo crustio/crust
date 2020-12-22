@@ -8,6 +8,7 @@ use frame_support::{
 use hex;
 use crate::MerchantLedger;
 
+/// Register & Pledge test cases
 #[test]
 fn register_should_work() {
     new_test_ext().execute_with(|| {
@@ -38,28 +39,6 @@ fn register_should_work() {
 }
 
 #[test]
-fn pledge_extra_should_fail_due_to_merchant_not_register() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let merchant = Sr25519Keyring::Bob.to_account_id();
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_noop!(
-            Market::pledge_extra(
-                Origin::signed(merchant),
-                200
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 3,
-                message: Some("NotRegister")
-            }
-        );
-    });
-}
-
-#[test]
 fn register_should_fail_due_to_insufficient_currency() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
@@ -76,6 +55,50 @@ fn register_should_fail_due_to_insufficient_currency() {
                 index: 0,
                 error: 0,
                 message: Some("InsufficientCurrency")
+            }
+        );
+    });
+}
+
+#[test]
+fn register_should_fail_due_to_double_register() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 70));
+        assert_noop!(
+            Market::register(
+                Origin::signed(merchant),
+                70
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 4,
+                message: Some("AlreadyRegistered")
+            }
+        );
+    });
+}
+
+#[test]
+fn pledge_extra_should_fail_due_to_merchant_not_register() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+        assert_noop!(
+            Market::pledge_extra(
+                Origin::signed(merchant),
+                200
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 3,
+                message: Some("NotRegister")
             }
         );
     });
@@ -118,29 +141,7 @@ fn cut_pledge_should_fail_due_to_reward() {
     });
 }
 
-#[test]
-fn register_should_fail_due_to_double_register() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-        let merchant = Sr25519Keyring::Bob.to_account_id();
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 70));
-        assert_noop!(
-            Market::register(
-                Origin::signed(merchant),
-                70
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 4,
-                message: Some("AlreadyRegistered")
-            }
-        );
-    });
-}
-
-
+/// Place storage order test cases
 #[test]
 fn place_storage_order_should_work() {
     new_test_ext().execute_with(|| {
@@ -186,7 +187,11 @@ fn place_storage_order_should_work() {
 }
 
 #[test]
-fn place_storage_order_should_work_for_extend_scenario() {
+// For extends:
+// 1. Add amount
+// 2. Extend duration
+// 3. Extend replicas
+fn place_storage_order_should_work_for_extend_scenarios() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -204,6 +209,7 @@ fn place_storage_order_should_work_for_extend_scenario() {
 
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
+        // 1. New storage order
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, false
@@ -228,6 +234,8 @@ fn place_storage_order_should_work_for_extend_scenario() {
         assert_eq!(Balances::free_balance(&storage_pot), 400);
 
         run_to_block(250);
+        
+        // 2. Add amount for sOrder not begin should work
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, false
@@ -278,6 +286,7 @@ fn place_storage_order_should_work_for_extend_scenario() {
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
 
+        // Report this cid's works
         register(&legal_pk, LegalCode::get());
         run_to_block(400);
         assert_ok!(Swork::report_works(
@@ -314,6 +323,8 @@ fn place_storage_order_should_work_for_extend_scenario() {
                 anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
+
+        // Calculate mannual claim reward should work
         run_to_block(500);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
@@ -337,6 +348,7 @@ fn place_storage_order_should_work_for_extend_scenario() {
             })
         );
 
+        // 3. Extend duration should work
         run_to_block(600);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -362,6 +374,8 @@ fn place_storage_order_should_work_for_extend_scenario() {
                 anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
+
+        // 4. Extend replicas should work
         run_to_block(800);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -391,12 +405,17 @@ fn place_storage_order_should_work_for_extend_scenario() {
 }
 
 
+/// Payouts test cases
 #[test]
+// Payout should be triggered by:
+// 1. Delete file(covered by swork module)
+// 2. Claim reward
+// 3. Place started storage order(covered by `place_storage_order_should_work_for_extend_scenarios`)
 fn calculate_payout_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
-
+ 
         let source = Sr25519Keyring::Alice.to_account_id();
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
@@ -410,6 +429,7 @@ fn calculate_payout_should_work() {
 
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
+        // 1. Place an order 1st
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
             file_size, 0, false
@@ -435,12 +455,12 @@ fn calculate_payout_should_work() {
         assert_eq!(Balances::free_balance(storage_pot), 400);
 
         run_to_block(303);
-
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
 
         register(&legal_pk, LegalCode::get());
 
+        // 2. Report this file's work, let file begin
         assert_ok!(Swork::report_works(
                 Origin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
@@ -476,6 +496,7 @@ fn calculate_payout_should_work() {
             })
         );
 
+        // 3. Go along with some time, and get reward
         run_to_block(606);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
@@ -1346,6 +1367,8 @@ fn calculate_payout_should_work_for_more_replicas() {
     });
 }
 
+
+/// Trash test case
 #[test]
 fn clear_trash_should_work() {
     new_test_ext().execute_with(|| {
@@ -1471,6 +1494,7 @@ fn clear_trash_should_work() {
     });
 }
 
+/// Update file price test case
 #[test]
 fn update_price_should_work() {
     new_test_ext().execute_with(|| {

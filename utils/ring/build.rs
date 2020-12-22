@@ -14,23 +14,23 @@
 
 //! Build the non-Rust components.
 
-#![forbid(
-    anonymous_parameters,
-    box_pointers,
-    missing_copy_implementations,
-    missing_debug_implementations,
-    missing_docs,
-    trivial_casts,
-    trivial_numeric_casts,
-    unsafe_code,
-    unstable_features,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_qualifications,
-    unused_results,
-    variant_size_differences,
-    warnings
-)]
+// #![forbid(
+//     anonymous_parameters,
+//     box_pointers,
+//     missing_copy_implementations,
+//     missing_debug_implementations,
+//     missing_docs,
+//     trivial_casts,
+//     trivial_numeric_casts,
+//     unsafe_code,
+//     unstable_features,
+//     unused_extern_crates,
+//     unused_import_braces,
+//     unused_qualifications,
+//     unused_results,
+//     variant_size_differences,
+//     warnings
+// )]
 
 // In the `pregenerate_asm_main()` case we don't want to access (Cargo)
 // environment variables at all, so avoid `use std::env` here.
@@ -384,7 +384,7 @@ fn maybe_set_toolchain(target: &Target) {
         std::env::set_var("CC_wasm32-unknown-unknown", &clang);
         std::env::set_var("AR_wasm32-unknown-unknown", &ar);
     } else if target.arch == "wasm32" {
-        panic!("One of the compatible llvm toolchain must exist: llvm-{11,10,9}");
+        panic!("{}", "One of the compatible llvm toolchain must exist: llvm-{11,10,9}");
     }
 }
 

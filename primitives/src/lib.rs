@@ -52,6 +52,9 @@ pub type SworkerCert = Vec<u8>;
 /// sworker public key, little-endian-format, 64 bytes vec
 pub type SworkerPubKey = Vec<u8>;
 
+/// sworker anchor, just use SworkerPubKey right now, 64 bytes vec
+pub type SworkerAnchor = SworkerPubKey;
+
 /// sworker signature, little-endian-format, 64 bytes vec
 pub type SworkerSignature = Vec<u8>;
 

@@ -144,13 +144,15 @@ pub fn verify_identity (
     None
 }
 
-pub fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
+pub fn encode_files(fs: &Vec<(Vec<u8>, u64, u64)>) -> Vec<u8> {
     // "["
     let open_square_brackets_bytes: Vec<u8> = [91].to_vec();
-    // "\"hash\":\""
-    let hash_bytes: Vec<u8> = [123, 34, 104, 97, 115,104, 34, 58, 34].to_vec();
+    // "{\"cid\":\""
+    let cid_bytes: Vec<u8> = [123, 34, 99, 105, 100, 34, 58, 34].to_vec();
     // "\",\"size\":"
     let size_bytes: Vec<u8> = [34, 44, 34, 115, 105, 122, 101, 34, 58].to_vec();
+    // ",\"c_block_num\":"
+    let block_num_bytes: Vec<u8> = [44, 34, 99, 95, 98, 108, 111, 99, 107, 95, 110, 117, 109, 34, 58].to_vec();
     // "}"
     let close_curly_brackets_bytes: Vec<u8> = [125].to_vec();
     // ","
@@ -159,11 +161,13 @@ pub fn encode_files(fs: &Vec<(Vec<u8>, u64)>) -> Vec<u8> {
     let close_square_brackets_bytes: Vec<u8> = [93].to_vec();
     let mut rst: Vec<u8> = open_square_brackets_bytes.clone();
     let len = fs.len();
-    for (pos, (hash, size)) in fs.iter().enumerate() {
-        rst.extend(hash_bytes.clone());
+    for (pos, (hash, size, block_num)) in fs.iter().enumerate() {
+        rst.extend(cid_bytes.clone());
         rst.extend(encode_file_root(hash.clone()));
         rst.extend(size_bytes.clone());
         rst.extend(encode_u64_to_string_to_bytes(*size));
+        rst.extend(block_num_bytes.clone());
+        rst.extend(encode_u64_to_string_to_bytes(*block_num));
         rst.extend(close_curly_brackets_bytes.clone());
         if pos != len-1 { rst.extend(comma_bytes.clone()) }
     }

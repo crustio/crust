@@ -148,7 +148,7 @@ impl Trait for Test {
     type CurrencyToBalance = CurrencyToVoteHandler;
     type Event = ();
     type Randomness = TestRandomness;
-    type OrderInspector = TestOrderInspector;
+    type OrderInspector = Swork;
     type MinimumStoragePrice = MinimumStoragePrice;
     type MinimumSorderDuration = MinimumSorderDuration;
     type ClaimLimit = TestClaimLimit;

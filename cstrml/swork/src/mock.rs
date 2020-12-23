@@ -1,20 +1,20 @@
 use crate::*;
 
-use frame_support::{
+pub use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
     traits::{OnInitialize, OnFinalize, Get, TestRandomness}
 };
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
-    testing::Header,
+    testing::Header, ModuleId,
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-use market::{MerchantInfo, SorderStatus, SorderInfo, SorderPunishment};
-use primitives::{MerkleRoot, Hash};
+pub use market_v2::{Replica, FileInfo, UsedInfo};
+use primitives::MerkleRoot;
 use balances::AccountData;
-use std::{cell::RefCell};
+pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;
@@ -27,6 +27,7 @@ thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
     static LEGAL_PK: Vec<u8> = hex::decode("cb8a7b27493749c939da4bba7266f1476bb960e74891817544503212620dce3c94e1c26c622ccb9a840415881deef5412b548f22a7d5e5c05fb412cfdc8e5464").unwrap();
     static LEGAL_CODE: Vec<u8> = hex::decode("781b537d3dcef39dec7b8bce6fdfcd032d8d846640e9b5598b4a9f627188a908").unwrap();
+    static WORKLOAD_MAP: RefCell<HashMap<AccountId, u128>> = RefCell::new(Default::default());
 }
 
 pub struct ExistentialDeposit;
@@ -50,6 +51,21 @@ impl Get<Vec<u8>> for LegalCode {
     }
 }
 
+pub struct WorkloadMap;
+impl Get<HashMap<AccountId, u128>> for WorkloadMap {
+    fn get() -> HashMap<AccountId, u128> {
+        WORKLOAD_MAP.with(|map| map.borrow().clone())
+    }
+}
+impl WorkloadMap {
+    fn set(who: &AccountId, own_workload: u128) {
+        WORKLOAD_MAP.with(|map| {
+            let mut map = map.borrow_mut();
+            map.insert(who.clone(), own_workload);
+        })
+    }
+}
+
 pub struct RegisterInfo {
     pub ias_sig: IASSig,
     pub ias_cert: SworkerCert,
@@ -67,8 +83,8 @@ pub struct ReportWorksInfo {
     pub used: u64,
     pub srd_root: MerkleRoot,
     pub files_root: MerkleRoot,
-    pub added_files: Vec<(MerkleRoot, u64)>,
-    pub deleted_files: Vec<(MerkleRoot, u64)>,
+    pub added_files: Vec<(MerkleRoot, u64, u64)>,
+    pub deleted_files: Vec<(MerkleRoot, u64, u64)>,
     pub sig: SworkerSignature
 }
 
@@ -124,34 +140,59 @@ impl balances::Trait for Test {
 }
 
 parameter_types! {
-    pub const ClaimLimit: u32 = 100;
-    pub const MaxBondsLimit: u32 = 2;
+    /// Unit is pico
+    pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
+    pub const FileDuration: BlockNumber = 1000;
+    pub const InitialReplica: u32 = 4;
+    pub const FileBaseFee: Balance = 1000;
+    pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const ClaimLimit: u32 = 1000;
+    pub const StorageReferenceRatio: u128 = 2;
+    pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
+    pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
+    pub const StakingRatio: Perbill = Perbill::from_percent(80);
+    pub const UsedTrashMaxSize: u128 = 2;
 }
 
-impl market::Trait for Test {
+impl market_v2::Trait for Test {
+    type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
     type CurrencyToBalance = ();
+    type SworkerInterface = Swork;
     type Event = ();
-    type Randomness = TestRandomness;
-    type OrderInspector = Swork;
-    type MinimumStoragePrice = ();
-    type MinimumSorderDuration = ();
+    /// File duration.
+    type FileDuration = FileDuration;
+    type InitialReplica = InitialReplica;
+    type FileBaseFee = FileBaseFee;
+    type FileInitPrice = FileInitPrice;
     type ClaimLimit = ClaimLimit;
-    type WeightInfo = market::weight::WeightInfo;
+    type StorageReferenceRatio = StorageReferenceRatio;
+    type StorageIncreaseRatio = StorageIncreaseRatio;
+    type StorageDecreaseRatio = StorageDecreaseRatio;
+    type StakingRatio = StakingRatio;
+    type UsedTrashMaxSize = UsedTrashMaxSize;
+}
+
+pub struct TestWorksInterface;
+
+impl Works<AccountId> for TestWorksInterface {
+    fn report_works(who: &AccountId, own_workload: u128, _: u128) {
+        WorkloadMap::set(who, own_workload);
+    }
 }
 
 impl Trait for Test {
     type Currency = balances::Module<Self>;
     type Event = ();
-    type Works = ();
+    type Works = TestWorksInterface;
     type MarketInterface = Market;
-    type MaxBondsLimit = MaxBondsLimit;
     type WeightInfo = weight::WeightInfo;
 }
 
 pub type Swork = Module<Test>;
 pub type System = system::Module<Test>;
-pub type Market = market::Module<Test>;
+pub type Market = market_v2::Module<Test>;
+pub type Balances = balances::Module<Test>;
 
 pub struct ExtBuilder {
     code: SworkerCode
@@ -221,17 +262,17 @@ pub fn legal_register_info() -> RegisterInfo {
 }
 
 pub fn legal_work_report() -> ReportWorksInfo {
-    let curr_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
+    let curr_pk = hex::decode("8c04b7ea70bdae811cb246c846bcce9b76d5fcf142359c41f76477eca5f30088e51e66b963b5f4305f39645e305fee1e50f3693bfbccc757c4253f76a362d296").unwrap();
     let prev_pk = hex::decode("").unwrap();
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
     let used: u64 = 2;
-    let added_files: Vec<(Vec<u8>, u64)> = vec![];
-    let deleted_files: Vec<(Vec<u8>, u64)> = vec![];
+    let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let files_root = hex::decode("11").unwrap();
     let srd_root = hex::decode("00").unwrap();
-    let sig = hex::decode("d537cc3578cdc126934efee55ab43741e4f2fa9430b7c92c00fad4e020810e3790b1661f3885b8479c1b9f8d7d81d03766ccaef60bd85ba663390483d50788d2").unwrap();
+    let sig = hex::decode("2b17ff9033173fdebc5f281ba9f7f165e9344560f124eb2ccebd1cc7ea44e295a558f9ad51f3494a40c906f471dab47cc11d3e373250ff861194d123e127dc10").unwrap();
 
     ReportWorksInfo {
         curr_pk,
@@ -248,21 +289,79 @@ pub fn legal_work_report() -> ReportWorksInfo {
     }
 }
 
+pub fn legal_work_report_with_added_and_deleted_files() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 600;
+    legal_wr.added_files = vec![
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1, 503),
+    ];
+    legal_wr.deleted_files = vec![
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1, 503),
+    ];
+    legal_wr.files_root = hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+    legal_wr.sig = hex::decode("1ba214b90d6814f9c7783b0da9581d2bd081df72d5ebc30719abe7b6c2f2640e642d83dbb25548b71c344dc82e473c8b5441f44ddc457195b350effd162ef499").unwrap();
+    legal_wr
+}
+
+pub fn continuous_ab_upgrade_work_report() -> ReportWorksInfo {
+    let mut legal_wr = ab_upgrade_work_report();
+    legal_wr.block_number = 900;
+    legal_wr.added_files = vec![(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 2, 903)];
+    legal_wr.deleted_files = vec![(hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1, 903)];
+    legal_wr.used = 3;
+    legal_wr.sig = hex::decode("c431c0f4fa032ab080e3d2a8d1ee4fbd355c0cf18a096b7ee0945af430fb0970f7668411e150674e3c66b96af22dc17bb0d6e6e4f58ebad218e408d8311dcb9e").unwrap();
+    legal_wr
+}
+
+pub fn ab_upgrade_work_report() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 600;
+    legal_wr.curr_pk = hex::decode("4aeb5997d0adcd9397a30d123b4f3a55f76c864191eb760058cff78d2ab0b5e865defca96b8d39803c5cf88d73315b7365b85607015cf6bcf7690c863d6e106a").unwrap();
+    legal_wr.prev_pk = hex::decode("8c04b7ea70bdae811cb246c846bcce9b76d5fcf142359c41f76477eca5f30088e51e66b963b5f4305f39645e305fee1e50f3693bfbccc757c4253f76a362d296").unwrap();
+    legal_wr.sig = hex::decode("ca2d8c7689ffa5645bb6daa5cd45abb9532945627cc1f14bdacfc7e908d38110292718574a1861502e78e0c8ee320671bc0eb38ce612af3c5914fe8fde957463").unwrap();
+    legal_wr
+}
+
+pub fn ab_upgrade_work_report_files_size_unmatch() -> ReportWorksInfo {
+    let mut legal_wr = ab_upgrade_work_report();
+    legal_wr.added_files = vec![(hex::decode("6aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 10, 606)];
+    legal_wr.sig = hex::decode("7de7dec131d3b78e7a88820b214c4da01be255d4f73db3c060e5f46bfb4293bd1f0a81466f9cdc03ce833782b585f8ed436f2056fdfe38cf2a0c590cec6cb3cd").unwrap();
+    legal_wr
+}
+
+pub fn continuous_work_report_300() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 300;
+    legal_wr.curr_pk = hex::decode("4aeb5997d0adcd9397a30d123b4f3a55f76c864191eb760058cff78d2ab0b5e865defca96b8d39803c5cf88d73315b7365b85607015cf6bcf7690c863d6e106a").unwrap();
+    legal_wr.sig = hex::decode("8d96e41efe97ab7c0006a702769572a5fb6ae008786b08a88df54779ec73b71d86fb49a191996232daaea2c455be01f8fbfad2c452b4218626781290eb3b686f").unwrap();
+
+    legal_wr
+}
+
+pub fn continuous_work_report_600() -> ReportWorksInfo {
+    let mut legal_wr = legal_work_report();
+    legal_wr.block_number = 600;
+    legal_wr.curr_pk = hex::decode("4aeb5997d0adcd9397a30d123b4f3a55f76c864191eb760058cff78d2ab0b5e865defca96b8d39803c5cf88d73315b7365b85607015cf6bcf7690c863d6e106a").unwrap();
+    legal_wr.sig = hex::decode("30f62121d380858855eba279a58632bd3d9092f8b70dd31c0baef6f2a60b9ea15db6914e7698132c94333524aafe61e74f5a07f20514de86dc6d80bbb9cc898f").unwrap();
+
+    legal_wr
+}
+
 pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
-    let curr_pk = hex::decode("7c16c0a0d7a1ccf654aa2925fe56575823972adaa0125ffb843d9a1cae0e1f2ea4f3d820ff59d5631ff873693936ebc6b91d0af22b821299019dbacf40f5791d").unwrap();
+    let curr_pk = hex::decode("8b1412c4eed29d29389f8a66aa61f0c0fdea30c7e384ca8086d72cf84c4b96dd7967f5841ba8b784c4de881fe073b1437051db1ee9ab0fe491df0df3792bce5d").unwrap();
     let prev_pk = hex::decode("").unwrap();
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
     let used: u64 = 402868224;
-    let added_files: Vec<(Vec<u8>, u64)> = [
-        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408),
-        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816)
+    let added_files: Vec<(Vec<u8>, u64, u64)> = [
+        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408, 303),
+        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816, 303)
     ].to_vec();
-    let deleted_files: Vec<(Vec<u8>, u64)> = vec![];
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let files_root = hex::decode("11").unwrap();
     let srd_root = hex::decode("00").unwrap();
-    let sig = hex::decode("b3f78863ec972955d9ca22d444a5475085a4f7975a738aba1eae1d98dd718fc691a77a35b764a148a3a861a4a2ef3279f3d5e25f607c73ca85ea86e1176ba662").unwrap();
+    let sig = hex::decode("9b775ad3a8469b7affacd0252bd5fdaa69a2a22dffec9c428faa5c12fce6886accc19446d1c833d9cd46e4f78d31d2544b91a644702308f9c4211448484ef3a9").unwrap();
 
     ReportWorksInfo {
         curr_pk,
@@ -280,21 +379,21 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
 }
 
 pub fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
-    let curr_pk = hex::decode("819e555a290c4f725739eb03a3e8d0f31db074a6e16abeec3a9a6a7c0379b6de9ad4d7658c44257746d58764e9db9c736d39474199ce53e4edfcc3d5340f1916").unwrap();
+    let curr_pk = hex::decode("f2553682f7b2cab9fa190a6389c3b8b4f415a799209be54bf1e11b6033693adb6a1c2437a24aaa8472b2047b299cd971c51e2a05652f6648b10372751ecea761").unwrap();
     let prev_pk = hex::decode("").unwrap();
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
     let used: u64 = 0;
-    let added_files: Vec<(Vec<u8>, u64)> = [].to_vec();
-    let deleted_files: Vec<(Vec<u8>, u64)> = vec![
-        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
-        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1),
-        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)
+    let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1, 303),
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1, 303),
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1, 303)
     ];
     let files_root = hex::decode("11").unwrap();
     let srd_root = hex::decode("00").unwrap();
-    let sig = hex::decode("3bce32266ddc55a713f67395a75c0cf0ad66aa9d3b102bea0dcd551a374792289e391f1f79a297fa31459c9969b862056840f07b15373f07f43542361b7664b4").unwrap();
+    let sig = hex::decode("227fe53e6e5c9d414e7d062a06232928ecc384bced9bd94746bc625c7e2a13429f323c418d15743600e232cbd3878f29b9eb8d5e6224e3e2cc95a88a93d0c705").unwrap();
 
     ReportWorksInfo {
         curr_pk,
@@ -311,133 +410,272 @@ pub fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
     }
 }
 
-pub fn resuming_work_report() -> ReportWorksInfo {
-    let mut legal_wr = legal_work_report();
-    legal_wr.block_number = 900;
-    legal_wr.curr_pk = hex::decode("8dfc5c61af8b9acf32e2d0eee52666da84cd8a205527a02c97d57220044982e5592ace42cd5e0ad483a3569d81b793723cd28e9973fddfc6c5ca44c95dc91f33").unwrap();
-    legal_wr.sig = hex::decode("577b5c8753cc7ccd8a63604e8b773fdb18b5b82d7926f916d7243f9bfd3bcb12d4b3a1109ee8d1c5d261a39eba8a4869208e14d5e6bd4de6c62e35dbdeb6128f").unwrap();
-    legal_wr
-}
-
-pub fn ab_upgrade_work_report() -> ReportWorksInfo {
-    let mut legal_wr = legal_work_report();
-    legal_wr.block_number = 600;
-    legal_wr.curr_pk = hex::decode("3dd32a6624d1a39af67620fb9221928f6892907456109167a8230b331f662458263805d7db1598b98ed363b594ab6f1a52f2c66a6524d09fbd19f064f02c0a73").unwrap();
-    legal_wr.prev_pk = hex::decode("69a2e1757b143b45246c6a47c1d2fd4db263328ee9e84f7950414a4ce420079eafa07d062f4fd716104040f3a99159e33434218a8c7c3107a9101fb007dead82").unwrap();
-    legal_wr.sig = hex::decode("3949297f56d65adacb6f5837b63a050c2aaf2f5674c425792b37823f78a36254a67a259ab5e03bbfab31d8d716db101036cc42cfb1fbb126c04772763c44486d").unwrap();
-    legal_wr
-}
-
-pub fn legal_work_report_with_added_and_deleted_files() -> ReportWorksInfo {
-    let mut legal_wr = legal_work_report();
-    legal_wr.block_number = 600;
-    legal_wr.added_files = vec![
-        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
+pub fn group_work_report_alice_300() -> ReportWorksInfo {
+    let curr_pk = hex::decode("2b60e057cc5a2177dee185b260a475ee5573a22275583c8c16661fe9781f7101d7a5455ec5f3b0dc8ea5183858337348151b13d908e45fff96d96629ae99f917").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 300;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 57;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = vec![
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 13, 303), // A file
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 7, 303),  // B file
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37, 303)  // C file
     ];
-    legal_wr.deleted_files = vec![
-        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 1),
-    ];
-    legal_wr.files_root = hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-    legal_wr.sig = hex::decode("3949297f56d65adacb6f5837b63a050c2aaf2f5674c425792b37823f78a36254a67a259ab5e03bbfab31d8d716db101036cc42cfb1fbb126c04772763c44486d").unwrap();
-    legal_wr
-}
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("77e4aefd3996b16d4016a78f9f8583f1ff10d28c198254d846737a4390573b3fc88ae425d9abf3f86abd9a8f42376554eab9b392e6631b154f8b7a2fad404807").unwrap();
 
-pub fn continuous_ab_upgrade_work_report() -> ReportWorksInfo {
-    let mut legal_wr = ab_upgrade_work_report();
-    legal_wr.block_number = 900;
-    legal_wr.added_files = vec![(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 2)];
-    legal_wr.deleted_files = vec![(hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 1)];
-    legal_wr.used = 3;
-    legal_wr.sig = hex::decode("d0fb8ec28beea243a550a51b99ae92a046b9829d87783cbc70e86d98ac9cf3b47cfa8148ba4ce6e8ed4352f8fa550437db6effe5f31a3ada755c0f783c83f2c3").unwrap();
-    legal_wr
-}
-
-pub fn continuous_work_report_300() -> ReportWorksInfo {
-    let mut legal_wr = legal_work_report();
-    legal_wr.block_number = 300;
-    legal_wr.curr_pk = hex::decode("8a71e8588914aeaeaebd27fbf315486398d76d4d32c2169b174a022f671e2e5bd7c9acb1d9259edf9f362e2af29f2df148c5c97eb1f2aec616a5d3c899a39a36").unwrap();
-    legal_wr.sig = hex::decode("38a4bf8a17b9578c3ac4758e542f10836b7609f698ebadc76fe9d6314270460ed3adaab60f2c08617fc9307c703192c4b831393a714f88dc62013f0123c19ec9").unwrap();
-
-    legal_wr
-}
-
-pub fn continuous_work_report_600() -> ReportWorksInfo {
-    let mut legal_wr = legal_work_report();
-    legal_wr.block_number = 600;
-    legal_wr.curr_pk = hex::decode("8a71e8588914aeaeaebd27fbf315486398d76d4d32c2169b174a022f671e2e5bd7c9acb1d9259edf9f362e2af29f2df148c5c97eb1f2aec616a5d3c899a39a36").unwrap();
-    legal_wr.sig = hex::decode("e435a3f626c101ed377eea85271cb47f249ab2d90e17a606a2211dd760ee84de6444d9ac200bffc7f11728439ea866881fb3c497b5b8f2a99ce9e91fb69d4373").unwrap();
-
-    legal_wr
-}
-
-pub fn register(who: &AccountId, pk: &SworkerPubKey, code: &SworkerCode) {
-    Swork::maybe_upsert_id(who, pk, code);
-}
-
-pub fn add_wr(pk: &SworkerPubKey, wr: &WorkReport) {
-    <self::WorkReports>::insert(pk.clone(), wr.clone());
-    <self::ReportedInSlot>::insert(pk.clone(), wr.report_slot, true);
-}
-
-pub fn add_pending_sorders(who: &AccountId) {
-    let files: Vec<Vec<u8>> = [
-        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(),
-        hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(),
-        hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()
-    ].to_vec();
-
-    for (idx, file) in files.iter().enumerate() {
-        insert_sorder(who, file, idx as u8, 1000, OrderStatus::Pending);
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
     }
 }
 
-pub fn add_success_sorders(who: &AccountId) {
-    let files: Vec<Vec<u8>> = [
-        hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(),
-        hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(),
-    ].to_vec();
+pub fn group_work_report_alice_1500() -> ReportWorksInfo {
+    let curr_pk = hex::decode("2b60e057cc5a2177dee185b260a475ee5573a22275583c8c16661fe9781f7101d7a5455ec5f3b0dc8ea5183858337348151b13d908e45fff96d96629ae99f917").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 1500;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 0;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 13, 1503), // A file
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 7, 1503),  // B file
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37, 1503)  // C file
+    ];
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("0d56da4b47066e76b83125c155efadf73faa79c07158d956aa137ae5235b9877caa9c40c13ebf073fd8af7c3c16c55476b864e17a00a7068e4bb7d12187d9114").unwrap();
 
-    for (idx, file) in files.iter().enumerate() {
-        insert_sorder(who, file, idx as u8, 1000, OrderStatus::Success);
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
     }
 }
 
-fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
-    let mut file_map = Market::merchants(who).unwrap_or_default().file_map;
-    let sorder_id: Hash = Hash::repeat_byte(rd);
-    let sorder_info = SorderInfo {
-        file_identifier: f_id.clone(),
-        file_size: 0,
-        created_on: 0,
-        merchant: who.clone(),
-        client: who.clone(),
-        amount: 10,
-        duration: 50
+pub fn group_work_report_bob_300() -> ReportWorksInfo {
+    let curr_pk = hex::decode("9585e9b85d4da275029b62757d1a7e7e4129b63e49f4c01e75d0f4e3940b4fa8d04c85179ac20a458dbf0a5e849a523cd3a1af6b7eb834c0d8468014a4eb483a").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 300;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 99;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = vec![
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 7, 303),  // B file
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37, 303), // C file
+        (hex::decode("66a706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b110").unwrap(), 55, 303) // D file
+    ];
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("31cbede1b8959257833a594bd426ab6d0831d446cc4b091c42c10d7b7a2d6e12e5ab2f8125fc7cbf65548d7d6a8e0bb96f78331b6cf6b225f864668bf12f78a1").unwrap();
+
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
+    }
+}
+
+pub fn group_work_report_bob_600() -> ReportWorksInfo {
+    let curr_pk = hex::decode("9585e9b85d4da275029b62757d1a7e7e4129b63e49f4c01e75d0f4e3940b4fa8d04c85179ac20a458dbf0a5e849a523cd3a1af6b7eb834c0d8468014a4eb483a").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 600;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 55;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 7, 603),  // B file
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37, 603)  // C file
+    ];
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("f39b39de264977e0325d17fb015890e3b5c17e8327f899d3e43577e083603b1f5723a35209905053db0f36b650b0896d1ab26d1be22a5ba023d443f1f205ac14").unwrap();
+
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
+    }
+}
+
+pub fn group_work_report_eve_300() -> ReportWorksInfo {
+    let curr_pk = hex::decode("09a4fcc750b10131abba450907abab25c79802e5ae8a6f0e88bebff899bc4dc505cb984066e9e1c115411f7e7a5095cf1eef6e084c6081ad611a801c26df8c4d").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 300;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 114;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = vec![
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37, 303), // C file
+        (hex::decode("66a706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b110").unwrap(), 55, 303), // D file
+        (hex::decode("33cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae12e").unwrap(), 22, 303)  // E file
+    ];
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("8730b5928c4c0c2e74e723266b0afb2923a689c53570943915960442d89ef5ef663f8993bb9792c2a44eb50836380cb0ddbf3d3c24e85eabcc860dcd6f65d75d").unwrap();
+
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
+    }
+}
+
+pub fn group_work_report_eve_600() -> ReportWorksInfo {
+    let curr_pk = hex::decode("09a4fcc750b10131abba450907abab25c79802e5ae8a6f0e88bebff899bc4dc505cb984066e9e1c115411f7e7a5095cf1eef6e084c6081ad611a801c26df8c4d").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 600;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 0;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37, 603), // C file
+        (hex::decode("66a706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b110").unwrap(), 55, 603), // D file
+        (hex::decode("33cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae12e").unwrap(), 22, 603)  // E file
+    ];
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("9270a2c303bd822495cc26ddd10ffc6df85e0c9e741a0504f4452e07b8a69455e5df71fbfd5cf278bb9994c67a3010bc619c92e9020c70b7c882c03b40b06e16").unwrap();
+
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
+    }
+}
+
+pub fn register(pk: &SworkerPubKey, code: SworkerCode) {
+    Swork::insert_pk_info(pk.clone(), code);
+}
+
+pub fn register_identity(who: &AccountId, pk: &SworkerPubKey, anchor: &SworkerAnchor) {
+    <self::PubKeys>::mutate(pk, |pk_info| {
+        pk_info.anchor = Some(anchor.clone());
+    });
+    <self::Identities<Test>>::insert(who, Identity {
+        anchor: anchor.clone(),
+        group: None
+    });
+}
+
+pub fn add_wr(anchor: &SworkerAnchor, wr: &WorkReport) {
+    <self::WorkReports>::insert(anchor.clone(), wr.clone());
+    <self::ReportedInSlot>::insert(anchor.clone(), wr.report_slot, true);
+}
+
+pub fn add_not_live_files() {
+    let files: Vec<(Vec<u8>, u64)> = [
+        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 100),
+        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 100),
+        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 100),
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 13), // A file
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 7),  // B file
+        (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37),  // C file
+        (hex::decode("66a706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b110").unwrap(), 55), // D file
+        (hex::decode("33cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae12e").unwrap(), 22)  // E file
+    ].to_vec();
+
+    for (file, file_size) in files.iter() {
+        let used_info = UsedInfo {
+            used_size: *file_size,
+            anchors: <BTreeSet<SworkerAnchor>>::new()
+        };
+        insert_file(file, 1000, 1000, 1000, 4, 0, vec![], *file_size, used_info);
+    }
+
+    let storage_pot = Market::storage_pot();
+    let _ = Balances::make_free_balance_be(&storage_pot, 20000);
+}
+
+pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
+    let files: Vec<(Vec<u8>, u64)> = [
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 100),
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 100)
+    ].to_vec();
+
+    let replica_info = Replica {
+        who: who.clone(),
+        valid_at: 200,
+        anchor: anchor.clone(),
     };
-    let sorder_status = SorderStatus {
-        completed_on: 0,
+    for (file, file_size) in files.iter() {
+        let mut anchors = <BTreeSet<SworkerAnchor>>::new();
+        anchors.insert(anchor.clone());
+        let used_info = UsedInfo {
+            used_size: *file_size,
+            anchors
+        };
+        insert_file(file, 200, 12000, 1000, 4, 0, vec![replica_info.clone()], *file_size, used_info);
+    }
+}
+
+fn insert_file(f_id: &MerkleRoot, claimed_at: u32, expired_on: u32, amount: Balance, expected_replica_count: u32, reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+    let file_info = FileInfo {
+        file_size,
         expired_on,
-        status: os,
-        claimed_at: 0
+        claimed_at,
+        amount,
+        expected_replica_count,
+        reported_replica_count,
+        replicas
     };
-    if let Some(orders) = file_map.get_mut(f_id) {
-        orders.push(sorder_id.clone())
-    } else {
-        file_map.insert(f_id.clone(), vec![sorder_id.clone()]);
-    }
 
-    let provision = MerchantInfo {
-        address_info: vec![],
-        storage_price: 1,
-        file_map
-    };
-    <market::Merchants<Test>>::insert(who, provision);
-    <market::SorderInfos<Test>>::insert(sorder_id.clone(), sorder_info);
-    <market::SorderStatuses<Test>>::insert(sorder_id.clone(), sorder_status);
-    let punishment = SorderPunishment {
-        success: 0,
-        failed: 0,
-        updated_at: 50
-    };
-    <market::SorderPunishments<Test>>::insert(sorder_id, punishment);
+    <market_v2::Files<Test>>::insert(f_id, (file_info, used_info));
 }

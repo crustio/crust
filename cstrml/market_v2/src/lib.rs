@@ -8,8 +8,7 @@ use frame_support::{
     storage::migration::remove_storage_prefix,
     traits::{
         Currency, ReservableCurrency, Get, ExistenceRequirement::AllowDeath,
-    },
-    weights::Weight
+    }
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_signed};
@@ -21,12 +20,17 @@ use sp_runtime::{
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
 use primitives::{
     MerkleRoot, BlockNumber,
     traits::{TransferrableCurrency, MarketInterface, SworkerInterface}, SworkerAnchor
 };
 
-pub(crate) const LOG_TARGET: &'static str = "market";
 
 #[macro_export]
 macro_rules! log {
@@ -446,6 +450,7 @@ decl_module! {
             Self::upsert_new_file_info(&cid, extend_replica, &storage_amount, &curr_bn, file_size);
 
             // 7. Update storage price.
+            #[cfg(not(test))]
             Self::update_storage_price();
 
             Self::deposit_event(RawEvent::FileSuccess(who, Self::files(cid).unwrap().0));
@@ -715,7 +720,7 @@ impl<T: Trait> Module<T> {
         ledger.reward + *value <= ledger.pledge
     }
 
-    fn update_storage_price() {
+    pub fn update_storage_price() {
         let total = T::SworkerInterface::get_free_plus_used();
         let mut file_price = Self::file_price();
         if let Some(storage_ratio) = total.checked_div(Self::files_size()) {

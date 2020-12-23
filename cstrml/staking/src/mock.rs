@@ -16,8 +16,9 @@ use sp_staking::{
     offence::{OffenceDetails, OnOffenceHandler},
     SessionIndex,
 };
-use std::{cell::RefCell, collections::HashSet};
+use std::{cell::RefCell, collections::HashSet, collections::btree_set::BTreeSet};
 use balances::AccountData;
+use primitives::{traits::MarketInterface, MerkleRoot, SworkerAnchor};
 
 /// The AccountId alias in this test module.
 pub type AccountId = u64;
@@ -204,12 +205,16 @@ impl swork::Works<AccountId> for TestStaking {
     }
 }
 
+impl<AID> MarketInterface<AID> for TestStaking {
+    fn upsert_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32, _: &Option<BTreeSet<AID>>) -> bool { false }
+    fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> bool { false }
+}
+
 impl swork::Trait for Test {
     type Currency = Balances;
     type Event = ();
     type Works = TestStaking;
-    type MarketInterface = ();
-    type MaxBondsLimit = ();
+    type MarketInterface = TestStaking;
     type WeightInfo = swork::weight::WeightInfo;
 }
 
@@ -631,46 +636,26 @@ pub fn payout_all_stakers(era_index: EraIndex) {
 }
 
 fn init_swork_setup() {
-    let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6];
+    let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
     let id_map: Vec<(u64, Vec<u8>)> = identities.iter().map(|account| (*account, account.to_be_bytes().to_vec())).collect();
     let code: Vec<u8> = vec![];
 
     for (id, pk) in id_map {
-        <swork::IdBonds<Test>>::insert(id, vec![pk.clone()]);
-        <swork::Identities>::insert(pk.clone(), code.clone());
+        <swork::PubKeys>::insert(pk.clone(), swork::PKInfo {
+            code: code.clone(),
+            anchor: Some(pk.clone())
+        });
+        <swork::Identities<Test>>::insert(id, swork::Identity {
+            anchor: pk.clone(),
+            group: None
+        });
         <swork::WorkReports>::insert(pk.clone(), swork::WorkReport {
             report_slot: 0,
             used: 0,
             free: 20000000000000,
-            files: Default::default(),
             reported_files_size: 0,
             reported_srd_root: vec![],
             reported_files_root: vec![]
         });
     }
-
-    // Test star network
-    let pk_100 = 100_u64.to_be_bytes().to_vec();
-    let pk_101 = 101_u64.to_be_bytes().to_vec();
-    <swork::Identities>::insert(pk_100.clone(), code.clone());
-    <swork::Identities>::insert(pk_101.clone(), code.clone());
-    <swork::IdBonds<Test>>::insert(100, vec![pk_100.clone(), pk_101.clone()]);
-    <swork::WorkReports>::insert(pk_100.clone(), swork::WorkReport {
-        report_slot: 0,
-        used: 0,
-        free: 10000000000000,
-        files: Default::default(),
-        reported_files_size: 0,
-        reported_srd_root: vec![],
-        reported_files_root: vec![]
-    });
-    <swork::WorkReports>::insert(pk_101.clone(), swork::WorkReport {
-        report_slot: 0,
-        used: 0,
-        free: 10000000000000,
-        files: Default::default(),
-        reported_files_size: 0,
-        reported_srd_root: vec![],
-        reported_files_root: vec![]
-    });
 }

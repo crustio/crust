@@ -83,8 +83,8 @@ pub struct WorkReport {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PKInfo {
-    code: SworkerCode,
-    anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
+    pub code: SworkerCode,
+    pub anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -92,8 +92,8 @@ pub struct PKInfo {
 pub struct Identity<AccountId> {
     /// The unique identity associated to one account id.
     /// During the AB upgrade, this anchor would keep and won't change.
-    anchor: SworkerAnchor,
-    group: Option<AccountId>
+    pub anchor: SworkerAnchor,
+    pub group: Option<AccountId>
 }
 
 /// An event handler for reporting works
@@ -600,12 +600,6 @@ impl<T: Trait> Module<T> {
         PubKeys::remove(pk);
     }
 
-    /// This function will (maybe) remove pub_keys
-    fn chill_identity(who: &T::AccountId) {
-        // 1. Remove from `identities`
-        <Identities<T>>::remove(who);
-    }
-
     /// This function will chill WorkReports and ReportedInSlot
     fn chill_anchor(anchor: &SworkerAnchor) {
         WorkReports::remove(anchor);
@@ -673,11 +667,10 @@ impl<T: Trait> Module<T> {
         changed_files: &Vec<(MerkleRoot, u64, u64)>,
         anchor: &SworkerPubKey,
         is_added: bool) -> Vec<(MerkleRoot, u64, u64)> {
-        let mut real_files = vec![];
 
         // 1. Loop changed files
         if is_added {
-            real_files = changed_files.iter().filter_map(|(cid, size, valid_at)| {
+            changed_files.iter().filter_map(|(cid, size, valid_at)| {
                 let mut members = None;
                 if let Some(identity) = Self::identities(reporter) {
                     if let Some(owner) = identity.group {
@@ -689,19 +682,18 @@ impl<T: Trait> Module<T> {
                 } else {
                     None
                 }
-            }).collect();
+            }).collect()
         } else {
             let curr_bn = Self::get_current_block_number();
-            real_files = changed_files.iter().filter_map(|(cid, size, _)| {
+            changed_files.iter().filter_map(|(cid, size, _)| {
                 // 2. If mapping to storage orders
                 if T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn) {
                     Some((cid.clone(), *size, curr_bn as u64))
                 } else {
                     None
                 }
-            }).collect();
+            }).collect()
         }
-        real_files
     }
 
     /// Get workload by reporter account,

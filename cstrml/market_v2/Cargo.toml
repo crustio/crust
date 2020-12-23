@@ -50,3 +50,4 @@ hex = '0.4.2'
 swork = { version = "0.10.0", package = 'cstrml-swork', path = '../swork' }
 balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
 frame-benchmarking = { version = '2.0.0' }
+keyring = { package = "sp-keyring", version = '2.0.0' }

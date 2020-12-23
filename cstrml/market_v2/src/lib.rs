@@ -31,7 +31,6 @@ use primitives::{
     traits::{TransferrableCurrency, MarketInterface, SworkerInterface}, SworkerAnchor
 };
 
-pub(crate) const LOG_TARGET: &'static str = "market";
 
 #[macro_export]
 macro_rules! log {
@@ -721,7 +720,7 @@ impl<T: Trait> Module<T> {
         ledger.reward + *value <= ledger.pledge
     }
 
-    fn update_storage_price() {
+    pub fn update_storage_price() {
         let total = T::SworkerInterface::get_free_plus_used();
         let mut file_price = Self::file_price();
         if let Some(storage_ratio) = total.checked_div(Self::files_size()) {
@@ -810,11 +809,6 @@ impl<T: Trait> Module<T> {
         });
 
         is_counted
-    }
-
-    #[cfg(test)]
-    pub fn test_update_storage_price() {
-        Self::update_storage_price()
     }
 }
 

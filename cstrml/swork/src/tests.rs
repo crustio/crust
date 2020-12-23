@@ -1319,7 +1319,7 @@ fn join_group_should_failed_due_to_invalid_situations() {
                 group: Some(alice.clone())
             });
 
-            // bob's used is 100
+            // bob's used is not 0
             assert_noop!(Swork::join_group(
                 Origin::signed(bob.clone()),
                 alice.clone()
@@ -1890,6 +1890,24 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::used_trash_i(&file_c).is_some(), true);
             assert_eq!(Market::used_trash_i(&file_d).is_some(), true);
             assert_eq!(Market::used_trash_ii(&file_e).is_some(), true);
+
+            assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
+                report_slot: 300,
+                used: 57,
+                free: 4294967296,
+                reported_files_size: 57,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
+                report_slot: 600,
+                used: 55,
+                free: 4294967296,
+                reported_files_size: 55,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
 
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),

@@ -259,30 +259,6 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         assert_eq!(Balances::free_balance(&staking_pot), 3200);
         assert_eq!(Balances::free_balance(&storage_pot), 800);
 
-        run_to_block(350);
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
-        ));
-
-        assert_eq!(Market::files(&cid).unwrap_or_default(), (
-            FileInfo {
-                file_size,
-                expired_on: 50,
-                claimed_at: 50,
-                amount: 1200, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
-                reported_replica_count: 0,
-                replicas: vec![]
-            },
-            UsedInfo {
-                used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
-            })
-        );
-        assert_eq!(Balances::free_balance(&staking_pot), 4800);
-        assert_eq!(Balances::free_balance(&storage_pot), 1200);
-
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
 
@@ -309,7 +285,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1400,
                 claimed_at: 400,
-                amount: 1200, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 800, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -333,7 +309,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1400,
                 claimed_at: 500,
-                amount: 1080,
+                amount: 720,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -360,7 +336,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1600,
                 claimed_at: 600,
-                amount: 1360,
+                amount: 1040,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -387,7 +363,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1800,
                 claimed_at: 800,
-                amount: 1528,
+                amount: 1272,
                 expected_replica_count: 8,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -543,7 +519,6 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
-        // pledge is 60 < 121 reward
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
@@ -635,6 +610,12 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
             })
         );
 
+        // pledge is 60 < 121 reward
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 60,
+            reward: 0
+        });
+
         run_to_block(903);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 600, true);
         assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 6000));
@@ -683,7 +664,6 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
-        // pledge is 60 < 121 reward
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
         assert_ok!(Market::place_storage_order(
@@ -1500,7 +1480,7 @@ fn update_price_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         // 0 / 0 => None => decrease
-        Market::test_update_storage_price();
+        Market::update_storage_price();
         assert_eq!(Market::file_price(), 990);
 
         run_to_block(50);
@@ -1508,23 +1488,23 @@ fn update_price_should_work() {
         <swork::Free>::put(10000);
         <swork::Used>::put(10000);
         assert_eq!(Swork::get_free_plus_used(), 20000);
-        Market::test_update_storage_price();
+        Market::update_storage_price();
         assert_eq!(Market::file_price(), 980);
 
         // first class storage is 11000 => increase 1%
         FilesSize::put(11000);
-        Market::test_update_storage_price();
+        Market::update_storage_price();
         assert_eq!(Market::file_price(), 990);
 
         // price is 40 and cannot decrease
         <FilePrice<Test>>::put(40);
         FilesSize::put(10);
-        Market::test_update_storage_price();
+        Market::update_storage_price();
         assert_eq!(Market::file_price(), 40);
 
         // price is 40 and will increase by 1
         FilesSize::put(20000);
-        Market::test_update_storage_price();
+        Market::update_storage_price();
         assert_eq!(Market::file_price(), 41);
     });
 }

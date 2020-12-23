@@ -14,18 +14,18 @@ safe-mix = { version = "1.0.0", default-features = false }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false, features = ["derive"] }
 
 # substrate frame dependencies
-frame-support = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
-frame-system = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
-pallet-session = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", features = ["historical"], default-features = false }
-pallet-authorship = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
+pallet-session = { git = "https://github.com/paritytech/substrate", branch = "master", features = ["historical"], default-features = false }
+pallet-authorship = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
 
 # substrate primitives
-sp-keyring = { optional = true, git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
-sp-std = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
-sp-io ={ git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
-sp-staking = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false }
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72", default-features = false, optional = true }
+sp-keyring = { optional = true, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-std = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
+sp-io ={ git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
+sp-staking = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false, optional = true }
 rand_chacha = { version = "0.2", default-features = false }
 
 # crust runtime modules
@@ -33,13 +33,13 @@ swork = { version = "0.10.0", package = "cstrml-swork", path = "../swork", defau
 primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "master" }
 balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
-pallet-timestamp = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
+pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # private crate inside substrate
-substrate-test-utils = { git = "https://github.com/paritytech/substrate", rev = "532cce0118fe7a64168413e638b177e7e144ef72" }
+substrate-test-utils = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
 [features]
 equalize = []

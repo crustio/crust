@@ -717,6 +717,18 @@ impl market::Config for Runtime {
     type WeightInfo = market::weight::WeightInfo;
 }
 
+impl cumulus_parachain_upgrade::Config for Runtime {
+    type Event = Event;
+    type OnValidationData = ();
+}
+
+impl cumulus_message_broker::Config for Runtime {
+    type DownwardMessageHandlers = ();
+    type HrmpMessageHandlers = ();
+}
+
+impl parachain_info::Config for Runtime {}
+
 construct_runtime! {
     pub enum Runtime where
         Block = Block,
@@ -773,6 +785,10 @@ construct_runtime! {
 
         // Token candy
         Candy: candy::{Module, Call, Storage, Event<T>},
+
+		ParachainUpgrade: cumulus_parachain_upgrade::{Module, Call, Storage, Inherent, Event},
+		MessageBroker: cumulus_message_broker::{Module, Storage, Call, Inherent},
+		ParachainInfo: parachain_info::{Module, Storage, Config},
     }
 }
 
@@ -1008,3 +1024,5 @@ impl_runtime_apis! {
         }
     }
 }
+
+cumulus_runtime::register_validate_block!(Block, Executive);

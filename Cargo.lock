@@ -974,7 +974,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "crust"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "crust-rpc",
  "crust-runtime",
@@ -1012,7 +1012,7 @@ dependencies = [
 
 [[package]]
 name = "crust-rpc"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "crust-runtime",
  "cst-primitives",
@@ -1040,7 +1040,7 @@ dependencies = [
 
 [[package]]
 name = "crust-runtime"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
@@ -1089,7 +1089,6 @@ dependencies = [
  "sp-io 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sp-offchain",
  "sp-runtime 2.0.0 (git+https://github.com/paritytech/substrate)",
- "sp-runtime-interface 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sp-session",
  "sp-staking",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate)",
@@ -1131,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "cst-primitives"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -1143,7 +1142,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-balances"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cst-primitives",
  "frame-benchmarking",
@@ -1160,7 +1159,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-candy"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -1175,7 +1174,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-market"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
@@ -1196,7 +1195,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-staking"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
@@ -1222,7 +1221,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-swork"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "base64 0.12.3",
  "cst-primitives",

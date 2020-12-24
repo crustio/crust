@@ -50,7 +50,6 @@ std = [
     'sp-std/std',
     'frame-system/std',
     'sp-runtime-interface/std',
-    'market/std',
     'primitives/std',
     'webpki/std'
 ]

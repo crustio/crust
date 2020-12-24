@@ -5,7 +5,7 @@ use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     StorageValue, IterableStorageMap,
     traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize, TestRandomness},
-    weights::{Weight, constants::RocksDbWeight},
+    weights::constants::RocksDbWeight,
 };
 use sp_core::{crypto::key_types, H256};
 use sp_io;
@@ -113,10 +113,8 @@ impl FindAuthor<u64> for Author11 {
 pub struct Test;
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
-    pub const MaximumBlockWeight: Weight = 1024;
-    pub const MaximumBlockLength: u32 = 2 * 1024;
-    pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
+
 impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
@@ -130,19 +128,15 @@ impl frame_system::Config for Test {
     type Header = Header;
     type Event = ();
     type BlockHashCount = BlockHashCount;
-    type MaximumBlockWeight = MaximumBlockWeight;
     type DbWeight = RocksDbWeight;
-    type BlockExecutionWeight = ();
-    type ExtrinsicBaseWeight = ();
-    type MaximumExtrinsicWeight = MaximumBlockWeight;
-    type MaximumBlockLength = MaximumBlockLength;
-    type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
     type PalletInfo = ();
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
+    type BlockWeights = ();
+    type BlockLength = ();
 }
 parameter_types! {
     pub const TransferFee: Balance = 0;

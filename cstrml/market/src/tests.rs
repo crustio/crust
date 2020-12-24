@@ -14,7 +14,7 @@ fn register_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
-        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let merchant = MERCHANT;
         let pledge_pot = Market::pledge_pot();
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
@@ -44,7 +44,7 @@ fn register_should_fail_due_to_insufficient_currency() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 100);
         assert_noop!(
             Market::register(
@@ -65,7 +65,7 @@ fn register_should_fail_due_to_double_register() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
-        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 70));
         assert_noop!(
@@ -88,7 +88,7 @@ fn pledge_extra_should_fail_due_to_merchant_not_register() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_noop!(
             Market::pledge_extra(
@@ -110,7 +110,7 @@ fn cut_pledge_should_fail_due_to_reward() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -148,11 +148,12 @@ fn place_storage_order_should_work() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid =
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
@@ -196,11 +197,12 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
@@ -392,11 +394,12 @@ fn calculate_payout_should_work() {
         // generate 50 blocks first
         run_to_block(50);
  
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
@@ -508,13 +511,15 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
+
         assert_eq!(Balances::free_balance(&staking_pot), 0);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
@@ -653,13 +658,15 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
+
         assert_eq!(Balances::free_balance(&staking_pot), 0);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
@@ -759,11 +766,11 @@ fn calculate_payout_should_work_in_complex_timeline() {
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let source = Sr25519Keyring::Alice.to_account_id();
-        let merchant = Sr25519Keyring::Bob.to_account_id();
-        let charlie = Sr25519Keyring::Charlie.to_account_id();
-        let dave = Sr25519Keyring::Dave.to_account_id();
-        let eve = Sr25519Keyring::Eve.to_account_id();
+        let source = ALICE;
+        let merchant = BOB;
+        let charlie = CHARLIE;
+        let dave = DAVE;
+        let eve = EVE;
 
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
@@ -1086,11 +1093,13 @@ fn calculate_payout_should_fail_due_to_not_live() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
+
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
@@ -1168,15 +1177,16 @@ fn calculate_payout_should_work_for_more_replicas() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+        let charlie = CHARLIE;
+        let dave = DAVE;
+        let eve = EVE;
+        let ferdie = FERDIE;
+
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
-        let charlie = Sr25519Keyring::Charlie.to_account_id();
-        let dave = Sr25519Keyring::Dave.to_account_id();
-        let eve = Sr25519Keyring::Eve.to_account_id();
-        let ferdie = Sr25519Keyring::Ferdie.to_account_id();
         let _ = Balances::make_free_balance_be(&source, 20000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
         for who in merchants.iter() {
@@ -1347,7 +1357,6 @@ fn calculate_payout_should_work_for_more_replicas() {
     });
 }
 
-
 /// Trash test case
 #[test]
 fn clear_trash_should_work() {
@@ -1355,7 +1364,9 @@ fn clear_trash_should_work() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = Sr25519Keyring::Alice.to_account_id();
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid1 =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let cid2 =
@@ -1370,7 +1381,6 @@ fn clear_trash_should_work() {
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b665").unwrap();
         let file_lists = vec![cid1.clone(), cid2.clone(), cid3.clone(), cid4.clone(), cid5.clone(), cid6.clone()];
         let file_size = 100; // should less than merchant
-        let merchant = Sr25519Keyring::Bob.to_account_id();
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 

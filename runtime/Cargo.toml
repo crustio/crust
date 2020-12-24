@@ -2,7 +2,7 @@
 authors = ['crustio']
 edition = '2018'
 name = 'crust-runtime'
-version = '0.10.0'
+version = '0.11.0'
 build = 'build.rs'
 license = "GPL-3.0"
 homepage = "https://crust.network"
@@ -70,12 +70,12 @@ sp-version = { default-features = false, git = "https://github.com/paritytech/su
 sp-runtime-interface = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # crust runtime modules
-swork = { version = "0.10.0", package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
-staking = { version = "0.10.0", package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
-market = { version = "0.10.0", package = 'cstrml-market', path = '../cstrml/market', default-features = false }
-primitives = { version = "0.10.0", package = 'cst-primitives', path = '../primitives', default-features = false }
-balances = { version = "0.10.0", package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
-candy = { version = "0.10.0", package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
+swork = { version = "0.11.0", package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
+staking = { version = "0.11.0", package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
+market = { version = "0.11.0", package = 'cstrml-market', path = '../cstrml/market', default-features = false }
+primitives = { version = "0.11.0", package = 'cst-primitives', path = '../primitives', default-features = false }
+balances = { version = "0.11.0", package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
+candy = { version = "0.11.0", package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
 
 [features]
 default = ['std']

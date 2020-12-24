@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-staking"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -29,12 +29,12 @@ frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch =
 rand_chacha = { version = "0.2", default-features = false }
 
 # crust runtime modules
-swork = { version = "0.10.0", package = "cstrml-swork", path = "../swork", default-features = false }
-primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
+swork = { version = "0.11.0", package = "cstrml-swork", path = "../swork", default-features = false }
+primitives = { version = "0.11.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/substrate", branch = "master" }
-balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
+balances = { version = "0.11.0", package = 'cstrml-balances', path = '../balances' }
 pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "master" }
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
 

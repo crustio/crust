@@ -1,6 +1,6 @@
 [package]
 name = 'crust'
-version = '0.10.0'
+version = '0.11.0'
 authors = ['crustio']
 build = 'build.rs'
 edition = '2018'
@@ -45,11 +45,11 @@ frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", bran
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # crust runtime modules
-crust-runtime = { path = '../runtime', version = '0.10.0' }
-cstrml-staking = { path = '../cstrml/staking', version = '0.10.0' }
-cstrml-swork = { path = '../cstrml/swork', version = '0.10.0' }
-primitives = { package = 'cst-primitives', path = '../primitives', version = '0.10.0' }
-crust-rpc = { path =  '../rpc', version = '0.10.0' }
+crust-runtime = { path = '../runtime', version = '0.11.0' }
+cstrml-staking = { path = '../cstrml/staking', version = '0.11.0' }
+cstrml-swork = { path = '../cstrml/swork', version = '0.11.0' }
+primitives = { package = 'cst-primitives', path = '../primitives', version = '0.11.0' }
+crust-rpc = { path =  '../rpc', version = '0.11.0' }
 
 [build-dependencies]
 substrate-build-script-utils = { git = "https://github.com/paritytech/substrate", branch = "master" }

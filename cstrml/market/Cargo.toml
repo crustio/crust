@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-market"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -26,7 +26,7 @@ sp-std = { default-features = false, git = "https://github.com/paritytech/substr
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false, optional = true }
 
 # crust runtime modules
-primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
+primitives = { version = "0.11.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [features]
 default = ['std']
@@ -47,7 +47,7 @@ runtime-benchmarks = [
 
 [dev-dependencies]
 hex = '0.4.2'
-swork = { version = "0.10.0", package = 'cstrml-swork', path = '../swork' }
-balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
+swork = { version = "0.11.0", package = 'cstrml-swork', path = '../swork' }
+balances = { version = "0.11.0", package = 'cstrml-balances', path = '../balances' }
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
 keyring = { package = "sp-keyring", version = '2.0.0' }

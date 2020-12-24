@@ -5,7 +5,7 @@ use frame_support::{
     assert_ok, impl_outer_origin, parameter_types,
     StorageValue, IterableStorageMap,
     traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize, TestRandomness},
-    weights::{Weight, constants::RocksDbWeight},
+    weights::constants::RocksDbWeight,
 };
 use sp_core::{crypto::key_types, H256};
 use sp_io;
@@ -113,11 +113,9 @@ impl FindAuthor<u64> for Author11 {
 pub struct Test;
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
-    pub const MaximumBlockWeight: Weight = 1024;
-    pub const MaximumBlockLength: u32 = 2 * 1024;
-    pub const AvailableBlockRatio: Perbill = Perbill::one();
 }
-impl frame_system::Trait for Test {
+
+impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
     type Call = ();
@@ -130,25 +128,21 @@ impl frame_system::Trait for Test {
     type Header = Header;
     type Event = ();
     type BlockHashCount = BlockHashCount;
-    type MaximumBlockWeight = MaximumBlockWeight;
     type DbWeight = RocksDbWeight;
-    type BlockExecutionWeight = ();
-    type ExtrinsicBaseWeight = ();
-    type MaximumExtrinsicWeight = MaximumBlockWeight;
-    type MaximumBlockLength = MaximumBlockLength;
-    type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
     type PalletInfo = ();
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
+    type BlockWeights = ();
+    type BlockLength = ();
 }
 parameter_types! {
     pub const TransferFee: Balance = 0;
     pub const CreationFee: Balance = 0;
 }
-impl balances::Trait for Test {
+impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = ();
@@ -163,7 +157,7 @@ parameter_types! {
     pub const UncleGenerations: u64 = 0;
     pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(25);
 }
-impl pallet_session::Trait for Test {
+impl pallet_session::Config for Test {
     type Event = ();
     type ValidatorId = AccountId;
     type ValidatorIdOf = crate::StashOf<Test>;
@@ -176,11 +170,11 @@ impl pallet_session::Trait for Test {
     type WeightInfo = ();
 }
 
-impl pallet_session::historical::Trait for Test {
+impl pallet_session::historical::Config for Test {
     type FullIdentification = crate::Exposure<AccountId, Balance>;
     type FullIdentificationOf = crate::ExposureOf<Test>;
 }
-impl pallet_authorship::Trait for Test {
+impl pallet_authorship::Config for Test {
     type FindAuthor = Author11;
     type UncleGenerations = UncleGenerations;
     type FilterUncle = ();
@@ -189,7 +183,7 @@ impl pallet_authorship::Trait for Test {
 parameter_types! {
     pub const MinimumPeriod: u64 = 5;
 }
-impl pallet_timestamp::Trait for Test {
+impl pallet_timestamp::Config for Test {
     type Moment = u64;
     type OnTimestampSet = ();
     type MinimumPeriod = MinimumPeriod;
@@ -210,7 +204,7 @@ impl<AID> MarketInterface<AID> for TestStaking {
     fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> bool { false }
 }
 
-impl swork::Trait for Test {
+impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
     type Works = TestStaking;
@@ -225,7 +219,7 @@ parameter_types! {
     pub const SPowerRatio: u128 = 2_500;
 }
 
-impl Trait for Test {
+impl Config for Test {
     type Currency = balances::Module<Self>;
     type UnixTime = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;

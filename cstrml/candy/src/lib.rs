@@ -6,9 +6,9 @@ use sp_runtime::traits::{Member, AtLeast32BitUnsigned, Zero, StaticLookup};
 use frame_system::{ensure_signed, ensure_root};
 
 /// The module configuration trait.
-pub trait Trait: frame_system::Trait {
+pub trait Config: frame_system::Config {
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
     /// The units in which we record balances.
     type Balance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
@@ -19,8 +19,8 @@ type ETHAddress = Vec<u8>;
 
 decl_event! {
 	pub enum Event<T> where
-		<T as frame_system::Trait>::AccountId,
-		<T as Trait>::Balance,
+		<T as frame_system::Config>::AccountId,
+		<T as Config>::Balance,
 	{
 		/// Some assets were issued. \[owner, total_supply\]
 		CandyIssued(AccountId, Balance),
@@ -34,7 +34,7 @@ decl_event! {
 }
 
 decl_error! {
-	pub enum Error for Module<T: Trait> {
+	pub enum Error for Module<T: Config> {
 		/// Transfer amount should be non-zero
 		AmountZero,
 		/// Account balance must be greater than or equal to the transfer amount
@@ -45,7 +45,7 @@ decl_error! {
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as Assets {
+	trait Store for Module<T: Config> as Assets {
 		/// The number of units of candy held by any given account.
 		Balances get(fn balances): map hasher(blake2_128_concat) T::AccountId => T::Balance;
 		/// The total unit supply of candy.
@@ -56,7 +56,7 @@ decl_storage! {
 }
 
 decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+	pub struct Module<T: Config> for enum Call where origin: T::Origin {
 		type Error = Error<T>;
 
 		fn deposit_event() = default;
@@ -153,9 +153,9 @@ decl_module! {
 mod tests {
     use super::*;
 
-    use frame_support::{impl_outer_origin, assert_ok, assert_noop, parameter_types, weights::Weight};
+    use frame_support::{impl_outer_origin, assert_ok, assert_noop, parameter_types};
     use sp_core::H256;
-    use sp_runtime::{Perbill, traits::{BlakeTwo256, IdentityLookup}, testing::Header};
+    use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header};
 
     impl_outer_origin! {
 		pub enum Origin for Test where system = frame_system {}
@@ -165,12 +165,11 @@ mod tests {
     pub struct Test;
     parameter_types! {
 		pub const BlockHashCount: u64 = 250;
-		pub const MaximumBlockWeight: Weight = 1024;
-		pub const MaximumBlockLength: u32 = 2 * 1024;
-		pub const AvailableBlockRatio: Perbill = Perbill::one();
 	}
-    impl frame_system::Trait for Test {
+    impl frame_system::Config for Test {
         type BaseCallFilter = ();
+        type BlockWeights = ();
+        type BlockLength = ();
         type Origin = Origin;
         type Call = ();
         type Index = u64;
@@ -182,13 +181,7 @@ mod tests {
         type Header = Header;
         type Event = ();
         type BlockHashCount = BlockHashCount;
-        type MaximumBlockWeight = MaximumBlockWeight;
         type DbWeight = ();
-        type BlockExecutionWeight = ();
-        type ExtrinsicBaseWeight = ();
-        type MaximumExtrinsicWeight = MaximumBlockWeight;
-        type MaximumBlockLength = MaximumBlockLength;
-        type AvailableBlockRatio = AvailableBlockRatio;
         type Version = ();
         type PalletInfo = ();
         type AccountData = ();
@@ -196,7 +189,7 @@ mod tests {
         type OnKilledAccount = ();
         type SystemWeightInfo = ();
     }
-    impl Trait for Test {
+    impl Config for Test {
         type Event = ();
         type Balance = u64;
     }

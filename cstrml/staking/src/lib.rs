@@ -323,16 +323,16 @@ pub struct UnappliedSlash<AccountId, Balance: HasCompact> {
 }
 
 pub type BalanceOf<T> =
-    <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
+    <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> =
-    <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::PositiveImbalance;
+    <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> =
-    <<T as Trait>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::NegativeImbalance;
+    <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 /// Means for interacting with a specialized version of the `session` trait.
 ///
-/// This is needed because `Staking` sets the `ValidatorIdOf` of the `pallet_session::Trait`
-pub trait SessionInterface<AccountId>: frame_system::Trait {
+/// This is needed because `Staking` sets the `ValidatorIdOf` of the `pallet_session::Config`
+pub trait SessionInterface<AccountId>: frame_system::Config {
     /// Disable a given validator by stash ID.
     ///
     /// Returns `true` if new era should be forced at the end of this session.
@@ -345,22 +345,22 @@ pub trait SessionInterface<AccountId>: frame_system::Trait {
     fn prune_historical_up_to(up_to: SessionIndex);
 }
 
-impl<T: Trait> SessionInterface<<T as frame_system::Trait>::AccountId> for T where
-    T: pallet_session::Trait<ValidatorId = <T as frame_system::Trait>::AccountId>,
-    T: pallet_session::historical::Trait<
-        FullIdentification = Exposure<<T as frame_system::Trait>::AccountId, BalanceOf<T>>,
+impl<T: Config> SessionInterface<<T as frame_system::Config>::AccountId> for T where
+    T: pallet_session::Config<ValidatorId = <T as frame_system::Config>::AccountId>,
+    T: pallet_session::historical::Config<
+        FullIdentification = Exposure<<T as frame_system::Config>::AccountId, BalanceOf<T>>,
         FullIdentificationOf = ExposureOf<T>,
     >,
-    T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Trait>::AccountId>,
-    T::SessionManager: pallet_session::SessionManager<<T as frame_system::Trait>::AccountId>,
+    T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Config>::AccountId>,
+    T::SessionManager: pallet_session::SessionManager<<T as frame_system::Config>::AccountId>,
     T::ValidatorIdOf:
-    Convert<<T as frame_system::Trait>::AccountId, Option<<T as frame_system::Trait>::AccountId>>,
+    Convert<<T as frame_system::Config>::AccountId, Option<<T as frame_system::Config>::AccountId>>,
 {
-    fn disable_validator(validator: &<T as frame_system::Trait>::AccountId) -> Result<bool, ()> {
+    fn disable_validator(validator: &<T as frame_system::Config>::AccountId) -> Result<bool, ()> {
         <pallet_session::Module<T>>::disable(validator)
     }
 
-    fn validators() -> Vec<<T as frame_system::Trait>::AccountId> {
+    fn validators() -> Vec<<T as frame_system::Config>::AccountId> {
         <pallet_session::Module<T>>::validators()
     }
 
@@ -369,17 +369,17 @@ impl<T: Trait> SessionInterface<<T as frame_system::Trait>::AccountId> for T whe
     }
 }
 
-pub trait SworkInterface: frame_system::Trait {
+pub trait SworkInterface: frame_system::Config {
     fn update_identities();
 }
 
-impl<T: Trait> SworkInterface for T where T: swork::Trait {
+impl<T: Config> SworkInterface for T where T: swork::Config {
     fn update_identities() {
         <swork::Module<T>>::update_identities();
     }
 }
 
-pub trait Trait: frame_system::Trait {
+pub trait Config: frame_system::Config {
     /// The staking balance.
     type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
@@ -400,7 +400,7 @@ pub trait Trait: frame_system::Trait {
     type RewardRemainder: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
     /// Handler for the unbalanced reduction when slashing a staker.
     type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
@@ -465,7 +465,7 @@ impl Default for Forcing {
 }
 
 decl_storage! {
-    trait Store for Module<T: Trait> as Staking {
+    trait Store for Module<T: Config> as Staking {
         /// Number of eras to keep in history.
         ///
         /// Information is kept for eras in `[current_era - history_depth; current_era]`.
@@ -666,7 +666,7 @@ decl_storage! {
 decl_event!(
     pub enum Event<T> where
         Balance = BalanceOf<T>,
-        <T as frame_system::Trait>::AccountId
+        <T as frame_system::Config>::AccountId
     {
         /// All validators have been rewarded by the first balance; the second is the remainder
         /// from the maximum amount of reward.
@@ -701,7 +701,7 @@ decl_event!(
 
 decl_error! {
     /// Error for the staking module.
-    pub enum Error for Module<T: Trait> {
+    pub enum Error for Module<T: Config> {
         /// Not a controller account.
         NotController,
         /// Not a stash account.
@@ -732,7 +732,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum Call where origin: T::Origin {
         /// Number of sessions per era.
         const SessionsPerEra: SessionIndex = T::SessionsPerEra::get();
 
@@ -1358,7 +1358,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
     // PUBLIC IMMUTABLES
 
     /// The total balance that can be slashed from a stash account as of right now.
@@ -2197,7 +2197,7 @@ impl<T: Trait> Module<T> {
 ///
 /// Once the first new_session is planned, all session must start and then end in order, though
 /// some session can lag in between the newest session planned and the latest session started.
-impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
+impl<T: Config> pallet_session::SessionManager<T::AccountId> for Module<T> {
     fn new_session(new_index: SessionIndex) -> Option<Vec<T::AccountId>> {
         Self::new_session(new_index)
     }
@@ -2209,7 +2209,7 @@ impl<T: Trait> pallet_session::SessionManager<T::AccountId> for Module<T> {
     }
 }
 
-impl<T: Trait> historical::SessionManager<T::AccountId, Exposure<T::AccountId, BalanceOf<T>>> for Module<T> {
+impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, BalanceOf<T>>> for Module<T> {
     fn new_session(new_index: SessionIndex)
         -> Option<Vec<(T::AccountId, Exposure<T::AccountId, BalanceOf<T>>)>>
     {
@@ -2233,7 +2233,7 @@ impl<T: Trait> historical::SessionManager<T::AccountId, Exposure<T::AccountId, B
 }
 
 
-impl<T: Trait> swork::Works<T::AccountId> for Module<T> {
+impl<T: Config> swork::Works<T::AccountId> for Module<T> {
     fn report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
         Self::update_stake_limit(controller, own_workload, total_workload);
     }
@@ -2243,7 +2243,7 @@ impl<T: Trait> swork::Works<T::AccountId> for Module<T> {
 /// * 20 points to the block producer for producing a (non-uncle) block in the relay chain,
 /// * 2 points to the block producer for each reference to a previously unreferenced uncle, and
 /// * 1 point to the producer of each referenced uncle block.
-impl<T: Trait + pallet_authorship::Trait>
+impl<T: Config + pallet_authorship::Config>
     pallet_authorship::EventHandler<T::AccountId, T::BlockNumber> for Module<T>
 {
     fn note_author(author: T::AccountId) {
@@ -2261,7 +2261,7 @@ impl<T: Trait + pallet_authorship::Trait>
 /// if any.
 pub struct StashOf<T>(sp_std::marker::PhantomData<T>);
 
-impl<T: Trait> Convert<T::AccountId, Option<T::AccountId>> for StashOf<T> {
+impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for StashOf<T> {
     fn convert(controller: T::AccountId) -> Option<T::AccountId> {
         <Module<T>>::ledger(&controller).map(|l| l.stash)
     }
@@ -2271,7 +2271,7 @@ impl<T: Trait> Convert<T::AccountId, Option<T::AccountId>> for StashOf<T> {
 /// on that account.
 pub struct ExposureOf<T>(sp_std::marker::PhantomData<T>);
 
-impl<T: Trait> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>>>
+impl<T: Config> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>>>
     for ExposureOf<T>
 {
     fn convert(validator: T::AccountId) -> Option<Exposure<T::AccountId, BalanceOf<T>>> {
@@ -2284,19 +2284,19 @@ impl<T: Trait> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>
 }
 
 /// This is intended to be used with `FilterHistoricalOffences`.
-impl <T: Trait>
+impl <T: Config>
     OnOffenceHandler<T::AccountId, pallet_session::historical::IdentificationTuple<T>, Weight>
 for Module<T> where
-    T: pallet_session::Trait<ValidatorId = <T as frame_system::Trait>::AccountId>,
-    T: pallet_session::historical::Trait<
-        FullIdentification = Exposure<<T as frame_system::Trait>::AccountId, BalanceOf<T>>,
+    T: pallet_session::Config<ValidatorId = <T as frame_system::Config>::AccountId>,
+    T: pallet_session::historical::Config<
+        FullIdentification = Exposure<<T as frame_system::Config>::AccountId, BalanceOf<T>>,
         FullIdentificationOf = ExposureOf<T>,
     >,
-    T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Trait>::AccountId>,
-    T::SessionManager: pallet_session::SessionManager<<T as frame_system::Trait>::AccountId>,
+    T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Config>::AccountId>,
+    T::SessionManager: pallet_session::SessionManager<<T as frame_system::Config>::AccountId>,
     T::ValidatorIdOf: Convert<
-        <T as frame_system::Trait>::AccountId,
-        Option<<T as frame_system::Trait>::AccountId>,
+        <T as frame_system::Config>::AccountId,
+        Option<<T as frame_system::Config>::AccountId>,
     >,
 {
     fn on_offence(
@@ -2427,7 +2427,7 @@ pub struct FilterHistoricalOffences<T, R> {
 
 impl<T, Reporter, Offender, R, O> ReportOffence<Reporter, Offender, O>
 for FilterHistoricalOffences<Module<T>, R> where
-    T: Trait,
+    T: Config,
     R: ReportOffence<Reporter, Offender, O>,
     O: Offence<Offender>,
 {

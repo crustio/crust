@@ -2,7 +2,7 @@ use super::*;
 
 use frame_support::{
     impl_outer_origin, parameter_types,
-    weights::{Weight, constants::RocksDbWeight},
+    weights::constants::RocksDbWeight,
     traits::{OnFinalize, OnInitialize, Get}
 };
 // use sp_core::H256;
@@ -20,6 +20,14 @@ pub use keyring::Sr25519Keyring;
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;
+
+pub const ALICE: AccountId32 = AccountId32::new([1u8; 32]);
+pub const BOB: AccountId32 = AccountId32::new([2u8; 32]);
+pub const CHARLIE: AccountId32 = AccountId32::new([3u8; 32]);
+pub const EVE: AccountId32 = AccountId32::new([4u8; 32]);
+pub const MERCHANT: AccountId32 = AccountId32::new([5u8; 32]);
+pub const DAVE: AccountId32 = AccountId32::new([6u8; 32]);
+pub const FERDIE: AccountId32 = AccountId32::new([7u8; 32]);
 
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
@@ -90,15 +98,12 @@ impl Get<Vec<u8>> for LegalCode {
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
-    pub const MaximumBlockWeight: Weight = 1024;
-    pub const MaximumBlockLength: u32 = 2 * 1024;
-    pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
-    pub const MinimumStoragePrice: Balance = 1;
-    pub const MinimumSorderDuration: u32 = 1;
 }
 
-impl system::Trait for Test {
+impl system::Config for Test {
     type BaseCallFilter = ();
+    type BlockWeights = ();
+    type BlockLength = ();
     type Origin = Origin;
     type Call = ();
     type Index = u64;
@@ -110,22 +115,16 @@ impl system::Trait for Test {
     type Header = Header;
     type Event = ();
     type BlockHashCount = BlockHashCount;
-    type MaximumBlockWeight = MaximumBlockWeight;
     type DbWeight = RocksDbWeight;
-    type BlockExecutionWeight = ();
-    type ExtrinsicBaseWeight = ();
-    type MaximumExtrinsicWeight = MaximumBlockWeight;
-    type MaximumBlockLength = MaximumBlockLength;
-    type AvailableBlockRatio = AvailableBlockRatio;
     type Version = ();
     type PalletInfo = ();
-    type AccountData = AccountData<u64>;
+    type AccountData = AccountData<Balance>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
 }
 
-impl balances::Trait for Test {
+impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = ();
@@ -135,7 +134,7 @@ impl balances::Trait for Test {
     type MaxLocks = ();
 }
 
-impl swork::Trait for Test {
+impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
     type Works = ();
@@ -158,7 +157,7 @@ parameter_types! {
     pub const UsedTrashMaxSize: u128 = 2;
 }
 
-impl Trait for Test {
+impl Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
     type CurrencyToBalance = CurrencyToVoteHandler;
@@ -199,14 +198,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 pub fn init_swork_setup() {
-    // 1. Register for 0, 100, 200
     let pks = vec![hex::decode("11").unwrap(), hex::decode("22").unwrap(), hex::decode("33").unwrap(), hex::decode("44").unwrap()];
-    let whos = vec![
-        Sr25519Keyring::Alice.to_account_id(),
-        Sr25519Keyring::Bob.to_account_id(),
-        Sr25519Keyring::Charlie.to_account_id(),
-        Sr25519Keyring::Dave.to_account_id()
-    ];
+    let whos = vec![ALICE, BOB, CHARLIE, DAVE];
     let frees: Vec<u64> = vec![0, 50, 50, 200];
     let code = LegalCode::get();
     for ((pk, who), free) in pks.iter().zip(whos.iter()).zip(frees.iter()) {

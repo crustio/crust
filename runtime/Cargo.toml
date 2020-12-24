@@ -73,7 +73,6 @@ sp-runtime-interface = { default-features = false, version = '2.0.0' }
 swork = { version = "0.10.0", package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
 staking = { version = "0.10.0", package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
 market = { version = "0.10.0", package = 'cstrml-market', path = '../cstrml/market', default-features = false }
-market_v2 = { version = "0.10.0", package = 'cstrml-market-v2', path = '../cstrml/market_v2', default-features = false }
 primitives = { version = "0.10.0", package = 'cst-primitives', path = '../primitives', default-features = false }
 balances = { version = "0.10.0", package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
 candy = { version = "0.10.0", package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
@@ -128,7 +127,6 @@ std = [
     'swork/std',
     'staking/std',
     'market/std',
-    'market_v2/std',
     'primitives/std',
     'candy/std'
 ]

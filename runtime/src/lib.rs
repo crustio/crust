@@ -679,7 +679,7 @@ parameter_types! {
     pub const UsedTrashMaxSize: u128 = 500_000;
 }
 
-impl market_v2::Trait for Runtime {
+impl market::Trait for Runtime {
 
     /// The market's module id, used for deriving its sovereign account ID.
     type ModuleId = MarketModuleId;
@@ -748,7 +748,7 @@ construct_runtime! {
 
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config},
-        Market: market_v2::{Module, Call, Storage, Event<T>},
+        Market: market::{Module, Call, Storage, Event<T>},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},

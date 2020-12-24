@@ -1,19 +1,6 @@
-// This file is part of Substrate.
+// This file is part of Crust.
 
-// Copyright (C) 2019-2020 Parity Technologies (UK) Ltd.
-// SPDX-License-Identifier: Apache-2.0
-
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// 	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright (C) 2019-2020 Crustio Technologies Ltd.
 
 //! # Balances Module
 //!
@@ -177,8 +164,10 @@ use sp_runtime::{
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
-use primitives::traits::TransferrableCurrency;
 pub use weights::WeightInfo;
+
+// Crust primitives
+use primitives::traits::TransferrableCurrency;
 
 pub trait Subtrait<I: Instance = DefaultInstance>: frame_system::Config {
 	/// The balance of an account.
@@ -410,9 +399,15 @@ decl_storage! {
 			for (_, balance) in &config.balances {
 				assert!(
 					*balance >= <T as Config<I>>::ExistentialDeposit::get(),
-					"the balance of any account should always be more than existential deposit.",
+					"the balance of any account should always be at least the existential deposit.",
 				)
 			}
+
+			// ensure no duplicates exist.
+			let endowed_accounts = config.balances.iter().map(|(x, _)| x).cloned().collect::<std::collections::BTreeSet<_>>();
+
+			assert!(endowed_accounts.len() == config.balances.len(), "duplicate balances in genesis.");
+
 			for &(ref who, free) in config.balances.iter() {
 				T::AccountStore::insert(who, AccountData { free, .. Default::default() });
 			}

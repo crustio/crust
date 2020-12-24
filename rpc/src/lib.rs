@@ -2,8 +2,7 @@
 
 use std::sync::Arc;
 
-use crust_runtime::opaque::Block;
-use crust_primitives::{BlockNumber, AccountId, Index, Balance, Hash};
+use crust_primitives::{Block, BlockNumber, AccountId, Index, Balance, Hash};
 use sp_api::ProvideRuntimeApi;
 use txpool_api::TransactionPool;
 use sp_blockchain::{HeaderBackend, HeaderMetadata, Error as BlockChainError};

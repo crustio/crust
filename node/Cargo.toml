@@ -62,7 +62,6 @@ polkadot-parachain = { git = "https://github.com/paritytech/polkadot", branch = 
 
 sp-timestamp = { git = "https://github.com/paritytech/substrate", branch = "master" }
 sc-chain-spec = { git = "https://github.com/paritytech/substrate", branch = "master" }
-node-primitives = { git = "https://github.com/paritytech/substrate", branch = "master" }
 sp-trie = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate", features = ["memory-tracker"], branch = "master" }
 sc-rpc = { git = "https://github.com/paritytech/substrate", branch = "master" }
 node-inspect = { optional = true, git = "https://github.com/paritytech/substrate", branch = "master" }

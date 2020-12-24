@@ -993,7 +993,6 @@ dependencies = [
  "jsonrpc-pubsub 14.2.0",
  "log",
  "node-inspect",
- "node-primitives",
  "parity-scale-codec",
  "polkadot-cli",
  "polkadot-parachain",
@@ -4123,18 +4122,6 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "structopt",
-]
-
-[[package]]
-name = "node-primitives"
-version = "2.0.0"
-source = "git+https://github.com/paritytech/substrate?branch=master#37a7727353f9bac1258acf59cd81688354c9120d"
-dependencies = [
- "frame-system",
- "parity-scale-codec",
- "sp-application-crypto",
- "sp-core",
- "sp-runtime",
 ]
 
 [[package]]

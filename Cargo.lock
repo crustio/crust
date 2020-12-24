@@ -1089,7 +1089,6 @@ dependencies = [
  "sp-io 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sp-offchain",
  "sp-runtime 2.0.0 (git+https://github.com/paritytech/substrate)",
- "sp-runtime-interface 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sp-session",
  "sp-staking",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate)",

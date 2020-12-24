@@ -43,7 +43,7 @@ mod tests;
 pub mod benchmarking;
 
 pub type BalanceOf<T> =
-    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
+    <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 
 pub(crate) const LOG_TARGET: &'static str = "swork";
 
@@ -106,7 +106,7 @@ impl<AId> Works<AId> for () {
 }
 
 /// Implement market's file inspector
-impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
+impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     /// check wr existing or not
     fn is_wr_reported(anchor: &SworkerAnchor, bn: BlockNumber) -> bool {
         let current_rs = Self::convert_bn_to_rs(bn);
@@ -137,13 +137,13 @@ impl<T: Trait> SworkerInterface<T::AccountId> for Module<T> {
 }
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait {
+pub trait Config: system::Config {
     /// The payment balance.
     /// TODO: remove this for abstracting MarketInterface into sWorker self
     type Currency: ReservableCurrency<Self::AccountId>;
 
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
 
     /// The handler for reporting works.
     type Works: Works<Self::AccountId>;
@@ -156,7 +156,7 @@ pub trait Trait: system::Trait {
 }
 
 decl_storage! {
-    trait Store for Module<T: Trait> as Swork {
+    trait Store for Module<T: Config> as Swork {
         /// The sWorker enclave code, this should be managed by sudo/democracy
         pub Code get(fn code) config(): SworkerCode;
 
@@ -203,7 +203,7 @@ decl_storage! {
 
 decl_error! {
     /// Error for the swork module.
-    pub enum Error for Module<T: Trait> {
+    pub enum Error for Module<T: Config> {
         /// Illegal applier
         IllegalApplier,
         /// Identity check failed
@@ -236,7 +236,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum Call where origin: T::Origin {
         type Error = Error<T>;
 
         // Initializing events
@@ -521,7 +521,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
     // PUBLIC MUTABLES
     /// This function is for updating all identities, in details:
     /// 1. call `update_and_get_workload` for every identity, which will return (reserved, used)
@@ -862,8 +862,8 @@ impl<T: Trait> Module<T> {
 decl_event!(
     pub enum Event<T>
     where
-        AccountId = <T as system::Trait>::AccountId,
-        BlockNumber = <T as system::Trait>::BlockNumber,
+        AccountId = <T as system::Config>::AccountId,
+        BlockNumber = <T as system::Config>::BlockNumber,
     {
         RegisterSuccess(AccountId, SworkerPubKey),
         WorksReportSuccess(AccountId, SworkerPubKey),

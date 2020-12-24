@@ -95,14 +95,14 @@ pub struct MerchantLedger<Balance> {
 }
 
 type BalanceOf<T> =
-    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
+    <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 
-impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
+impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
 {
     /// Upsert new replica
     /// Accept id(who, anchor), cid, valid_at and maybe_member
     /// Returns whether this id is counted to a group/itself's stake limit
-    fn upsert_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, maybe_members: &Option<BTreeSet<<T as system::Trait>::AccountId>>) -> bool {
+    fn upsert_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>) -> bool {
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
         // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
@@ -156,7 +156,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
     /// Return whether this id is counted to a group/itself's stake limit
-    fn delete_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
+    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
         if <Files<T>>::get(cid).is_some() {
             // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
@@ -184,7 +184,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 }
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait {
+pub trait Config: system::Config {
     /// The market's module id, used for deriving its sovereign account ID.
     type ModuleId: Get<ModuleId>;
 
@@ -198,7 +198,7 @@ pub trait Trait: system::Trait {
     type SworkerInterface: SworkerInterface<Self::AccountId>;
 
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
 
     /// File duration.
     type FileDuration: Get<BlockNumber>;
@@ -233,7 +233,7 @@ pub trait Trait: system::Trait {
 
 // This module's storage items.
 decl_storage! {
-    trait Store for Module<T: Trait> as Market {
+    trait Store for Module<T: Config> as Market {
         /// Merchant Ledger
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
@@ -280,7 +280,7 @@ decl_storage! {
 
 decl_error! {
     /// Error for the market module.
-    pub enum Error for Module<T: Trait> {
+    pub enum Error for Module<T: Config> {
         /// Don't have enough currency
         InsufficientCurrency,
         /// Don't have enough pledge
@@ -297,7 +297,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum Call where origin: T::Origin {
         type Error = Error<T>;
 
         // Initializing events
@@ -476,7 +476,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
     /// The pot of a pledge account
     pub fn pledge_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "pled" is 16 bytes
@@ -815,7 +815,7 @@ impl<T: Trait> Module<T> {
 decl_event!(
     pub enum Event<T>
     where
-        AccountId = <T as system::Trait>::AccountId,
+        AccountId = <T as system::Config>::AccountId,
         Balance = BalanceOf<T>
     {
         FileSuccess(AccountId, FileInfo<AccountId, Balance>),

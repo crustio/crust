@@ -1,4 +1,7 @@
-//! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
+// Copyright 2019-2020 Crust Technologies Ltd.
+// This file is part of Crust.
+
+//! Crust service. Specialized wrapper over substrate service.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,6 +15,7 @@ use sp_inherents::InherentDataProviders;
 use sc_consensus::LongestChain;
 
 // Our native executor instance.
+// TODO: Bring benchmarks back
 native_executor_instance!(
     pub Executor,
     crust_runtime::api::dispatch,
@@ -31,18 +35,21 @@ pub fn new_partial(config: &Configuration) -> Result<
         sp_consensus::DefaultImportQueue<Block, FullClient>,
         sc_transaction_pool::FullPool<Block, FullClient>,
         (
-            impl Fn(crust_rpc::DenyUnsafe, crust_rpc::SubscriptionTaskExecutor) -> crust_rpc::RpcExtension,
+            impl Fn(
+                crust_rpc::DenyUnsafe,
+                crust_rpc::SubscriptionTaskExecutor
+            ) -> crust_rpc::RpcExtension,
             (
-                sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,
+                sc_consensus_babe::BabeBlockImport<
+                    Block, FullClient, FullGrandpaBlockImport
+                >,
                 sc_finality_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
                 sc_consensus_babe::BabeLink<Block>
             ),
-            (
-                sc_finality_grandpa::SharedVoterState,
-                Arc<GrandpaFinalityProofProvider<FullBackend, Block>>
-            )
+            sc_finality_grandpa::SharedVoterState
         )
-    >, ServiceError> {
+    >,
+    ServiceError> {
 
     let inherent_data_providers = InherentDataProviders::new();
 
@@ -60,7 +67,11 @@ pub fn new_partial(config: &Configuration) -> Result<
     );
 
     let (grandpa_block_import, grandpa_link) =
-        sc_finality_grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain.clone())?;
+        sc_finality_grandpa::block_import(
+            client.clone(),
+            &(client.clone() as Arc<_>),
+            select_chain.clone()
+        )?;
 
     let justification_import = grandpa_block_import.clone();
 
@@ -89,7 +100,7 @@ pub fn new_partial(config: &Configuration) -> Result<
         GrandpaFinalityProofProvider::new_for_service(backend.clone(), client.clone());
 
     let import_setup = (babe_block_import.clone(), grandpa_link, babe_link.clone());
-    let rpc_setup = (shared_voter_state.clone(), finality_proof_provider.clone());
+    let rpc_setup = shared_voter_state.clone();
 
     let babe_config = babe_link.config().clone();
     let shared_epoch_changes = babe_link.epoch_changes().clone();
@@ -164,7 +175,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
 
     let prometheus_registry = config.prometheus_registry().cloned();
 
-    let (shared_voter_state, _) = rpc_setup;
+    let shared_voter_state = rpc_setup;
 
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
         sc_service::build_network(sc_service::BuildNetworkParams {
@@ -197,7 +208,8 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
         on_demand: None,
         remote_blockchain: None,
         telemetry_connection_sinks: telemetry_connection_sinks.clone(),
-        network_status_sinks, system_rpc_tx,
+        network_status_sinks,
+        system_rpc_tx,
     })?;
 
     let (babe_block_import, grandpa_link, babe_link) = import_setup;
@@ -276,7 +288,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
     };
 
     let grandpa_config = sc_finality_grandpa::Config {
-        // FIXME: [Substrate]substrate/issues#1578 make this available through chainspec
+        // FIXME: [Substrate]substrate/issues#1578 make this available through chain spec
         gossip_duration: Duration::from_millis(1000),
         justification_period: 512,
         name: Some(name),
@@ -312,8 +324,6 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
             "grandpa-voter",
             sc_finality_grandpa::run_grandpa_voter(grandpa_config)?
         );
-    } else {
-        sc_finality_grandpa::setup_disabled_grandpa(network)?;
     }
 
     network_starter.start_network();

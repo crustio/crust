@@ -13,36 +13,36 @@ name = 'crust'
 
 [dependencies]
 # third parity dependencies
-futures = "0.3.4"
-log = "0.4.8"
-structopt = { version = '0.3.8', optional = true }
-hex-literal = "0.2.1"
+futures = "0.3.8"
+log = "0.4.11"
+structopt = { version = '0.3.21', optional = true }
+hex-literal = "0.3.1"
 
 # substrate client dependencies
-authority-discovery = { package = 'sc-authority-discovery', git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-consensus-babe = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-finality-grandpa  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-basic-authorship = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-client-api = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-cli = {  git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f", features = ["wasmtime"], optional = true }
-sc-consensus = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-consensus-slots = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-executor = {  git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f", features = ["wasmtime"] }
-sc-network = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-service = {  git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f", features = ["wasmtime"] }
-sc-transaction-pool = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
+authority-discovery = { package = 'sc-authority-discovery', git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-consensus-babe = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-finality-grandpa  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-basic-authorship = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-client-api = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-cli = {  git = "https://github.com/paritytech/substrate", branch = "master", features = ["wasmtime"], optional = true }
+sc-consensus = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-consensus-slots = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-executor = {  git = "https://github.com/paritytech/substrate", branch = "master", features = ["wasmtime"] }
+sc-network = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-service = {  git = "https://github.com/paritytech/substrate", branch = "master", features = ["wasmtime"] }
+sc-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # substrate primitives
-sp-transaction-pool = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-consensus = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-consensus-babe = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-inherents = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-io = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-finality-grandpa = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f", optional = true }
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
+sp-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-consensus = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-consensus-babe = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-inherents = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-finality-grandpa = { git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.10.0' }
@@ -52,8 +52,8 @@ primitives = { package = 'cst-primitives', path = '../primitives', version = '0.
 crust-rpc = { path =  '../rpc', version = '0.10.0' }
 
 [build-dependencies]
-build-script-utils = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f",  package = "substrate-build-script-utils", optional = true }
-frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f", optional = true }
+substrate-build-script-utils = { git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
 
 [features]
 default = [ "cli" ]
@@ -63,7 +63,6 @@ cli = [
     "frame-benchmarking-cli",
     "sc-service/db",
     "structopt",
-    "build-script-utils",
 ]
 
 runtime-benchmarks = [

@@ -9,29 +9,29 @@ repository = "https://github.com/crustio/crust/"
 
 [dependencies]
 jsonrpc-core = "15.1.0"
-frame-rpc-system = { package = "substrate-frame-rpc-system", git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f"  }
+frame-rpc-system = { package = "substrate-frame-rpc-system", git = "https://github.com/paritytech/substrate", branch = "master"  }
 codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false }
 
 # substrate client dependencies
-sc-client-api = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-rpc = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-consensus-babe  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-consensus-babe-rpc  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-consensus-epochs  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-finality-grandpa  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-finality-grandpa-rpc  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sc-keystore = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
+sc-client-api = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-rpc = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-consensus-babe  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-consensus-babe-rpc  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-consensus-epochs  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-finality-grandpa  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-finality-grandpa-rpc  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-keystore = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # substrate pallet dependencies
-sp-keystore = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-blockchain = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-api = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-consensus  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-consensus-babe  = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-txpool-api = { package = "sp-transaction-pool", git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-block-builder = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
+sp-keystore = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-blockchain = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-api = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-consensus  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-consensus-babe  = { git = "https://github.com/paritytech/substrate", branch = "master" }
+txpool-api = { package = "sp-transaction-pool", git = "https://github.com/paritytech/substrate", branch = "master" }
+pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-block-builder = { git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # crust dependent
 crust-primitives = { version = "0.10.0", package = 'cst-primitives', path='../primitives' }

@@ -97,7 +97,7 @@ parameter_types! {
     pub const MinimumSorderDuration: u32 = 1;
 }
 
-impl system::Trait for Test {
+impl system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
     type Call = ();
@@ -125,7 +125,7 @@ impl system::Trait for Test {
     type SystemWeightInfo = ();
 }
 
-impl balances::Trait for Test {
+impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = ();
@@ -135,7 +135,7 @@ impl balances::Trait for Test {
     type MaxLocks = ();
 }
 
-impl swork::Trait for Test {
+impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
     type Works = ();
@@ -158,7 +158,7 @@ parameter_types! {
     pub const UsedTrashMaxSize: u128 = 2;
 }
 
-impl Trait for Test {
+impl Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
     type CurrencyToBalance = CurrencyToVoteHandler;

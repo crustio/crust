@@ -1,7 +1,6 @@
-use build_script_utils::{generate_cargo_keys, rerun_if_git_head_changed};
+// Copyright 2019-2020 Crustio Technologies Ltd.
+// This file is part of Crust.
 
 fn main() {
-    generate_cargo_keys();
-
-    rerun_if_git_head_changed();
+    substrate_build_script_utils::generate_cargo_keys();
 }

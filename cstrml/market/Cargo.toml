@@ -14,16 +14,16 @@ serde = { optional = true, version = '1.0.116' }
 serde_json = "1.0.51"
 
 # substrate frames
-frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
+frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
 
 # substrate primitives
-sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
+sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
 
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f", default-features = false, optional = true }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false, optional = true }
 
 # crust runtime modules
 primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
@@ -49,5 +49,5 @@ runtime-benchmarks = [
 hex = '0.4.2'
 swork = { version = "0.10.0", package = 'cstrml-swork', path = '../swork' }
 balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "b2d9affd7135bdc08daba0ae460219740822980f" }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
 keyring = { package = "sp-keyring", version = '2.0.0' }

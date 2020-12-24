@@ -1,3 +1,6 @@
+// Copyright 2019-2020 Crustio Technologies Ltd.
+// This file is part of Crust.
+
 //! Crust-specific RPCs implementation.
 
 use std::sync::Arc;

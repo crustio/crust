@@ -964,7 +964,6 @@ dependencies = [
  "cstrml-balances",
  "cstrml-candy",
  "cstrml-market",
- "cstrml-market-v2",
  "cstrml-staking",
  "cstrml-swork",
  "frame-benchmarking",
@@ -1107,26 +1106,6 @@ dependencies = [
  "serde_json",
  "sp-core",
  "sp-io",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
-name = "cstrml-market-v2"
-version = "0.10.0"
-dependencies = [
- "cst-primitives",
- "cstrml-balances",
- "cstrml-swork",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "hex",
- "parity-scale-codec",
- "serde",
- "serde_json",
- "sp-core",
- "sp-io",
  "sp-keyring",
  "sp-runtime",
  "sp-std",
@@ -1166,7 +1145,6 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-market",
- "cstrml-market-v2",
  "frame-benchmarking",
  "frame-support",
  "frame-system",

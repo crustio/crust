@@ -27,7 +27,6 @@ sp-std = { default-features = false, version = '2.0.0' }
 frame-benchmarking = { version = '2.0.0', default-features = false, optional = true }
 
 # crust runtime modules
-market = { version = "0.10.0", package = 'cstrml-market', path = '../market', default-features = false }
 primitives = { version = "0.10.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
 webpki = { version = "0.21.0", package = 'webpki', path = '../../utils/webpki', default-features = false }
 serde_json = { version = "1.0.59", package = "serde_json_no_std", path = '../../utils/serde_json_no_std', default-features = false, features = ["alloc"] }
@@ -35,7 +34,7 @@ serde_json = { version = "1.0.59", package = "serde_json_no_std", path = '../../
 [dev-dependencies]
 keyring = { package = "sp-keyring", version = '2.0.0' }
 balances = { version = "0.10.0", package = 'cstrml-balances', path = '../balances' }
-market_v2 = { version = "0.10.0", package = 'cstrml-market-v2', path = '../market_v2' }
+market = { version = "0.10.0", package = 'cstrml-market', path = '../market' }
 frame-benchmarking = { version = '2.0.0' }
 hex = '0.4.2'
 

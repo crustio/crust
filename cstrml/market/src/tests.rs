@@ -6,260 +6,89 @@ use frame_support::{
     dispatch::DispatchError,
 };
 use hex;
-use crate::{SorderStatus, SorderInfo, MerchantInfo, SorderPunishment};
-use sp_core::H256;
+use crate::MerchantLedger;
 
+/// Register & Pledge test cases
 #[test]
-fn test_for_storage_order_should_work() {
+fn register_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let client: u64 = 0;
-        let file_size = 16; // should less than merchant
-        let duration = 10;
-        let fee: u64 = 1;
-        let amount: u64 = 10;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 60);
-
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 60);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 60));
-        assert!(!<Pledges<Test>>::contains_key(merchant.clone()));
-        assert_eq!(Balances::locks(merchant.clone()).len(), 0);
-
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
-
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(merchant.clone()), merchant.clone(),
-                file_identifier.clone(), file_size, duration, file_alias.clone()
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 9,
-                message: Some("PlaceSelfOrder"),
-            }
-        );
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias.clone()
-        ));
-
-        let order_id = H256::default();
-        assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
-            address_info,
-            storage_price: fee,
-            file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
-        });
-        assert_eq!(Market::clients(&client, file_alias).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            merchant,
-            client,
-            amount,
-            duration: 100
-        });
-        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
-            completed_on: 50,
-            expired_on: 50+10*10,
-            status: OrderStatus::Pending,
-            claimed_at: 50
-        });
-
-        // 2. Register after get order, address should update but others should not
-        let another_address_info = "ws://127.0.0.1:9900".as_bytes().to_vec();
-        let another_price: u64 = 2;
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), another_address_info.clone(), another_price));
-        assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
-            address_info: another_address_info.clone(),
-            storage_price: another_price,
-            file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
-        });
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 60,
-            used: amount
-        });
-    });
-}
-
-#[test]
-fn test_for_storage_order_should_fail_due_to_file_size() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant = 100;
-        let file_size = 200; // should less than merchant
-        let duration = 10;
-        let fee = 1;
-        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-
-
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 0));
-        assert_ok!(Market::register(Origin::signed(merchant), address.clone(), fee));
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(source.clone()), merchant,
-                file_identifier, file_size, duration, file_alias
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 1,
-                message: Some("NoWorkload"),
-            }
-        );
-    });
-}
-
-#[test]
-fn test_for_storage_order_should_fail_due_to_duration_too_short() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant = 100;
-        let file_size = 60; // should less than merchant
-        let duration = 1; // shoule more than 1 minute
-        let fee = 1;
-        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 0));
-        assert_ok!(Market::register(Origin::signed(merchant), address.clone(), fee));
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(source.clone()), merchant,
-                file_identifier, file_size, duration, file_alias
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 3,
-                message: Some("DurationTooShort"),
-            }
-        );
-    });
-}
-
-#[test]
-fn test_for_register_should_fail_due_to_low_price() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let merchant = 100;
-        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 0));
-        assert_noop!(
-            Market::register(Origin::signed(merchant), address.clone(), 0),
-            DispatchError::Module {
-                index: 0,
-                error: 10,
-                message: Some("LowStoragePrice"),
-            }
-        );
-    });
-}
-
-#[test]
-fn test_for_storage_order_should_fail_due_to_wr_not_exist() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let merchant = 400; // Invalid merchant. No work report
-        let address = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 0));
-        assert_noop!(
-            Market::register(Origin::signed(merchant), address.clone(), 1),
-            DispatchError::Module {
-                index: 0,
-                error: 1,
-                message: Some("NoWorkload"),
-            }
-        );
-    });
-}
-
-#[test]
-fn test_for_storage_order_should_fail_due_to_merchant_not_register() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant = 100;
-        let file_size = 80; // should less than merchant
-        let duration = 10;
-        let file_alias = "/test/file1".as_bytes().to_vec();
-
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(source.clone()), merchant,
-                file_identifier, file_size, duration, file_alias
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 2,
-                message: Some("NotMerchant"),
-            }
-        );
-    });
-}
-
-#[test]
-fn test_for_pledge_should_work() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-        let merchant = 100;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let pledge_pot = Market::pledge_pot();
         let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 180));
-        assert_ok!(Market::register(Origin::signed(merchant), address_info.clone(), 1));
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 180,
-            used: 0
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 180,
+            reward: 0
         });
-        assert_ok!(Market::cut_pledge(Origin::signed(merchant), 20));
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 160,
-            used: 0
+        assert_eq!(Balances::free_balance(&pledge_pot), 180);
+        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 20));
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 160,
+            reward: 0
         });
-        assert_ok!(Market::pledge_extra(Origin::signed(merchant), 10));
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 170,
-            used: 0
+        assert_eq!(Balances::free_balance(&pledge_pot), 160);
+        assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 10));
+        assert_eq!(Market::merchant_ledgers(merchant), MerchantLedger {
+            pledge: 170,
+            reward: 0
         });
+        assert_eq!(Balances::free_balance(&pledge_pot), 170);
     });
 }
 
 #[test]
-fn test_for_pledge_extra_should_fail_due_to_merchant_not_pledges() {
+fn register_should_fail_due_to_insufficient_currency() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
 
-        let merchant = 100;
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let _ = Balances::make_free_balance_be(&merchant, 100);
+        assert_noop!(
+            Market::register(
+                Origin::signed(merchant),
+                200
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 0,
+                message: Some("InsufficientCurrency")
+            }
+        );
+    });
+}
+
+#[test]
+fn register_should_fail_due_to_double_register() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 70));
+        assert_noop!(
+            Market::register(
+                Origin::signed(merchant),
+                70
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 4,
+                message: Some("AlreadyRegistered")
+            }
+        );
+    });
+}
+
+#[test]
+fn pledge_extra_should_fail_due_to_merchant_not_register() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let merchant = Sr25519Keyring::Bob.to_account_id();
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_noop!(
             Market::pledge_extra(
@@ -268,578 +97,1415 @@ fn test_for_pledge_extra_should_fail_due_to_merchant_not_pledges() {
             ),
             DispatchError::Module {
                 index: 0,
-                error: 7,
-                message: Some("NotPledged")
+                error: 3,
+                message: Some("NotRegister")
             }
         );
     });
 }
 
 #[test]
-fn test_for_pledge_should_fail_due_to_insufficient_currency() {
+fn cut_pledge_should_fail_due_to_reward() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
 
-        let merchant = 100;
-        let _ = Balances::make_free_balance_be(&merchant, 100);
-        assert_noop!(
-            Market::pledge(
-                Origin::signed(merchant),
-                200
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 4,
-                message: Some("InsufficientCurrency")
-            }
-        );
-    });
-}
-
-#[test]
-fn test_for_pledge_should_fail_due_to_insufficient_pledge() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant = 100;
-        let file_size = 16; // should less than merchant
-        let duration = 50;
-        let fee = 1;
-        let amount: u64 = 50;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 80);
-        let _ = Balances::make_free_balance_be(&merchant, 80);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 70));
-
-        assert_ok!(Market::register(Origin::signed(merchant), address_info.clone(), fee));
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias
-        ));
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 70,
-            used: amount
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 180,
+            reward: 0
         });
-        assert_ok!(Market::cut_pledge(Origin::signed(merchant), 20));
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 50,
-            used: amount
+
+        <self::MerchantLedgers<Test>>::insert(&merchant, MerchantLedger {
+            pledge: 180,
+            reward: 120
+        });
+        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 20));
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 160,
+            reward: 120
         });
         assert_noop!(
             Market::cut_pledge(
                 Origin::signed(merchant),
-                1
+                50
             ),
             DispatchError::Module {
                 index: 0,
-                error: 5,
+                error: 1,
                 message: Some("InsufficientPledge")
             }
         );
     });
 }
 
+/// Place storage order test cases
 #[test]
-fn test_for_storage_order_should_fail_due_to_insufficient_pledge() {
+fn place_storage_order_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = 0;
-        let file_identifier =
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid =
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant = 100;
-        let file_size = 16; // should less than merchant
-        let duration = 60;
-        let fee = 1;
-        let amount: u64 = 60;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 80);
-        let _ = Balances::make_free_balance_be(&merchant, 80);
-        assert_ok!(Market::pledge(Origin::signed(merchant), 0));
-        assert_ok!(Market::register(Origin::signed(merchant), address_info.clone(), fee));
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(source.clone()), merchant,
-                file_identifier.clone(), file_size, duration, file_alias.clone()
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 5,
-                message: Some("InsufficientPledge"),
-            }
-        );
-
-        assert_ok!(Market::pledge_extra(Origin::signed(merchant), 60));
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 60,
-            used: 0
-        });
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias.clone()
-        ));
-
-        let order_id = H256::default();
-        
-        assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
-            address_info,
-            storage_price: fee,
-            file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
-        });
-        assert_eq!(Market::clients(&0, file_alias).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            merchant,
-            client: source.clone(),
-            amount,
-            duration: duration*10
-        });
-        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
-            completed_on: 50,
-            expired_on: 50+duration*10,
-            status: OrderStatus::default(),
-            claimed_at: 50
-        });
-        assert_eq!(Market::pledges(merchant), Pledge {
-            total: 60,
-            used: 60
-        });
-    });
-}
-
-#[test]
-fn test_for_pledge_should_fail_due_to_double_pledge() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-        let merchant = 100;
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 70));
-        assert_noop!(
-            Market::pledge(
-                Origin::signed(merchant),
-                70
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 8,
-                message: Some("AlreadyPledged")
-            }
-        );
-    });
-}
 
-#[test]
-fn test_for_pledge_should_work_without_register() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-        let merchant = 100;
-        let _ = Balances::make_free_balance_be(&merchant, 80);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 70));
-        assert_noop!(
-            Market::pledge_extra(
-                Origin::signed(merchant.clone()),
-                70
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 4,
-                message: Some("InsufficientCurrency")
-            }
-        );
-        assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 10));
-        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 70));
-    });
-}
-
-#[test]
-fn test_for_close_sorder() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let client: u64 = 0;
-        let file_size = 16; // should less than merchant
-        let duration = 10;
-        let fee: u64 = 1;
-        let amount: u64 = 10;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 60);
-
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias
-        ));
-
-        let order_id = H256::default();
-        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            merchant,
-            client,
-            amount,
-            duration: 100
-        });
-        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
-            completed_on: 50,
-            expired_on: 50+10*10,
-            status: OrderStatus::Pending,
-            claimed_at: 50
-        });
-
-        Market::close_sorder(&order_id, amount.clone());
-
-        // storage order has been closed
-        assert_eq!(Balances::free_balance(&merchant), 200);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 60,
-            used: 0
-        });
-        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
-        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
-        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
-        assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
-            address_info: address_info.clone(),
-            storage_price: fee,
-            file_map: vec![].into_iter().collect()
-        });
-
-
-        // delete it twice would not have bad effect
-        Market::close_sorder(&order_id, amount);
-        assert_eq!(Balances::free_balance(&merchant), 200);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 60,
-            used: 0
-        });
-        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
-        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
-        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
-    });
-}
-
-#[test]
-fn test_scenario_for_file_alias_should_work() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let client: u64 = 0;
-        let file_size = 16; // should less than merchant
-        let duration = 10;
-        let fee: u64 = 1;
-        let amount: u64 = 10;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 60);
-
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 60);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 60));
-        assert!(!<Pledges<Test>>::contains_key(merchant.clone()));
-        assert_eq!(Balances::locks(merchant.clone()).len(), 0);
-
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), merchant.clone(),
-            file_identifier.clone(), file_size, duration, file_alias.clone()
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
         ));
 
-        let order_id = H256::default();
-        assert_eq!(Market::merchants(&merchant).unwrap(), MerchantInfo {
-            address_info,
-            storage_price: fee,
-            file_map: vec![(file_identifier.clone(), vec![order_id.clone()])].into_iter().collect()
-        });
-        assert_eq!(Market::clients(&client, &file_alias).unwrap(), vec![order_id.clone()]);
-        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            merchant,
-            client,
-            amount,
-            duration: 100
-        });
-        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
-            completed_on: 50,
-            expired_on: 50+10*10,
-            status: OrderStatus::Pending,
-            claimed_at: 50
-        });
-
-
-        let new_file_alias = "/test/file2".as_bytes().to_vec();
-        assert_noop!(
-            Market::set_file_alias(
-                Origin::signed(source.clone()), new_file_alias.clone(), file_alias.clone()
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 11,
-                message: Some("InvalidFileAlias"),
-            }
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
         );
-        Market::set_file_alias(Origin::signed(source.clone()), file_alias.clone(), new_file_alias.clone()).unwrap();
-        assert!(!<Clients<Test>>::contains_key(&client, &file_alias));
-        assert_eq!(Market::clients(&client, &new_file_alias).unwrap(), vec![order_id.clone()]);
+        assert_eq!(Balances::free_balance(staking_pot), 1600);
+        assert_eq!(Balances::free_balance(storage_pot), 400);
     });
 }
 
 #[test]
-fn test_for_update_punishment_for_merchant() {
+// For extends:
+// 1. Add amount
+// 2. Extend duration
+// 3. Extend replicas
+fn place_storage_order_should_work_for_extend_scenarios() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let fee: u64 = 1;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 60);
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 20000);
 
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::pledge(Origin::signed(merchant.clone()), 60));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), address_info.clone(), fee));
-        insert_sorder(&merchant, &file_identifier, 0, 1000, OrderStatus::Success);
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
-        let order_id = Hash::repeat_byte(0);
-        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
-            file_identifier: file_identifier.clone(),
-            file_size: 0,
-            created_on: 0,
-            merchant,
-            client: 100,
-            amount: 10,
-            duration: 50
-        });
-        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
-            completed_on: 0,
-            expired_on: 1000,
-            status: OrderStatus::Success,
-            claimed_at: 50
-        });
-        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
-            success: 0,
-            failed: 0,
-            updated_at: 50
-        });
-        Market::update_sorder_punishment(&order_id, &100, &OrderStatus::Success);
-        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
-            success: 50,
-            failed: 0,
-            updated_at: 100
-        });
-        Market::update_sorder_punishment(&order_id, &120, &OrderStatus::Failed);
-        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
-            success: 50,
-            failed: 20,
-            updated_at: 120
-        });
-    });
-}
-
-#[test]
-fn test_for_pay_sorders() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let client: u64 = 0;
-        let file_size = 16; // should less than merchant
-        let duration: u32 = 100;
-        let fee: u64 = 1000;
-        let amount: u64 = duration as u64 * fee;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 500000);
-
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 500000);
-        assert_ok!(Market::pledge(Origin::signed(merchant), 500000));
-        assert_ok!(Market::register(Origin::signed(merchant), address_info.clone(), fee));
+        // 1. New storage order
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
         ));
 
-        let order_id = H256::default();
-        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            merchant,
-            client,
-            amount,
-            duration: duration*10
-        });
-        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
-            completed_on: 50,
-            expired_on: 50+duration*10,
-            status: OrderStatus::Pending,
-            claimed_at: 50
-        });
-        let mut so = Market::sorder_statuses(&order_id).unwrap();
-        so.status = OrderStatus::Success;
-        <SorderStatuses<Test>>::insert(order_id.clone(), so);
-        // 91% SLA
-        Market::update_sorder_punishment(&order_id, &141, &OrderStatus::Success);
-        Market::update_sorder_punishment(&order_id, &150, &OrderStatus::Failed);
-        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
-            success: 91,
-            failed: 9,
-            updated_at: 150
-        });
-        run_to_block(150);
-        assert_eq!(Balances::free_balance(&merchant), 500000);
-        assert_eq!(Balances::free_balance(&source), 400000);
-        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
-        assert_eq!(Balances::free_balance(&merchant), 508000);
-        assert_eq!(Balances::free_balance(&source), 402000);
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+        assert_eq!(Balances::free_balance(&staking_pot), 1600);
+        assert_eq!(Balances::free_balance(&storage_pot), 400);
 
-        // 95% SLA
-        Market::update_sorder_punishment(&order_id, &249, &OrderStatus::Success);
-        Market::update_sorder_punishment(&order_id, &250, &OrderStatus::Failed);
-        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
-            success: 190,
-            failed: 10,
-            updated_at: 250
-        });
         run_to_block(250);
-        assert_eq!(Balances::free_balance(&merchant), 508000);
-        assert_eq!(Balances::free_balance(&source), 402000);
-        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
-        assert_eq!(Balances::free_balance(&merchant), 517000);
-        assert_eq!(Balances::free_balance(&source), 403000);
+        
+        // 2. Add amount for sOrder not begin should work
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
+        ));
 
-        // ~50% SLA
-        Market::update_sorder_punishment(&order_id, &450, &OrderStatus::Failed);
-        assert_eq!(Market::sorder_punishments(&order_id).unwrap(), SorderPunishment {
-            success: 190,
-            failed: 210,
-            updated_at: 450
-        });
-        run_to_block(450);
-        assert_eq!(Balances::free_balance(&merchant), 517000);
-        assert_eq!(Balances::free_balance(&source), 403000);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 500000,
-            used: 100000
-        });
-        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
-        // 50% pledge is slashed
-        assert_eq!(Balances::free_balance(&merchant), 467000);
-        assert_eq!(Balances::free_balance(&source), 483000);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 450000,
-            used: 0
-        });
-        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
-        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
-        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 800, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+        assert_eq!(Balances::free_balance(&staking_pot), 3200);
+        assert_eq!(Balances::free_balance(&storage_pot), 800);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        // Report this cid's works
+        register(&legal_pk, LegalCode::get());
+        run_to_block(400);
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1400,
+                claimed_at: 400,
+                amount: 800, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        // Calculate mannual claim reward should work
+        run_to_block(500);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1400,
+                claimed_at: 500,
+                amount: 720,
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        // 3. Extend duration should work
+        run_to_block(600);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1600,
+                claimed_at: 600,
+                amount: 1040,
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        // 4. Extend replicas should work
+        run_to_block(800);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 200, true
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1800,
+                claimed_at: 800,
+                amount: 1272,
+                expected_replica_count: 8,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+    });
+}
+
+
+/// Payouts test cases
+#[test]
+// Payout should be triggered by:
+// 1. Delete file(covered by swork module)
+// 2. Claim reward
+// 3. Place started storage order(covered by `place_storage_order_should_work_for_extend_scenarios`)
+fn calculate_payout_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+ 
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 20000);
+
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+
+        // 1. Place an order 1st
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        assert_eq!(Balances::free_balance(staking_pot), 1600);
+        assert_eq!(Balances::free_balance(storage_pot), 400);
+
+        run_to_block(303);
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        // 2. Report this file's work, let file begin
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 303,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        // 3. Go along with some time, and get reward
+        run_to_block(606);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 606,
+                amount: 279, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 121
+        })
     });
 }
 
 #[test]
-fn test_for_pay_sorders_for_out_dated_order() {
+fn calculate_payout_should_fail_due_to_insufficient_pledge() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
 
-        let source = 0;
-        let file_identifier =
-        hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let merchant: u64 = 100;
-        let client: u64 = 0;
-        let file_size = 16; // should less than merchant
-        let duration: u32 = 100;
-        let fee: u64 = 1000;
-        let amount: u64 = duration as u64 * fee;
-        let address_info = "ws://127.0.0.1:8855".as_bytes().to_vec();
-        let file_alias = "/test/file1".as_bytes().to_vec();
-        let _ = Balances::make_free_balance_be(&source, 500000);
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 20000);
 
-        // 1. Normal flow, aka happy pass 😃
-        let _ = Balances::make_free_balance_be(&merchant, 500000);
-        assert_ok!(Market::pledge(Origin::signed(merchant), 500000));
-        assert_ok!(Market::register(Origin::signed(merchant), address_info.clone(), fee));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), merchant,
-            file_identifier.clone(), file_size, duration, file_alias
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
         ));
 
-        let order_id = H256::default();
-        assert_eq!(Market::sorder_infos(&order_id).unwrap(), SorderInfo {
-            file_identifier: file_identifier.clone(),
-            file_size: 16,
-            created_on: 50,
-            merchant,
-            client,
-            amount,
-            duration: duration*10
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        assert_eq!(Balances::free_balance(staking_pot), 1600);
+        assert_eq!(Balances::free_balance(storage_pot), 400);
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 303,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        run_to_block(603);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 603,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        // pledge is 60 < 121 reward
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 60,
+            reward: 0
         });
-        assert_eq!(Market::sorder_statuses(&order_id).unwrap(), SorderStatus {
-            completed_on: 50,
-            expired_on: 50+duration*10,
-            status: OrderStatus::Pending,
-            claimed_at: 50
-        });
-        let mut so = Market::sorder_statuses(&order_id).unwrap();
-        so.status = OrderStatus::Success;
-        <SorderStatuses<Test>>::insert(order_id.clone(), so);
-        
-        run_to_block(1050);
-        assert_eq!(Balances::free_balance(&merchant), 500000);
-        assert_eq!(Balances::free_balance(&source), 400000);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 500000,
-            used: 100000
-        });
-        assert_ok!(Market::pay_sorders(Origin::signed(source), vec![order_id]));
-        // 50% pledge is slashed
-        assert_eq!(Balances::free_balance(&merchant), 600000);
-        assert_eq!(Balances::free_balance(&source), 400000);
-        assert_eq!(Market::pledges(&merchant), Pledge {
-            total: 500000,
-            used: 0
-        });
-        assert!(!<SorderStatuses<Test>>::contains_key(&order_id));
-        assert!(!<SorderInfos<Test>>::contains_key(&order_id));
-        assert!(!<SorderPunishments<Test>>::contains_key(&order_id));
+
+        run_to_block(903);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 600, true);
+        assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 903,
+                amount: 229, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6060,
+            reward: 171
+        })
     });
 }
+
+#[test]
+fn calculate_payout_should_move_file_to_trash_due_to_expired() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 20000);
+
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        assert_eq!(Balances::free_balance(staking_pot), 1600);
+        assert_eq!(Balances::free_balance(storage_pot), 400);
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 303,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        run_to_block(1506);
+        // expired_on is 1303. So to check 900
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid), None);
+
+        assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+        });
+
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 400
+        })
+    });
+}
+
+#[test]
+fn calculate_payout_should_work_in_complex_timeline() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let charlie = Sr25519Keyring::Charlie.to_account_id();
+        let dave = Sr25519Keyring::Dave.to_account_id();
+        let eve = Sr25519Keyring::Eve.to_account_id();
+
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        let reserved_pot = Market::reserved_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        assert_eq!(Balances::free_balance(&reserved_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6000));
+        }
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        assert_eq!(Balances::free_balance(staking_pot), 1600);
+        assert_eq!(Balances::free_balance(storage_pot), 400);
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files_size(), file_size as u128);
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 303,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        run_to_block(503);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 503,
+                amount: 320,
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 80
+        });
+
+        add_who_into_replica(&cid, charlie.clone(), legal_pk.clone(), None);
+
+        run_to_block(603);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 603,
+                amount: 280,
+                expected_replica_count: 4,
+                reported_replica_count: 2,
+                replicas: vec![
+                    Replica {
+                        who: merchant.clone(),
+                        valid_at: 303,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: charlie.clone(),
+                        valid_at: 503,
+                        anchor: legal_pk.clone()
+                    }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 100
+        });
+        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+            pledge: 6000,
+            reward: 20
+        });
+
+        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+
+        add_who_into_replica(&cid, dave.clone(), hex::decode("11").unwrap(), None);
+        run_to_block(703);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 703,
+                amount: 254,
+                expected_replica_count: 4,
+                reported_replica_count: 2,
+                replicas: vec![
+                    Replica {
+                        who: merchant.clone(),
+                        valid_at: 303,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: charlie.clone(),
+                        valid_at: 503,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: dave.clone(),
+                        valid_at: 703, // did't report. change it to curr bn
+                        anchor: hex::decode("11").unwrap()
+                    }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
+            })
+        );
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 113
+        });
+        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+            pledge: 6000,
+            reward: 33
+        });
+
+        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+
+        run_to_block(903);
+        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 600, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 903,
+                amount: 226,
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![
+                    Replica {
+                        who: dave.clone(),
+                        valid_at: 703,
+                        anchor: hex::decode("11").unwrap()
+                    },
+                    Replica {
+                        who: merchant.clone(),
+                        valid_at: 903, // did't report. change it to curr bn
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: charlie.clone(),
+                        valid_at: 903, // did't report. change it to curr bn
+                        anchor: legal_pk.clone()
+                    }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
+            })
+        );
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 113
+        });
+        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+            pledge: 6000,
+            reward: 33
+        });
+        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+            pledge: 6000,
+            reward: 28
+        });
+
+        assert_eq!(Market::files_size(), file_size as u128);
+
+        run_to_block(1203);
+        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 900, true);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 1203,
+                amount: 58,
+                expected_replica_count: 4,
+                reported_replica_count: 3,
+                replicas: vec![
+                    Replica {
+                        who: dave.clone(),
+                        valid_at: 703,
+                        anchor: hex::decode("11").unwrap()
+                    },
+                    Replica {
+                        who: merchant.clone(),
+                        valid_at: 903,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: charlie.clone(),
+                        valid_at: 903,
+                        anchor: legal_pk.clone()
+                    }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
+            })
+        );
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 169
+        });
+        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+            pledge: 6000,
+            reward: 89
+        });
+        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+            pledge: 6000,
+            reward: 84
+        });
+        assert_eq!(Market::files_size(), (file_size * 3) as u128);
+
+        run_to_block(1803);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        let mut anchors = <BTreeSet<SworkerAnchor>>::new();
+        anchors.insert(legal_pk.clone());
+        anchors.insert(hex::decode("11").unwrap());
+        assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors
+        });
+
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 188
+        });
+        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+            pledge: 6000,
+            reward: 108
+        });
+        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+            pledge: 6000,
+            reward: 103
+        });
+        assert_eq!(Market::files_size(), 0);
+        assert_eq!(Balances::free_balance(&reserved_pot), 1);
+    });
+}
+
+#[test]
+fn calculate_payout_should_fail_due_to_not_live() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 20000);
+
+        // pledge is 60 < 121 reward
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        run_to_block(1506);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+    });
+}
+
+#[test]
+fn calculate_payout_should_work_for_more_replicas() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let charlie = Sr25519Keyring::Charlie.to_account_id();
+        let dave = Sr25519Keyring::Dave.to_account_id();
+        let eve = Sr25519Keyring::Eve.to_account_id();
+        let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6000));
+        }
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        add_who_into_replica(&cid, ferdie.clone(), legal_pk.clone(), Some(303u32));
+        assert_eq!(Market::files_size(), file_size as u128);
+        add_who_into_replica(&cid, charlie.clone(), legal_pk.clone(), Some(403u32));
+        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+        add_who_into_replica(&cid, dave.clone(), legal_pk.clone(), Some(503u32));
+        assert_eq!(Market::files_size(), (file_size * 3) as u128);
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files_size(), (file_size * 4) as u128);
+
+        add_who_into_replica(&cid, eve.clone(), legal_pk.clone(), Some(503u32));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 303,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 5,
+                replicas: vec![
+                    Replica {
+                        who: ferdie.clone(),
+                        valid_at: 303,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: merchant.clone(),
+                        valid_at: 303,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: charlie.clone(),
+                        valid_at: 403,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: dave.clone(),
+                        valid_at: 503,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: eve.clone(),
+                        valid_at: 503,
+                        anchor: legal_pk.clone()
+                    }
+                ]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+        run_to_block(503);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                claimed_at: 503,
+                amount: 320,
+                expected_replica_count: 4,
+                reported_replica_count: 5,
+                replicas: vec![
+                    Replica {
+                        who: ferdie.clone(),
+                        valid_at: 303,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: merchant.clone(),
+                        valid_at: 303,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: charlie.clone(),
+                        valid_at: 403,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: dave.clone(),
+                        valid_at: 503,
+                        anchor: legal_pk.clone()
+                    },
+                    Replica {
+                        who: eve.clone(),
+                        valid_at: 503,
+                        anchor: legal_pk.clone()
+                    }
+                ]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        assert_eq!(Market::merchant_ledgers(&ferdie), MerchantLedger {
+            pledge: 6000,
+            reward: 20
+        });
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 20
+        });
+        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+            pledge: 6000,
+            reward: 20
+        });
+        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+            pledge: 6000,
+            reward: 20
+        });
+        assert_eq!(Market::merchant_ledgers(&eve), MerchantLedger {
+            pledge: 6000,
+            reward: 0
+        });
+    });
+}
+
+
+/// Trash test case
+#[test]
+fn clear_trash_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = Sr25519Keyring::Alice.to_account_id();
+        let cid1 =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let cid2 =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b661").unwrap();
+        let cid3 =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b662").unwrap();
+        let cid4 =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b663").unwrap();
+        let cid5 =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b664").unwrap();
+        let cid6 =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b665").unwrap();
+        let file_lists = vec![cid1.clone(), cid2.clone(), cid3.clone(), cid4.clone(), cid5.clone(), cid6.clone()];
+        let file_size = 100; // should less than merchant
+        let merchant = Sr25519Keyring::Bob.to_account_id();
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 20000);
+
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+
+        for cid in file_lists.clone().iter() {
+            assert_ok!(Market::place_storage_order(
+                Origin::signed(source.clone()), cid.clone(),
+                file_size, 0, false
+            ));
+            assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                anchors: BTreeSet::from_iter(vec![].into_iter())
+            })
+            );
+        }
+
+        run_to_block(303);
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+        register(&legal_pk, LegalCode::get());
+        for cid in file_lists.clone().iter() {
+            add_who_into_replica(&cid, merchant.clone(), legal_pk.clone(), None);
+        }
+
+        for cid in file_lists.clone().iter() {
+            assert_eq!(Market::files(&cid).unwrap_or_default(), (
+                FileInfo {
+                    file_size,
+                    expired_on: 1303,
+                    claimed_at: 303,
+                    amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                    expected_replica_count: 4,
+                    reported_replica_count: 1,
+                    replicas: vec![Replica {
+                        who: merchant.clone(),
+                        valid_at: 303,
+                        anchor: legal_pk.clone()
+                    }]
+                },
+                UsedInfo {
+                    used_size: file_size,
+                    anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                })
+            );
+        }
+
+        run_to_block(1500);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
+        // close files one by one
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
+        assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+        });
+
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
+        assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+        });
+
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
+        assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+        });
+
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
+        assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+        });
+        assert_eq!(Market::used_trash_i(&cid1), None);
+        assert_eq!(Market::used_trash_i(&cid2), None);
+
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
+        assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+        });
+
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
+        assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), UsedInfo {
+            used_size: file_size,
+            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+        });
+
+        assert_eq!(Market::used_trash_ii(&cid3), None);
+        assert_eq!(Market::used_trash_ii(&cid4), None);
+    });
+}
+
+/// Update file price test case
+#[test]
+fn update_price_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        // 0 / 0 => None => decrease
+        Market::update_storage_price();
+        assert_eq!(Market::file_price(), 990);
+
+        run_to_block(50);
+        // first class storage is 0
+        <swork::Free>::put(10000);
+        <swork::Used>::put(10000);
+        assert_eq!(Swork::get_free_plus_used(), 20000);
+        Market::update_storage_price();
+        assert_eq!(Market::file_price(), 980);
+
+        // first class storage is 11000 => increase 1%
+        FilesSize::put(11000);
+        Market::update_storage_price();
+        assert_eq!(Market::file_price(), 990);
+
+        // price is 40 and cannot decrease
+        <FilePrice<Test>>::put(40);
+        FilesSize::put(10);
+        Market::update_storage_price();
+        assert_eq!(Market::file_price(), 40);
+
+        // price is 40 and will increase by 1
+        FilesSize::put(20000);
+        Market::update_storage_price();
+        assert_eq!(Market::file_price(), 41);
+    });
+}
+

@@ -5,29 +5,20 @@ use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
     dispatch::DispatchResult, ensure,
+    storage::migration::remove_storage_prefix,
     traits::{
-        Randomness, Currency, ReservableCurrency, LockIdentifier, LockableCurrency,
-        WithdrawReasons, Get, ExistenceRequirement
-    },
-    weights::Weight
+        Currency, ReservableCurrency, Get, ExistenceRequirement::AllowDeath,
+    }
 };
-use sp_std::{prelude::*, convert::TryInto, collections::btree_map::BTreeMap};
+use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
-    Perbill,
-    traits::{StaticLookup, Zero, CheckedMul, Convert}
+    Perbill, ModuleId,
+    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
 };
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
-
-// Crust runtime modules
-use primitives::{
-    AddressInfo, MerkleRoot, BlockNumber, FileAlias,
-    traits::TransferrableCurrency
-};
-
-pub mod weight;
 
 #[cfg(test)]
 mod mock;
@@ -35,12 +26,11 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[cfg(any(feature = "runtime-benchmarks", test))]
-pub mod benchmarking;
+use primitives::{
+    MerkleRoot, BlockNumber,
+    traits::{TransferrableCurrency, MarketInterface, SworkerInterface}, SworkerAnchor
+};
 
-const MARKET_ID: LockIdentifier = *b"market  ";
-
-pub(crate) const LOG_TARGET: &'static str = "market";
 
 #[macro_export]
 macro_rules! log {
@@ -52,237 +42,255 @@ macro_rules! log {
     };
 }
 
-pub trait WeightInfo {
-    fn pledge() -> Weight;
-    fn pledge_extra() -> Weight;
-    fn cut_pledge() -> Weight;
-    fn register() -> Weight;
-    fn place_storage_order() -> Weight;
-    fn set_file_alias() -> Weight;
-}
-
-/// Counter for the number of eras that have passed.
-pub type EraIndex = u32;
-
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct SorderInfo<AccountId, Balance> {
-    pub file_identifier: MerkleRoot,
+pub struct FileInfo<AccountId, Balance> {
+    // The ordered file size, which declare by user
     pub file_size: u64,
-    pub created_on: BlockNumber,
-    pub merchant: AccountId,
-    pub client: AccountId,
-    pub amount: Balance,
-    pub duration: BlockNumber
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct SorderStatus {
-    pub completed_on: BlockNumber,
+    // The block number when the file goes invalide
     pub expired_on: BlockNumber,
-    pub status: OrderStatus,
-    pub claimed_at: BlockNumber
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub enum OrderStatus {
-    Success,
-    Failed,
-    Pending
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct SorderPunishment {
-    pub success: BlockNumber,
-    pub failed: BlockNumber,
-    pub updated_at: BlockNumber
-}
-
-impl Default for SorderPunishment {
-    fn default() -> Self {
-        SorderPunishment {
-            success: 0,
-            failed: 0,
-            updated_at: 0
-        }
-    }
+    // The last block number when the file's amount is claimed
+    pub claimed_at: BlockNumber,
+    // The file value
+    pub amount: Balance,
+    // The count of replica that user wants
+    pub expected_replica_count: u32,
+    // The count of valid replica each report slot
+    pub reported_replica_count: u32,
+    // The replica list
+    // TODO: restrict the length of this replica
+    pub replicas: Vec<Replica<AccountId>>
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Pledge<Balance> {
-    // total balance of pledge
-    pub total: Balance,
-    // used balance of pledge
-    pub used: Balance
+pub struct Replica<AccountId> {
+    // Controller account
+    pub who: AccountId,
+    // The last bloch number when the node reported works
+    pub valid_at: BlockNumber,
+    // The anchor associated to the node mapping with file
+    pub anchor: SworkerAnchor,
 }
 
-impl Default for OrderStatus {
-    fn default() -> Self {
-        OrderStatus::Pending
-    }
-}
-
-/// Preference of what happens regarding validation.
+/// According to the definition, we should put this one into swork pallet.
+/// However, in consideration of performance,
+/// we put this in market to avoid too many keys in storage
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct MerchantInfo<Hash, Balance> {
-    /// Merchant's address
-    pub address_info: AddressInfo,
-    /// Merchant's storage order's price, unit is CRUs/byte/minute
-    pub storage_price: Balance,
-    /// Mapping from `file_id` to `sorder_id`s
-    /// this mapping only be added when client place a sorder
-    pub file_map: BTreeMap<MerkleRoot, Vec<Hash>>,
+pub struct UsedInfo {
+    // The size of used value in MPoW
+    pub used_size: u64,
+    // Anchors which is counted as contributor for this file
+    pub anchors: BTreeSet<SworkerAnchor>
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct MerchantLedger<Balance> {
+    // The current reward amount.
+    pub reward: Balance,
+    // The total pledge amount
+    pub pledge: Balance
 }
 
 type BalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
-/// A trait for checking order's legality
-/// This wanyi is an outer inspector to judge if s/r order can be accepted 😵
-pub trait OrderInspector<AccountId> {
-    /// Check if the merchant can take storage order
-    fn check_works(merchant: &AccountId, file_size: u64) -> bool;
-}
-
-/// Means for interacting with a specialized version of the `market` trait.
-///
-/// This is needed because `sWork`
-/// 1. updates the `Merchants` of the `market::Trait`
-/// 2. use `Merchants` to judge work report
-pub trait MarketInterface<AccountId, Hash, Balance> {
-    /// MerchantInfo{files} will be used for swork module.
-    fn merchants(account_id: &AccountId) -> Option<MerchantInfo<Hash, Balance>>;
-    /// Get storage order
-    fn maybe_get_sorder_status(order_id: &Hash) -> Option<SorderStatus>;
-    /// (Maybe) set storage order's status
-    fn maybe_set_sorder_status(order_id: &Hash, so_status: &SorderStatus, current_block: &BlockNumber);
-}
-
-impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
-    fn merchants(_: &AId) -> Option<MerchantInfo<Hash, Balance>> {
-        None
-    }
-
-    fn maybe_get_sorder_status(_: &Hash) -> Option<SorderStatus> {
-        None
-    }
-
-    fn maybe_set_sorder_status(_: &Hash, _: &SorderStatus, _: &BlockNumber) {
-
-    }
-}
-
-impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
-    <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
+impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId> for Module<T>
 {
-    fn merchants(account_id: &<T as system::Trait>::AccountId)
-                 -> Option<MerchantInfo<<T as system::Trait>::Hash, BalanceOf<T>>> {
-        Self::merchants(account_id)
+    /// Upsert new replica
+    /// Accept id(who, anchor), cid, valid_at and maybe_member
+    /// Returns whether this id is counted to a group/itself's stake limit
+    fn upsert_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, maybe_members: &Option<BTreeSet<<T as system::Trait>::AccountId>>) -> bool {
+        // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
+        // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
+        // if the file exist, is_counted == true, will change it later.
+        let mut is_counted = <Files<T>>::get(cid).is_some();
+        if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
+            
+            // 1. Check if the file is stored by other members
+            if let Some(members) = maybe_members {
+                for replica in file_info.replicas.iter() {
+                    if used_info.anchors.contains(&replica.anchor) && members.contains(&replica.who) {
+                        if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
+                            // duplicated in group and set is_counted to false
+                            is_counted = false;
+                        }
+                    }
+                }
+            }
+
+            // 2. Prepare new replica info
+            let new_replica = Replica {
+                who: who.clone(),
+                valid_at,
+                anchor: anchor.clone(),
+            };
+            file_info.reported_replica_count += 1;
+            Self::insert_replica(&mut file_info, new_replica);
+
+            // 3. Update used_info
+            if is_counted {
+                used_info.anchors.insert(anchor.clone());
+            };
+
+            // 4. The first join the 
+            let curr_bn = Self::get_current_block_number();
+            if file_info.replicas.len() == 1 {
+                file_info.claimed_at = curr_bn;
+                file_info.expired_on = curr_bn + T::FileDuration::get();
+            }
+
+            // 5. Update files size
+            if file_info.reported_replica_count <= file_info.expected_replica_count {
+                FilesSize::mutate(|fcs| { *fcs = fcs.saturating_add(file_info.file_size as u128); });
+            }
+
+            // 6. Update files
+            <Files<T>>::insert(cid, (file_info, used_info));
+        }
+        return is_counted
     }
 
-    fn maybe_get_sorder_status(order_id: &<T as system::Trait>::Hash)
-        -> Option<SorderStatus> {
-        Self::sorder_statuses(order_id)
-    }
+    /// Node who delete the replica
+    /// Accept id(who, anchor), cid and current block number
+    /// Return whether this id is counted to a group/itself's stake limit
+    fn delete_replicas(who: &<T as system::Trait>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
+        if <Files<T>>::get(cid).is_some() {
+            // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
+            let claimed_bn = Self::calculate_payout(cid, curr_bn);
+            
+            // 2. Delete replica from file_info
+            if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+                // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
+                if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
+                    // decrease it due to deletion
+                    file_info.reported_replica_count -= 1;
+                    if file_info.reported_replica_count < file_info.expected_replica_count {
+                        FilesSize::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
+                    }
+                }
+                file_info.replicas.retain(|replica| {
+                    replica.who != *who
+                });
+                <Files<T>>::insert(cid, (file_info, used_info));
+            }
+        }
 
-    fn maybe_set_sorder_status(order_id: &<T as system::Trait>::Hash,
-                        so_status: &SorderStatus,
-                        current_block: &BlockNumber) {
-        Self::maybe_set_sorder_status(order_id, so_status, current_block);
+        // 3. Delete anchor from file_info/file_trash and return whether it is counted
+        Self::delete_used_anchor(cid, anchor)
     }
 }
 
 /// The module's configuration trait.
 pub trait Trait: system::Trait {
+    /// The market's module id, used for deriving its sovereign account ID.
+    type ModuleId: Get<ModuleId>;
+
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId> + TransferrableCurrency<Self::AccountId>;
 
     /// Converter from Currency<u64> to Balance.
     type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
 
+    /// used to check work report
+    type SworkerInterface: SworkerInterface<Self::AccountId>;
+
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
-    /// Something that provides randomness in the runtime.
-    type Randomness: Randomness<Self::Hash>;
+    /// File duration.
+    type FileDuration: Get<BlockNumber>;
 
-    /// Connector with swork module
-    type OrderInspector: OrderInspector<Self::AccountId>;
+    /// File base replica. Use 4 for now
+    type InitialReplica: Get<u32>;
 
-    /// Minimum storage order price
-    type MinimumStoragePrice: Get<BalanceOf<Self>>;
+    /// File Base Fee. Use 0.001 CRU for now
+    type FileBaseFee: Get<BalanceOf<Self>>;
 
-    /// Minimum storage order duration
-    type MinimumSorderDuration: Get<u32>;
+    /// File Base Price.
+    type FileInitPrice: Get<BalanceOf<Self>>;
 
-    /// Max limit for the length of sorders in each payment claim
+    /// Max limit for the length of sorders in each payment claim.
     type ClaimLimit: Get<u32>;
 
-    /// Weight information for extrinsics in this pallet.
-    type WeightInfo: WeightInfo;
+    /// Storage reference ratio. total / first class storage
+    type StorageReferenceRatio: Get<u128>;
+
+    /// Storage increase ratio.
+    type StorageIncreaseRatio: Get<Perbill>;
+
+    /// Storage decrease ratio.
+    type StorageDecreaseRatio: Get<Perbill>;
+
+    /// Storage/Staking ratio.
+    type StakingRatio: Get<Perbill>;
+
+    /// UsedTrashMaxSize.
+    type UsedTrashMaxSize: Get<u128>;
 }
 
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Market {
-        /// A mapping from storage merchant to order id
-        pub Merchants get(fn merchants):
-        map hasher(twox_64_concat) T::AccountId => Option<MerchantInfo<T::Hash, BalanceOf<T>>>;
+        /// Merchant Ledger
+        pub MerchantLedgers get(fn merchant_ledgers):
+        map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
-        /// A mapping from clients to order id
-        pub Clients get(fn clients):
-        double_map hasher(twox_64_concat) T::AccountId, hasher(twox_64_concat) FileAlias => Option<Vec<T::Hash>>;
+        /// File information iterated by order id
+        pub Files get(fn files):
+        map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)>;
 
-        /// Order basic information iterated by order id
-        pub SorderInfos get(fn sorder_infos):
-        map hasher(twox_64_concat) T::Hash => Option<SorderInfo<T::AccountId, BalanceOf<T>>>;
+        /// File price. It would change according to First Party Storage, Total Storage and Storage Base Ratio.
+        pub FilePrice get(fn file_price): BalanceOf<T> = T::FileInitPrice::get();
 
-        /// Order status iterated by order id
-        pub SorderStatuses get(fn sorder_statuses):
-        map hasher(twox_64_concat) T::Hash => Option<SorderStatus>;
+        /// First Class Storage
+        pub FilesSize get(fn files_size): u128 = 0;
 
-        /// Order status counts used for punishment
-        pub SorderPunishments get(fn sorder_punishments):
-        map hasher(twox_64_concat) T::Hash => Option<SorderPunishment>;
+        /// File trash to store second class storage
+        pub UsedTrashI get(fn used_trash_i):
+        map hasher(twox_64_concat) MerkleRoot => Option<UsedInfo>;
 
-        /// Pledge details iterated by merchant id
-        pub Pledges get(fn pledges):
-        map hasher(twox_64_concat) T::AccountId => Pledge<BalanceOf<T>>;
+        pub UsedTrashII get(fn used_trash_ii):
+        map hasher(twox_64_concat) MerkleRoot => Option<UsedInfo>;
+
+        pub UsedTrashSizeI get(fn used_trash_size_i): u128 = 0;
+
+        pub UsedTrashSizeII get(fn used_trash_size_ii): u128 = 0;
+
+        pub UsedTrashMappingI get(fn used_trash_mapping_i):
+        map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
+
+        pub UsedTrashMappingII get(fn used_trash_mapping_ii):
+        map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
+
+
     }
+    add_extra_genesis {
+		build(|_config| {
+			// Create Market accounts
+			<Module<T>>::init_pot(<Module<T>>::pledge_pot);
+			<Module<T>>::init_pot(<Module<T>>::storage_pot);
+			<Module<T>>::init_pot(<Module<T>>::staking_pot);
+			<Module<T>>::init_pot(<Module<T>>::reserved_pot);
+		});
+	}
 }
 
 decl_error! {
     /// Error for the market module.
     pub enum Error for Module<T: Trait> {
-        /// Failed on generating order id
-        GenerateOrderIdFailed,
-        /// No workload
-        NoWorkload,
-        /// Target is not merchant
-        NotMerchant,
-        /// File duration is too short
-        DurationTooShort,
         /// Don't have enough currency
         InsufficientCurrency,
         /// Don't have enough pledge
         InsufficientPledge,
         /// Can not bond with value less than minimum balance.
         InsufficientValue,
-        /// Not Pledged before
-        NotPledged,
-        /// Pledged before
-        AlreadyPledged,
-        /// Place order to himself
-        PlaceSelfOrder,
-        /// Storage price is too low
-        LowStoragePrice,
-        /// Invalid file alias
-        InvalidFileAlias,
+        /// Not Register before
+        NotRegister,
+        /// Register before
+        AlreadyRegistered,
         /// Reward length is too long
         RewardLengthTooLong,
     }
@@ -296,52 +304,8 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
-        /// Register to be a merchant, you should provide your storage layer's address info,
-        /// this will require you to pledge first, complexity depends on `Pledges`(P) and `swork.WorkReports`(W).
-        ///
-        /// # <weight>
-        /// Complexity: O(logP)
-        /// - Read: Pledge
-        /// - Write: WorkReports, Merchants
-        /// # </weight>
-        #[weight = T::WeightInfo::register()]
-        pub fn register(
-            origin,
-            address_info: AddressInfo,
-            storage_price: BalanceOf<T>
-        ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // 1. Make sure you have works
-            ensure!(T::OrderInspector::check_works(&who, 0), Error::<T>::NoWorkload);
-
-            // 2. Check if the register already pledged before
-            ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
-
-            // 3. Make sure the storage price
-            ensure!(storage_price >= T::MinimumStoragePrice::get(), Error::<T>::LowStoragePrice);
-
-            // 4. Upsert merchant info
-            <Merchants<T>>::mutate(&who, |maybe_minfo| {
-                if let Some(minfo) = maybe_minfo {
-                    // Update merchant
-                    minfo.address_info = address_info;
-                    minfo.storage_price = storage_price;
-                } else {
-                    // New merchant
-                    *maybe_minfo = Some(MerchantInfo {
-                        address_info,
-                        storage_price,
-                        file_map: BTreeMap::new()
-                    })
-                }
-            });
-
-            // 5. Emit success
-            Self::deposit_event(RawEvent::RegisterSuccess(who));
-
-            Ok(())
-        }
+        /// The market's module id, used for deriving its sovereign account ID.
+		const ModuleId: ModuleId = T::ModuleId::get();
 
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to pledge first, complexity depends on `Pledges`(P).
@@ -351,33 +315,36 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = T::WeightInfo::pledge()]
-        pub fn pledge(
+        #[weight = 1000]
+        pub fn register(
             origin,
-            #[compact] value: BalanceOf<T>
+            #[compact] pledge: BalanceOf<T>
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Reject a pledge which is considered to be _dust_.
-            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+            ensure!(pledge >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Ensure merchant has enough currency.
-            ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(pledge <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 3. Check if merchant has not pledged before
-            ensure!(!<Pledges<T>>::contains_key(&who), Error::<T>::AlreadyPledged);
+            // 3. Check if merchant has not register before.
+            ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
 
-            // 4. Prepare new pledge
-            let pledge = Pledge {
-                total: value,
-                used: Zero::zero()
+            // 4. Transfer from origin to pledge account.
+            T::Currency::transfer(&who, &Self::pledge_pot(), pledge.clone(), AllowDeath).expect("Something wrong during transferring");
+
+            // 5. Prepare new ledger
+            let ledger = MerchantLedger {
+                reward: Zero::zero(),
+                pledge: pledge.clone()
             };
 
-            // 5 Upsert pledge
-            Self::upsert_pledge(&who, &pledge);
+            // 6. Upsert pledge.
+            <MerchantLedgers<T>>::insert(&who, ledger);
 
-            // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who));
+            // 7. Emit success
+            Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), pledge));
 
             Ok(())
         }
@@ -389,7 +356,7 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = T::WeightInfo::pledge_extra()]
+        #[weight = 1000]
         pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -397,20 +364,19 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if merchant has pledged before
-            ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
+            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             // 3. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
-            let mut pledge = Self::pledges(&who);
-            // 4. Increase total value
-            pledge.total += value;
+            // 4. Upgrade pledge.
+            <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.pledge += value.clone();});
 
-            // 5 Upsert pledge
-            Self::upsert_pledge(&who, &pledge);
+            // 5. Transfer from origin to pledge account.
+            T::Currency::transfer(&who, &Self::pledge_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who));
+            Self::deposit_event(RawEvent::PledgeExtraSuccess(who.clone(), value));
 
             Ok(())
         }
@@ -422,7 +388,7 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = T::WeightInfo::cut_pledge()]
+        #[weight = 1000]
         pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -430,374 +396,371 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if merchant has pledged before
-            ensure!(<Pledges<T>>::contains_key(&who), Error::<T>::NotPledged);
+            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
+
+            let mut ledger = Self::merchant_ledgers(&who);
 
             // 3. Ensure value is smaller than unused.
-            let mut pledge = Self::pledges(&who);
-            ensure!(value <= pledge.total - pledge.used, Error::<T>::InsufficientPledge);
+            ensure!(value <= ledger.pledge - ledger.reward, Error::<T>::InsufficientPledge);
 
-            // 4. Decrease total value
-            pledge.total -= value;
+            // 4. Upgrade pledge.
+            ledger.pledge -= value.clone();
+            <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
-            // 5 Upsert pledge
-            if pledge.total.is_zero() {
-                <Pledges<T>>::remove(&who);
-                // Remove the lock.
-                T::Currency::remove_lock(MARKET_ID, &who);
-            } else {
-                Self::upsert_pledge(&who, &pledge);
-            }
+            // 5. Transfer from origin to pledge account.
+            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeSuccess(who));
+            Self::deposit_event(RawEvent::CutPledgeSuccess(who, value));
 
             Ok(())
         }
 
         /// Place a storage order
-        // TODO: Reconsider this weight
-        #[weight = T::WeightInfo::place_storage_order()]
+        /// TODO: Reconsider this weight
+        #[weight = 1000]
         pub fn place_storage_order(
             origin,
-            target: <T::Lookup as StaticLookup>::Source,
-            file_identifier: MerkleRoot,
+            cid: MerkleRoot,
             file_size: u64,
-            duration: u32,
-            file_alias: FileAlias
+            #[compact] tips: BalanceOf<T>,
+            extend_replica: bool
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
-            let merchant = T::Lookup::lookup(target)?;
 
-            // 1. Cannot place storage order to himself.
-            ensure!(who != merchant, Error::<T>::PlaceSelfOrder);
+            // TODO: 10% tax
+            // 1. Calculate amount.
+            let amount = T::FileBaseFee::get() + Self::get_file_amount(file_size) + tips;
 
-            // 2. Expired should be greater than created
-            ensure!(duration > T::MinimumSorderDuration::get(), Error::<T>::DurationTooShort);
+            // 2. This should not happen at all
+            ensure!(amount >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 3. Check if merchant is registered
-            ensure!(<Merchants<T>>::contains_key(&merchant), Error::<T>::NotMerchant);
+            // 3. Check client can afford the sorder
+            ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
-            // 4. Check merchant has capacity to store file
-            ensure!(T::OrderInspector::check_works(&merchant, file_size), Error::<T>::NoWorkload);
+            // 4. Split into storage and staking account.
+            let storage_amount = Self::split_into_storage_and_staking_pot(&who, amount.clone());
 
-            // 5. Check if merchant pledged and has enough unused pledge
-            ensure!(<Pledges<T>>::contains_key(&merchant), Error::<T>::InsufficientPledge);
+            let curr_bn = Self::get_current_block_number();
 
-            let pledge = Self::pledges(&merchant);
-            let minfo = Self::merchants(&merchant).unwrap();
+            // 5. calculate payouts. Try to close file and decrease first party storage
+            Self::calculate_payout(&cid, curr_bn);
 
-            // 6. Get amount
-            let amount = Self::get_sorder_amount(&minfo.storage_price, file_size, duration).unwrap();
+            // 6. three scenarios: new file, extend time or extend replica
+            Self::upsert_new_file_info(&cid, extend_replica, &storage_amount, &curr_bn, file_size);
 
-            // 7. Judge if merchant's pledge is enough
-            ensure!(amount <= pledge.total - pledge.used, Error::<T>::InsufficientPledge);
+            // 7. Update storage price.
+            #[cfg(not(test))]
+            Self::update_storage_price();
 
-            // 8. Check client can afford the sorder
-            ensure!(T::Currency::can_reserve(&who, amount.clone()), Error::<T>::InsufficientCurrency);
-
-            // 9. Construct storage order
-            let created_on = TryInto::<u32>::try_into(<system::Module<T>>::block_number()).ok().unwrap();
-            let expired_on = created_on + duration*10;
-            let sorder_info = SorderInfo::<T::AccountId, BalanceOf<T>> {
-                file_identifier,
-                file_size,
-                created_on,
-                merchant: merchant.clone(),
-                client: who.clone(),
-                amount,
-                duration: duration * 10
-            };
-
-            let sorder_status = SorderStatus {
-                completed_on: created_on, // Not fixed, this will be changed, when `status` become `Success`
-                expired_on, // Not fixed, this will be changed, when `status` become `Success`
-                status: OrderStatus::Pending,
-                claimed_at: created_on
-            };
-
-
-            // 10. Pay the order and (maybe) add storage order
-            if let Some(order_id) = Self::maybe_insert_sorder(&who, &merchant, amount.clone(), &sorder_info, &sorder_status) {
-                // a. update pledge
-                <Pledges<T>>::mutate(&merchant, |pledge| {
-                        pledge.used += amount;
-                });
-                // b. Add `order_id` to client orders
-                <Clients<T>>::mutate(&who, file_alias, |maybe_client_orders| {
-                    if let Some(client_order) = maybe_client_orders {
-                        client_order.push(order_id.clone());
-                    } else {
-                        *maybe_client_orders = Some(vec![order_id.clone()])
-                    }
-                });
-                // c. emit storage order success event
-                Self::deposit_event(RawEvent::StorageOrderSuccess(who, sorder_info, sorder_status));
-            } else {
-                // d. emit error
-                Err(Error::<T>::GenerateOrderIdFailed)?
-            }
+            Self::deposit_event(RawEvent::FileSuccess(who, Self::files(cid).unwrap().0));
 
             Ok(())
         }
 
-        /// Rename the file path for a storage order
-        #[weight = T::WeightInfo::set_file_alias()]
-        pub fn set_file_alias(
+        /// Calculate the payout
+        /// TODO: Reconsider this weight
+        #[weight = 1000]
+        pub fn calculate_reward(
             origin,
-            old_file_alias: FileAlias,
-            new_file_alias: FileAlias
+            cid: MerkleRoot,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            ensure!(<Clients<T>>::contains_key(&who, &old_file_alias), Error::<T>::InvalidFileAlias);
-            let order_ids = Self::clients(&who, &old_file_alias).unwrap();
-            <Clients<T>>::insert(&who, &new_file_alias, order_ids);
-            <Clients<T>>::remove(&who, &old_file_alias);
-            Self::deposit_event(RawEvent::SetAliasSuccess(who, old_file_alias, new_file_alias));
+            let _ = ensure_signed(origin)?;
+            let curr_bn = Self::get_current_block_number();
+            Self::calculate_payout(&cid, curr_bn);
+            Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
         }
 
-        /// Do storage order payment
-        /// Would loop each sorder in the list
-        /// For each sorder, the process is 
-        /// 1. Update the sorder punishment
-        /// 2. Calculate payment ratio and slash ratio
-        /// 3. If the slash ratio is not zero, do slash and prepare for closing sorder
-        /// 4. Calculate total payment amount, unreserve the payment amount
-        /// 5. Transfer the payment ratio * payment amount currency
-        /// 6. Close the sorder or update the sorder status
-        #[weight = 1_000_000]
-        pub fn pay_sorders(
-            origin,
-            order_ids: Vec<T::Hash>
-        ) {
-            let who = ensure_signed(origin)?;
-
-            // The length of order_ids cannot be too long.
-            ensure!(order_ids.len() <= T::ClaimLimit::get().try_into().unwrap(), Error::<T>::RewardLengthTooLong);
-
-            let current_block_numeric = Self::get_current_block_number();
-            for order_id in order_ids.iter() {
-                if let Some(mut so_status) = Self::sorder_statuses(order_id) {
-                    if let Some(so_info) = Self::sorder_infos(order_id) {
-                        if so_status.status == OrderStatus::Pending {
-                            continue;
-                        }
-                        let mut payment_block = current_block_numeric.min(so_status.expired_on);
-                        Self::update_sorder_punishment(&order_id, &payment_block, &so_status.status);
-    
-                        let (payment_ratio, slash_ratio) = Self::get_payment_and_slash_ratio(&order_id);
-                        let mut slash_value = Zero::zero();
-                        // If we do need slash the merchant of this sorder.
-                        if !slash_ratio.is_zero() {
-                            slash_value = slash_ratio * so_info.amount;
-                            Self::slash_pledge(&so_info.merchant, slash_value);
-                            // Set the payment block to the expired on to trigger closing the order
-                            payment_block = so_status.expired_on;
-                        }
-                        // Do the payment
-                        let payment_amount = Perbill::from_rational_approximation(payment_block - so_status.claimed_at, so_info.duration) * so_info.amount;
-                        T::Currency::unreserve(&so_info.client, payment_amount);
-                        if T::Currency::transfer(&so_info.client, &so_info.merchant, payment_ratio * payment_amount, ExistenceRequirement::AllowDeath).is_ok() {
-                            if payment_block >= so_status.expired_on {
-                                Self::close_sorder(&order_id, so_info.amount - slash_value);
-                            } else {
-                                so_status.claimed_at = payment_block;
-                                <SorderStatuses<T>>::insert(order_id, so_status);
-                            }
-                        }
-                    }
-                }
-            }
-            Self::deposit_event(RawEvent::PaysOrderSuccess(who));
-        }
+        // TODO: add claim_reward
     }
 }
 
 impl<T: Trait> Module<T> {
-    // MUTABLE PUBLIC
-    pub fn maybe_set_sorder_status(order_id: &T::Hash,
-                                   so_status: &SorderStatus,
-                                   current_block: &BlockNumber) {
-        if let Some(old_sorder_status) = Self::sorder_statuses(order_id) {
-            if &old_sorder_status != so_status {
-                // 1. Update sorder punishment
-                Self::update_sorder_punishment(order_id, current_block, &old_sorder_status.status);
-                // 2. Update storage order status (`pay_sorders` depends on the newest `completed_on`)
-                <SorderStatuses<T>>::insert(order_id, so_status);
+    /// The pot of a pledge account
+    pub fn pledge_pot() -> T::AccountId {
+        // "modl" ++ "crmarket" ++ "pled" is 16 bytes
+        T::ModuleId::get().into_sub_account("pled")
+    }
+
+    /// The pot of a storage account
+    pub fn storage_pot() -> T::AccountId {
+        // "modl" ++ "crmarket" ++ "stor" is 16 bytes
+        T::ModuleId::get().into_sub_account("stor")
+    }
+
+    /// The pot of a staking account
+    pub fn staking_pot() -> T::AccountId {
+        // "modl" ++ "crmarket" ++ "stak" is 16 bytes
+        T::ModuleId::get().into_sub_account("stak")
+    }
+
+    /// The pot of a reserved account
+    pub fn reserved_pot() -> T::AccountId {
+        // "modl" ++ "crmarket" ++ "rese" is 16 bytes
+        T::ModuleId::get().into_sub_account("rese")
+    }
+
+    /// Calculate payout from file's replica
+    /// This function will calculate the file's reward, update replicas
+    /// and (maybe) insert file's status(files_size and delete file)
+    /// input:
+    ///     cid: MerkleRoot
+    ///     curr_bn: BlockNumber
+    /// return:
+    ///     claimed_bn: BlockNumber
+    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber) -> BlockNumber
+    {
+        // 1. File must exist
+        if Self::files(cid).is_none() { return curr_bn; }
+        
+        // 2. File must already started
+        let (mut file_info, used_info) = Self::files(cid).unwrap_or_default();
+        
+        // 3. File already expired
+        if file_info.expired_on <= file_info.claimed_at { return file_info.claimed_at; }
+        
+        // TODO: Restrict the frequency of calculate payout(limit the duration of 2 claiming)
+        // Get the previous first class storage count
+        let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
+        let claim_block = curr_bn.min(file_info.expired_on);
+        let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
+        
+        // 4. Calulate payouts, check replicas and update the file_info
+        if target_reward_count > 0 {
+            // 4.1 Get 1 payout amount
+            let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
+                                                                        (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount;
+            let mut rewarded_amount = Zero::zero();
+            let mut rewarded_count = 0u32;
+            let mut new_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
+            let mut invalid_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
+            
+            // 4.2. Loop replicas
+            for replica in file_info.replicas.iter() {
+                // a. didn't report in prev slot, push back to the end of replica
+                if !T::SworkerInterface::is_wr_reported(&replica.anchor, claim_block) {
+                    let mut invalid_replica = replica.clone();
+                    // update the valid_at to the curr_bn
+                    invalid_replica.valid_at = curr_bn;
+                    // move it to the end of replica
+                    invalid_replicas.push(invalid_replica);
+                    // TODO: kick this anchor out of used info
+                // b. keep the replica's sequence
+                } else {
+                    new_replicas.push(replica.clone());
+                    
+                    // if payouts is full, just continue
+                    if rewarded_count == target_reward_count {
+                        continue;
+                    }
+                    
+                    // if that guy is poor, just pass him ☠️ 
+                    if Self::has_enough_pledge(&replica.who, &one_payout_amount) {
+                        <MerchantLedgers<T>>::mutate(&replica.who, |ledger| {
+                            ledger.reward += one_payout_amount.clone();
+                        });
+                        rewarded_amount += one_payout_amount.clone();
+                        rewarded_count +=1;
+                    }
+                }
             }
+
+            // 4.3 Update file info
+            file_info.claimed_at = claim_block;
+            file_info.amount -= rewarded_amount;
+            file_info.reported_replica_count = new_replicas.len() as u32;
+            new_replicas.append(&mut invalid_replicas);
+            file_info.replicas = new_replicas;
         }
+        
+        // 5. Update files
+        <Files<T>>::insert(cid, (file_info.clone(), used_info));
+
+        // 6. Update first class storage size
+        Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
+        
+        // 7. Try to close file, judge if it is outdated
+        Self::try_to_close_file(cid, curr_bn);
+
+        // 8. Return the claimed block
+        return claim_block;
     }
 
-    pub fn update_sorder_punishment(order_id: &T::Hash, current_block: &BlockNumber, so_status: &OrderStatus) {
-        if let Some(mut p) = Self::sorder_punishments(order_id) {
-            match so_status {
-                OrderStatus::Success => p.success += current_block - p.updated_at,
-                OrderStatus::Failed => p.failed += current_block - p.updated_at,
-                OrderStatus::Pending => {}
+    /// Update the first class storage's size
+    fn update_files_size(file_size: u64, prev_count: u32, curr_count: u32) {
+        FilesSize::mutate(|size| {
+            *size = size.saturating_sub((file_size * (prev_count as u64)) as u128).saturating_add((file_size * (curr_count as u64)) as u128);
+        });
+    }
+
+    /// Close file, maybe move into trash
+    fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
+        if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
+            // If it's already expired.
+            if file_info.expired_on <= curr_bn {
+                Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
+                if file_info.amount != Zero::zero() {
+                    // This should rarely happen.
+                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                }
+                Self::move_into_trash(cid, used_info);
             };
-            p.updated_at = *current_block;
-            <SorderPunishments<T>>::insert(order_id, p);
         }
     }
 
-    // Slash pledge value for a merchant
-    pub fn slash_pledge(
-        merchant: &T::AccountId,
-        slash_value: BalanceOf<T>
-    ) {
-        T::Currency::slash(merchant, slash_value);
-        // Update ledger
-        let mut pledge = Self::pledges(merchant);
-        pledge.total -= slash_value;
-        pledge.used -= slash_value;
-        Self::upsert_pledge(merchant, &pledge);
-        //TODO: Move slash value into treasury
-    }
-
-    // MUTABLE PRIVATE
-    // Create a new order
-    // `sorder` is equal to storage order
-    fn maybe_insert_sorder(client: &T::AccountId,
-                           merchant: &T::AccountId,
-                           amount: BalanceOf<T>,
-                           so_info: &SorderInfo<T::AccountId, BalanceOf<T>>,
-                           so_status: &SorderStatus
-                        ) -> Option<T::Hash> {
-        let order_id = Self::generate_sorder_id(client, merchant);
-
-        // This should be false, cause we don't allow duplicated `order_id`
-        if <SorderInfos<T>>::contains_key(&order_id) {
-            None
+    /// Trashbag operations
+    fn move_into_trash(cid: &MerkleRoot, used_info: UsedInfo) {
+        if Self::used_trash_size_i() < T::UsedTrashMaxSize::get() {
+            UsedTrashI::insert(cid, used_info.clone());
+            UsedTrashSizeI::mutate(|value| {*value += 1;});
+            // archive used for each merchant
+            for anchor in used_info.anchors.iter() {
+                UsedTrashMappingI::mutate(&anchor, |value| {
+                    *value += used_info.used_size;
+                })
+            }
+            // trash I is full => dump trash II
+            if Self::used_trash_size_i() == T::UsedTrashMaxSize::get() {
+                Self::dump_used_trash_ii();
+            }
         } else {
-            // 0. If reserve client's balance failed return error
-            // TODO: return different error type
-            if !T::Currency::reserve(&so_info.client, amount).is_ok() {
-                log!(
-                    debug,
-                    "🏢 Cannot reserve currency for sorder {:?}",
-                    order_id
-                );
-                return None
+            UsedTrashII::insert(cid, used_info.clone());
+            UsedTrashSizeII::mutate(|value| {*value += 1;});
+            // archive used for each merchant
+            for anchor in used_info.anchors.iter() {
+                UsedTrashMappingII::mutate(&anchor, |value| {
+                    *value += used_info.used_size;
+                })
             }
+            // trash II is full => dump trash I
+            if Self::used_trash_size_ii() == T::UsedTrashMaxSize::get() {
+                Self::dump_used_trash_i();
+            }
+        }
+        <Files<T>>::remove(&cid);
+    }
 
-            // 1. Add new storage order basic info and status
-            <SorderInfos<T>>::insert(&order_id, so_info);
-            <SorderStatuses<T>>::insert(&order_id, so_status);
+    fn dump_used_trash_i() {
+        for (anchor, used) in UsedTrashMappingI::iter() {
+            T::SworkerInterface::decrease_used(&anchor, used);
+        }
+        remove_storage_prefix(UsedTrashMappingI::module_prefix(), UsedTrashMappingI::storage_prefix(), &[]);
+        remove_storage_prefix(UsedTrashI::module_prefix(), UsedTrashI::storage_prefix(), &[]);
+        UsedTrashSizeI::mutate(|value| {*value = 0;});
+    }
 
-            // 2. Add `file_identifier` -> `order_id`s to merchant's file_map
-            <Merchants<T>>::mutate(merchant, |maybe_minfo| {
-                // `minfo` cannot be None
-                if let Some(minfo) = maybe_minfo {
-                    let mut order_ids: Vec::<T::Hash> = vec![];
-                    if let Some(o_ids) = minfo.file_map.get(&so_info.file_identifier) {
-                        order_ids = o_ids.clone();
-                    }
+    fn dump_used_trash_ii() {
+        for (anchor, used) in UsedTrashMappingII::iter() {
+            T::SworkerInterface::decrease_used(&anchor, used);
+        }
+        remove_storage_prefix(UsedTrashMappingII::module_prefix(), UsedTrashMappingII::storage_prefix(), &[]);
+        remove_storage_prefix(UsedTrashII::module_prefix(), UsedTrashII::storage_prefix(), &[]);
+        UsedTrashSizeII::mutate(|value| {*value = 0;});
+    }
 
-                    order_ids.push(order_id);
-                    minfo.file_map.insert(so_info.file_identifier.clone(), order_ids.clone());
-                }
-            });
-
-            // 3. Add OrderSlashRecord
-            let merchant_punishment = SorderPunishment {
-                success: 0,
-                failed: 0,
-                updated_at: so_info.created_on
+    fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
+        // Extend expired_on or expected_replica_count
+        if let Some((mut file_info, used_info)) = Self::files(cid) {
+            let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
+            if file_info.expired_on > file_info.claimed_at { //if it's already live.
+                file_info.expired_on = curr_bn + T::FileDuration::get();
+            }
+            file_info.amount += amount.clone();
+            if extend_replica {
+                // TODO: use 2 instead of 4
+                file_info.expected_replica_count += T::InitialReplica::get();
+                Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
+            }
+            <Files<T>>::insert(cid, (file_info, used_info));
+        } else {
+            // New file
+            let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
+                file_size,
+                expired_on: curr_bn.clone(), // Not fixed, this will be changed, when first file is reported
+                claimed_at: curr_bn.clone(),
+                amount: amount.clone(),
+                expected_replica_count: T::InitialReplica::get(),
+                reported_replica_count: 0u32,
+                replicas: vec![]
             };
-            <SorderPunishments<T>>::insert(&order_id, merchant_punishment);
-
-            Some(order_id)
+            let used_info = UsedInfo {
+                used_size: file_size,
+                anchors: <BTreeSet<SworkerAnchor>>::new()
+            };
+            <Files<T>>::insert(cid, (file_info, used_info));
         }
     }
 
-    // Remove a sorder
-    fn close_sorder(
-        order_id: &<T as system::Trait>::Hash,
-        free_pledge: BalanceOf<T>
-    ) {
-        if let Some(so_info) = Self::sorder_infos(order_id) {
-            // 1. Remove `file_identifier` -> `order_id`s from merchant's file_map
-            <Merchants<T>>::mutate(&so_info.merchant, |maybe_minfo| {
-                // `minfo` cannot be None
-                if let Some(minfo) = maybe_minfo {
-                    let mut sorder_ids: Vec<T::Hash> = minfo
-                        .file_map
-                        .get(&so_info.file_identifier)
-                        .unwrap_or(&vec![])
-                        .clone();
-                    sorder_ids.retain(|&id| {&id != order_id});
-
-                    if sorder_ids.is_empty() {
-                        minfo.file_map.remove(&so_info.file_identifier);
-                    } else {
-                        minfo.file_map.insert(so_info.file_identifier.clone(), sorder_ids.clone());
-                    }
-                }
-            });
-
-            // 2. Update `Pledge` for merchant
-            let mut pledge = Self::pledges(&so_info.merchant);
-            // `checked_sub`, prevent overflow
-            if free_pledge >= pledge.used {
-                pledge.used = Zero::zero();
-            } else {
-                pledge.used -= free_pledge;
+    fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
+        let mut insert_index: usize = file_info.replicas.len();
+        for (index, replica) in file_info.replicas.iter().enumerate() {
+            if new_replica.valid_at < replica.valid_at {
+                insert_index = index;
+                break;
             }
-            Self::upsert_pledge(&so_info.merchant, &pledge);
+        }
+        file_info.replicas.insert(insert_index, new_replica);
+    }
 
-            // 3. Remove Merchant Punishment
-            <SorderPunishments<T>>::remove(order_id);
-
-            // 4. Remove storage order info and status
-            <SorderInfos<T>>::remove(order_id);
-            <SorderStatuses<T>>::remove(order_id);
+    fn init_pot(account: fn() -> T::AccountId) {
+        let account_id = account();
+        let min = T::Currency::minimum_balance();
+        if T::Currency::free_balance(&account_id) < min {
+            let _ = T::Currency::make_free_balance_be(
+                &account_id,
+                min,
+            );
         }
     }
 
-    fn upsert_pledge(
-        merchant: &T::AccountId,
-        pledge: &Pledge<BalanceOf<T>>
-    ) {
-        // 1. Set lock
-        T::Currency::set_lock(
-            MARKET_ID,
-            &merchant,
-            pledge.total,
-            WithdrawReasons::all(),
-        );
-        // 2. Update Pledge
-        <Pledges<T>>::insert(&merchant, pledge);
+    fn has_enough_pledge(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
+        let ledger = Self::merchant_ledgers(who);
+        // TODO: 10x pledge value
+        ledger.reward + *value <= ledger.pledge
     }
 
-    // IMMUTABLE PRIVATE
-    // Generate the storage order id by using the on-chain randomness
-    fn generate_sorder_id(client: &T::AccountId, merchant: &T::AccountId) -> T::Hash {
-        // 1. Construct random seed, 👼 bless the randomness
-        // seed = [ block_hash, client_account, merchant_account ]
-        let bn = <system::Module<T>>::block_number();
-        let bh: T::Hash = <system::Module<T>>::block_hash(bn);
-        let seed = [
-            &bh.as_ref()[..],
-            &client.encode()[..],
-            &merchant.encode()[..],
-        ].concat();
-
-        // 2. It can cover most cases, for the "real" random
-        T::Randomness::random(seed.as_slice())
+    pub fn update_storage_price() {
+        let total = T::SworkerInterface::get_free_plus_used();
+        let mut file_price = Self::file_price();
+        if let Some(storage_ratio) = total.checked_div(Self::files_size()) {
+            // Too much total => decrease the price
+            if storage_ratio > T::StorageReferenceRatio::get() {
+                let gap = T::StorageDecreaseRatio::get() * file_price;
+                file_price = file_price.saturating_sub(gap);
+            } else {
+                let gap = (T::StorageIncreaseRatio::get() * file_price).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
+                file_price = file_price.saturating_add(gap);
+            }
+        } else {
+            let gap = T::StorageDecreaseRatio::get() * file_price;
+            file_price = file_price.saturating_sub(gap);
+        }
+        <FilePrice<T>>::put(file_price);
     }
 
-    // Calculate storage order's amount
-    fn get_sorder_amount(price: &BalanceOf<T>, file_size: u64, duration: u32) -> Option<BalanceOf<T>> {
+    // Calculate file's amount
+    fn get_file_amount(file_size: u64) -> BalanceOf<T> {
         // Rounded file size from `bytes` to `megabytes`
         let mut rounded_file_size = file_size / 1_048_576;
         if file_size % 1_048_576 != 0 {
             rounded_file_size += 1;
         }
-
+        let price = Self::file_price();
         // Convert file size into `Currency`
-        price.checked_mul(&<T::CurrencyToBalance
-        as Convert<u64, BalanceOf<T>>>::convert(rounded_file_size * (duration as u64)))
+        let amount = price.checked_mul(&<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(rounded_file_size));
+        match amount {
+            Some(value) => value,
+            None => Zero::zero(),
+        }
+    }
+
+    fn split_into_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
+        let staking_amount = T::StakingRatio::get() * value;
+        let storage_amount = value - staking_amount;
+        T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, AllowDeath).expect("Something wrong during transferring");
+        T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), AllowDeath).expect("Something wrong during transferring");
+        storage_amount
     }
 
     fn get_current_block_number() -> BlockNumber {
@@ -805,27 +768,47 @@ impl<T: Trait> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn get_payment_and_slash_ratio(order_id: &T::Hash) -> (Perbill, Perbill) {
-        let mut payment_ratio: Perbill = Perbill::one();
-        let mut slash_ratio: Perbill = Perbill::zero();
-        if let Some(punishment) = Self::sorder_punishments(order_id) {
-            let punishment_ratio: f64 = punishment.success as f64 / (punishment.success + punishment.failed) as f64;
-            if punishment_ratio >= 0.99 {
-                payment_ratio = Perbill::one();
-            } else if punishment_ratio >= 0.98 {
-                payment_ratio = Perbill::from_percent(95);
-            } else if punishment_ratio >= 0.95 {
-                payment_ratio = Perbill::from_percent(90);
-            } else if punishment_ratio >= 0.90 {
-                payment_ratio = Perbill::from_percent(80);
-            } else if punishment_ratio >= 0.85 {
-                payment_ratio = Perbill::from_percent(50);
-            } else {
-                payment_ratio = Perbill::zero();
-                slash_ratio = Perbill::from_percent(50);
-            }
-        }
-        (payment_ratio, slash_ratio)
+    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> bool {
+        let mut is_counted = false;
+        
+        // 1. Delete files anchor
+        <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
+            Some((_, ref mut used_info)) => {
+                if used_info.anchors.take(anchor).is_some() {
+                    is_counted = true;
+                }
+            },
+            None => {}
+        });
+        
+
+        // 2. Delete trashI's anchor
+        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.anchors.take(anchor).is_some() {
+                    is_counted = true;
+                    UsedTrashMappingI::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
+
+        // 3. Delete trashII's anchor
+        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.anchors.take(anchor).is_some() {
+                    is_counted = true;
+                    UsedTrashMappingII::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
+
+        is_counted
     }
 }
 
@@ -835,10 +818,11 @@ decl_event!(
         AccountId = <T as system::Trait>::AccountId,
         Balance = BalanceOf<T>
     {
-        StorageOrderSuccess(AccountId, SorderInfo<AccountId, Balance>, SorderStatus),
-        RegisterSuccess(AccountId),
-        PledgeSuccess(AccountId),
-        SetAliasSuccess(AccountId, FileAlias, FileAlias),
+        FileSuccess(AccountId, FileInfo<AccountId, Balance>),
+        RegisterSuccess(AccountId, Balance),
+        PledgeExtraSuccess(AccountId, Balance),
+        CutPledgeSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
+        CalculateSuccess(MerkleRoot),
     }
 );

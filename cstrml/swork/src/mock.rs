@@ -11,7 +11,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market_v2::{Replica, FileInfo, UsedInfo};
+pub use market::{Replica, FileInfo, UsedInfo};
 use primitives::MerkleRoot;
 use balances::AccountData;
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
@@ -154,7 +154,7 @@ parameter_types! {
     pub const UsedTrashMaxSize: u128 = 2;
 }
 
-impl market_v2::Trait for Test {
+impl market::Trait for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
     type CurrencyToBalance = ();
@@ -191,7 +191,7 @@ impl Trait for Test {
 
 pub type Swork = Module<Test>;
 pub type System = system::Module<Test>;
-pub type Market = market_v2::Module<Test>;
+pub type Market = market::Module<Test>;
 pub type Balances = balances::Module<Test>;
 
 pub struct ExtBuilder {
@@ -677,5 +677,5 @@ fn insert_file(f_id: &MerkleRoot, claimed_at: u32, expired_on: u32, amount: Bala
         replicas
     };
 
-    <market_v2::Files<Test>>::insert(f_id, (file_info, used_info));
+    <market::Files<Test>>::insert(f_id, (file_info, used_info));
 }

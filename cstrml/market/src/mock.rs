@@ -3,19 +3,22 @@ use super::*;
 use frame_support::{
     impl_outer_origin, parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{OnFinalize, OnInitialize, Get, TestRandomness}
+    traits::{OnFinalize, OnInitialize, Get}
 };
-use sp_core::H256;
+// use sp_core::H256;
+pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
     testing::Header,
     traits::{BlakeTwo256, IdentityLookup, SaturatedConversion},
     Perbill,
 };
-use std::{cell::RefCell};
+pub use std::{cell::RefCell, iter::FromIterator};
 use balances::AccountData;
-pub use primitives::{MerkleRoot, Hash};
+pub use primitives::*;
+use swork::{PKInfo, Identity};
+pub use keyring::Sr25519Keyring;
 
-pub type AccountId = u64;
+pub type AccountId = AccountId32;
 pub type Balance = u64;
 
 impl_outer_origin! {
@@ -30,6 +33,7 @@ pub struct Test;
 
 thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
+    static LEGAL_CODE: Vec<u8> = hex::decode("781b537d3dcef39dec7b8bce6fdfcd032d8d846640e9b5598b4a9f627188a908").unwrap();
 }
 
 pub struct ExistentialDeposit;
@@ -60,6 +64,27 @@ impl Convert<u128, u128> for CurrencyToVoteHandler {
 impl Convert<u64, u128> for CurrencyToVoteHandler {
     fn convert(x: u64) -> u128 {
         x as u128
+    }
+}
+
+pub struct ReportWorksInfo {
+    pub curr_pk: SworkerPubKey,
+    pub prev_pk: SworkerPubKey,
+    pub block_number: u64,
+    pub block_hash: Vec<u8>,
+    pub free: u64,
+    pub used: u64,
+    pub srd_root: MerkleRoot,
+    pub files_root: MerkleRoot,
+    pub added_files: Vec<(MerkleRoot, u64, u64)>,
+    pub deleted_files: Vec<(MerkleRoot, u64, u64)>,
+    pub sig: SworkerSignature
+}
+
+pub struct LegalCode;
+impl Get<Vec<u8>> for LegalCode {
+    fn get() -> Vec<u8> {
+        LEGAL_CODE.with(|code| code.clone())
     }
 }
 
@@ -100,26 +125,6 @@ impl system::Trait for Test {
     type SystemWeightInfo = ();
 }
 
-pub struct TestOrderInspector;
-
-impl OrderInspector<AccountId> for TestOrderInspector {
-    // file size should smaller than merchant's num
-    fn check_works(merchant: &AccountId, file_size: u64) -> bool {
-        let mut free = 0;
-
-        // Loop and sum all pks
-        for pk in Swork::id_bonds(merchant) {
-            if let Some(wr) = Swork::work_reports(pk) {
-                // Pruning
-                if wr.free > file_size { return true }
-                free = free + wr.free;
-            }
-        }
-
-        free > file_size
-    }
-}
-
 impl balances::Trait for Test {
     type Balance = Balance;
     type DustRemoval = ();
@@ -134,25 +139,41 @@ impl swork::Trait for Test {
     type Currency = Balances;
     type Event = ();
     type Works = ();
-    type MarketInterface = ();
-    type MaxBondsLimit = ();
+    type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;
 }
 
 parameter_types! {
-    pub const TestClaimLimit: u32 = 100;
+    /// Unit is pico
+    pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
+    pub const FileDuration: BlockNumber = 1000;
+    pub const InitialReplica: u32 = 4;
+    pub const FileBaseFee: Balance = 1000;
+    pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const ClaimLimit: u32 = 1000;
+    pub const StorageReferenceRatio: u128 = 2;
+    pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
+    pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
+    pub const StakingRatio: Perbill = Perbill::from_percent(80);
+    pub const UsedTrashMaxSize: u128 = 2;
 }
 
 impl Trait for Test {
-    type Currency = Balances;
+    type ModuleId = MarketModuleId;
+    type Currency = balances::Module<Self>;
     type CurrencyToBalance = CurrencyToVoteHandler;
+    type SworkerInterface = Swork;
     type Event = ();
-    type Randomness = TestRandomness;
-    type OrderInspector = Swork;
-    type MinimumStoragePrice = MinimumStoragePrice;
-    type MinimumSorderDuration = MinimumSorderDuration;
-    type ClaimLimit = TestClaimLimit;
-    type WeightInfo = weight::WeightInfo;
+    type FileDuration = FileDuration;
+    type InitialReplica = InitialReplica;
+    type FileBaseFee = FileBaseFee;
+    type FileInitPrice = FileInitPrice;
+    type ClaimLimit = ClaimLimit;
+    type StorageReferenceRatio = StorageReferenceRatio;
+    type StorageIncreaseRatio = StorageIncreaseRatio;
+    type StorageDecreaseRatio = StorageDecreaseRatio;
+    type StakingRatio = StakingRatio;
+    type UsedTrashMaxSize = UsedTrashMaxSize;
 }
 
 pub type Market = Module<Test>;
@@ -166,7 +187,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .unwrap();
 
     let _ = swork::GenesisConfig {
-        code: vec![],
+        code: LegalCode::get(),
     }.assimilate_storage(&mut t);
 
     let mut ext: sp_io::TestExternalities = t.into();
@@ -179,60 +200,75 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
 pub fn init_swork_setup() {
     // 1. Register for 0, 100, 200
-    let pk1 = hex::decode("11").unwrap();
-    let pk2 = hex::decode("22").unwrap();
-    let pk3 = hex::decode("33").unwrap();
-    let pk4 = hex::decode("44").unwrap();
-    let code = hex::decode("").unwrap();
+    let pks = vec![hex::decode("11").unwrap(), hex::decode("22").unwrap(), hex::decode("33").unwrap(), hex::decode("44").unwrap()];
+    let whos = vec![
+        Sr25519Keyring::Alice.to_account_id(),
+        Sr25519Keyring::Bob.to_account_id(),
+        Sr25519Keyring::Charlie.to_account_id(),
+        Sr25519Keyring::Dave.to_account_id()
+    ];
+    let frees: Vec<u64> = vec![0, 50, 50, 200];
+    let code = LegalCode::get();
+    for ((pk, who), free) in pks.iter().zip(whos.iter()).zip(frees.iter()) {
+        <swork::PubKeys>::insert(pk.clone(), PKInfo {
+            code: code.clone(),
+            anchor: Some(pk.clone())
+        });
+        <swork::Identities<Test>>::insert(who, Identity {
+            anchor: pk.clone(),
+            group: None
+        });
+        <swork::WorkReports>::insert(pk.clone(), swork::WorkReport{
+            report_slot: 0,
+            used: 0,
+            free: *free,
+            reported_files_size: 0,
+            reported_srd_root: vec![],
+            reported_files_root: vec![]
+        });
+    }
+}
 
-    <swork::Identities>::insert(pk1.clone(), code.clone());
-    <swork::Identities>::insert(pk1.clone(), code.clone());
-    <swork::Identities>::insert(pk1.clone(), code.clone());
+// fake for report_works
+pub fn add_who_into_replica(cid: &MerkleRoot, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>) {
+    Market::upsert_replicas(&who, cid, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &None);
+}
 
-    <swork::IdBonds<Test>>::insert(0, vec![pk1.clone()]);
+pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
+    let curr_pk = hex::decode("8b1412c4eed29d29389f8a66aa61f0c0fdea30c7e384ca8086d72cf84c4b96dd7967f5841ba8b784c4de881fe073b1437051db1ee9ab0fe491df0df3792bce5d").unwrap();
+    let prev_pk = hex::decode("").unwrap();
+    let block_number: u64 = 300;
+    let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let free: u64 = 4294967296;
+    let used: u64 = 402868224;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = [
+        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408, 303),
+        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816, 303)
+    ].to_vec();
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
+    let files_root = hex::decode("11").unwrap();
+    let srd_root = hex::decode("00").unwrap();
+    let sig = hex::decode("9b775ad3a8469b7affacd0252bd5fdaa69a2a22dffec9c428faa5c12fce6886accc19446d1c833d9cd46e4f78d31d2544b91a644702308f9c4211448484ef3a9").unwrap();
 
-    // Test star network
-    <swork::IdBonds<Test>>::insert(100, vec![pk2.clone(), pk3.clone()]);
-    <swork::IdBonds<Test>>::insert(200, vec![pk4.clone()]);
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
+    }
+}
 
-    <swork::WorkReports>::insert(pk1.clone(), swork::WorkReport{
-        report_slot: 0,
-        used: 0,
-        free: 0,
-        files: Default::default(),
-        reported_files_size: 0,
-        reported_srd_root: vec![],
-        reported_files_root: vec![]
-    });
-
-    // Test star network
-    <swork::WorkReports>::insert(pk2.clone(), swork::WorkReport{
-        report_slot: 0,
-        used: 0,
-        free: 50,
-        files: Default::default(),
-        reported_files_size: 0,
-        reported_srd_root: vec![],
-        reported_files_root: vec![]
-    });
-    <swork::WorkReports>::insert(pk3.clone(), swork::WorkReport{
-        report_slot: 0,
-        used: 0,
-        free: 50,
-        files: Default::default(),
-        reported_files_size: 0,
-        reported_srd_root: vec![],
-        reported_files_root: vec![]
-    });
-
-    <swork::WorkReports>::insert(pk4.clone(), swork::WorkReport{
-        report_slot: 0,
-        used: 0,
-        free: 200,
-        files: Default::default(),
-        reported_files_size: 0,
-        reported_srd_root: vec![],
-        reported_files_root: vec![]
+pub fn register(pk: &SworkerPubKey, code: SworkerCode) {
+    <swork::PubKeys>::insert(pk.clone(), PKInfo {
+        code: code,
+        anchor: None
     });
 }
 
@@ -246,44 +282,4 @@ pub fn run_to_block(n: u64) {
         System::set_block_number(System::block_number() + 1);
         System::on_initialize(System::block_number());
     }
-}
-
-pub fn insert_sorder(who: &AccountId, f_id: &MerkleRoot, rd: u8, expired_on: u32, os: OrderStatus) {
-    let mut file_map = Market::merchants(who).unwrap_or_default().file_map;
-    let sorder_id: Hash = Hash::repeat_byte(rd);
-    let sorder_info = SorderInfo {
-        file_identifier: f_id.clone(),
-        file_size: 0,
-        created_on: 0,
-        merchant: who.clone(),
-        client: who.clone(),
-        amount: 10,
-        duration: 50
-    };
-    let sorder_status = SorderStatus {
-        completed_on: 0,
-        expired_on,
-        status: os,
-        claimed_at: 50
-    };
-    if let Some(orders) = file_map.get_mut(f_id) {
-        orders.push(sorder_id.clone())
-    } else {
-        file_map.insert(f_id.clone(), vec![sorder_id.clone()]);
-    }
-
-    let provision = MerchantInfo {
-        address_info: vec![],
-        storage_price: 1,
-        file_map
-    };
-    <Merchants<Test>>::insert(who, provision);
-    <SorderInfos<Test>>::insert(sorder_id.clone(), sorder_info);
-    <SorderStatuses<Test>>::insert(sorder_id.clone(), sorder_status);
-    let punishment = SorderPunishment {
-        success: 0,
-        failed: 0,
-        updated_at: 50
-    };
-    <SorderPunishments<Test>>::insert(sorder_id, punishment);
 }

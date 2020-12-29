@@ -115,16 +115,18 @@ pub enum StakerStatus<AccountId, Balance: HasCompact> {
 
 /// A destination account for payment.
 #[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug)]
-pub enum RewardDestination {
+pub enum RewardDestination<AccountId> {
     /// Pay into the stash account, increasing the amount at stake accordingly.
     Staked,
     /// Pay into the stash account, not increasing the amount at stake.
     Stash,
     /// Pay into the controller account.
     Controller,
+    /// Pay into a specified account.
+    Account(AccountId),
 }
 
-impl Default for RewardDestination {
+impl<AccountId> Default for RewardDestination<AccountId> {
     fn default() -> Self {
         RewardDestination::Staked
     }
@@ -480,7 +482,7 @@ decl_storage! {
             => Option<StakingLedger<T::AccountId, BalanceOf<T>>>;
 
         /// Where the reward payment should be made. Keyed by stash.
-        pub Payee get(fn payee): map hasher(twox_64_concat) T::AccountId => RewardDestination;
+        pub Payee get(fn payee): map hasher(twox_64_concat) T::AccountId => RewardDestination<T::AccountId>;
 
         /// The map from (wannabe) validator stash key to the preferences of that validator.
         pub Validators get(fn validators):
@@ -794,7 +796,7 @@ decl_module! {
         fn bond(origin,
             controller: <T::Lookup as StaticLookup>::Source,
             #[compact] value: BalanceOf<T>,
-            payee: RewardDestination
+            payee: RewardDestination<T::AccountId>
         ) {
             let stash = ensure_signed(origin)?;
 
@@ -1136,7 +1138,7 @@ decl_module! {
         ///     - Write: Payee
         /// # </weight>
         #[weight = T::WeightInfo::set_payee()]
-        fn set_payee(origin, payee: RewardDestination) {
+        fn set_payee(origin, payee: RewardDestination<T::AccountId>) {
             let controller = ensure_signed(origin)?;
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let stash = &ledger.stash;
@@ -1597,6 +1599,9 @@ impl<T: Config> Module<T> {
                     Self::update_ledger(&controller, &l);
                     r
                 }),
+            RewardDestination::Account(dest_account) => {
+                Some(T::Currency::deposit_creating(&dest_account, amount))
+            }
         }
     }
 

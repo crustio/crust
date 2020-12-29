@@ -259,7 +259,7 @@ impl pallet_indices::Config for Runtime {
     type Currency = Balances;
     type Deposit = IndexDeposit;
     type Event = Event;
-    type WeightInfo = ();
+    type WeightInfo = weights::pallet_indices::WeightInfo<Runtime>;
 }
 
 impl pallet_authority_discovery::Config for Runtime {}

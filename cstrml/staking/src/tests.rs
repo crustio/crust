@@ -4198,6 +4198,36 @@ fn era_clean_should_work() {
         });
 }
 
+#[test]
+fn payout_to_any_account_works() {
+    ExtBuilder::default().own_workload(u128::max_value()).build()
+        .execute_with(|| {
+        let balance = 1000;
+        // Create a validator:
+        bond_validator(110, balance); // Default(64)
+
+        // Create a stash/controller pair
+        bond_guarantor(1337,  100, vec![(111, 50)]);
+
+        // Update payout location
+        assert_ok!(Staking::set_payee(Origin::signed(1337), RewardDestination::Account(42)));
+
+        // Reward Destination account doesn't exist
+        assert_eq!(Balances::free_balance(42), 0);
+
+        start_era(1, true);
+        <Module<Test>>::reward_by_ids(vec![(111, 1)]);
+        // Compute total payout now for whole duration as other parameter won't change
+        let total_payout = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+        assert!(total_payout > 100); // Test is meaningfull if reward something
+        start_era(2, true);
+        assert_ok!(<Module<Test>>::reward_stakers(Origin::signed(1337), 111, 1));
+
+        // Payment is successful
+        assert!(Balances::free_balance(42) > 0);
+    })
+}
+
 // #[test]
 // fn randomly_select_validators_works() {
 //     ExtBuilder::default()

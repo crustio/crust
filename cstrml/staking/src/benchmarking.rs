@@ -76,7 +76,7 @@ pub fn create_validators_with_guarantors_for_era<T: Config>(v: u32, n: u32, m: u
     for _ in 0 .. m {
         let selected = rng.next_u32() as usize % available_validators.len();
         let validator = available_validators.get(selected).unwrap();
-        Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance() * 10.into()))?;
+        Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance() * 10u32.into()))?;
     }
 
     let saved_n_controller = n_controller;
@@ -88,7 +88,7 @@ pub fn create_validators_with_guarantors_for_era<T: Config>(v: u32, n: u32, m: u
         for _ in 0 .. m {
             let selected = rng.next_u32() as usize % available_validators.len();
             let validator = available_validators.get(selected).unwrap();
-            Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance() * 10.into()))?;
+            Staking::<T>::guarantee(RawOrigin::Signed(n_controller.clone()).into(), (validator.clone(), T::Currency::minimum_balance() * 10u32.into()))?;
         }
     }
 
@@ -116,7 +116,7 @@ benchmarks! {
         let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller);
         let reward_destination = RewardDestination::Staked;
-        let amount = T::Currency::minimum_balance() * 10.into();
+        let amount = T::Currency::minimum_balance() * 10u32.into();
     }: _(RawOrigin::Signed(stash), controller_lookup, amount, reward_destination)
 
 
@@ -124,7 +124,7 @@ benchmarks! {
         let (stash, controller) = create_stash_controller::<T>(100)?;
         Staking::<T>::upsert_stake_limit(&stash, T::Currency::minimum_balance() * STAKE_LIMIT_RATIO.into());
         Staking::<T>::validate(RawOrigin::Signed(controller.clone()).into(), Default::default())?;
-        let max_additional = T::Currency::minimum_balance() * 10.into();
+        let max_additional = T::Currency::minimum_balance() * 10u32.into();
     }: _(RawOrigin::Signed(stash), max_additional)
 
 
@@ -132,9 +132,9 @@ benchmarks! {
         let stash = create_funded_user::<T>("stash",100);
         let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
-        let max_additional = T::Currency::minimum_balance() * 10.into();
+        let max_additional = T::Currency::minimum_balance() * 10u32.into();
         let reward_destination = RewardDestination::Staked;
-        let amount = T::Currency::minimum_balance() * 10.into();
+        let amount = T::Currency::minimum_balance() * 10u32.into();
         Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
     }: _(RawOrigin::Signed(controller), max_additional)
 
@@ -144,9 +144,9 @@ benchmarks! {
         let stash = create_funded_user::<T>("stash",100);
         let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
-        let max_additional = T::Currency::minimum_balance() * 10.into();
+        let max_additional = T::Currency::minimum_balance() * 10u32.into();
         let reward_destination = RewardDestination::Staked;
-        let amount = T::Currency::minimum_balance() * 10.into();
+        let amount = T::Currency::minimum_balance() * 10u32.into();
         Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
         Staking::<T>::unbond(RawOrigin::Signed(controller.clone()).into(), max_additional)?;
     }: _(RawOrigin::Signed(controller.clone()))
@@ -162,15 +162,15 @@ benchmarks! {
     guarantee {
         MinimumValidatorCount::put(1);
         let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(100, 1000, MAX_GUARANTEE.try_into().unwrap())?;
-    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10.into()))
+    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10u32.into()))
 
 
     cut_guarantee {
         MinimumValidatorCount::put(1);
         let (g_controller, v_lookup) = create_validators_with_guarantors_for_era::<T>(100, 1000, MAX_GUARANTEE.try_into().unwrap())?;
         Staking::<T>::guarantee(RawOrigin::Signed(g_controller.clone()).into(),
-        (v_lookup.clone(), T::Currency::minimum_balance() * 10.into()))?;
-    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10.into()))
+        (v_lookup.clone(), T::Currency::minimum_balance() * 10u32.into()))?;
+    }: _(RawOrigin::Signed(g_controller), (v_lookup, T::Currency::minimum_balance() * 10u32.into()))
 
 
     chill {

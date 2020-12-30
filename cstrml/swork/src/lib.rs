@@ -231,7 +231,11 @@ decl_error! {
         /// Not a owner,
         NotOwner,
         /// Used is not zero,
-        IllegalUsed
+        IllegalUsed,
+        /// Group already exist
+        GroupAlreadyExist,
+        /// Group owner cannot register
+        GroupOwnerForbidden
     }
 }
 
@@ -289,15 +293,18 @@ decl_module! {
             // 1. Ensure who is applier
             ensure!(&who == &applier, Error::<T>::IllegalApplier);
 
-            // 2. Ensure unparsed_identity trusted chain is legal, including signature and sworker code
+            // 2. Ensure who cannot be group owner
+            ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupOwnerForbidden);
+
+            // 3. Ensure unparsed_identity trusted chain is legal, including signature and sworker code
             let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
             ensure!(maybe_pk.is_some(), Error::<T>::IllegalIdentity);
 
-            // 3. Insert new pub key info
+            // 4. Insert new pub key info
             let pk = maybe_pk.unwrap();
             Self::insert_pk_info(pk.clone(), Self::code());
 
-            // 4. Emit event
+            // 5. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())
@@ -340,16 +347,19 @@ decl_module! {
 
             // 1. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
+
+            // 2. Ensure who cannot be group owner
+            ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
             
-            // 2. Ensure reporter's code is legal
+            // 3. Ensure reporter's code is legal
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
-            // 3. Decide which scenario
+            // 4. Decide which scenario
             let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
             let is_ab_upgrade = maybe_anchor.is_none() && !ab_upgrade_pk.is_empty();
             let is_first_report = maybe_anchor.is_none() && ab_upgrade_pk.is_empty();
 
-            // 4. Unique Check for normal report work for curr pk
+            // 5. Unique Check for normal report work for curr pk
             if let Some(anchor) = maybe_anchor {
                 // Normally report works.
                 // 3.1 Ensure Identity's anchor be same with current pk's anchor
@@ -366,10 +376,10 @@ decl_module! {
                 }
             }
 
-            // 5. Timing check
+            // 6. Timing check
             ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 6. Ensure sig is legal
+            // 7. Ensure sig is legal
             ensure!(
                 Self::work_report_sig_check(
                     &curr_pk,
@@ -387,15 +397,15 @@ decl_module! {
                 Error::<T>::IllegalWorkReportSig
             );
 
-            // 7. Files storage status transition check
+            // 8. Files storage status transition check
             if is_ab_upgrade {
-                // 7.1 Previous pk should already reported works
+                // 8.1 Previous pk should already reported works
                 ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
                 // unwrap_or_default is a small tricky solution
                 let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
 
-                // 7.2 Current work report should NOT be changed at all
+                // 8.2 Current work report should NOT be changed at all
                 let prev_wr = maybe_prev_wr.unwrap();
                 ensure!(added_files.is_empty() &&
                     deleted_files.is_empty() &&
@@ -403,7 +413,7 @@ decl_module! {
                     prev_wr.reported_srd_root == reported_srd_root,
                     Error::<T>::ABUpgradeFailed);
 
-                // 7.3 Set the real previous public key(contains work report);
+                // 8.3 Set the real previous public key(contains work report);
                 prev_pk = ab_upgrade_pk.clone();
             } else {
                 ensure!(
@@ -418,9 +428,9 @@ decl_module! {
                 );
             }
 
-            // 8. Finish register
+            // 9. Finish register
             if is_ab_upgrade {
-                // 8.1 Transfer A's status to B and delete old A's storage status
+                // 9.1 Transfer A's status to B and delete old A's storage status
                 let prev_pk_info = Self::pub_keys(&prev_pk);
                 PubKeys::mutate(&curr_pk, |curr_pk_info| {
                     curr_pk_info.anchor = prev_pk_info.anchor;
@@ -430,13 +440,13 @@ decl_module! {
             } else if is_first_report {
                 let mut pk_info = Self::pub_keys(&curr_pk);
                 match Self::identities(&reporter) {
-                    // 8.2 re-register scenario
+                    // 9.2 re-register scenario
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
                         <Identities<T>>::insert(&reporter, identity);
                     },
-                    // 8.3 first register scenario
+                    // 9.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),
@@ -449,7 +459,7 @@ decl_module! {
                 PubKeys::insert(&curr_pk, pk_info);
             }
 
-            // 9. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
+            // 10. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
             // a. Upsert work report
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
@@ -468,8 +478,29 @@ decl_module! {
                 slot,
             );
 
-            // 10. Emit work report event
+            // 11. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
+
+            Ok(())
+        }
+
+        #[weight = 1000]
+        pub fn create_group(
+            origin
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Ensure who didn't report work before
+            ensure!(Self::identities(&who).is_none(), Error::<T>::GroupOwnerForbidden);
+
+            // 2. Ensure who is not a group owner right now
+            ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupAlreadyExist);
+
+            // 3. Create the group
+            <Groups<T>>::insert(&who, <BTreeSet<T::AccountId>>::new());
+
+            // 4. Emit event
+            Self::deposit_event(RawEvent::CreateGroupSuccess(who));
 
             Ok(())
         }
@@ -489,27 +520,24 @@ decl_module! {
             // 2. Ensure who didn't join group right now
             ensure!(identity.group.is_none(), Error::<T>::AlreadyJoint);
 
-            if who != owner {
-                // 3. Ensure owner has identity information
-                ensure!(Self::identities(&owner).is_some(), Error::<T>::IdentityNotExist);
-                // 4. Ensure owner's group is itself
-                ensure!(Self::identities(&owner).unwrap().group.unwrap_or_default() == owner, Error::<T>::NotOwner);
-                // 5. Ensure who's wr's used is zero
-                ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
-            }
+            // 3. Ensure owner's group exist
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
-            // 6. Join/Create the group
+            // 4. Ensure who's wr's used is zero
+            ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
+
+            // 5. Join the group
             <Groups<T>>::mutate(&owner, |members| {
                 members.insert(who.clone());
             });
 
-            // 7. Mark the group owner
+            // 6. Mark the group owner
             <Identities<T>>::mutate_exists(&who, |maybe_i| match *maybe_i {
                 Some(Identity { ref mut group, .. }) => *group = Some(owner.clone()),
                 ref mut i => *i = None,
             });
 
-            // 8. Emit event
+            // 7. Emit event
             Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
 
             Ok(())
@@ -871,5 +899,6 @@ decl_event!(
         ChillSuccess(AccountId, SworkerPubKey),
         SworkerUpgradeSuccess(SworkerCode, BlockNumber),
         JoinGroupSuccess(AccountId, AccountId),
+        CreateGroupSuccess(AccountId),
     }
 );

@@ -1239,7 +1239,6 @@ dependencies = [
  "sp-io 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sp-keyring 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sp-runtime 2.0.0 (git+https://github.com/paritytech/substrate)",
- "sp-runtime-interface 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sp-std 2.0.0 (git+https://github.com/paritytech/substrate)",
  "webpki 0.21.0",
 ]

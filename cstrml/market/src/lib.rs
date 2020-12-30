@@ -721,7 +721,7 @@ impl<T: Config> Module<T> {
     }
 
     pub fn update_file_price() {
-        let total = T::SworkerInterface::get_free_plus_used();
+        let total = T::SworkerInterface::get_total_capacity();
         let mut file_price = Self::file_price();
         if let Some(storage_ratio) = total.checked_div(Self::files_size()) {
             // Too much total => decrease the price

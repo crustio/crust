@@ -131,7 +131,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     }
 
     /// get total used and free space
-    fn get_free_plus_used() -> u128 {
+    fn get_total_capacity() -> u128 {
         return Self::used().saturating_add(Self::free());
     }
 }

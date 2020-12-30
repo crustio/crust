@@ -179,7 +179,7 @@ fn place_storage_order_should_work() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
         assert_eq!(Balances::free_balance(staking_pot), 1600);
@@ -229,7 +229,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
         assert_eq!(Balances::free_balance(&staking_pot), 1600);
@@ -255,7 +255,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
         assert_eq!(Balances::free_balance(&staking_pot), 3200);
@@ -298,7 +298,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -322,7 +322,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -349,7 +349,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -376,7 +376,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
     });
@@ -426,7 +426,7 @@ fn calculate_payout_should_work() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
 
@@ -471,7 +471,7 @@ fn calculate_payout_should_work() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -495,7 +495,7 @@ fn calculate_payout_should_work() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -543,7 +543,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
 
@@ -588,7 +588,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -611,7 +611,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -641,7 +641,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -690,7 +690,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
 
@@ -735,7 +735,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -747,7 +747,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
 
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -801,7 +801,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
 
@@ -848,7 +848,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -871,7 +871,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -906,7 +906,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -950,7 +950,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -994,7 +994,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -1043,7 +1043,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -1062,12 +1062,12 @@ fn calculate_payout_should_work_in_complex_timeline() {
 
         run_to_block(1803);
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
-        let mut anchors = <BTreeSet<SworkerAnchor>>::new();
-        anchors.insert(legal_pk.clone());
-        anchors.insert(hex::decode("11").unwrap());
+        let mut groups = <BTreeSet<SworkerAnchor>>::new();
+        groups.insert(legal_pk.clone());
+        groups.insert(hex::decode("11").unwrap());
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors
+            groups
         });
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
@@ -1123,7 +1123,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
 
@@ -1146,7 +1146,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
 
@@ -1165,7 +1165,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
     });
@@ -1211,7 +1211,7 @@ fn calculate_payout_should_work_for_more_replicas() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
 
@@ -1286,7 +1286,7 @@ fn calculate_payout_should_work_for_more_replicas() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
         run_to_block(503);
@@ -1330,7 +1330,7 @@ fn calculate_payout_should_work_for_more_replicas() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
 
@@ -1403,7 +1403,7 @@ fn clear_trash_should_work() {
             },
             UsedInfo {
                 used_size: file_size,
-                anchors: BTreeSet::from_iter(vec![].into_iter())
+                groups: BTreeSet::from_iter(vec![].into_iter())
             })
             );
         }
@@ -1433,7 +1433,7 @@ fn clear_trash_should_work() {
                 },
                 UsedInfo {
                     used_size: file_size,
-                    anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
                 })
             );
         }
@@ -1444,25 +1444,25 @@ fn clear_trash_should_work() {
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
         assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
         assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
         assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
         assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
         assert_eq!(Market::used_trash_i(&cid1), None);
         assert_eq!(Market::used_trash_i(&cid2), None);
@@ -1470,13 +1470,13 @@ fn clear_trash_should_work() {
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
         assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
         assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), UsedInfo {
             used_size: file_size,
-            anchors: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_eq!(Market::used_trash_ii(&cid3), None);

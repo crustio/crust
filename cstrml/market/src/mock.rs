@@ -16,7 +16,6 @@ pub use std::{cell::RefCell, iter::FromIterator};
 use balances::AccountData;
 pub use primitives::*;
 use swork::{PKInfo, Identity};
-pub use keyring::Sr25519Keyring;
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;

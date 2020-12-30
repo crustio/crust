@@ -81,8 +81,8 @@ pub struct Replica<AccountId> {
 pub struct UsedInfo {
     // The size of used value in MPoW
     pub used_size: u64,
-    // Anchors which is counted as contributor for this file
-    pub anchors: BTreeSet<SworkerAnchor>
+    // Anchors which is counted as contributor for this file in its own group
+    pub groups: BTreeSet<SworkerAnchor>
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -112,7 +112,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
             // 1. Check if the file is stored by other members
             if let Some(members) = maybe_members {
                 for replica in file_info.replicas.iter() {
-                    if used_info.anchors.contains(&replica.anchor) && members.contains(&replica.who) {
+                    if used_info.groups.contains(&replica.anchor) && members.contains(&replica.who) {
                         if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
                             // duplicated in group and set is_counted to false
                             is_counted = false;
@@ -132,7 +132,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
 
             // 3. Update used_info
             if is_counted {
-                used_info.anchors.insert(anchor.clone());
+                used_info.groups.insert(anchor.clone());
             };
 
             // 4. The first join the 
@@ -615,7 +615,7 @@ impl<T: Config> Module<T> {
             UsedTrashI::insert(cid, used_info.clone());
             UsedTrashSizeI::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for anchor in used_info.anchors.iter() {
+            for anchor in used_info.groups.iter() {
                 UsedTrashMappingI::mutate(&anchor, |value| {
                     *value += used_info.used_size;
                 })
@@ -628,7 +628,7 @@ impl<T: Config> Module<T> {
             UsedTrashII::insert(cid, used_info.clone());
             UsedTrashSizeII::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for anchor in used_info.anchors.iter() {
+            for anchor in used_info.groups.iter() {
                 UsedTrashMappingII::mutate(&anchor, |value| {
                     *value += used_info.used_size;
                 })
@@ -686,7 +686,7 @@ impl<T: Config> Module<T> {
             };
             let used_info = UsedInfo {
                 used_size: file_size,
-                anchors: <BTreeSet<SworkerAnchor>>::new()
+                groups: <BTreeSet<SworkerAnchor>>::new()
             };
             <Files<T>>::insert(cid, (file_info, used_info));
         }
@@ -774,7 +774,7 @@ impl<T: Config> Module<T> {
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
             Some((_, ref mut used_info)) => {
-                if used_info.anchors.take(anchor).is_some() {
+                if used_info.groups.take(anchor).is_some() {
                     is_counted = true;
                 }
             },
@@ -785,7 +785,7 @@ impl<T: Config> Module<T> {
         // 2. Delete trashI's anchor
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
-                if used_info.anchors.take(anchor).is_some() {
+                if used_info.groups.take(anchor).is_some() {
                     is_counted = true;
                     UsedTrashMappingI::mutate(anchor, |value| {
                         *value -= used_info.used_size;
@@ -798,7 +798,7 @@ impl<T: Config> Module<T> {
         // 3. Delete trashII's anchor
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
-                if used_info.anchors.take(anchor).is_some() {
+                if used_info.groups.take(anchor).is_some() {
                     is_counted = true;
                     UsedTrashMappingII::mutate(anchor, |value| {
                         *value -= used_info.used_size;

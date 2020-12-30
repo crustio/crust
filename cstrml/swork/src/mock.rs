@@ -630,7 +630,7 @@ pub fn add_not_live_files() {
     for (file, file_size) in files.iter() {
         let used_info = UsedInfo {
             used_size: *file_size,
-            anchors: <BTreeSet<SworkerAnchor>>::new()
+            groups: <BTreeSet<SworkerAnchor>>::new()
         };
         insert_file(file, 1000, 1000, 1000, 4, 0, vec![], *file_size, used_info);
     }
@@ -651,11 +651,11 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
         anchor: anchor.clone(),
     };
     for (file, file_size) in files.iter() {
-        let mut anchors = <BTreeSet<SworkerAnchor>>::new();
-        anchors.insert(anchor.clone());
+        let mut groups = <BTreeSet<SworkerAnchor>>::new();
+        groups.insert(anchor.clone());
         let used_info = UsedInfo {
             used_size: *file_size,
-            anchors
+            groups
         };
         insert_file(file, 200, 12000, 1000, 4, 0, vec![replica_info.clone()], *file_size, used_info);
     }

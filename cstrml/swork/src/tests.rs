@@ -1513,7 +1513,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 13,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_b).unwrap_or_default(), (
@@ -1532,7 +1532,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 7,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1551,7 +1551,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 37,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
@@ -1601,7 +1601,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 7,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1627,7 +1627,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 37,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
 
@@ -1649,7 +1649,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 55,
-                    anchors: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
@@ -1704,7 +1704,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 37,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
@@ -1730,7 +1730,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 55,
-                    anchors: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
 
@@ -1752,7 +1752,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 22,
-                    anchors: BTreeSet::from_iter(vec![c_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![c_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
@@ -1801,7 +1801,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 7,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1827,7 +1827,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 37,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
 
@@ -1854,7 +1854,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 55,
-                    anchors: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
@@ -1899,7 +1899,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 37,
-                    anchors: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
@@ -1920,7 +1920,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 55,
-                    anchors: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
 
@@ -1936,7 +1936,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 },
                 UsedInfo {
                     used_size: 22,
-                    anchors: BTreeSet::from_iter(vec![].into_iter())
+                    groups: BTreeSet::from_iter(vec![].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {

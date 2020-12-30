@@ -231,7 +231,9 @@ decl_error! {
         /// Not a owner,
         NotOwner,
         /// Used is not zero,
-        IllegalUsed
+        IllegalUsed,
+        /// Group already exist
+        GroupAlreadyExist
     }
 }
 
@@ -475,6 +477,24 @@ decl_module! {
         }
 
         #[weight = 1000]
+        pub fn create_group(
+            origin
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Ensure who is not a group owner right now
+            ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupAlreadyExist);
+
+            // 2. Create the group
+            <Groups<T>>::insert(&who, <BTreeSet<T::AccountId>>::new());
+
+            // 3. Emit event
+            Self::deposit_event(RawEvent::CreateGroupSuccess(who));
+
+            Ok(())
+        }
+
+        #[weight = 1000]
         pub fn join_group(
             origin,
             target: <T::Lookup as StaticLookup>::Source
@@ -489,27 +509,24 @@ decl_module! {
             // 2. Ensure who didn't join group right now
             ensure!(identity.group.is_none(), Error::<T>::AlreadyJoint);
 
-            if who != owner {
-                // 3. Ensure owner has identity information
-                ensure!(Self::identities(&owner).is_some(), Error::<T>::IdentityNotExist);
-                // 4. Ensure owner's group is itself
-                ensure!(Self::identities(&owner).unwrap().group.unwrap_or_default() == owner, Error::<T>::NotOwner);
-                // 5. Ensure who's wr's used is zero
-                ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
-            }
+            // 3. Ensure owner's group exist
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
-            // 6. Join/Create the group
+            // 4. Ensure who's wr's used is zero
+            ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
+
+            // 5. Join the group
             <Groups<T>>::mutate(&owner, |members| {
                 members.insert(who.clone());
             });
 
-            // 7. Mark the group owner
+            // 6. Mark the group owner
             <Identities<T>>::mutate_exists(&who, |maybe_i| match *maybe_i {
                 Some(Identity { ref mut group, .. }) => *group = Some(owner.clone()),
                 ref mut i => *i = None,
             });
 
-            // 8. Emit event
+            // 7. Emit event
             Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
 
             Ok(())
@@ -871,5 +888,6 @@ decl_event!(
         ChillSuccess(AccountId, SworkerPubKey),
         SworkerUpgradeSuccess(SworkerCode, BlockNumber),
         JoinGroupSuccess(AccountId, AccountId),
+        CreateGroupSuccess(AccountId),
     }
 );

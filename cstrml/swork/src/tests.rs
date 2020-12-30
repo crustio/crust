@@ -1184,7 +1184,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
 
 /// Group test cases
 #[test]
-fn join_group_should_work() {
+fn create_and_join_group_should_work() {
     ExtBuilder::default()
         .build()
         .execute_with(|| {
@@ -1192,22 +1192,11 @@ fn join_group_should_work() {
             let bob = Sr25519Keyring::Bob.to_account_id();
 
             // Prepare two work reports
-            let a_wr_info = legal_work_report();
             let b_wr_info = ab_upgrade_work_report();
-            let a_pk = a_wr_info.curr_pk.clone();
             let b_pk = b_wr_info.curr_pk.clone();
 
-            register_identity(&alice, &a_pk, &a_pk);
             register_identity(&bob, &b_pk, &b_pk);
 
-            add_wr(&a_pk, &WorkReport {
-                report_slot: 0,
-                used: 2000,
-                free: 0,
-                reported_files_size: 2,
-                reported_srd_root: hex::decode("00").unwrap(),
-                reported_files_root: hex::decode("11").unwrap()
-            });
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
                 used: 0,
@@ -1218,15 +1207,9 @@ fn join_group_should_work() {
             });
 
             // Alice create a group and be the owner
-            assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
-                alice.clone()
+            assert_ok!(Swork::create_group(
+                Origin::signed(alice.clone())
             ));
-
-            assert_eq!(Swork::identities(&alice).unwrap_or_default(), Identity {
-                anchor: a_pk.clone(),
-                group: Some(alice.clone())
-            });
 
             // Bob join the alice's group
             assert_ok!(Swork::join_group(
@@ -1242,6 +1225,29 @@ fn join_group_should_work() {
 }
 
 #[test]
+fn double_create_group_should_fail() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+
+            // Alice create a group and be the owner
+            assert_ok!(Swork::create_group(
+                Origin::signed(alice.clone())
+            ));
+
+            assert_noop!(Swork::create_group(
+                Origin::signed(alice.clone())
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 14,
+                message: Some("GroupAlreadyExist"),
+            });
+        });
+}
+
+#[test]
 fn join_group_should_failed_due_to_invalid_situations() {
     ExtBuilder::default()
         .build()
@@ -1249,9 +1255,7 @@ fn join_group_should_failed_due_to_invalid_situations() {
             let alice = Sr25519Keyring::Alice.to_account_id();
             let bob = Sr25519Keyring::Bob.to_account_id();
 
-            let a_wr_info = legal_work_report();
             let b_wr_info = ab_upgrade_work_report();
-            let a_pk = a_wr_info.curr_pk.clone();
             let b_pk = b_wr_info.curr_pk.clone();
 
             // bob's identity doesn't exist
@@ -1267,27 +1271,6 @@ fn join_group_should_failed_due_to_invalid_situations() {
 
 
             register_identity(&bob, &b_pk, &b_pk);
-            // alice's identity doesn't exist
-            assert_noop!(Swork::join_group(
-                Origin::signed(bob.clone()),
-                alice.clone()
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 10,
-                message: Some("IdentityNotExist"),
-            });
-
-            register_identity(&alice, &a_pk, &a_pk);
-
-            add_wr(&a_pk, &WorkReport {
-                report_slot: 0,
-                used: 2000,
-                free: 0,
-                reported_files_size: 2,
-                reported_srd_root: hex::decode("00").unwrap(),
-                reported_files_root: hex::decode("11").unwrap()
-            });
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
                 used: 100,
@@ -1309,15 +1292,9 @@ fn join_group_should_failed_due_to_invalid_situations() {
             });
 
             // Alice create a group and be the owner
-            assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
-                alice.clone()
+            assert_ok!(Swork::create_group(
+                Origin::signed(alice.clone())
             ));
-
-            assert_eq!(Swork::identities(&alice).unwrap_or_default(), Identity {
-                anchor: a_pk.clone(),
-                group: Some(alice.clone())
-            });
 
             // bob's used is not 0
             assert_noop!(Swork::join_group(
@@ -1393,6 +1370,10 @@ fn join_group_should_work_for_used_in_work_report() {
             let file_c = hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(); // C file
             let file_d = hex::decode("66a706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b110").unwrap(); // D file
             let file_e = hex::decode("33cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae12e").unwrap(); // E file
+
+            assert_ok!(Swork::create_group(
+                Origin::signed(alice.clone())
+            ));
 
             // alice, bob and eve become a group
             assert_ok!(Swork::join_group(
@@ -1976,6 +1957,10 @@ fn join_group_should_work_for_stake_limit() {
             register_identity(&alice, &a_pk, &a_pk);
             register_identity(&bob, &b_pk, &b_pk);
             register_identity(&eve, &c_pk, &c_pk);
+
+            assert_ok!(Swork::create_group(
+                Origin::signed(alice.clone())
+            ));
 
             assert_ok!(Swork::join_group(
                 Origin::signed(alice.clone()),

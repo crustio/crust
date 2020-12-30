@@ -1490,7 +1490,7 @@ fn update_price_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         // 0 / 0 => None => decrease
-        Market::update_storage_price();
+        Market::update_file_price();
         assert_eq!(Market::file_price(), 990);
 
         run_to_block(50);
@@ -1498,23 +1498,23 @@ fn update_price_should_work() {
         <swork::Free>::put(10000);
         <swork::Used>::put(10000);
         assert_eq!(Swork::get_free_plus_used(), 20000);
-        Market::update_storage_price();
+        Market::update_file_price();
         assert_eq!(Market::file_price(), 980);
 
         // first class storage is 11000 => increase 1%
         FilesSize::put(11000);
-        Market::update_storage_price();
+        Market::update_file_price();
         assert_eq!(Market::file_price(), 990);
 
         // price is 40 and cannot decrease
         <FilePrice<Test>>::put(40);
         FilesSize::put(10);
-        Market::update_storage_price();
+        Market::update_file_price();
         assert_eq!(Market::file_price(), 40);
 
         // price is 40 and will increase by 1
         FilesSize::put(20000);
-        Market::update_storage_price();
+        Market::update_file_price();
         assert_eq!(Market::file_price(), 41);
     });
 }

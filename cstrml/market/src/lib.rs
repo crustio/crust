@@ -451,7 +451,7 @@ decl_module! {
 
             // 7. Update storage price.
             #[cfg(not(test))]
-            Self::update_storage_price();
+            Self::update_file_price();
 
             Self::deposit_event(RawEvent::FileSuccess(who, Self::files(cid).unwrap().0));
 
@@ -720,7 +720,7 @@ impl<T: Config> Module<T> {
         ledger.reward + *value <= ledger.pledge
     }
 
-    pub fn update_storage_price() {
+    pub fn update_file_price() {
         let total = T::SworkerInterface::get_free_plus_used();
         let mut file_price = Self::file_price();
         if let Some(storage_ratio) = total.checked_div(Self::files_size()) {

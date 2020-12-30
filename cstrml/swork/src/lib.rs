@@ -235,7 +235,7 @@ decl_error! {
         /// Group already exist
         GroupAlreadyExist,
         /// Group owner cannot register
-        GroupOwnerCannotRegister
+        GroupOwnerForbidden
     }
 }
 
@@ -294,7 +294,7 @@ decl_module! {
             ensure!(&who == &applier, Error::<T>::IllegalApplier);
 
             // 2. Ensure who cannot be group owner
-            ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupOwnerCannotRegister);
+            ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupOwnerForbidden);
 
             // 3. Ensure unparsed_identity trusted chain is legal, including signature and sworker code
             let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
@@ -349,7 +349,7 @@ decl_module! {
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
             // 2. Ensure who cannot be group owner
-            ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerCannotRegister);
+            ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
             
             // 3. Ensure reporter's code is legal
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
@@ -491,7 +491,7 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // 1. Ensure who didn't report work before
-            ensure!(Self::identities(&who).is_none(), Error::<T>::GroupOwnerCannotRegister);
+            ensure!(Self::identities(&who).is_none(), Error::<T>::GroupOwnerForbidden);
 
             // 2. Ensure who is not a group owner right now
             ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupAlreadyExist);

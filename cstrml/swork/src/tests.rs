@@ -1255,7 +1255,7 @@ fn create_group_should_fail_due_to_invalid_situations() {
             DispatchError::Module {
                 index: 0,
                 error: 15,
-                message: Some("GroupOwnerCannotRegister"),
+                message: Some("GroupOwnerForbidden"),
             });
         });
 }
@@ -1287,7 +1287,7 @@ fn register_should_fail_due_to_reporter_is_group_owner() {
                 DispatchError::Module {
                     index: 0,
                     error: 15,
-                    message: Some("GroupOwnerCannotRegister"),
+                    message: Some("GroupOwnerForbidden"),
                 }
             );
         });
@@ -1329,7 +1329,7 @@ fn report_works_should_fail_due_to_reporter_is_group_owner() {
                 DispatchError::Module {
                     index: 0,
                     error: 15,
-                    message: Some("GroupOwnerCannotRegister"),
+                    message: Some("GroupOwnerForbidden"),
                 });
         });
 }

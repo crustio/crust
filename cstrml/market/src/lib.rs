@@ -526,7 +526,7 @@ impl<T: Config> Module<T> {
         let claim_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
         
-        // 4. Calulate payouts, check replicas and update the file_info
+        // 4. Calculate payouts, check replicas and update the file_info
         if target_reward_count > 0 {
             // 4.1 Get 1 payout amount
             let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,

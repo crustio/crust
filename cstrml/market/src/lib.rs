@@ -140,7 +140,7 @@ pub struct MerchantInfo<Hash, Balance> {
 }
 
 type BalanceOf<T> =
-    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
+    <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 
 /// A trait for checking order's legality
 /// This wanyi is an outer inspector to judge if s/r order can be accepted 😵
@@ -152,7 +152,7 @@ pub trait OrderInspector<AccountId> {
 /// Means for interacting with a specialized version of the `market` trait.
 ///
 /// This is needed because `sWork`
-/// 1. updates the `Merchants` of the `market::Trait`
+/// 1. updates the `Merchants` of the `market::Config`
 /// 2. use `Merchants` to judge work report
 pub trait MarketInterface<AccountId, Hash, Balance> {
     /// MerchantInfo{files} will be used for swork module.
@@ -177,20 +177,20 @@ impl<AId, Hash, Balance> MarketInterface<AId, Hash, Balance> for () {
     }
 }
 
-impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
-    <T as system::Trait>::Hash, BalanceOf<T>> for Module<T>
+impl<T: Config> MarketInterface<<T as system::Config>::AccountId,
+    <T as system::Config>::Hash, BalanceOf<T>> for Module<T>
 {
-    fn merchants(account_id: &<T as system::Trait>::AccountId)
-                 -> Option<MerchantInfo<<T as system::Trait>::Hash, BalanceOf<T>>> {
+    fn merchants(account_id: &<T as system::Config>::AccountId)
+                 -> Option<MerchantInfo<<T as system::Config>::Hash, BalanceOf<T>>> {
         Self::merchants(account_id)
     }
 
-    fn maybe_get_sorder_status(order_id: &<T as system::Trait>::Hash)
+    fn maybe_get_sorder_status(order_id: &<T as system::Config>::Hash)
         -> Option<SorderStatus> {
         Self::sorder_statuses(order_id)
     }
 
-    fn maybe_set_sorder_status(order_id: &<T as system::Trait>::Hash,
+    fn maybe_set_sorder_status(order_id: &<T as system::Config>::Hash,
                         so_status: &SorderStatus,
                         current_block: &BlockNumber) {
         Self::maybe_set_sorder_status(order_id, so_status, current_block);
@@ -198,7 +198,7 @@ impl<T: Trait> MarketInterface<<T as system::Trait>::AccountId,
 }
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait {
+pub trait Config: system::Config {
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId> + TransferrableCurrency<Self::AccountId>;
 
@@ -206,7 +206,7 @@ pub trait Trait: system::Trait {
     type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
 
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
 
     /// Something that provides randomness in the runtime.
     type Randomness: Randomness<Self::Hash>;
@@ -229,7 +229,7 @@ pub trait Trait: system::Trait {
 
 // This module's storage items.
 decl_storage! {
-    trait Store for Module<T: Trait> as Market {
+    trait Store for Module<T: Config> as Market {
         /// A mapping from storage merchant to order id
         pub Merchants get(fn merchants):
         map hasher(twox_64_concat) T::AccountId => Option<MerchantInfo<T::Hash, BalanceOf<T>>>;
@@ -258,7 +258,7 @@ decl_storage! {
 
 decl_error! {
     /// Error for the market module.
-    pub enum Error for Module<T: Trait> {
+    pub enum Error for Module<T: Config> {
         /// Failed on generating order id
         GenerateOrderIdFailed,
         /// No workload
@@ -289,7 +289,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum Call where origin: T::Origin {
         type Error = Error<T>;
 
         // Initializing events
@@ -614,7 +614,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T> {
+impl<T: Config> Module<T> {
     // MUTABLE PUBLIC
     pub fn maybe_set_sorder_status(order_id: &T::Hash,
                                    so_status: &SorderStatus,
@@ -713,7 +713,7 @@ impl<T: Trait> Module<T> {
 
     // Remove a sorder
     fn close_sorder(
-        order_id: &<T as system::Trait>::Hash,
+        order_id: &<T as system::Config>::Hash,
         free_pledge: BalanceOf<T>
     ) {
         if let Some(so_info) = Self::sorder_infos(order_id) {
@@ -832,7 +832,7 @@ impl<T: Trait> Module<T> {
 decl_event!(
     pub enum Event<T>
     where
-        AccountId = <T as system::Trait>::AccountId,
+        AccountId = <T as system::Config>::AccountId,
         Balance = BalanceOf<T>
     {
         StorageOrderSuccess(AccountId, SorderInfo<AccountId, Balance>, SorderStatus),

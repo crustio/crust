@@ -9,7 +9,7 @@ use crate::Module as Market;
 const SEED: u32 = 0;
 const ACCOUNT_BALANCE_RATIO: u32 = 10000000;
 
-fn create_funded_user<T: Trait>(string: &'static str, n: u32) -> T::AccountId {
+fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     let user = account(string, n, SEED);
     let balance = T::Currency::minimum_balance() * ACCOUNT_BALANCE_RATIO.into();
     T::Currency::make_free_balance_be(&user, balance);

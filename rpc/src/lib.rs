@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
-use crust_runtime::opaque::Block;
-use crust_primitives::{BlockNumber, AccountId, Index, Balance, Hash};
+use crust_primitives::{Block, BlockNumber, AccountId, Index, Balance, Hash};
 use sp_api::ProvideRuntimeApi;
 use txpool_api::TransactionPool;
 use sp_blockchain::{HeaderBackend, HeaderMetadata, Error as BlockChainError};
+use sp_keystore::SyncCryptoStorePtr;
 use sp_consensus::SelectChain;
 use sp_consensus_babe::BabeApi;
 use sc_client_api::light::{Fetcher, RemoteBlockchain};
@@ -37,7 +37,7 @@ pub struct BabeDeps {
     /// BABE pending epoch changes.
     pub shared_epoch_changes: sc_consensus_epochs::SharedEpochChanges<Block, Epoch>,
     /// The keystore that manages the keys of the node.
-    pub keystore: sc_keystore::KeyStorePtr,
+    pub keystore: SyncCryptoStorePtr,
 }
 
 /// Dependencies for GRANDPA

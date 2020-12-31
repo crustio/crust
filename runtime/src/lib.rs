@@ -708,7 +708,7 @@ parameter_types! {
     pub const FileBaseFee: Balance = CENTS / 20;  // roughly equal to 1RMB / month
     pub const FileInitPrice: Balance = MILLICENTS / 10; // Need align with FileDuration and InitialReplica
     pub const ClaimLimit: u32 = 1000;
-    pub const StorageReferenceRatio: u128 = 4; // 1/4 = 25%
+    pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);

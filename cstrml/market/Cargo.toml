@@ -50,4 +50,3 @@ hex = '0.4.2'
 swork = { version = "0.11.0", package = 'cstrml-swork', path = '../swork' }
 balances = { version = "0.11.0", package = 'cstrml-balances', path = '../balances' }
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
-keyring = { package = "sp-keyring", version = '2.0.0' }

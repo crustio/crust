@@ -22,7 +22,6 @@ frame-system = { default-features = false, git = "https://github.com/paritytech/
 sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
 sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
 sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-runtime-interface = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
 sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false, optional = true }
 
@@ -49,7 +48,6 @@ std = [
     'sp-runtime/std',
     'sp-std/std',
     'frame-system/std',
-    'sp-runtime-interface/std',
     'primitives/std',
     'webpki/std'
 ]

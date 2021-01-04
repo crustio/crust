@@ -402,6 +402,7 @@ fn calculate_payout_should_work() {
         let file_size = 100; // should less than merchant
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
+        let reserved_pot = Market::reserved_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
@@ -419,7 +420,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.9 * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -430,8 +431,9 @@ fn calculate_payout_should_work() {
             })
         );
 
-        assert_eq!(Balances::free_balance(staking_pot), 1600);
-        assert_eq!(Balances::free_balance(storage_pot), 400);
+        assert_eq!(Balances::free_balance(reserved_pot), 200);
+        assert_eq!(Balances::free_balance(staking_pot), 1440);
+        assert_eq!(Balances::free_balance(storage_pot), 360);
 
         run_to_block(303);
         let legal_wr_info = legal_work_report_with_added_files();
@@ -460,7 +462,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -484,7 +486,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 606,
-                amount: 279, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 251, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -500,7 +502,7 @@ fn calculate_payout_should_work() {
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 121
+            reward: 109
         })
     });
 }

@@ -75,6 +75,7 @@ candy = { version = "0.11.0", package = 'cstrml-candy', path = '../cstrml/candy'
 market = { version = "0.11.0", package = 'cstrml-market', path = '../cstrml/market', default-features = false }
 primitives = { version = "0.11.0", package = 'cst-primitives', path = '../primitives', default-features = false }
 swork = { version = "0.11.0", package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
+swork-benchmarking = { version = "0.11.0", package = 'cstrml-swork-benchmarking', path = '../cstrml/swork/benchmarking', default-features = false, optional = true }
 staking = { version = "0.11.0", package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
 
 [features]
@@ -140,5 +141,5 @@ runtime-benchmarks = [
     "frame-system-benchmarking",
     "staking/runtime-benchmarks",
     "market/runtime-benchmarks",
-    "swork/runtime-benchmarks"
+    "swork-benchmarking"
 ]

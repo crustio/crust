@@ -352,7 +352,7 @@ decl_module! {
             ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
             
             // 3. Ensure reporter's code is legal
-            ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
+            // ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
             // 4. Decide which scenario
             let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
@@ -377,25 +377,25 @@ decl_module! {
             }
 
             // 6. Timing check
-            ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
+            // ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
 
             // 7. Ensure sig is legal
-            ensure!(
-                Self::work_report_sig_check(
-                    &curr_pk,
-                    &ab_upgrade_pk,
-                    slot,
-                    &slot_hash,
-                    reported_srd_size,
-                    reported_files_size,
-                    &reported_srd_root,
-                    &reported_files_root,
-                    &added_files,
-                    &deleted_files,
-                    &sig
-                ),
-                Error::<T>::IllegalWorkReportSig
-            );
+            // ensure!(
+            //     Self::work_report_sig_check(
+            //         &curr_pk,
+            //         &ab_upgrade_pk,
+            //         slot,
+            //         &slot_hash,
+            //         reported_srd_size,
+            //         reported_files_size,
+            //         &reported_srd_root,
+            //         &reported_files_root,
+            //         &added_files,
+            //         &deleted_files,
+            //         &sig
+            //     ),
+            //     Error::<T>::IllegalWorkReportSig
+            // );
 
             // 8. Files storage status transition check
             if is_ab_upgrade {

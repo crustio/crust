@@ -725,7 +725,7 @@ impl<T: Config> Module<T> {
         let (numerator, denominator) = T::StorageReferenceRatio::get();
         let files_size = Self::files_size();
         let mut file_price = Self::file_price();
-        if files_size !=0 {
+        if files_size != 0 {
             // Too much supply => decrease the price
             if files_size.saturating_mul(denominator) < total_capacity.saturating_mul(numerator) {
                 let gap = T::StorageDecreaseRatio::get() * file_price;

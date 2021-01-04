@@ -703,14 +703,14 @@ impl swork::Config for Runtime {
 parameter_types! {
     /// Unit is pico
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
-    pub const FileDuration: BlockNumber = 15 * DAYS;
-    pub const InitialReplica: u32 = 4;
+    pub const FileDuration: BlockNumber = 15 * MINUTES;
+    pub const InitialReplica: u32 = 2;
     pub const FileBaseFee: Balance = CENTS / 20;  // roughly equal to 1RMB / month
-    pub const FileInitPrice: Balance = MILLICENTS / 10; // Need align with FileDuration and InitialReplica
+    pub const FileInitPrice: Balance = CENTS / 10; // Need align with FileDuration and InitialReplica
     pub const ClaimLimit: u32 = 1000;
-    pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
-    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
-    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
+    pub const StorageReferenceRatio: (u128, u128) = (1, 2); // 25/100 = 25%
+    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 2);
+    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 2);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
     pub const UsedTrashMaxSize: u128 = 500_000;
 }
@@ -722,7 +722,6 @@ impl market::Config for Runtime {
     type CurrencyToBalance = CurrencyToVoteHandler;
     type SworkerInterface = Swork;
     type Event = Event;
-    /// File duration.
     type FileDuration = FileDuration;
     type InitialReplica = InitialReplica;
     type FileBaseFee = FileBaseFee;

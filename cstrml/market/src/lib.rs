@@ -227,6 +227,9 @@ pub trait Config: system::Config {
     /// Storage/Staking ratio.
     type StakingRatio: Get<Perbill>;
 
+    /// Tax / Storage plus Staking ratio.
+    type TaxRatio: Get<Perbill>;
+
     /// UsedTrashMaxSize.
     type UsedTrashMaxSize: Get<u128>;
 }
@@ -439,7 +442,7 @@ decl_module! {
             ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
             // 4. Split into storage and staking account.
-            let storage_amount = Self::split_into_storage_and_staking_pot(&who, amount.clone());
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
 
             let curr_bn = Self::get_current_block_number();
 
@@ -447,7 +450,7 @@ decl_module! {
             Self::calculate_payout(&cid, curr_bn);
 
             // 6. three scenarios: new file, extend time or extend replica
-            Self::upsert_new_file_info(&cid, extend_replica, &storage_amount, &curr_bn, file_size);
+            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, file_size);
 
             // 7. Update storage price.
             #[cfg(not(test))]
@@ -757,9 +760,13 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn split_into_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
-        let staking_amount = T::StakingRatio::get() * value;
-        let storage_amount = value - staking_amount;
+    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
+        let reserved_amount = T::TaxRatio::get() * value;
+        let staking_and_storage_amount = value - reserved_amount;
+        let staking_amount = T::StakingRatio::get() * staking_and_storage_amount;
+        let storage_amount = staking_and_storage_amount - staking_amount;
+
+        T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, AllowDeath).expect("Something wrong during transferring");
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, AllowDeath).expect("Something wrong during transferring");
         T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), AllowDeath).expect("Something wrong during transferring");
         storage_amount

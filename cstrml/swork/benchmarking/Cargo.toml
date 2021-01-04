@@ -25,10 +25,10 @@ sp-std = { default-features = false, git = "https://github.com/paritytech/substr
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
 
 # crust runtime modules
-primitives = { package = 'cst-primitives', path = '../../primitives', default-features = false }
-market = { package = 'cstrml-market', path = '../market', default-features = false }
-swork = { package = "cstrml-swork", path = "../swork", default-features = false }
-balances = { default-features = false, package = 'cstrml-balances', path = '../balances' }
+primitives = { package = 'cst-primitives', path = '../../../primitives', default-features = false }
+market = { package = 'cstrml-market', path = '../../market', default-features = false }
+swork = { package = "cstrml-swork", path = "../../swork", default-features = false }
+balances = { package = 'cstrml-balances', path = '../../balances', default-features = false }
 
 [features]
 default = ['std']
@@ -43,11 +43,9 @@ std = [
     'frame-system/std',
     'primitives/std',
     'frame-benchmarking/std',
-]
-runtime-benchmarks = [
-    'swork/runtime-benchmarks',
-    'market/runtime-benchmarks',
-    'balances/runtime-benchmarks',
+    'swork/std',
+    'market/std',
+    'balances/std'
 ]
 
 [dev-dependencies]

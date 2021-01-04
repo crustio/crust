@@ -572,18 +572,18 @@ impl<T: Config> Module<T> {
             file_info.reported_replica_count = new_replicas.len() as u32;
             new_replicas.append(&mut invalid_replicas);
             file_info.replicas = new_replicas;
-        }
-        
-        // 5. Update files
-        <Files<T>>::insert(cid, (file_info.clone(), used_info));
 
-        // 6. Update first class storage size
-        Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
-        
-        // 7. Try to close file, judge if it is outdated
+            // 4.4 Update files
+            <Files<T>>::insert(cid, (file_info.clone(), used_info));
+
+            // 4.5 Update first class storage size
+            Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
+        }
+                
+        // 5. Try to close file, judge if it is outdated
         Self::try_to_close_file(cid, curr_bn);
 
-        // 8. Return the claimed block
+        // 6. Return the claimed block
         return claim_block;
     }
 

@@ -382,7 +382,7 @@ impl<T: Config> SworkInterface for T where T: swork::Config {
 }
 
 pub trait Config: frame_system::Config {
-    /// The staking's module id, used for deriving its sovereign account ID.
+    /// The staking's module id, used for staking pot
     type ModuleId: Get<ModuleId>;
     /// The staking balance.
     type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
@@ -768,7 +768,7 @@ decl_module! {
         const MaxGuarantorRewardedPerValidator: u32 = T::MaxGuarantorRewardedPerValidator::get();
 
         /// The staking's module id, used for deriving its sovereign account ID.
-		const ModuleId: ModuleId = T::ModuleId::get();
+        const ModuleId: ModuleId = T::ModuleId::get();
 
         type Error = Error<T>;
 

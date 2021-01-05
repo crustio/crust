@@ -1858,7 +1858,10 @@ impl<T: Config> Module<T> {
                     WithdrawReasons::TRANSFER,
                     KeepAlive
                 ) {
-                    Self::deposit_event(RawEvent::NotEnoughCurrency(active_era_index, total_authoring_payout, total_staking_payout));
+                    log!(
+                        info,
+                        "💸 Staking pot is not enough"
+                    );
                     return;
                 }
                 // 2. Block authoring payout

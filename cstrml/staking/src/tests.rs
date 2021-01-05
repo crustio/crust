@@ -81,8 +81,8 @@ fn basic_setup_works() {
             <Validators<Test>>::iter().collect::<Vec<_>>(),
             vec![
                 (31, ValidatorPrefs::default()),
-                (21, ValidatorPrefs::default()),
-                (11, ValidatorPrefs::default())
+                (11, ValidatorPrefs::default()),
+                (21, ValidatorPrefs::default())
             ]
         );
 
@@ -184,13 +184,13 @@ fn change_controller_works() {
 
         assert!(<Validators<Test>>::iter()
             .map(|(c, _)| c)
-            .collect::<Vec<u64>>()
+            .collect::<Vec<u128>>()
             .contains(&11));
         // 10 can control 11 who is initially a validator.
         assert_ok!(Staking::chill(Origin::signed(10)));
         assert!(!<Validators<Test>>::iter()
             .map(|(c, _)| c)
-            .collect::<Vec<u64>>()
+            .collect::<Vec<u128>>()
             .contains(&11));
 
         assert_ok!(Staking::set_controller(Origin::signed(11), 5));
@@ -660,8 +660,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
                 // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
                 // TODO: tmp change for equalize strategy(with voting to candidates)
@@ -681,8 +681,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
             } else {
                 // total expo of 10, with 1200 coming from guarantors (externals), according to phragmen.
@@ -702,8 +702,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
                 // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
                 assert_eq!(Staking::eras_stakers(0, 41).own, 1000);
@@ -722,8 +722,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
             }
 
@@ -3310,11 +3310,11 @@ fn update_stakers_should_work_new_era() {
                 total: 2500,
                 own: 1000,
                 others: vec![IndividualExposure {
-                    who: 3,
+                    who: 7,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 7,
+                    who: 3,
                     value: 500
                 },
                 IndividualExposure {
@@ -3419,11 +3419,11 @@ fn eras_stakers_clipped_should_work_new_era() {
                 total: 3400,
                 own: 1000,
                 others: vec![IndividualExposure {
-                    who: 115,
+                    who: 113,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 113,
+                    who: 111,
                     value: 500
                 },
                 IndividualExposure {
@@ -3431,11 +3431,11 @@ fn eras_stakers_clipped_should_work_new_era() {
                     value: 400
                 },
                 IndividualExposure {
-                    who: 117,
+                    who: 115,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 111,
+                    who: 117,
                     value: 500
                 }]
             }
@@ -3446,19 +3446,19 @@ fn eras_stakers_clipped_should_work_new_era() {
                 total: 3400,
                 own: 1000,
                 others: vec![IndividualExposure {
-                    who: 115,
-                    value: 500
-                },
-                IndividualExposure {
                     who: 113,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 117,
+                    who: 111,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 111,
+                    who: 115,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 117,
                     value: 500
                 }]
             }
@@ -3668,11 +3668,11 @@ fn multi_guarantees_should_work() {
                     total: 2500,
                     own: 1000,
                     others: vec![IndividualExposure {
-                        who: 3,
-                        value: 1000
-                    }, IndividualExposure {
                         who: 1,
                         value: 500
+                    }, IndividualExposure {
+                        who: 3,
+                        value: 1000
                     }]
                 }
             );
@@ -3927,10 +3927,10 @@ fn new_era_with_stake_limit_should_work() {
                     total: 2500,
                     own: 500,
                     others: vec![IndividualExposure {
-                        who: 3,
+                        who: 1,
                         value: 1000
                     }, IndividualExposure {
-                        who: 1,
+                        who: 3,
                         value: 1000
                     }]
                 }

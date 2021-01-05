@@ -213,6 +213,7 @@ impl swork::Config for Test {
 }
 
 parameter_types! {
+    pub const StakingModuleId: ModuleId = ModuleId(*b"cstaking");
     pub const SessionsPerEra: SessionIndex = 3;
     pub const BondingDuration: EraIndex = 3;
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
@@ -220,6 +221,7 @@ parameter_types! {
 }
 
 impl Config for Test {
+    type ModuleId = StakingModuleId;
     type Currency = balances::Module<Self>;
     type UnixTime = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;
@@ -250,7 +252,8 @@ pub struct ExtBuilder {
     num_validators: Option<u32>,
     invulnerables: Vec<u128>,
     own_workload: u128,
-    total_workload: u128
+    total_workload: u128,
+    staking_pot: Balance
 }
 
 impl Default for ExtBuilder {
@@ -267,6 +270,7 @@ impl Default for ExtBuilder {
             invulnerables: vec![],
             own_workload: 3000,
             total_workload: 3000,
+            staking_pot: 1_000_000_000_000_000_000
         }
     }
 }
@@ -316,6 +320,10 @@ impl ExtBuilder {
         self.invulnerables = invulnerables;
         self
     }
+    pub fn staking_pot(mut self, amount: Balance) -> Self {
+        self.staking_pot = amount;
+        self
+    }
     pub fn set_associated_consts(&self) {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow_mut() = self.existential_deposit);
         SLASH_DEFER_DURATION.with(|v| *v.borrow_mut() = self.slash_defer_duration);
@@ -352,6 +360,7 @@ impl ExtBuilder {
                 (101, 2000 * balance_factor),
                 // This allow us to have a total_payout different from 0.
                 (999, 1_000_000_000_000),
+                (Staking::staking_pot(), self.staking_pot)
             ],
         }.assimilate_storage(&mut storage);
 
@@ -623,10 +632,10 @@ pub fn start_era_with_new_workloads(era_index: EraIndex, with_reward: bool, own_
 }
 
 pub fn payout_all_stakers(era_index: EraIndex) {
-    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap();
-    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap();
-    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap();
-    Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap_or_default();
 }
 
 fn init_swork_setup() {

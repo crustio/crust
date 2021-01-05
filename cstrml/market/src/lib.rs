@@ -531,9 +531,9 @@ impl<T: Config> Module<T> {
         
         // 4. Calculate payouts, check replicas and update the file_info
         if target_reward_count > 0 {
-            // 4.1 Get 1 payout amount
-            let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
-                                                                        (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount;
+            // 4.1 Get 1 payout amount. Sub 1 to make sure that we won't get overflow
+            let one_payout_amount = (Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
+                                                                          (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount).saturating_sub(1u32.into());
             let mut rewarded_amount = Zero::zero();
             let mut rewarded_count = 0u32;
             let mut new_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
@@ -571,7 +571,7 @@ impl<T: Config> Module<T> {
 
             // 4.3 Update file info
             file_info.claimed_at = claim_block;
-            file_info.amount -= rewarded_amount;
+            file_info.amount = file_info.amount.saturating_sub(rewarded_amount);
             file_info.reported_replica_count = new_replicas.len() as u32;
             new_replicas.append(&mut invalid_replicas);
             file_info.replicas = new_replicas;

@@ -21,7 +21,7 @@ use balances::AccountData;
 use primitives::{traits::MarketInterface, MerkleRoot, SworkerAnchor};
 
 /// The AccountId alias in this test module.
-pub type AccountId = u64;
+pub type AccountId = u128;
 pub type BlockNumber = u64;
 pub type Balance = u64;
 
@@ -99,8 +99,8 @@ impl_outer_origin! {
 
 /// Author of block is always 11
 pub struct Author11;
-impl FindAuthor<u64> for Author11 {
-    fn find_author<'a, I>(_digests: I) -> Option<u64>
+impl FindAuthor<u128> for Author11 {
+    fn find_author<'a, I>(_digests: I) -> Option<u128>
     where
         I: 'a + IntoIterator<Item = (frame_support::ConsensusEngineId, &'a [u8])>,
     {
@@ -213,6 +213,7 @@ impl swork::Config for Test {
 }
 
 parameter_types! {
+    pub const StakingModuleId: ModuleId = ModuleId(*b"cstaking");
     pub const SessionsPerEra: SessionIndex = 3;
     pub const BondingDuration: EraIndex = 3;
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
@@ -220,6 +221,7 @@ parameter_types! {
 }
 
 impl Config for Test {
+    type ModuleId = StakingModuleId;
     type Currency = balances::Module<Self>;
     type UnixTime = pallet_timestamp::Module<Self>;
     type CurrencyToVote = CurrencyToVoteHandler;
@@ -248,9 +250,10 @@ pub struct ExtBuilder {
     slash_defer_duration: EraIndex,
     fair: bool,
     num_validators: Option<u32>,
-    invulnerables: Vec<u64>,
+    invulnerables: Vec<u128>,
     own_workload: u128,
-    total_workload: u128
+    total_workload: u128,
+    staking_pot: Balance
 }
 
 impl Default for ExtBuilder {
@@ -267,6 +270,7 @@ impl Default for ExtBuilder {
             invulnerables: vec![],
             own_workload: 3000,
             total_workload: 3000,
+            staking_pot: 1_000_000_000_000_000_000
         }
     }
 }
@@ -312,8 +316,12 @@ impl ExtBuilder {
         self.num_validators = Some(num_validators);
         self
     }
-    pub fn invulnerables(mut self, invulnerables: Vec<u64>) -> Self {
+    pub fn invulnerables(mut self, invulnerables: Vec<u128>) -> Self {
         self.invulnerables = invulnerables;
+        self
+    }
+    pub fn staking_pot(mut self, amount: Balance) -> Self {
+        self.staking_pot = amount;
         self
     }
     pub fn set_associated_consts(&self) {
@@ -331,7 +339,7 @@ impl ExtBuilder {
 
         let num_validators = self.num_validators.unwrap_or(self.validator_count);
         let validators = (0..num_validators)
-            .map(|x| ((x + 1) * 10 + 1) as u64)
+            .map(|x| ((x + 1) * 10 + 1) as u128)
             .collect::<Vec<_>>();
 
         let _ = balances::GenesisConfig::<Test> {
@@ -352,6 +360,7 @@ impl ExtBuilder {
                 (101, 2000 * balance_factor),
                 // This allow us to have a total_payout different from 0.
                 (999, 1_000_000_000_000),
+                (Staking::staking_pot(), self.staking_pot)
             ],
         }.assimilate_storage(&mut storage);
 
@@ -414,7 +423,7 @@ impl ExtBuilder {
             keys: validators.iter().map(|x| (
                 *x,
                 *x,
-                UintAuthorityId(*x)
+                UintAuthorityId((*x).try_into().unwrap())
             )).collect(),
         }
         .assimilate_storage(&mut storage);
@@ -458,7 +467,7 @@ pub fn check_guarantor_all() {
 
 /// Check that for each guarantor: slashable_balance > sum(used_balance)
 /// Note: we might not consume all of a guarantor's balance, but we MUST NOT over spend it.
-pub fn check_guarantor_exposure(stash: u64) {
+pub fn check_guarantor_exposure(stash: u128) {
     assert_is_stash(stash);
     let mut sum = 0;
     let current_era = Staking::current_era().unwrap_or(0);
@@ -482,11 +491,11 @@ pub fn check_guarantor_exposure(stash: u64) {
     );
 }
 
-pub fn assert_is_stash(acc: u64) {
+pub fn assert_is_stash(acc: u128) {
     assert!(Staking::bonded(&acc).is_some(), "Not a stash.");
 }
 
-pub fn assert_ledger_consistent(stash: u64) {
+pub fn assert_ledger_consistent(stash: u128) {
     assert_is_stash(stash);
     let ledger = Staking::ledger(stash - 1).unwrap();
 
@@ -497,7 +506,7 @@ pub fn assert_ledger_consistent(stash: u64) {
     assert_eq!(real_total, ledger.total);
 }
 
-pub fn bond_validator(acc: u64, val: u64) {
+pub fn bond_validator(acc: u128, val: u64) {
     // a = controller
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
@@ -511,7 +520,7 @@ pub fn bond_validator(acc: u64, val: u64) {
     assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
 }
 
-pub fn bond_guarantor(acc: u64, val: u64, targets: Vec<(u64, u64)>) {
+pub fn bond_guarantor(acc: u128, val: u64, targets: Vec<(u128, u64)>) {
     // a = controller
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
@@ -623,15 +632,15 @@ pub fn start_era_with_new_workloads(era_index: EraIndex, with_reward: bool, own_
 }
 
 pub fn payout_all_stakers(era_index: EraIndex) {
-    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap();
-    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap();
-    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap();
-    Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap();
+    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap_or_default();
 }
 
 fn init_swork_setup() {
-    let identities: Vec<u64> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
-    let id_map: Vec<(u64, Vec<u8>)> = identities.iter().map(|account| (*account, account.to_be_bytes().to_vec())).collect();
+    let identities: Vec<u128> = vec![10, 20, 30, 40, 2, 60, 50, 70, 4, 6, 100];
+    let id_map: Vec<(u128, Vec<u8>)> = identities.iter().map(|account| (*account, account.to_be_bytes().to_vec())).collect();
     let code: Vec<u8> = vec![];
 
     for (id, pk) in id_map {

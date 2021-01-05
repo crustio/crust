@@ -81,8 +81,8 @@ fn basic_setup_works() {
             <Validators<Test>>::iter().collect::<Vec<_>>(),
             vec![
                 (31, ValidatorPrefs::default()),
-                (21, ValidatorPrefs::default()),
-                (11, ValidatorPrefs::default())
+                (11, ValidatorPrefs::default()),
+                (21, ValidatorPrefs::default())
             ]
         );
 
@@ -184,13 +184,13 @@ fn change_controller_works() {
 
         assert!(<Validators<Test>>::iter()
             .map(|(c, _)| c)
-            .collect::<Vec<u64>>()
+            .collect::<Vec<u128>>()
             .contains(&11));
         // 10 can control 11 who is initially a validator.
         assert_ok!(Staking::chill(Origin::signed(10)));
         assert!(!<Validators<Test>>::iter()
             .map(|(c, _)| c)
-            .collect::<Vec<u64>>()
+            .collect::<Vec<u128>>()
             .contains(&11));
 
         assert_ok!(Staking::set_controller(Origin::signed(11), 5));
@@ -395,6 +395,86 @@ fn multi_era_reward_should_work() {
             assert_eq!(
                 Balances::total_balance(&31) / 1000000,
                 (stakes_31 + (total_staking_payout_1 / 2001)) / 1000000
+            );
+        });
+}
+
+#[test]
+fn era_reward_should_fail_due_to_insufficient_staking_pot() {
+    // Should check that:
+    // The value of current_session_reward is set at the end of each era, based on
+    // total_stakes and session_reward.
+    ExtBuilder::default()
+        .guarantee(false)
+        .staking_pot(400_000_000_000_000)
+        .own_workload(u128::max_value())
+        .build()
+        .execute_with(|| {
+            let init_balance_10 = Balances::total_balance(&10);
+            let init_balance_21 = Balances::total_balance(&21);
+
+            // Set payee to controller
+            assert_ok!(Staking::set_payee(
+                Origin::signed(10),
+                RewardDestination::Controller
+            ));
+
+            // Compute now as other parameter won't change
+            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
+            assert_eq!(Staking::eras_total_stakes(0), 2001);
+            <Module<Test>>::reward_by_ids(vec![(21, 1)]);
+
+            start_session(0, true);
+            start_session(1, true);
+            start_session(2, true);
+            start_session(3, true);
+            payout_all_stakers(0);
+
+            assert_eq!(Staking::current_era().unwrap_or(0), 1);
+            assert_eq!(Staking::eras_total_stakes(1), 2001);
+            // rewards may round to 0.000001
+            assert_eq!(
+                Balances::total_balance(&10) / 1000000,
+                (init_balance_10 + total_staking_payout_0 * 1000 / 2001) / 1000000
+            );
+            let stakes_21 = Balances::total_balance(&21);
+            let stakes_31 = Balances::total_balance(&31);
+            // candidates should have rewards
+            assert_eq!(
+                stakes_21 / 1000000,
+                (init_balance_21 + total_authoring_payout + total_staking_payout_0 * 1000 / 2001) / 1000000
+            );
+
+            start_session(4, true);
+
+            <Module<Test>>::reward_by_ids(vec![(21, 101)]); // meaningless points
+            // new era is triggered here.
+            start_session(5, true);
+            start_session(6, true);
+            let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert!(total_staking_payout_1 > 10); // Test is meaningful if reward something
+            // Payout would fail because staking pot doesn't have enough money
+            payout_all_stakers(1);
+
+            assert_eq!(Staking::eras_total_stakes(2), 148371513234946);
+            // Staking pot doesn't have enough money
+            assert_eq!(
+                Balances::total_balance(&10) / 10000000,
+                (init_balance_10 + total_staking_payout_0 * 1000 / 2001) / 10000000
+            );
+            assert_eq!(
+                Balances::total_balance(&21) / 1000000,
+                stakes_21 / 1000000
+            );
+            assert_eq!(
+                Balances::total_balance(&31) / 1000000,
+                stakes_31 / 1000000
+            );
+            assert_eq!(
+                Balances::total_balance(&Staking::staking_pot()) / 1000000,
+                109103353 // 400_000_000_000_000 - 285192790326260 - 5703855806525
             );
         });
 }
@@ -660,8 +740,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
                 // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
                 // TODO: tmp change for equalize strategy(with voting to candidates)
@@ -681,8 +761,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
             } else {
                 // total expo of 10, with 1200 coming from guarantors (externals), according to phragmen.
@@ -702,8 +782,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
                 // total expo of 20, with 500 coming from guarantors (externals), according to phragmen.
                 assert_eq!(Staking::eras_stakers(0, 41).own, 1000);
@@ -722,8 +802,8 @@ fn guaranteeing_and_rewards_should_work() {
                         .others
                         .iter()
                         .map(|e| e.who)
-                        .collect::<Vec<u64>>(),
-                    vec![3, 1]
+                        .collect::<Vec<u128>>(),
+                    vec![1, 3]
                 );
             }
 
@@ -3310,11 +3390,11 @@ fn update_stakers_should_work_new_era() {
                 total: 2500,
                 own: 1000,
                 others: vec![IndividualExposure {
-                    who: 3,
+                    who: 7,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 7,
+                    who: 3,
                     value: 500
                 },
                 IndividualExposure {
@@ -3419,11 +3499,11 @@ fn eras_stakers_clipped_should_work_new_era() {
                 total: 3400,
                 own: 1000,
                 others: vec![IndividualExposure {
-                    who: 115,
+                    who: 113,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 113,
+                    who: 111,
                     value: 500
                 },
                 IndividualExposure {
@@ -3431,11 +3511,11 @@ fn eras_stakers_clipped_should_work_new_era() {
                     value: 400
                 },
                 IndividualExposure {
-                    who: 117,
+                    who: 115,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 111,
+                    who: 117,
                     value: 500
                 }]
             }
@@ -3446,19 +3526,19 @@ fn eras_stakers_clipped_should_work_new_era() {
                 total: 3400,
                 own: 1000,
                 others: vec![IndividualExposure {
-                    who: 115,
-                    value: 500
-                },
-                IndividualExposure {
                     who: 113,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 117,
+                    who: 111,
                     value: 500
                 },
                 IndividualExposure {
-                    who: 111,
+                    who: 115,
+                    value: 500
+                },
+                IndividualExposure {
+                    who: 117,
                     value: 500
                 }]
             }
@@ -3668,11 +3748,11 @@ fn multi_guarantees_should_work() {
                     total: 2500,
                     own: 1000,
                     others: vec![IndividualExposure {
-                        who: 3,
-                        value: 1000
-                    }, IndividualExposure {
                         who: 1,
                         value: 500
+                    }, IndividualExposure {
+                        who: 3,
+                        value: 1000
                     }]
                 }
             );
@@ -3927,10 +4007,10 @@ fn new_era_with_stake_limit_should_work() {
                     total: 2500,
                     own: 500,
                     others: vec![IndividualExposure {
-                        who: 3,
+                        who: 1,
                         value: 1000
                     }, IndividualExposure {
-                        who: 1,
+                        who: 3,
                         value: 1000
                     }]
                 }

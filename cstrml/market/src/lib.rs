@@ -531,7 +531,7 @@ impl<T: Config> Module<T> {
         
         // 4. Calculate payouts, check replicas and update the file_info
         if target_reward_count > 0 {
-            // 4.1 Get 1 payout amount. Sub 1 to make sure that we won't get overflow
+            // 4.1 Get 1 payout amount and sub 1 to make sure that we won't get overflow
             let one_payout_amount = (Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
                                                                           (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount).saturating_sub(1u32.into());
             let mut rewarded_amount = Zero::zero();
@@ -760,6 +760,11 @@ impl<T: Config> Module<T> {
         }
     }
 
+    // Split total value into three pot and return the amount in storage pot
+    // Currently
+    // 10% into reserved pot
+    // 72% into staking pot
+    // 18% into storage pot
     fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
         let reserved_amount = T::TaxRatio::get() * value;
         let staking_and_storage_amount = value - reserved_amount;

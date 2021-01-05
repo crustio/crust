@@ -153,7 +153,8 @@ fn place_storage_order_should_work() {
 
         let cid =
         hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
-        let file_size = 100; // should less than merchant
+        let file_size = 100; // should less than
+        let reserved_pot = Market::reserved_pot();
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
@@ -172,7 +173,7 @@ fn place_storage_order_should_work() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -182,8 +183,9 @@ fn place_storage_order_should_work() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-        assert_eq!(Balances::free_balance(staking_pot), 1600);
-        assert_eq!(Balances::free_balance(storage_pot), 400);
+        assert_eq!(Balances::free_balance(reserved_pot), 200);
+        assert_eq!(Balances::free_balance(staking_pot), 1440);
+        assert_eq!(Balances::free_balance(storage_pot), 360);
     });
 }
 
@@ -222,7 +224,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -232,8 +234,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-        assert_eq!(Balances::free_balance(&staking_pot), 1600);
-        assert_eq!(Balances::free_balance(&storage_pot), 400);
+        assert_eq!(Balances::free_balance(&staking_pot), 1440);
+        assert_eq!(Balances::free_balance(&storage_pot), 360);
 
         run_to_block(250);
         
@@ -248,7 +250,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 800, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -258,8 +260,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-        assert_eq!(Balances::free_balance(&staking_pot), 3200);
-        assert_eq!(Balances::free_balance(&storage_pot), 800);
+        assert_eq!(Balances::free_balance(&staking_pot), 2880);
+        assert_eq!(Balances::free_balance(&storage_pot), 720);
 
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
@@ -287,7 +289,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1400,
                 claimed_at: 400,
-                amount: 800, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -311,7 +313,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1400,
                 claimed_at: 500,
-                amount: 720,
+                amount: 649,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -338,7 +340,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1600,
                 claimed_at: 600,
-                amount: 1040,
+                amount: 938,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -365,7 +367,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1800,
                 claimed_at: 800,
-                amount: 1272,
+                amount: 1147,
                 expected_replica_count: 8,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -402,6 +404,7 @@ fn calculate_payout_should_work() {
         let file_size = 100; // should less than merchant
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
+        let reserved_pot = Market::reserved_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
@@ -419,7 +422,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.9 * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -430,8 +433,9 @@ fn calculate_payout_should_work() {
             })
         );
 
-        assert_eq!(Balances::free_balance(staking_pot), 1600);
-        assert_eq!(Balances::free_balance(storage_pot), 400);
+        assert_eq!(Balances::free_balance(reserved_pot), 200);
+        assert_eq!(Balances::free_balance(staking_pot), 1440);
+        assert_eq!(Balances::free_balance(storage_pot), 360);
 
         run_to_block(303);
         let legal_wr_info = legal_work_report_with_added_files();
@@ -460,7 +464,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -484,7 +488,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 606,
-                amount: 279, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 252, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -500,7 +504,7 @@ fn calculate_payout_should_work() {
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 121
+            reward: 108
         })
     });
 }
@@ -517,10 +521,6 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let staking_pot = Market::staking_pot();
-        let storage_pot = Market::storage_pot();
-
-        assert_eq!(Balances::free_balance(&staking_pot), 0);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
@@ -536,7 +536,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -546,9 +546,6 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-
-        assert_eq!(Balances::free_balance(staking_pot), 1600);
-        assert_eq!(Balances::free_balance(storage_pot), 400);
 
         run_to_block(303);
 
@@ -577,7 +574,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -600,7 +597,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 603,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -630,7 +627,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 903,
-                amount: 229, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 207, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -647,7 +644,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6060,
-            reward: 171
+            reward: 153
         })
     });
 }
@@ -664,10 +661,6 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
         let file_size = 100; // should less than merchant
-        let staking_pot = Market::staking_pot();
-        let storage_pot = Market::storage_pot();
-
-        assert_eq!(Balances::free_balance(&staking_pot), 0);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
@@ -683,7 +676,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -693,9 +686,6 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-
-        assert_eq!(Balances::free_balance(staking_pot), 1600);
-        assert_eq!(Balances::free_balance(storage_pot), 400);
 
         run_to_block(303);
 
@@ -724,7 +714,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -752,7 +742,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 400
+            reward: 359
         })
     });
 }
@@ -794,7 +784,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -805,8 +795,9 @@ fn calculate_payout_should_work_in_complex_timeline() {
             })
         );
 
-        assert_eq!(Balances::free_balance(staking_pot), 1600);
-        assert_eq!(Balances::free_balance(storage_pot), 400);
+        assert_eq!(Balances::free_balance(&reserved_pot), 200);
+        assert_eq!(Balances::free_balance(&staking_pot), 1440);
+        assert_eq!(Balances::free_balance(&storage_pot), 360);
 
         run_to_block(303);
 
@@ -837,7 +828,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -860,7 +851,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 503,
-                amount: 320,
+                amount: 289,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -876,7 +867,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 80
+            reward: 71
         });
 
         add_who_into_replica(&cid, charlie.clone(), legal_pk.clone(), None);
@@ -889,7 +880,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 603,
-                amount: 280,
+                amount: 255,
                 expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
@@ -911,11 +902,11 @@ fn calculate_payout_should_work_in_complex_timeline() {
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 100
+            reward: 88
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
             pledge: 6000,
-            reward: 20
+            reward: 17
         });
 
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
@@ -928,7 +919,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 703,
-                amount: 254,
+                amount: 233,
                 expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
@@ -955,11 +946,11 @@ fn calculate_payout_should_work_in_complex_timeline() {
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 113
+            reward: 99
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
             pledge: 6000,
-            reward: 33
+            reward: 28
         });
 
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
@@ -972,7 +963,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 903,
-                amount: 226,
+                amount: 208,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![
@@ -999,15 +990,15 @@ fn calculate_payout_should_work_in_complex_timeline() {
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 113
+            reward: 99
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
             pledge: 6000,
-            reward: 33
+            reward: 28
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
             pledge: 6000,
-            reward: 28
+            reward: 25
         });
 
         assert_eq!(Market::files_size(), file_size as u128);
@@ -1021,7 +1012,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 1203,
-                amount: 58,
+                amount: 55,
                 expected_replica_count: 4,
                 reported_replica_count: 3,
                 replicas: vec![
@@ -1048,15 +1039,15 @@ fn calculate_payout_should_work_in_complex_timeline() {
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 169
+            reward: 150
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
             pledge: 6000,
-            reward: 89
+            reward: 79
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
             pledge: 6000,
-            reward: 84
+            reward: 76
         });
         assert_eq!(Market::files_size(), (file_size * 3) as u128);
 
@@ -1072,18 +1063,18 @@ fn calculate_payout_should_work_in_complex_timeline() {
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 188
+            reward: 167
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
             pledge: 6000,
-            reward: 108
+            reward: 96
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
             pledge: 6000,
-            reward: 103
+            reward: 93
         });
         assert_eq!(Market::files_size(), 0);
-        assert_eq!(Balances::free_balance(&reserved_pot), 1);
+        assert_eq!(Balances::free_balance(&reserved_pot), 204);
     });
 }
 
@@ -1116,7 +1107,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -1139,7 +1130,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -1158,7 +1149,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -1204,7 +1195,7 @@ fn calculate_payout_should_work_for_more_replicas() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -1253,7 +1244,7 @@ fn calculate_payout_should_work_for_more_replicas() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
@@ -1297,7 +1288,7 @@ fn calculate_payout_should_work_for_more_replicas() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 503,
-                amount: 320,
+                amount: 292,
                 expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
@@ -1336,19 +1327,19 @@ fn calculate_payout_should_work_for_more_replicas() {
 
         assert_eq!(Market::merchant_ledgers(&ferdie), MerchantLedger {
             pledge: 6000,
-            reward: 20
+            reward: 17
         });
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
             pledge: 6000,
-            reward: 20
+            reward: 17
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
             pledge: 6000,
-            reward: 20
+            reward: 17
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
             pledge: 6000,
-            reward: 20
+            reward: 17
         });
         assert_eq!(Market::merchant_ledgers(&eve), MerchantLedger {
             pledge: 6000,
@@ -1396,7 +1387,7 @@ fn clear_trash_should_work() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -1422,7 +1413,7 @@ fn clear_trash_should_work() {
                     file_size,
                     expired_on: 1303,
                     claimed_at: 303,
-                    amount: 400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                    amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                     expected_replica_count: 4,
                     reported_replica_count: 1,
                     replicas: vec![Replica {

@@ -712,6 +712,7 @@ parameter_types! {
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
+    pub const TaxRatio: Perbill = Perbill::from_percent(10);
     pub const UsedTrashMaxSize: u128 = 500_000;
 }
 
@@ -732,6 +733,7 @@ impl market::Config for Runtime {
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
+    type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
 }
 

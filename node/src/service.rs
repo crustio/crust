@@ -17,14 +17,14 @@ use sc_consensus::LongestChain;
 // Our native executor instance.
 // TODO: Bring benchmarks back
 native_executor_instance!(
-    pub Executor,
+    pub CrustExecutor,
     crust_runtime::api::dispatch,
     crust_runtime::native_version
 );
 
 type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = LongestChain<FullBackend, Block>;
-type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
+type FullClient = sc_service::TFullClient<Block, RuntimeApi, CrustExecutor>;
 type FullGrandpaBlockImport = sc_finality_grandpa::GrandpaBlockImport<
     FullBackend, Block, FullClient, FullSelectChain
 >;
@@ -54,7 +54,7 @@ pub fn new_partial(config: &Configuration) -> Result<
     let inherent_data_providers = InherentDataProviders::new();
 
     let (client, backend, keystore_container, task_manager) =
-        sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
+        sc_service::new_full_parts::<Block, RuntimeApi, CrustExecutor>(&config)?;
     let client = Arc::new(client);
 
     let select_chain = sc_consensus::LongestChain::new(backend.clone());
@@ -77,7 +77,7 @@ pub fn new_partial(config: &Configuration) -> Result<
 
     let (babe_block_import, babe_link) = sc_consensus_babe::block_import(
         sc_consensus_babe::Config::get_or_compute(&*client)?,
-        grandpa_block_import.clone(),
+        grandpa_block_import,
         client.clone(),
     )?;
 
@@ -149,7 +149,7 @@ pub fn new_partial(config: &Configuration) -> Result<
 }
 
 /// Builds a new service for a full client.
-pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
+pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
 {
 
     let role = config.role.clone();
@@ -177,6 +177,8 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
 
     let shared_voter_state = rpc_setup;
 
+    config.network.notifications_protocols.push(sc_finality_grandpa::GRANDPA_PROTOCOL_NAME.into());
+
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
         sc_service::build_network(sc_service::BuildNetworkParams {
             config: &config,
@@ -189,7 +191,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
         })?;
 
     if config.offchain_worker.enabled {
-        sc_service::build_offchain_workers(
+        sc_service::build_offchain_workers(›
             &config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
         );
     }
@@ -334,7 +336,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError>
 /// Builds a new service for a light client.
 pub fn new_light(config: Configuration) -> Result<TaskManager, ServiceError> {
     let (client, backend, keystore, mut task_manager, on_demand) =
-        sc_service::new_light_parts::<Block, RuntimeApi, Executor>(&config)?;
+        sc_service::new_light_parts::<Block, RuntimeApi, CrustExecutor>(&config)?;
 
     let select_chain = LongestChain::new(backend.clone());
 

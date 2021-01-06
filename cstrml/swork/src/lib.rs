@@ -39,9 +39,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[cfg(any(feature = "runtime-benchmarks", test))]
-pub mod benchmarking;
-
 pub type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 
@@ -613,7 +610,7 @@ impl<T: Config> Module<T> {
 
     // PRIVATE MUTABLES
     /// This function will insert a new pk
-    fn insert_pk_info(pk: SworkerPubKey, code: SworkerCode) {
+    pub fn insert_pk_info(pk: SworkerPubKey, code: SworkerCode) {
         let pk_info = PKInfo {
             code,
             anchor: None

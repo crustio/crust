@@ -386,6 +386,7 @@ impl pallet_session::historical::Config for Runtime {
 }
 
 parameter_types! {
+    pub const StakingModuleId: ModuleId = ModuleId(*b"cstaking");
     // 3 sessions in an era (30 mins).
     pub const SessionsPerEra: SessionIndex = 3;
     // 28 eras for unbonding (14 hours).
@@ -399,6 +400,7 @@ parameter_types! {
 }
 
 impl staking::Config for Runtime {
+    type ModuleId = StakingModuleId;
     type Currency = Balances;
     type UnixTime = Timestamp;
 
@@ -712,6 +714,7 @@ parameter_types! {
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 2);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 2);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
+    pub const TaxRatio: Perbill = Perbill::from_percent(10);
     pub const UsedTrashMaxSize: u128 = 500_000;
 }
 
@@ -731,6 +734,7 @@ impl market::Config for Runtime {
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
+    type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
 }
 
@@ -1009,8 +1013,10 @@ impl_runtime_apis! {
             // To get around that, we separated the Session benchmarks into its own crate, which is why
             // we need these two lines below.
             use frame_system_benchmarking::Module as SystemBench;
+            use swork_benchmarking::Module as SworkBench;
 
             impl frame_system_benchmarking::Config for Runtime {}
+            impl swork_benchmarking::Config for Runtime {}
             let whitelist: Vec<TrackedStorageKey> = vec![];
             let mut batches = Vec::<BenchmarkBatch>::new();
             let params = (&config, &whitelist);
@@ -1018,7 +1024,7 @@ impl_runtime_apis! {
             add_benchmark!(params, batches, system, SystemBench::<Runtime>);
             add_benchmark!(params, batches, staking, Staking);
             // add_benchmark!(params, batches, market, Market);
-            add_benchmark!(params, batches, swork, Swork);
+            add_benchmark!(params, batches, swork, SworkBench::<Runtime>);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
             Ok(batches)

@@ -227,6 +227,9 @@ pub trait Config: system::Config {
     /// Storage/Staking ratio.
     type StakingRatio: Get<Perbill>;
 
+    /// Tax / Storage plus Staking ratio.
+    type TaxRatio: Get<Perbill>;
+
     /// UsedTrashMaxSize.
     type UsedTrashMaxSize: Get<u128>;
 }
@@ -439,7 +442,7 @@ decl_module! {
             ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
             // 4. Split into storage and staking account.
-            let storage_amount = Self::split_into_storage_and_staking_pot(&who, amount.clone());
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
 
             let curr_bn = Self::get_current_block_number();
 
@@ -447,7 +450,7 @@ decl_module! {
             Self::calculate_payout(&cid, curr_bn);
 
             // 6. three scenarios: new file, extend time or extend replica
-            Self::upsert_new_file_info(&cid, extend_replica, &storage_amount, &curr_bn, file_size);
+            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, file_size);
 
             // 7. Update storage price.
             #[cfg(not(test))]
@@ -528,9 +531,9 @@ impl<T: Config> Module<T> {
         
         // 4. Calculate payouts, check replicas and update the file_info
         if target_reward_count > 0 {
-            // 4.1 Get 1 payout amount
-            let one_payout_amount = Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
-                                                                        (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount;
+            // 4.1 Get 1 payout amount and sub 1 to make sure that we won't get overflow
+            let one_payout_amount = (Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
+                                                                          (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount).saturating_sub(1u32.into());
             let mut rewarded_amount = Zero::zero();
             let mut rewarded_count = 0u32;
             let mut new_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
@@ -568,7 +571,7 @@ impl<T: Config> Module<T> {
 
             // 4.3 Update file info
             file_info.claimed_at = claim_block;
-            file_info.amount -= rewarded_amount;
+            file_info.amount = file_info.amount.saturating_sub(rewarded_amount);
             file_info.reported_replica_count = new_replicas.len() as u32;
             new_replicas.append(&mut invalid_replicas);
             file_info.replicas = new_replicas;
@@ -757,9 +760,18 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn split_into_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
-        let staking_amount = T::StakingRatio::get() * value;
-        let storage_amount = value - staking_amount;
+    // Split total value into three pot and return the amount in storage pot
+    // Currently
+    // 10% into reserved pot
+    // 72% into staking pot
+    // 18% into storage pot
+    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
+        let reserved_amount = T::TaxRatio::get() * value;
+        let staking_and_storage_amount = value - reserved_amount;
+        let staking_amount = T::StakingRatio::get() * staking_and_storage_amount;
+        let storage_amount = staking_and_storage_amount - staking_amount;
+
+        T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, AllowDeath).expect("Something wrong during transferring");
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, AllowDeath).expect("Something wrong during transferring");
         T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), AllowDeath).expect("Something wrong during transferring");
         storage_amount

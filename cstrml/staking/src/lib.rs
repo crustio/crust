@@ -19,16 +19,16 @@ use frame_support::{
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
-        UnixTime, EnsureOrigin, Randomness
+        UnixTime, EnsureOrigin, Randomness, ExistenceRequirement::KeepAlive
     },
     dispatch::DispatchResult
 };
 use pallet_session::historical;
 use sp_runtime::{
-    Perbill, RuntimeDebug, SaturatedConversion,
+    Perbill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd
+        CheckedAdd, AccountIdConversion
     },
 };
 use sp_staking::{
@@ -382,6 +382,8 @@ impl<T: Config> SworkInterface for T where T: swork::Config {
 }
 
 pub trait Config: frame_system::Config {
+    /// The staking's module id, used for staking pot
+    type ModuleId: Get<ModuleId>;
     /// The staking balance.
     type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
@@ -661,6 +663,15 @@ decl_storage! {
                 };
             }
             <ErasTotalStakes<T>>::insert(0, gensis_total_stakes);
+
+            let staking_pot = <Module<T>>::staking_pot();
+            let min = T::Currency::minimum_balance();
+            if T::Currency::free_balance(&staking_pot) < min {
+                let _ = T::Currency::make_free_balance_be(
+                    &staking_pot,
+                    min,
+                );
+            }
         });
     }
 }
@@ -680,6 +691,8 @@ decl_event!(
         OldSlashingReportDiscarded(SessionIndex),
         /// Total reward at each era
         EraReward(EraIndex, Balance, Balance),
+        /// Staking pot is not enough
+        NotEnoughCurrency(EraIndex, Balance, Balance),
         /// An account has bonded this amount. [stash, amount]
         ///
         /// NOTE: This event is only emitted when funds are bonded via a dispatchable. Notably,
@@ -753,6 +766,9 @@ decl_module! {
         /// For each validator only the `$MaxGuarantorRewardedPerValidator` biggest stakers can claim
         /// their reward. This used to limit the i/o cost for the guarantor payout.
         const MaxGuarantorRewardedPerValidator: u32 = T::MaxGuarantorRewardedPerValidator::get();
+
+        /// The staking's module id, used for deriving its sovereign account ID.
+        const ModuleId: ModuleId = T::ModuleId::get();
 
         type Error = Error<T>;
 
@@ -1371,6 +1387,12 @@ impl<T: Config> Module<T> {
             .unwrap_or_default()
     }
 
+    /// Staking pot for authoring reward and staking reward
+    pub fn staking_pot() -> T::AccountId {
+        // "modl" ++ "cstaking" ++ "stak" is 16 bytes
+        T::ModuleId::get().into_sub_account("stak")
+    }
+
     // PRIVATE IMMUTABLES
 
     /// Calculate the stake limit by storage workloads, returns the stake limit value
@@ -1820,11 +1842,29 @@ impl<T: Config> Module<T> {
 
             let era_duration = now_as_millis_u64 - active_era_start;
             if !era_duration.is_zero() {
+                let staking_pot = <Module<T>>::staking_pot();
                 let active_era_index = active_era.index.clone();
                 let points = <ErasRewardPoints<T>>::get(&active_era_index);
+                let mut imbalance = <PositiveImbalanceOf<T>>::zero();
                 let total_authoring_payout = Self::authoring_rewards_in_era();
-                // let mut total_imbalance = <PositiveImbalanceOf<T>>::zero();
-                // 1. Block authoring payout
+                let total_staking_payout = Self::staking_rewards_in_era(active_era_index);
+
+                // 1. Check whether staking pot has enough money
+                imbalance.subsume(T::Currency::burn(total_authoring_payout.clone()));
+                imbalance.subsume(T::Currency::burn(total_staking_payout.clone()));
+                if let Err(_) = T::Currency::settle(
+                    &staking_pot,
+                    imbalance,
+                    WithdrawReasons::TRANSFER,
+                    KeepAlive
+                ) {
+                    log!(
+                        info,
+                        "💸 Staking pot is not enough"
+                    );
+                    return;
+                }
+                // 2. Block authoring payout
                 for (v, p) in points.individual.iter() {
                     if *p != 0u32 {
                         let authoring_reward =
@@ -1833,11 +1873,10 @@ impl<T: Config> Module<T> {
                     }
                 }
     
-                // 2. Staking payout
-                let total_staking_payout = Self::staking_rewards_in_era(active_era_index);
+                // 3. Staking payout
                 <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
     
-                // 3. Deposit era reward event
+                // 4. Deposit era reward event
                 Self::deposit_event(RawEvent::EraReward(active_era_index, total_authoring_payout, total_staking_payout));
     
                 // TODO: enable treasury and might bring this back

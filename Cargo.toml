@@ -15,6 +15,7 @@ members = [
     'cstrml/staking',
     'cstrml/swork',
     'cstrml/market',
+    'cstrml/swork/benchmarking',
     'runtime',
     'rpc',
     'node',

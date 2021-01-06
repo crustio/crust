@@ -1048,6 +1048,7 @@ dependencies = [
  "cstrml-market",
  "cstrml-staking",
  "cstrml-swork",
+ "cstrml-swork-benchmarking",
  "frame-benchmarking",
  "frame-executive",
  "frame-support",
@@ -1226,7 +1227,6 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-market",
- "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex",
@@ -1240,6 +1240,27 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "webpki 0.21.0",
+]
+
+[[package]]
+name = "cstrml-swork-benchmarking"
+version = "0.11.0"
+dependencies = [
+ "cst-primitives",
+ "cstrml-balances",
+ "cstrml-market",
+ "cstrml-swork",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-keyring",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

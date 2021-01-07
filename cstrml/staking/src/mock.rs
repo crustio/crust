@@ -236,7 +236,6 @@ impl Config for Test {
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
     type WeightInfo = weight::WeightInfo;
 }
@@ -448,6 +447,7 @@ pub type Balances = balances::Module<Test>;
 pub type Session = pallet_session::Module<Test>;
 pub type Timestamp = pallet_timestamp::Module<Test>;
 pub type Staking = Module<Test>;
+pub type Swork = swork::Module<Test>;
 
 pub fn check_exposure_all() {
     // a check per validator to ensure the exposure struct is always sane.
@@ -543,6 +543,7 @@ pub fn advance_session() {
 pub fn start_session(session_index: SessionIndex, with_reward: bool) {
     // Compensate for session delay
     for i in Session::current_index()..session_index {
+        Swork::on_initialize(System::block_number());
         Staking::on_finalize(System::block_number());
         System::set_block_number(((i+1)*100).into());
         if with_reward {

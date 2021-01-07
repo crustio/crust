@@ -418,7 +418,6 @@ impl staking::Config for Runtime {
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
     type WeightInfo = staking::weight::WeightInfo;
 }

@@ -53,15 +53,15 @@
     unused_qualifications,
     variant_size_differences,
 )]
-#![forbid(
-    anonymous_parameters,
-    trivial_casts,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_results,
-    warnings
-)]
+// #![forbid(
+//     anonymous_parameters,
+//     trivial_casts,
+//     trivial_numeric_casts,
+//     unused_extern_crates,
+//     unused_import_braces,
+//     unused_results,
+//     warnings
+// )]
 #![no_std]
 #![cfg_attr(feature = "internal_benches", allow(unstable_features), feature(test))]
 

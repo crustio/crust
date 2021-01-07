@@ -11,7 +11,7 @@ use frame_support::{
         Weight, DispatchClass
     }
 };
-use sp_runtime::traits::StaticLookup;
+use sp_runtime::traits::{StaticLookup, Zero};
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_root, ensure_signed};
 
@@ -243,6 +243,15 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
+
+
+        /// Called when a block is initialized. Will call update_identities to update stake limit
+		fn on_initialize(now: T::BlockNumber) -> Weight {
+			if (now % <T as frame_system::Config>::BlockNumber::from(REPORT_SLOT as u32)).is_zero()  {
+				Self::update_identities();
+			}
+			0
+		}
 
         /// AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`

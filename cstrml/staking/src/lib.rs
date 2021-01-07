@@ -372,16 +372,6 @@ impl<T: Config> SessionInterface<<T as frame_system::Config>::AccountId> for T w
     }
 }
 
-pub trait SworkInterface: frame_system::Config {
-    fn update_identities();
-}
-
-impl<T: Config> SworkInterface for T where T: swork::Config {
-    fn update_identities() {
-        <swork::Module<T>>::update_identities();
-    }
-}
-
 pub trait Config: frame_system::Config {
     /// The staking's module id, used for staking pot
     type ModuleId: Get<ModuleId>;
@@ -438,9 +428,6 @@ pub trait Config: frame_system::Config {
 
     /// Interface for interacting with a session module.
     type SessionInterface: self::SessionInterface<Self::AccountId>;
-
-    /// Interface for interacting with a swork module
-    type SworkInterface: self::SworkInterface;
 
     /// Storage power ratio for crust network phase 1
     type SPowerRatio: Get<u128>;
@@ -1758,8 +1745,6 @@ impl<T: Config> Module<T> {
         }
 
         // Set staking information for new era.
-        // TODO: move this update 1 session in advance
-        T::SworkInterface::update_identities();
         Self::deposit_event(RawEvent::UpdateIdentitiesSuccess(current_era.clone()));
         let maybe_new_validators = Self::select_and_update_validators(current_era);
 

@@ -39,7 +39,7 @@ impl_outer_origin! {
 pub struct Test;
 
 thread_local! {
-    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
+    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(1);
     static LEGAL_CODE: Vec<u8> = hex::decode("781b537d3dcef39dec7b8bce6fdfcd032d8d846640e9b5598b4a9f627188a908").unwrap();
 }
 

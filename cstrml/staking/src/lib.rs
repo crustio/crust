@@ -82,6 +82,7 @@ pub trait WeightInfo {
     // The following two doesn't used to generate weight info
     fn new_era(v: u32, n: u32, m: u32, ) -> Weight;
     fn select_and_update_validators(v: u32, n: u32, m: u32, ) -> Weight;
+    fn recharge_staking_pot() -> Weight;
 }
 
 /// Counter for the number of eras that have passed.
@@ -743,6 +744,8 @@ decl_error! {
         InvalidEraToReward,
         /// Claimed reward twice.
         AlreadyClaimed,
+        /// Don't have enough balance to recharge the staking pot
+        InsufficientCurrency,
     }
 }
 
@@ -1205,6 +1208,15 @@ decl_module! {
         fn reward_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
             ensure_signed(origin)?;
             Self::do_reward_stakers(validator_stash, era)
+        }
+
+        /// Recharge the staking pot
+        #[weight = T::WeightInfo::recharge_staking_pot()]
+        fn recharge_staking_pot(origin, #[compact] value: BalanceOf<T>) {
+            let who = ensure_signed(origin)?;
+            ensure!(T::Currency::free_balance(&who) > value, Error::<T>::InsufficientCurrency);
+            let staking_pot = Self::staking_pot();
+            T::Currency::transfer(&who, &staking_pot, value, KeepAlive)?;
         }
 
         // ----- Root Calls ------

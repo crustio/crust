@@ -26,6 +26,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
+
 use primitives::{
     MerkleRoot, BlockNumber,
     traits::{TransferrableCurrency, MarketInterface, SworkerInterface}, SworkerAnchor

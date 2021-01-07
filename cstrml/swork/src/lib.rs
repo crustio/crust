@@ -246,12 +246,13 @@ decl_module! {
 
 
         /// Called when a block is initialized. Will call update_identities to update stake limit
-		fn on_initialize(now: T::BlockNumber) -> Weight {
-			if (now % <T as frame_system::Config>::BlockNumber::from(REPORT_SLOT as u32)).is_zero()  {
-				Self::update_identities();
-			}
-			0
-		}
+        fn on_initialize(now: T::BlockNumber) -> Weight {
+            if (now % <T as frame_system::Config>::BlockNumber::from(REPORT_SLOT as u32)).is_zero()  {
+			    Self::update_identities();
+            }
+            // TODO: Recalculate this weight
+            0
+        }
 
         /// AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`

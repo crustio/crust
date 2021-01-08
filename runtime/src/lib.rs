@@ -419,6 +419,7 @@ impl staking::Config for Runtime {
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type DSMStakingPot = Market;
     type WeightInfo = staking::weight::WeightInfo;
 }
 

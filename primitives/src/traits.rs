@@ -31,3 +31,9 @@ pub trait MarketInterface<AccountId> {
 	// return is_deleted
 	fn delete_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool;
 }
+
+/// Means for withdrawing staking pot from DSM module
+pub trait StakingPotInterface<Balance> {
+	// used for arranging DSM staking payout
+	fn withdraw_staking_pot() -> Balance;
+}

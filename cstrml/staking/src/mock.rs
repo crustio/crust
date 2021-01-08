@@ -13,7 +13,7 @@ use frame_support::{
 use sp_core::{crypto::key_types, H256};
 use sp_io;
 use sp_runtime::testing::{Header, UintAuthorityId};
-use sp_runtime::traits::{Convert, IdentityLookup, OpaqueKeys, SaturatedConversion};
+use sp_runtime::traits::{Convert, IdentityLookup, OpaqueKeys, SaturatedConversion, Zero};
 use sp_runtime::{KeyTypeId, Perbill};
 use sp_staking::{
     offence::{OffenceDetails, OnOffenceHandler},
@@ -21,7 +21,7 @@ use sp_staking::{
 };
 use std::{cell::RefCell, collections::HashSet, collections::btree_set::BTreeSet};
 use balances::AccountData;
-use primitives::{traits::MarketInterface, MerkleRoot, SworkerAnchor};
+use primitives::{traits::{MarketInterface, StakingPotInterface}, MerkleRoot, SworkerAnchor};
 
 /// The AccountId alias in this test module.
 pub type AccountId = u128;
@@ -202,6 +202,12 @@ impl swork::Works<AccountId> for TestStaking {
     }
 }
 
+impl StakingPotInterface<BalanceOf<Test>> for TestStaking {
+    fn withdraw_staking_pot() -> BalanceOf<Test> {
+        Zero::zero()
+    }
+}
+
 impl<AID> MarketInterface<AID> for TestStaking {
     fn upsert_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32, _: &Option<BTreeSet<AID>>) -> bool { false }
     fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> bool { false }
@@ -240,6 +246,7 @@ impl Config for Test {
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type DSMStakingPot = TestStaking;
     type WeightInfo = weight::WeightInfo;
 }
 

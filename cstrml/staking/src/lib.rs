@@ -51,7 +51,7 @@ pub mod weight;
 use swork;
 use primitives::{
     constants::{currency::*, time::*},
-    traits::TransferrableCurrency
+    traits::{TransferrableCurrency, StakingPotInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -434,6 +434,8 @@ pub trait Config: frame_system::Config {
 
     /// Storage power ratio for crust network phase 1
     type SPowerRatio: Get<u128>;
+
+    type DSMStakingPot: StakingPotInterface<BalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -1875,8 +1877,11 @@ impl<T: Config> Module<T> {
     
                 // 3. Staking payout
                 <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
+
+                // 4. DSM's staking payout
+                Self::withdraw_and_arrange_dsm_staking_payout(active_era_index);
     
-                // 4. Deposit era reward event
+                // 5. Deposit era reward event
                 Self::deposit_event(RawEvent::EraReward(active_era_index, total_authoring_payout, total_staking_payout));
     
                 // TODO: enable treasury and might bring this back
@@ -1937,6 +1942,15 @@ impl<T: Config> Module<T> {
         let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
 
         reward_this_era.try_into().ok().unwrap()
+    }
+
+    fn withdraw_and_arrange_dsm_staking_payout(active_era: EraIndex) {
+        let total_dsm_staking_payout = T::DSMStakingPot::withdraw_staking_pot();
+        Self::arrange_dsm_staking_payout(active_era, total_dsm_staking_payout);
+    }
+
+    fn arrange_dsm_staking_payout(active_era: EraIndex, total_dsm_staking_payout: BalanceOf<T>) {
+
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.

@@ -33,8 +33,11 @@ mod tests;
 pub mod benchmarking;
 
 use primitives::{
-    MerkleRoot, BlockNumber,
-    traits::{TransferrableCurrency, MarketInterface, SworkerInterface}, SworkerAnchor
+    MerkleRoot, BlockNumber, SworkerAnchor,
+    traits::{
+        TransferrableCurrency, MarketInterface,
+        SworkerInterface, StakingPotInterface
+    }
 };
 
 
@@ -186,6 +189,13 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
 
         // 3. Delete anchor from file_info/file_trash and return whether it is counted
         Self::delete_used_anchor(cid, anchor)
+    }
+}
+
+impl<T: Config> StakingPotInterface<BalanceOf<T>> for Module<T> {
+    fn withdraw_staking_pot() -> BalanceOf<T> {
+        // TODO: withdraw the staking pot
+        Zero::zero()
     }
 }
 

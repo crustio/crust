@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 //! Balances pallet benchmarking.
 use super::*;
 use frame_system::RawOrigin;

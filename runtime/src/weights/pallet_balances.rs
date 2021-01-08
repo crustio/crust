@@ -1,5 +1,5 @@
-// Copyright 2019-2020 Parity Technologies (UK) Ltd.
-// This file is part of Polkadot.
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
 
 #![allow(unused_parens)]
 #![allow(unused_imports)]

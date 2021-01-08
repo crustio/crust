@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use frame_support::traits::LockableCurrency;
 use crate::{SworkerAnchor, MerkleRoot, BlockNumber};
 use sp_std::collections::btree_set::BTreeSet;

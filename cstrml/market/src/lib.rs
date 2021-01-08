@@ -640,7 +640,7 @@ impl<T: Config> Module<T> {
                 })
             }
             // trash I is full => dump trash II
-            if Self::used_trash_size_i() == T::UsedTrashMaxSize::get() {
+            if Self::used_trash_size_i() >= T::UsedTrashMaxSize::get() {
                 Self::dump_used_trash_ii();
             }
         } else {
@@ -653,7 +653,7 @@ impl<T: Config> Module<T> {
                 })
             }
             // trash II is full => dump trash I
-            if Self::used_trash_size_ii() == T::UsedTrashMaxSize::get() {
+            if Self::used_trash_size_ii() >= T::UsedTrashMaxSize::get() {
                 Self::dump_used_trash_i();
             }
         }

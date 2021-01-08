@@ -435,7 +435,11 @@ pub trait Config: frame_system::Config {
     /// Storage power ratio for crust network phase 1
     type SPowerRatio: Get<u128>;
 
+    /// Reference to DSM staking pot.
     type DSMStakingPot: StakingPotInterface<BalanceOf<Self>>;
+
+    /// DSM Staking Pot Duration. Count of EraIndex
+    type DSMStakingPotDuration: Get<u32>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -529,6 +533,10 @@ decl_storage! {
         
         /// Total staking payout at era.
         pub ErasStakingPayout get(fn eras_staking_payout):
+            map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
+
+        /// DSM staking payout of validator at era.
+        pub ErasDSMStakingPayout get(fn eras_dsm_staking_payout):
             map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
 
         /// Authoring payout of validator at era.
@@ -764,6 +772,8 @@ decl_module! {
 
         /// The staking's module id, used for deriving its sovereign account ID.
         const ModuleId: ModuleId = T::ModuleId::get();
+
+        const DSMStakingPotDuration: u32 = T::DSMStakingPotDuration::get();
 
         type Error = Error<T>;
 
@@ -1648,6 +1658,9 @@ impl<T: Config> Module<T> {
         // `ledger.claimed_rewards` in this case.
         let era_staking_payout = <ErasStakingPayout<T>>::get(&era)
             .ok_or_else(|| Error::<T>::InvalidEraToReward)?;
+        let era_dsm_staking_payout = <ErasDSMStakingPayout<T>>::get(&era)
+            .unwrap_or(Zero::zero());
+        let total_era_staking_payout = era_staking_payout.saturating_add(era_dsm_staking_payout);
 
         let controller = Self::bonded(&validator_stash).ok_or(Error::<T>::NotStash)?;
         let mut ledger = <Ledger<T>>::get(&controller).ok_or_else(|| Error::<T>::NotController)?;
@@ -1672,7 +1685,7 @@ impl<T: Config> Module<T> {
 
         // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
-        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
+        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * total_era_staking_payout;
         let total = exposure.total.max(One::one());
         // 4. Calculate total rewards for staking
         let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * staking_reward;
@@ -1848,8 +1861,8 @@ impl<T: Config> Module<T> {
                 let active_era_index = active_era.index.clone();
                 let points = <ErasRewardPoints<T>>::get(&active_era_index);
                 let mut imbalance = <PositiveImbalanceOf<T>>::zero();
-                let total_authoring_payout = Self::authoring_rewards_in_era();
-                let total_staking_payout = Self::staking_rewards_in_era(active_era_index);
+                let mut total_authoring_payout = Self::authoring_rewards_in_era();
+                let mut total_staking_payout = Self::staking_rewards_in_era(active_era_index);
 
                 // 1. Check whether staking pot has enough money
                 imbalance.subsume(T::Currency::burn(total_authoring_payout.clone()));
@@ -1864,7 +1877,9 @@ impl<T: Config> Module<T> {
                         info,
                         "💸 Staking pot is not enough"
                     );
-                    return;
+                    // DSM staking pot won't be skipped.
+                    total_authoring_payout = Zero::zero();
+                    total_staking_payout = Zero::zero();
                 }
                 // 2. Block authoring payout
                 for (v, p) in points.individual.iter() {
@@ -1898,6 +1913,7 @@ impl<T: Config> Module<T> {
         <ErasStakersClipped<T>>::remove_prefix(era_index);
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
         <ErasStakingPayout<T>>::remove(era_index);
+        <ErasDSMStakingPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
         <ErasAuthoringPayout<T>>::remove_prefix(era_index);
         <ErasRewardPoints<T>>::remove(era_index);
@@ -1950,7 +1966,15 @@ impl<T: Config> Module<T> {
     }
 
     fn arrange_dsm_staking_payout(active_era: EraIndex, total_dsm_staking_payout: BalanceOf<T>) {
-
+        let duration = T::DSMStakingPotDuration::get();
+        let dsm_staking_payout_per_era = Perbill::from_rational_approximation(1, duration) * total_dsm_staking_payout;
+        // Reward starts from this era.
+        for i in 0..duration {
+            <ErasDSMStakingPayout<T>>::mutate(active_era + i, |payout| match *payout {
+                Some(amount) => *payout = Some(amount.saturating_add(dsm_staking_payout_per_era.clone())),
+                None => *payout = Some(dsm_staking_payout_per_era.clone())
+            });
+        }
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.

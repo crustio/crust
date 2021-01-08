@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 

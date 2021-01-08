@@ -1,4 +1,6 @@
-//! Substrate Node Template CLI library.
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 #![warn(missing_docs)]
 
 mod chain_spec;

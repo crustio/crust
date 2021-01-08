@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 /// Money matters.
 pub mod currency {
     use crate::Balance;

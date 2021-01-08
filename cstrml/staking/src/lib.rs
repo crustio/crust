@@ -773,6 +773,7 @@ decl_module! {
         /// The staking's module id, used for deriving its sovereign account ID.
         const ModuleId: ModuleId = T::ModuleId::get();
 
+        /// Total era duration for once dsm staking pot.
         const DSMStakingPotDuration: u32 = T::DSMStakingPotDuration::get();
 
         type Error = Error<T>;

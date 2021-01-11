@@ -150,7 +150,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
 
             // 5. Update files size
             if file_info.reported_replica_count <= file_info.expected_replica_count {
-                FilesSize::mutate(|fcs| { *fcs = fcs.saturating_add(file_info.file_size as u128); });
+                Self::update_files_size(file_info.file_size, 0, 1);
             }
 
             // 6. Update files
@@ -174,7 +174,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
                     // decrease it due to deletion
                     file_info.reported_replica_count -= 1;
                     if file_info.reported_replica_count < file_info.expected_replica_count {
-                        FilesSize::mutate(|fcs| { *fcs = fcs.saturating_sub(file_info.file_size as u128); });
+                        Self::update_files_size(file_info.file_size, 1, 0);
                     }
                 }
                 file_info.replicas.retain(|replica| {

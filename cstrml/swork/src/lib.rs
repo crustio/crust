@@ -7,11 +7,11 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
-    dispatch::DispatchResult,
+    dispatch::{DispatchResult, DispatchResultWithPostInfo},
     storage::IterableStorageMap,
     traits::{Currency, ReservableCurrency},
     weights::{
-        Weight, DispatchClass
+        Weight, DispatchClass, Pays
     }
 };
 use sp_runtime::traits::{StaticLookup, Zero};
@@ -351,7 +351,7 @@ decl_module! {
             reported_srd_root: MerkleRoot,
             reported_files_root: MerkleRoot,
             sig: SworkerSignature
-        ) -> DispatchResult {
+        ) -> DispatchResultWithPostInfo {
             let reporter = ensure_signed(origin)?;
             let mut prev_pk = curr_pk.clone();
 
@@ -382,7 +382,8 @@ decl_module! {
                         curr_pk,
                         slot
                     );
-                    return Ok(())
+                    // This is weird and might be an attack.
+                    return Ok(Pays::Yes.into())
                 }
             }
 
@@ -491,7 +492,7 @@ decl_module! {
             // 11. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
-            Ok(())
+            Ok(Pays::No.into())
         }
 
         #[weight = 1000]

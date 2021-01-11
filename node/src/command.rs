@@ -15,8 +15,8 @@ use crust_runtime::{Block, RuntimeApi};
 use cumulus_primitives::{genesis::generate_genesis_block, ParaId};
 use polkadot_parachain::primitives::AccountIdConversion;
 use sc_cli::{
-    CliConfiguration, DefaultConfigurationValues, ImportParams, KeystoreParams,
-    NetworkParams, SharedParams,
+    CliConfiguration, DefaultConfigurationValues, ImportParams, InitLoggerParams,
+    SharedParams, KeystoreParams, NetworkParams
 };
 use sc_service::config::{BasePath, PrometheusConfig};
 use sp_core::hexdisplay::HexDisplay;
@@ -180,12 +180,15 @@ pub fn run() -> sc_cli::Result<()> {
 
             runner.sync_run(|config| cmd.run::<Block, RuntimeApi, Executor>(config))
         },
-        Some(Subcommand::Base(cmd)) => cmd.run(),
+        Some(Subcommand::Base(cmd)) => cmd.run(&cli),
         Some(Subcommand::Sign(cmd)) => cmd.run(),
         Some(Subcommand::Verify(cmd)) => cmd.run(),
         Some(Subcommand::Vanity(cmd)) => cmd.run(),
         Some(Subcommand::ExportGenesisState(params)) => {
-            sc_cli::init_logger("", sc_tracing::TracingReceiver::Log, None, false)?;
+            sc_cli::init_logger(InitLoggerParams {
+                tracing_receiver: sc_tracing::TracingReceiver::Log,
+                ..Default::default()
+            })?;
 
             let block: Block = generate_genesis_block(&load_spec(
                 &params.chain.clone().unwrap_or_default(),
@@ -207,7 +210,10 @@ pub fn run() -> sc_cli::Result<()> {
             Ok(())
         },
         Some(Subcommand::ExportGenesisWasm(params)) => {
-            sc_cli::init_logger("", sc_tracing::TracingReceiver::Log, None, false)?;
+            sc_cli::init_logger(InitLoggerParams {
+                tracing_receiver: sc_tracing::TracingReceiver::Log,
+                ..Default::default()
+            })?;
 
             let raw_wasm_blob =
                 extract_genesis_wasm(&cli.load_spec(&params.chain.clone().unwrap_or_default())?)?;

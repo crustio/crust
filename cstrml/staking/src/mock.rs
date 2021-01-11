@@ -228,7 +228,7 @@ parameter_types! {
     pub const BondingDuration: EraIndex = 3;
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
-    pub const DSMStakingPotDuration: u32 = 5;
+    pub const MarketStakingPotDuration: u32 = 5;
 }
 
 impl Config for Test {
@@ -249,7 +249,7 @@ impl Config for Test {
     type SessionInterface = Self;
     type SPowerRatio = SPowerRatio;
     type MarketStakingPot = TestStaking;
-    type MarketStakingPotDuration = DSMStakingPotDuration;
+    type MarketStakingPotDuration = MarketStakingPotDuration;
     type WeightInfo = weight::WeightInfo;
 }
 

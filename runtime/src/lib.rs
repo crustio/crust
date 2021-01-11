@@ -398,7 +398,7 @@ parameter_types! {
     // 64 guarantors for one validator.
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
     // 60 eras means 15 days if era = 6 hours
-    pub const DSMStakingPotDuration: u32 = 60;
+    pub const MarketStakingPotDuration: u32 = 60;
 }
 
 impl staking::Config for Runtime {
@@ -421,8 +421,8 @@ impl staking::Config for Runtime {
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
     type SPowerRatio = SPowerRatio;
-    type DSMStakingPot = Market;
-    type DSMStakingPotDuration = DSMStakingPotDuration;
+    type MarketStakingPot = Market;
+    type MarketStakingPotDuration = MarketStakingPotDurat;
     type WeightInfo = staking::weight::WeightInfo;
 }
 

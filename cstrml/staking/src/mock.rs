@@ -248,8 +248,8 @@ impl Config for Test {
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
     type SPowerRatio = SPowerRatio;
-    type DSMStakingPot = TestStaking;
-    type DSMStakingPotDuration = DSMStakingPotDuration;
+    type MarketStakingPot = TestStaking;
+    type MarketStakingPotDuration = DSMStakingPotDuration;
     type WeightInfo = weight::WeightInfo;
 }
 

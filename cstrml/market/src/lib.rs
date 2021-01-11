@@ -212,7 +212,7 @@ impl<T: Config> StakingPotInterface<BalanceOf<T>> for Module<T> {
         ) {
             log!(
                 warn,
-                "🏢 Something wrong during withdrawing staking pot. This should never happen!!!"
+                "🏢 Something wrong during withdrawing staking pot. This should never happen!"
             );
 
             return Zero::zero();

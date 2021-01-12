@@ -422,7 +422,7 @@ impl staking::Config for Runtime {
     type SessionInterface = Self;
     type SPowerRatio = SPowerRatio;
     type MarketStakingPot = Market;
-    type MarketStakingPotDuration = MarketStakingPotDurat;
+    type MarketStakingPotDuration = MarketStakingPotDuration;
     type WeightInfo = staking::weight::WeightInfo;
 }
 

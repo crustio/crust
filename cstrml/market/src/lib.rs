@@ -10,7 +10,9 @@ use frame_support::{
     dispatch::DispatchResult, ensure,
     storage::migration::remove_storage_prefix,
     traits::{
-        Currency, ReservableCurrency, Get, ExistenceRequirement::AllowDeath,
+        Currency, ReservableCurrency, Get,
+        ExistenceRequirement::{AllowDeath, KeepAlive},
+        WithdrawReasons, Imbalance
     }
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
@@ -33,10 +35,14 @@ mod tests;
 pub mod benchmarking;
 
 use primitives::{
-    MerkleRoot, BlockNumber,
-    traits::{TransferrableCurrency, MarketInterface, SworkerInterface}, SworkerAnchor
+    MerkleRoot, BlockNumber, SworkerAnchor,
+    traits::{
+        TransferrableCurrency, MarketInterface,
+        SworkerInterface
+    }
 };
 
+pub(crate) const LOG_TARGET: &'static str = "market";
 
 #[macro_export]
 macro_rules! log {
@@ -102,8 +108,10 @@ pub struct MerchantLedger<Balance> {
 
 type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
+type PositiveImbalanceOf<T> =
+    <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance;
 
-impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
+impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> for Module<T>
 {
     /// Upsert new replica
     /// Accept id(who, anchor), cid, valid_at and maybe_member
@@ -186,6 +194,29 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
 
         // 3. Delete anchor from file_info/file_trash and return whether it is counted
         Self::delete_used_anchor(cid, anchor)
+    }
+
+    // withdraw market staking pot for distributing staking reward
+    fn withdraw_staking_pot() -> BalanceOf<T> {
+        let staking_pot = Self::staking_pot();
+        // Leave the minimum balance to keep this account live.
+        let staking_amount = T::Currency::free_balance(&staking_pot) - T::Currency::minimum_balance();
+        let mut imbalance = <PositiveImbalanceOf<T>>::zero();
+        imbalance.subsume(T::Currency::burn(staking_amount.clone()));
+        if let Err(_) = T::Currency::settle(
+            &staking_pot,
+            imbalance,
+            WithdrawReasons::TRANSFER,
+            KeepAlive
+        ) {
+            log!(
+                warn,
+                "🏢 Something wrong during withdrawing staking pot. This should never happen!"
+            );
+
+            return Zero::zero();
+        }
+        staking_amount
     }
 }
 
@@ -630,7 +661,7 @@ impl<T: Config> Module<T> {
                 })
             }
             // trash I is full => dump trash II
-            if Self::used_trash_size_i() == T::UsedTrashMaxSize::get() {
+            if Self::used_trash_size_i() >= T::UsedTrashMaxSize::get() {
                 Self::dump_used_trash_ii();
             }
         } else {
@@ -643,7 +674,7 @@ impl<T: Config> Module<T> {
                 })
             }
             // trash II is full => dump trash I
-            if Self::used_trash_size_ii() == T::UsedTrashMaxSize::get() {
+            if Self::used_trash_size_ii() >= T::UsedTrashMaxSize::get() {
                 Self::dump_used_trash_i();
             }
         }

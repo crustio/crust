@@ -149,7 +149,7 @@ pub trait Config: system::Config {
     type Works: Works<Self::AccountId>;
 
     /// Interface for interacting with a market module.
-    type MarketInterface: MarketInterface<Self::AccountId>;
+    type MarketInterface: MarketInterface<Self::AccountId, BalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;

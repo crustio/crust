@@ -1513,3 +1513,53 @@ fn update_price_should_work() {
     });
 }
 
+/// Withdraw staking pot should work
+#[test]
+fn withdraw_staking_pot_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+
+        let cid =
+            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let file_size = 100; // should less than
+        let reserved_pot = Market::reserved_pot();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                groups: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+        assert_eq!(Balances::free_balance(&reserved_pot), 200);
+        assert_eq!(Balances::free_balance(&staking_pot), 1440);
+        assert_eq!(Balances::free_balance(&storage_pot), 360);
+
+        assert_eq!(Market::withdraw_staking_pot(), 1439);
+        assert_eq!(Balances::free_balance(&staking_pot), 1);
+    });
+}

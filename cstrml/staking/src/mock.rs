@@ -47,6 +47,7 @@ thread_local! {
     static SLASH_DEFER_DURATION: RefCell<EraIndex> = RefCell::new(0);
     static OWN_WORKLOAD: RefCell<u128> = RefCell::new(0);
     static TOTAL_WORKLOAD: RefCell<u128> = RefCell::new(0);
+    static DSM_STAKING_PAYOUT: RefCell<Balance> = RefCell::new(0);
 }
 
 pub struct TestSessionHandler;
@@ -202,9 +203,12 @@ impl swork::Works<AccountId> for TestStaking {
     }
 }
 
-impl<AID> MarketInterface<AID> for TestStaking {
+impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
     fn upsert_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32, _: &Option<BTreeSet<AID>>) -> bool { false }
     fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> bool { false }
+    fn withdraw_staking_pot() -> BalanceOf<Test> {
+        BalanceOf::<Test>::from(DSM_STAKING_PAYOUT.with(|v| *v.borrow()))
+    }
 }
 
 impl swork::Config for Test {
@@ -221,6 +225,7 @@ parameter_types! {
     pub const BondingDuration: EraIndex = 3;
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
+    pub const MarketStakingPotDuration: u32 = 5;
 }
 
 impl Config for Test {
@@ -240,6 +245,8 @@ impl Config for Test {
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type MarketStakingPot = TestStaking;
+    type MarketStakingPotDuration = MarketStakingPotDuration;
     type WeightInfo = weight::WeightInfo;
 }
 
@@ -255,7 +262,8 @@ pub struct ExtBuilder {
     invulnerables: Vec<u128>,
     own_workload: u128,
     total_workload: u128,
-    staking_pot: Balance
+    staking_pot: Balance,
+    dsm_staking_payout: Balance
 }
 
 impl Default for ExtBuilder {
@@ -272,7 +280,8 @@ impl Default for ExtBuilder {
             invulnerables: vec![],
             own_workload: 3000,
             total_workload: 3000,
-            staking_pot: 1_000_000_000_000_000_000
+            staking_pot: 1_000_000_000_000_000_000,
+            dsm_staking_payout: 0
         }
     }
 }
@@ -326,11 +335,16 @@ impl ExtBuilder {
         self.staking_pot = amount;
         self
     }
+    pub fn dsm_staking_payout(mut self, amount: Balance) -> Self {
+        self.dsm_staking_payout = amount;
+        self
+    }
     pub fn set_associated_consts(&self) {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow_mut() = self.existential_deposit);
         SLASH_DEFER_DURATION.with(|v| *v.borrow_mut() = self.slash_defer_duration);
         OWN_WORKLOAD.with(|v| *v.borrow_mut() = self.own_workload);
         TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = self.total_workload);
+        DSM_STAKING_PAYOUT.with(|v| *v.borrow_mut() = self.dsm_staking_payout);
     }
     pub fn build(self) -> sp_io::TestExternalities {
         self.set_associated_consts();

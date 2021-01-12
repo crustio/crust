@@ -38,7 +38,7 @@ use primitives::{
     MerkleRoot, BlockNumber, SworkerAnchor,
     traits::{
         TransferrableCurrency, MarketInterface,
-        SworkerInterface, StakingPotInterface
+        SworkerInterface
     }
 };
 
@@ -111,7 +111,7 @@ type BalanceOf<T> =
 type PositiveImbalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance;
 
-impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
+impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> for Module<T>
 {
     /// Upsert new replica
     /// Accept id(who, anchor), cid, valid_at and maybe_member
@@ -195,9 +195,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId> for Module<T>
         // 3. Delete anchor from file_info/file_trash and return whether it is counted
         Self::delete_used_anchor(cid, anchor)
     }
-}
 
-impl<T: Config> StakingPotInterface<BalanceOf<T>> for Module<T> {
+    // withdraw market staking pot for distributing staking reward
     fn withdraw_staking_pot() -> BalanceOf<T> {
         let staking_pot = Self::staking_pot();
         // Leave the minimum balance to keep this account live.

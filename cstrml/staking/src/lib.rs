@@ -51,7 +51,7 @@ pub mod weight;
 use swork;
 use primitives::{
     constants::{currency::*, time::*},
-    traits::{TransferrableCurrency, StakingPotInterface}
+    traits::{TransferrableCurrency, MarketInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -436,7 +436,7 @@ pub trait Config: frame_system::Config {
     type SPowerRatio: Get<u128>;
 
     /// Reference to Market staking pot.
-    type MarketStakingPot: StakingPotInterface<BalanceOf<Self>>;
+    type MarketStakingPot: MarketInterface<Self::AccountId, BalanceOf<Self>>;
 
     /// Market Staking Pot Duration. Count of EraIndex
     type MarketStakingPotDuration: Get<u32>;

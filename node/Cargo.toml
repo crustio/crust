@@ -19,30 +19,30 @@ structopt = { version = '0.3.21', optional = true }
 hex-literal = "0.3.1"
 
 # substrate client dependencies
-authority-discovery = { package = 'sc-authority-discovery', git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-consensus-babe = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-finality-grandpa  = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-basic-authorship = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-client-api = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-cli = {  git = "https://github.com/paritytech/substrate", branch = "master", features = ["wasmtime"], optional = true }
-sc-consensus = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-consensus-slots = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-executor = {  git = "https://github.com/paritytech/substrate", branch = "master", features = ["wasmtime"] }
-sc-network = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sc-service = {  git = "https://github.com/paritytech/substrate", branch = "master", features = ["wasmtime"] }
-sc-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "master" }
+authority-discovery = { package = 'sc-authority-discovery', version = "0.8.1" }
+sc-consensus-babe = "0.8.1"
+sc-finality-grandpa  = "0.8.1"
+sc-basic-authorship = "0.8.1"
+sc-client-api = "2.0.1"
+sc-cli = {  version = "0.8.1", features = ["wasmtime"], optional = true }
+sc-consensus = "0.8.1"
+sc-consensus-slots = "0.8.1"
+sc-executor = {  version = "0.8.1", features = ["wasmtime"] }
+sc-network = "0.8.1"
+sc-service = {  version = "0.8.1", features = ["wasmtime"] }
+sc-transaction-pool = "2.0.1"
 
 # substrate primitives
-sp-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-core = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-consensus = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-consensus-babe = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-inherents = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-io = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-finality-grandpa = { git = "https://github.com/paritytech/substrate", branch = "master" }
-frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-transaction-pool = "2.0.1"
+sp-core = "2.0.1"
+sp-consensus = "0.8.1"
+sp-consensus-babe = "0.8.1"
+sp-inherents = "2.0.1"
+sp-io = "2.0.1"
+sp-runtime = "2.0.1"
+sp-finality-grandpa = "2.0.1"
+frame-benchmarking-cli = { version = "2.0.1", optional = true }
+frame-benchmarking = "2.0.1"
 
 # crust runtime modules
 crust-runtime = { path = '../runtime', version = '0.11.0' }
@@ -52,8 +52,7 @@ primitives = { package = 'cst-primitives', path = '../primitives', version = '0.
 crust-rpc = { path =  '../rpc', version = '0.11.0' }
 
 [build-dependencies]
-substrate-build-script-utils = { git = "https://github.com/paritytech/substrate", branch = "master" }
-frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", branch = "master", optional = true }
+substrate-build-script-utils = "2.0.1"
 
 [features]
 default = [ "cli" ]

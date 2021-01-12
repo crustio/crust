@@ -14,16 +14,16 @@ serde = { optional = true, version = '1.0.116' }
 serde_json = "1.0.51"
 
 # substrate frames
-frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
-frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-system = { default-features = false, version = "2.0.1" }
+frame-support = { default-features = false, version = "2.0.1" }
 
 # substrate primitives
-sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-core = { default-features = false, version = "2.0.1" }
+sp-io = { default-features = false, version = "2.0.1" }
+sp-runtime = { default-features = false, version = "2.0.1" }
+sp-std = { default-features = false, version = "2.0.1" }
 
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false, optional = true }
+frame-benchmarking = { version = "2.0.1", default-features = false, optional = true }
 
 # crust runtime modules
 primitives = { version = "0.11.0", package = 'cst-primitives', path = '../../primitives', default-features = false }
@@ -49,4 +49,4 @@ runtime-benchmarks = [
 hex = '0.4.2'
 swork = { version = "0.11.0", package = 'cstrml-swork', path = '../swork' }
 balances = { version = "0.11.0", package = 'cstrml-balances', path = '../balances' }
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-benchmarking = "2.0.1"

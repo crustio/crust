@@ -282,7 +282,7 @@ fn report_works_should_work() {
 
             // Check same file all been confirmed
             assert_eq!(Market::files(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap()).unwrap_or_default().0, FileInfo {
-                file_size: 100,
+                file_size: 134289408,
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,
@@ -295,7 +295,7 @@ fn report_works_should_work() {
                 }]
             });
             assert_eq!(Market::files(hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()).unwrap_or_default().0, FileInfo {
-                file_size: 100,
+                file_size: 268578816,
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,

@@ -207,14 +207,14 @@ fn place_storage_order_should_work_for_extend_scenarios() {
 
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let file_size = 100; // should less than merchant
+        let file_size = 134289408; // 134289408 / 1_048_576 = 129
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
-        let _ = Balances::make_free_balance_be(&source, 20000);
-        let _ = Balances::make_free_balance_be(&merchant, 20000);
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
 
         // 1. New storage order
         assert_ok!(Market::place_storage_order(
@@ -227,7 +227,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -237,8 +237,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-        assert_eq!(Balances::free_balance(&staking_pot), 1440);
-        assert_eq!(Balances::free_balance(&storage_pot), 360);
+        assert_eq!(Balances::free_balance(&staking_pot), 93600);
+        assert_eq!(Balances::free_balance(&storage_pot), 23400);
 
         run_to_block(250);
         
@@ -253,7 +253,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -263,8 +263,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-        assert_eq!(Balances::free_balance(&staking_pot), 2880);
-        assert_eq!(Balances::free_balance(&storage_pot), 720);
+        assert_eq!(Balances::free_balance(&staking_pot), 187200);
+        assert_eq!(Balances::free_balance(&storage_pot), 46800);
 
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
@@ -292,7 +292,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1400,
                 claimed_at: 400,
-                amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -316,7 +316,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1400,
                 claimed_at: 500,
-                amount: 649,
+                amount: 42121,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -343,7 +343,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1600,
                 claimed_at: 600,
-                amount: 938,
+                amount: 60842,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -370,7 +370,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1800,
                 claimed_at: 800,
-                amount: 1147,
+                amount: 72111,
                 expected_replica_count: 8,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -404,19 +404,19 @@ fn calculate_payout_should_work() {
 
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let file_size = 100; // should less than merchant
+        let file_size = 134289408; // 134289408 / 1_048_576 = 129
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         let reserved_pot = Market::reserved_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
-        let _ = Balances::make_free_balance_be(&source, 20000);
-        let _ = Balances::make_free_balance_be(&merchant, 20000);
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
 
-        // 1. Place an order 1st
+        // 1. New storage order
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            Origin::signed(source.clone()), cid.clone(),
             file_size, 0, false
         ));
 
@@ -425,7 +425,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.9 * 0.2
+                amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -435,10 +435,9 @@ fn calculate_payout_should_work() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-
-        assert_eq!(Balances::free_balance(reserved_pot), 200);
-        assert_eq!(Balances::free_balance(staking_pot), 1440);
-        assert_eq!(Balances::free_balance(storage_pot), 360);
+        assert_eq!(Balances::free_balance(&staking_pot), 93600);
+        assert_eq!(Balances::free_balance(&storage_pot), 23400);
+        assert_eq!(Balances::free_balance(&reserved_pot), 13000);
 
         run_to_block(303);
         let legal_wr_info = legal_work_report_with_added_files();
@@ -467,7 +466,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -491,7 +490,7 @@ fn calculate_payout_should_work() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 606,
-                amount: 252, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 16311,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -506,8 +505,8 @@ fn calculate_payout_should_work() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 108
+            pledge: 6_000_000,
+            reward: 7089
         })
     });
 }
@@ -523,9 +522,9 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
 
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let file_size = 100; // should less than merchant
-        let _ = Balances::make_free_balance_be(&source, 20000);
-        let _ = Balances::make_free_balance_be(&merchant, 20000);
+        let file_size = 134289408; // should less than merchant
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
 
@@ -539,7 +538,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -577,7 +576,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -600,7 +599,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 603,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -623,14 +622,14 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
 
         run_to_block(903);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 600, true);
-        assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 6_000_000));
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 903,
-                amount: 207, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 13372, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -646,9 +645,9 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         );
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6060,
-            reward: 153
-        })
+            pledge: 6_000_060,
+            reward: 10028
+        });
     });
 }
 
@@ -663,11 +662,11 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
 
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let file_size = 100; // should less than merchant
-        let _ = Balances::make_free_balance_be(&source, 20000);
-        let _ = Balances::make_free_balance_be(&merchant, 20000);
+        let file_size = 134289408; // should less than merchant
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -679,7 +678,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400,
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -717,7 +716,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -744,8 +743,8 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         });
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 359
+            pledge: 6_000_000,
+            reward: 23399
         })
     });
 }
@@ -758,7 +757,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
 
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let file_size = 100; // should less than merchant
+        let file_size = 134289408; // should less than merchant
         let source = ALICE;
         let merchant = BOB;
         let charlie = CHARLIE;
@@ -766,15 +765,14 @@ fn calculate_payout_should_work_in_complex_timeline() {
         let eve = EVE;
 
         let staking_pot = Market::staking_pot();
-        let storage_pot = Market::storage_pot();
         let reserved_pot = Market::reserved_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
         assert_eq!(Balances::free_balance(&reserved_pot), 0);
-        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
-            let _ = Balances::make_free_balance_be(&who, 20000);
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6000));
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -787,7 +785,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400,
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -797,10 +795,6 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
-
-        assert_eq!(Balances::free_balance(&reserved_pot), 200);
-        assert_eq!(Balances::free_balance(&staking_pot), 1440);
-        assert_eq!(Balances::free_balance(&storage_pot), 360);
 
         run_to_block(303);
 
@@ -831,7 +825,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -854,7 +848,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 503,
-                amount: 289,
+                amount: 18721,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -869,11 +863,11 @@ fn calculate_payout_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 71
+            pledge: 6_000_000,
+            reward: 4679
         });
 
-        add_who_into_replica(&cid, charlie.clone(), legal_pk.clone(), None);
+        add_who_into_replica(&cid, file_size, charlie.clone(), legal_pk.clone(), None);
 
         run_to_block(603);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
@@ -883,7 +877,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 603,
-                amount: 255,
+                amount: 16383,
                 expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
@@ -904,17 +898,17 @@ fn calculate_payout_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 88
+            pledge: 6_000_000,
+            reward: 5848
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6000,
-            reward: 17
+            pledge: 6_000_000,
+            reward: 1169
         });
 
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
 
-        add_who_into_replica(&cid, dave.clone(), hex::decode("11").unwrap(), None);
+        add_who_into_replica(&cid, file_size, dave.clone(), hex::decode("11").unwrap(), None);
         run_to_block(703);
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -922,7 +916,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 703,
-                amount: 233,
+                amount: 14825,
                 expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
@@ -948,12 +942,12 @@ fn calculate_payout_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 99
+            pledge: 6_000_000,
+            reward: 6627
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6000,
-            reward: 28
+            pledge: 6_000_000,
+            reward: 1948
         });
 
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
@@ -966,7 +960,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 903,
-                amount: 208,
+                amount: 13179,
                 expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![
@@ -992,16 +986,16 @@ fn calculate_payout_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 99
+            pledge: 6_000_000,
+            reward: 6627
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6000,
-            reward: 28
+            pledge: 6_000_000,
+            reward: 1948
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6000,
-            reward: 25
+            pledge: 6_000_000,
+            reward: 1646
         });
 
         assert_eq!(Market::files_size(), file_size as u128);
@@ -1015,7 +1009,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 1203,
-                amount: 55,
+                amount: 3297,
                 expected_replica_count: 4,
                 reported_replica_count: 3,
                 replicas: vec![
@@ -1041,16 +1035,16 @@ fn calculate_payout_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 150
+            pledge: 6_000_000,
+            reward: 9921
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6000,
-            reward: 79
+            pledge: 6_000_000,
+            reward: 5242
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6000,
-            reward: 76
+            pledge: 6_000_000,
+            reward: 4940
         });
         assert_eq!(Market::files_size(), (file_size * 3) as u128);
 
@@ -1065,19 +1059,19 @@ fn calculate_payout_should_work_in_complex_timeline() {
         });
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 167
+            pledge: 6_000_000,
+            reward: 11019
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6000,
-            reward: 96
+            pledge: 6_000_000,
+            reward: 6340
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6000,
-            reward: 93
+            pledge: 6_000_000,
+            reward: 6038
         });
         assert_eq!(Market::files_size(), 0);
-        assert_eq!(Balances::free_balance(&reserved_pot), 204);
+        assert_eq!(Balances::free_balance(&reserved_pot), 13003);
     });
 }
 
@@ -1180,12 +1174,12 @@ fn calculate_payout_should_work_for_more_replicas() {
 
         let cid =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
-        let file_size = 100; // should less than merchant
-        let _ = Balances::make_free_balance_be(&source, 20000);
+        let file_size = 134289408;
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
         for who in merchants.iter() {
-            let _ = Balances::make_free_balance_be(&who, 20000);
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6000));
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -1198,7 +1192,7 @@ fn calculate_payout_should_work_for_more_replicas() {
                 file_size,
                 expired_on: 50,
                 claimed_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400,
                 expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -1214,11 +1208,11 @@ fn calculate_payout_should_work_for_more_replicas() {
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
 
-        add_who_into_replica(&cid, ferdie.clone(), legal_pk.clone(), Some(303u32));
+        add_who_into_replica(&cid, file_size, ferdie.clone(), legal_pk.clone(), Some(303u32));
         assert_eq!(Market::files_size(), file_size as u128);
-        add_who_into_replica(&cid, charlie.clone(), legal_pk.clone(), Some(403u32));
+        add_who_into_replica(&cid, file_size, charlie.clone(), legal_pk.clone(), Some(403u32));
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
-        add_who_into_replica(&cid, dave.clone(), legal_pk.clone(), Some(503u32));
+        add_who_into_replica(&cid, file_size, dave.clone(), legal_pk.clone(), Some(503u32));
         assert_eq!(Market::files_size(), (file_size * 3) as u128);
 
         register(&legal_pk, LegalCode::get());
@@ -1240,14 +1234,14 @@ fn calculate_payout_should_work_for_more_replicas() {
 
         assert_eq!(Market::files_size(), (file_size * 4) as u128);
 
-        add_who_into_replica(&cid, eve.clone(), legal_pk.clone(), Some(503u32));
+        add_who_into_replica(&cid, file_size, eve.clone(), legal_pk.clone(), Some(503u32));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 303,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 23400,
                 expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
@@ -1291,7 +1285,7 @@ fn calculate_payout_should_work_for_more_replicas() {
                 file_size,
                 expired_on: 1303,
                 claimed_at: 503,
-                amount: 292,
+                amount: 18724,
                 expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
@@ -1329,23 +1323,23 @@ fn calculate_payout_should_work_for_more_replicas() {
         );
 
         assert_eq!(Market::merchant_ledgers(&ferdie), MerchantLedger {
-            pledge: 6000,
-            reward: 17
+            pledge: 6_000_000,
+            reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
-            reward: 17
+            pledge: 6_000_000,
+            reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6000,
-            reward: 17
+            pledge: 6_000_000,
+            reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6000,
-            reward: 17
+            pledge: 6_000_000,
+            reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&eve), MerchantLedger {
-            pledge: 6000,
+            pledge: 6_000_000,
             reward: 0
         });
     });
@@ -1407,7 +1401,7 @@ fn clear_trash_should_work() {
         let legal_pk = legal_wr_info.curr_pk.clone();
         register(&legal_pk, LegalCode::get());
         for cid in file_lists.clone().iter() {
-            add_who_into_replica(&cid, merchant.clone(), legal_pk.clone(), None);
+            add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None);
         }
 
         for cid in file_lists.clone().iter() {

@@ -26,7 +26,7 @@ pub trait SworkerInterface<AccountId> {
 pub trait MarketInterface<AccountId, Balance> {
 	// used for `added_files`
 	// return is_added
-	fn upsert_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> bool;
+	fn upsert_replicas(who: &AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> bool;
 	// used for `delete_files`
 	// return is_deleted
 	fn delete_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool;

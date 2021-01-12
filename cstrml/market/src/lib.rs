@@ -116,7 +116,16 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Upsert new replica
     /// Accept id(who, anchor), cid, valid_at and maybe_member
     /// Returns whether this id is counted to a group/itself's stake limit
-    fn upsert_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>) -> bool {
+    fn upsert_replicas(who: &<T as system::Config>::AccountId,
+                       cid: &MerkleRoot,
+                       reported_file_size: u64,
+                       anchor: &SworkerAnchor,
+                       valid_at: BlockNumber,
+                       maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
+    ) -> bool {
+        // Judge if file_info.file_size == reported_file_size or not
+        Self::judge_file_size_match_or_not(cid, reported_file_size);
+
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
         // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
@@ -860,6 +869,52 @@ impl<T: Config> Module<T> {
         });
 
         is_counted
+    }
+
+    fn judge_file_size_match_or_not(cid: &MerkleRoot, reported_file_size: u64) {
+        let mut is_removed = false;
+        <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
+            Some((ref mut file_info, _)) => {
+                if file_info.file_size >= reported_file_size {
+                    file_info.file_size = reported_file_size
+                } else {
+                    is_removed = true;
+                }
+            },
+            None => {}
+        });
+
+        if is_removed {
+            <Files<T>>::remove(cid);
+        }
+    }
+
+    fn get_used_size_ratio(replicas_count: usize) -> u64 {
+        let mut used_size_ratio: u64 = 0;
+        if replicas_count < 1 {
+            used_size_ratio = 0;
+        } else if replicas_count <= 10 {
+            used_size_ratio = 2;
+        } else if replicas_count <= 20 {
+            used_size_ratio = 4;
+        } else if replicas_count <= 30 {
+            used_size_ratio = 6;
+        } else if replicas_count <= 40 {
+            used_size_ratio = 8;
+        } else if replicas_count <= 70 {
+            used_size_ratio = 10;
+        } else if replicas_count <= 80 {
+            used_size_ratio = 8;
+        } else if replicas_count <= 90 {
+            used_size_ratio = 6;
+        } else if replicas_count <= 100 {
+            used_size_ratio = 4;
+        } else if replicas_count <= 200 {
+            used_size_ratio = 2;
+        } else {
+            used_size_ratio = 0;
+        }
+        return used_size_ratio;
     }
 }
 

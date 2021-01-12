@@ -716,7 +716,7 @@ impl<T: Config> Module<T> {
                         members= Some(Self::groups(owner));
                     }
                 };
-                if T::MarketInterface::upsert_replicas(reporter, cid, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members) {
+                if T::MarketInterface::upsert_replicas(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members) {
                     Some((cid.clone(), *size, *valid_at))
                 } else {
                     None

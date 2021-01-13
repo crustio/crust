@@ -162,7 +162,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                 used_size = used_info.used_size;
             };
 
-            // 4. The first join the 
+            // 4. The first join the replicas and file become live(expired_on > claimed_at)
             let curr_bn = Self::get_current_block_number();
             if file_info.replicas.len() == 1 {
                 file_info.claimed_at = curr_bn;
@@ -629,6 +629,7 @@ impl<T: Config> Module<T> {
             }
 
             // 4.3 Update file info
+            // file status might become ready to be closed if claim_block == expired_on
             file_info.claimed_at = claim_block;
             file_info.amount = file_info.amount.saturating_sub(rewarded_amount);
             file_info.reported_replica_count = new_replicas.len() as u32;
@@ -723,9 +724,9 @@ impl<T: Config> Module<T> {
         // Extend expired_on or expected_replica_count
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
-            // expired_on < claimed_at => not live. Only for new file
-            // expired_on == claimed_at => already be calculated payout. to be removed into trash or refreshed here.
-            // expired_on > claimed_at => live file => to extend the duration
+            // expired_on < claimed_at => file is not live yet. This situation only happen for new file.
+            // expired_on == claimed_at => file is ready to be closed(wait to be put into trash or refreshed).
+            // expired_on > claimed_at => file is ongoing.
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             } else if file_info.expired_on == file_info.claimed_at {

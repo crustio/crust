@@ -114,8 +114,9 @@ type PositiveImbalanceOf<T> =
 impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> for Module<T>
 {
     /// Upsert new replica
-    /// Accept id(who, anchor), cid, valid_at and maybe_member
-    /// Returns whether this id is counted to a group/itself's stake limit
+    /// Accept id(who, anchor), reported_file_size, cid, valid_at and maybe_member
+    /// Returns the real used size of this file
+    /// used size is decided by market
     fn upsert_replicas(who: &<T as system::Config>::AccountId,
                        cid: &MerkleRoot,
                        reported_file_size: u64,
@@ -124,7 +125,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                        maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
     ) -> u64 {
         // Judge if file_info.file_size == reported_file_size or not
-        Self::judge_file_size_match_or_not(who, cid, reported_file_size);
+        Self::maybe_upsert_file_size(who, cid, reported_file_size);
 
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
         // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
@@ -181,7 +182,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
-    /// Return whether this id is counted to a group/itself's stake limit
+    /// Returns the real used size of this file
     fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> u64 {
         if <Files<T>>::get(cid).is_some() {
             // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
@@ -476,23 +477,23 @@ decl_module! {
         pub fn place_storage_order(
             origin,
             cid: MerkleRoot,
-            file_size: u64,
+            reported_file_size: u64,
             #[compact] tips: BalanceOf<T>,
             extend_replica: bool
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Calculate amount.
-            let mut real_file_size = file_size;
+            let mut charged_file_size = reported_file_size;
             if let Some((file_info, _)) = Self::files(&cid) {
-                if file_info.file_size <= file_size {
+                if file_info.file_size <= reported_file_size {
                     // Charge user with real file size
-                    real_file_size = file_info.file_size;
+                    charged_file_size = file_info.file_size;
                 } else {
                     Err(Error::<T>::FileSizeNotCorrect)?
                 }
             }
-            let amount = T::FileBaseFee::get() + Self::get_file_amount(real_file_size) + tips;
+            let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
             // 2. This should not happen at all
             ensure!(amount >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
@@ -509,7 +510,7 @@ decl_module! {
             Self::calculate_payout(&cid, curr_bn);
 
             // 6. three scenarios: new file, extend time or extend replica
-            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, real_file_size);
+            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
             // 7. Update storage price.
             #[cfg(not(test))]
@@ -886,26 +887,21 @@ impl<T: Config> Module<T> {
         used_size
     }
 
-    fn judge_file_size_match_or_not(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
-        let mut is_removed = false;
-        let mut amount = Zero::zero();
-        <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
-            Some((ref mut file_info, _)) => {
+    fn maybe_upsert_file_size(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
+        if let Some((mut file_info, used_info)) = Self::files(cid) {
+            if file_info.replicas.len().is_zero() {
                 if file_info.file_size >= reported_file_size {
-                    file_info.file_size = reported_file_size
+                    file_info.file_size = reported_file_size;
+                    <Files<T>>::insert(cid, (file_info, used_info));
                 } else {
-                    is_removed = true;
-                    amount = file_info.amount;
+                    if Self::has_enough_pledge(&who, &file_info.amount) {
+                        <MerchantLedgers<T>>::mutate(&who, |ledger| {
+                            ledger.reward += file_info.amount;
+                        });
+                    }
+                    <Files<T>>::remove(cid);
                 }
-            },
-            None => {}
-        });
-
-        if is_removed {
-            <MerchantLedgers<T>>::mutate(&who, |ledger| {
-                ledger.reward += amount;
-            });
-            <Files<T>>::remove(cid);
+            }
         }
     }
 

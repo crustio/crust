@@ -675,6 +675,16 @@ impl candy::Config for Runtime {
     type Balance = Balance;
 }
 
+parameter_types! {
+	pub Prefix: &'static [u8] = b"Pay CRUs to the Crust account:";
+}
+
+impl claims::Config for Runtime {
+    type Event = Event;
+    type Currency = Balances;
+    type Prefix = Prefix;
+}
+
 // TODO: better way to deal with fee(s)
 parameter_types! {
     pub const TransactionBaseFee: Balance = 1 * CENTS;
@@ -796,8 +806,9 @@ construct_runtime! {
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
 
-        // Token candy
+        // Token candy and claims bridge
         Candy: candy::{Module, Call, Storage, Event<T>},
+        Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
     }
 }
 

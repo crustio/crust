@@ -162,7 +162,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                 used_size = used_info.used_size;
             };
 
-            // 4. The first join the 
+            // 4. The first join the replicas and file become live(expired_on > claimed_at)
             let curr_bn = Self::get_current_block_number();
             if file_info.replicas.len() == 1 {
                 file_info.claimed_at = curr_bn;
@@ -187,6 +187,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         if <Files<T>>::get(cid).is_some() {
             // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
+            Self::try_to_close_file(cid, curr_bn);
             
             // 2. Delete replica from file_info
             if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
@@ -509,7 +510,7 @@ decl_module! {
             // 5. calculate payouts. Try to close file and decrease first party storage
             Self::calculate_payout(&cid, curr_bn);
 
-            // 6. three scenarios: new file, extend time or extend replica
+            // 6. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
             // 7. Update storage price.
@@ -531,6 +532,7 @@ decl_module! {
             let _ = ensure_signed(origin)?;
             let curr_bn = Self::get_current_block_number();
             Self::calculate_payout(&cid, curr_bn);
+            Self::try_to_close_file(&cid, curr_bn);
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
         }
@@ -627,6 +629,7 @@ impl<T: Config> Module<T> {
             }
 
             // 4.3 Update file info
+            // file status might become ready to be closed if claim_block == expired_on
             file_info.claimed_at = claim_block;
             file_info.amount = file_info.amount.saturating_sub(rewarded_amount);
             file_info.reported_replica_count = new_replicas.len() as u32;
@@ -640,10 +643,7 @@ impl<T: Config> Module<T> {
             Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
         }
 
-        // 5. Try to close file, judge if it is outdated
-        Self::try_to_close_file(cid, curr_bn);
-
-        // 6. Return the claimed block
+        // 5. Return the claimed block
         return claim_block;
     }
 
@@ -658,7 +658,7 @@ impl<T: Config> Module<T> {
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
-            if file_info.expired_on <= curr_bn {
+            if file_info.expired_on <= curr_bn && file_info.expired_on >= file_info.claimed_at {
                 Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
@@ -719,12 +719,19 @@ impl<T: Config> Module<T> {
         UsedTrashSizeII::mutate(|value| {*value = 0;});
     }
 
+
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_replica_count
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
+            // expired_on < claimed_at => file is not live yet. This situation only happen for new file.
+            // expired_on == claimed_at => file is ready to be closed(wait to be put into trash or refreshed).
+            // expired_on > claimed_at => file is ongoing.
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
+            } else if file_info.expired_on == file_info.claimed_at {
+                file_info.expired_on = curr_bn + T::FileDuration::get();
+                file_info.claimed_at = *curr_bn;
             }
             file_info.amount += amount.clone();
             if extend_replica {
@@ -737,7 +744,7 @@ impl<T: Config> Module<T> {
             // New file
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
                 file_size,
-                expired_on: curr_bn.clone(), // Not fixed, this will be changed, when first file is reported
+                expired_on: 0,
                 claimed_at: curr_bn.clone(),
                 amount: amount.clone(),
                 expected_replica_count: T::InitialReplica::get(),

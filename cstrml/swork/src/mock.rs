@@ -637,7 +637,7 @@ pub fn add_not_live_files() {
             used_size: *file_size,
             groups: <BTreeSet<SworkerAnchor>>::new()
         };
-        insert_file(file, 1000, 1000, 1000, 4, 0, vec![], *file_size, used_info);
+        insert_file(file, 1000, 0, 1000, 4, 0, vec![], *file_size, used_info);
     }
 
     let storage_pot = Market::storage_pot();

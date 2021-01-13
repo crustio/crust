@@ -174,7 +174,7 @@ fn place_storage_order_should_work() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
@@ -225,7 +225,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 expected_replica_count: 4,
@@ -251,7 +251,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
                 expected_replica_count: 4,
@@ -423,7 +423,7 @@ fn calculate_payout_should_work() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 expected_replica_count: 4,
@@ -536,7 +536,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
@@ -676,7 +676,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
                 expected_replica_count: 4,
@@ -783,7 +783,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
                 expected_replica_count: 4,
@@ -1102,7 +1102,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
@@ -1125,7 +1125,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
@@ -1144,7 +1144,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
@@ -1190,7 +1190,7 @@ fn calculate_payout_should_work_for_more_replicas() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
                 expected_replica_count: 4,
@@ -1382,7 +1382,7 @@ fn clear_trash_should_work() {
             assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
@@ -1537,7 +1537,7 @@ fn withdraw_staking_pot_should_work() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,
@@ -1589,7 +1589,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
             assert_eq!(Market::files(&cid).unwrap_or_default(), (
                 FileInfo {
                     file_size,
-                    expired_on: 50,
+                    expired_on: 0,
                     claimed_at: 50,
                     amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                     expected_replica_count: 4,
@@ -1665,7 +1665,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         assert_eq!(Market::files(&cid1).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 50,
+                expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 expected_replica_count: 4,

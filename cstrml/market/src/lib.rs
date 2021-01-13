@@ -510,7 +510,7 @@ decl_module! {
             // 5. calculate payouts. Try to close file and decrease first party storage
             Self::calculate_payout(&cid, curr_bn);
 
-            // 6. three scenarios: new file, extend time or extend replica
+            // 6. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
             // 7. Update storage price.

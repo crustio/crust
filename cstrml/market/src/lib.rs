@@ -898,6 +898,8 @@ impl<T: Config> Module<T> {
                         <MerchantLedgers<T>>::mutate(&who, |ledger| {
                             ledger.reward += file_info.amount;
                         });
+                    } else {
+                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
                 }

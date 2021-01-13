@@ -122,16 +122,16 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                        anchor: &SworkerAnchor,
                        valid_at: BlockNumber,
                        maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
-    ) -> bool {
+    ) -> u64 {
         // Judge if file_info.file_size == reported_file_size or not
         Self::judge_file_size_match_or_not(cid, reported_file_size);
 
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
         // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
-        let mut is_counted = <Files<T>>::get(cid).is_some();
+        let mut used_size: u64 = 0;
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
-            
+            let mut is_counted = true;
             // 1. Check if the file is stored by other members
             if let Some(members) = maybe_members {
                 for replica in file_info.replicas.iter() {
@@ -154,8 +154,11 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             Self::insert_replica(&mut file_info, new_replica);
 
             // 3. Update used_info
+            // TODO: update other anchors used
+            // used_info.used_size = Self::update_used_size(file_info.file_size, used_info.groups.len());
             if is_counted {
                 used_info.groups.insert(anchor.clone());
+                used_size = used_info.used_size;
             };
 
             // 4. The first join the 
@@ -173,13 +176,13 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 6. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
-        return is_counted
+        return used_size
     }
 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
     /// Return whether this id is counted to a group/itself's stake limit
-    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
+    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> u64 {
         if <Files<T>>::get(cid).is_some() {
             // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
@@ -828,14 +831,14 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> bool {
-        let mut is_counted = false;
+    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+        let mut used_size: u64 = 0;
         
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
             Some((_, ref mut used_info)) => {
                 if used_info.groups.take(anchor).is_some() {
-                    is_counted = true;
+                    used_size = used_info.used_size;
                 }
             },
             None => {}
@@ -846,7 +849,7 @@ impl<T: Config> Module<T> {
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.groups.take(anchor).is_some() {
-                    is_counted = true;
+                    used_size = used_info.used_size;
                     UsedTrashMappingI::mutate(anchor, |value| {
                         *value -= used_info.used_size;
                     });
@@ -859,7 +862,7 @@ impl<T: Config> Module<T> {
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.groups.take(anchor).is_some() {
-                    is_counted = true;
+                    used_size = used_info.used_size;
                     UsedTrashMappingII::mutate(anchor, |value| {
                         *value -= used_info.used_size;
                     });
@@ -868,7 +871,9 @@ impl<T: Config> Module<T> {
             None => {}
         });
 
-        is_counted
+        // 4. TODO: update other's used_info
+
+        used_size
     }
 
     fn judge_file_size_match_or_not(cid: &MerkleRoot, reported_file_size: u64) {
@@ -889,32 +894,21 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn get_used_size_ratio(replicas_count: usize) -> u64 {
-        let mut used_size_ratio: u64 = 0;
-        if replicas_count < 1 {
-            used_size_ratio = 0;
-        } else if replicas_count <= 10 {
-            used_size_ratio = 2;
-        } else if replicas_count <= 20 {
-            used_size_ratio = 4;
-        } else if replicas_count <= 30 {
-            used_size_ratio = 6;
-        } else if replicas_count <= 40 {
-            used_size_ratio = 8;
-        } else if replicas_count <= 70 {
-            used_size_ratio = 10;
-        } else if replicas_count <= 80 {
-            used_size_ratio = 8;
-        } else if replicas_count <= 90 {
-            used_size_ratio = 6;
-        } else if replicas_count <= 100 {
-            used_size_ratio = 4;
-        } else if replicas_count <= 200 {
-            used_size_ratio = 2;
-        } else {
-            used_size_ratio = 0;
-        }
-        return used_size_ratio;
+    fn update_used_size(file_size: u64, replicas_count: usize) -> u64 {
+        let used_ratio: u64 = match replicas_count {
+            1..=10 => 2,
+            11..=20 => 4,
+            21..=30 => 6,
+            31..=40 => 8,
+            41..=70 => 10,
+            71..=80 => 8,
+            81..=90 => 6,
+            91..=100 => 4,
+            101..=200 => 2,
+            _ => return 0,
+        };
+
+        used_ratio * file_size
     }
 }
 

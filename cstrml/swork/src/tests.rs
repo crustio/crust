@@ -1031,14 +1031,14 @@ fn ab_upgrade_should_work() {
             // 11. Check B's work report and free & used again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
-                used: 3,
+                used: 134289403,
                 free: 4294967296,
                 reported_files_size: 3,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 3); // Added 2 and delete 1
+            assert_eq!(Swork::used(), 134289403); // Added 134289408 and delete 7
         });
 }
 

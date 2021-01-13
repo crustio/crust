@@ -716,21 +716,13 @@ impl<T: Config> Module<T> {
                         members= Some(Self::groups(owner));
                     }
                 };
-                if T::MarketInterface::upsert_replicas(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members) {
-                    Some((cid.clone(), *size, *valid_at))
-                } else {
-                    None
-                }
+                Some((cid.clone(), T::MarketInterface::upsert_replicas(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members), *valid_at))
             }).collect()
         } else {
             let curr_bn = Self::get_current_block_number();
-            changed_files.iter().filter_map(|(cid, size, _)| {
+            changed_files.iter().filter_map(|(cid, _, _)| {
                 // 2. If mapping to storage orders
-                if T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn) {
-                    Some((cid.clone(), *size, curr_bn as u64))
-                } else {
-                    None
-                }
+                Some((cid.clone(), T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn), curr_bn as u64))
             }).collect()
         }
     }

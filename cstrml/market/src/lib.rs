@@ -619,10 +619,7 @@ impl<T: Config> Module<T> {
                     }
                     
                     // if that guy is poor, just pass him ☠️ 
-                    if Self::has_enough_pledge(&replica.who, &one_payout_amount) {
-                        <MerchantLedgers<T>>::mutate(&replica.who, |ledger| {
-                            ledger.reward += one_payout_amount.clone();
-                        });
+                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount) {
                         rewarded_amount += one_payout_amount.clone();
                         rewarded_count +=1;
                     }
@@ -894,17 +891,23 @@ impl<T: Config> Module<T> {
                     file_info.file_size = reported_file_size;
                     <Files<T>>::insert(cid, (file_info, used_info));
                 } else {
-                    if Self::has_enough_pledge(&who, &file_info.amount) {
-                        <MerchantLedgers<T>>::mutate(&who, |ledger| {
-                            ledger.reward += file_info.amount;
-                        });
-                    } else {
+                    if !Self::maybe_reward_merchant(who, &file_info.amount){
                         T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
                 }
             }
         }
+    }
+
+    fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>) -> bool {
+        if Self::has_enough_pledge(&who, amount) {
+            <MerchantLedgers<T>>::mutate(&who, |ledger| {
+                ledger.reward += amount.clone();
+            });
+            return true;
+        }
+        false
     }
 
     fn update_used_size(file_size: u64, replicas_count: usize) -> u64 {

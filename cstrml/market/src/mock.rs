@@ -227,8 +227,8 @@ pub fn init_swork_setup() {
 }
 
 // fake for report_works
-pub fn add_who_into_replica(cid: &MerkleRoot, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>) {
-    Market::upsert_replicas(&who, cid, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &None);
+pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>) {
+    Market::upsert_replicas(&who, cid, reported_size, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &None);
 }
 
 pub fn legal_work_report_with_added_files() -> ReportWorksInfo {

@@ -114,15 +114,25 @@ type PositiveImbalanceOf<T> =
 impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> for Module<T>
 {
     /// Upsert new replica
-    /// Accept id(who, anchor), cid, valid_at and maybe_member
-    /// Returns whether this id is counted to a group/itself's stake limit
-    fn upsert_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>) -> bool {
+    /// Accept id(who, anchor), reported_file_size, cid, valid_at and maybe_member
+    /// Returns the real used size of this file
+    /// used size is decided by market
+    fn upsert_replicas(who: &<T as system::Config>::AccountId,
+                       cid: &MerkleRoot,
+                       reported_file_size: u64,
+                       anchor: &SworkerAnchor,
+                       valid_at: BlockNumber,
+                       maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
+    ) -> u64 {
+        // Judge if file_info.file_size == reported_file_size or not
+        Self::maybe_upsert_file_size(who, cid, reported_file_size);
+
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
         // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
-        let mut is_counted = <Files<T>>::get(cid).is_some();
+        let mut used_size: u64 = 0;
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
-            
+            let mut is_counted = true;
             // 1. Check if the file is stored by other members
             if let Some(members) = maybe_members {
                 for replica in file_info.replicas.iter() {
@@ -145,11 +155,14 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             Self::insert_replica(&mut file_info, new_replica);
 
             // 3. Update used_info
+            // TODO: update other anchors used
+            // used_info.used_size = Self::update_used_size(file_info.file_size, used_info.groups.len());
             if is_counted {
                 used_info.groups.insert(anchor.clone());
+                used_size = used_info.used_size;
             };
 
-            // 4. The first join the 
+            // 4. The first join the replicas and file become live(expired_on > claimed_at)
             let curr_bn = Self::get_current_block_number();
             if file_info.replicas.len() == 1 {
                 file_info.claimed_at = curr_bn;
@@ -164,16 +177,17 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 6. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
-        return is_counted
+        return used_size
     }
 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
-    /// Return whether this id is counted to a group/itself's stake limit
-    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool {
+    /// Returns the real used size of this file
+    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> u64 {
         if <Files<T>>::get(cid).is_some() {
             // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
+            Self::try_to_close_file(cid, curr_bn);
             
             // 2. Delete replica from file_info
             if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
@@ -333,6 +347,8 @@ decl_error! {
         AlreadyRegistered,
         /// Reward length is too long
         RewardLengthTooLong,
+        /// File size is not correct
+        FileSizeNotCorrect
     }
 }
 
@@ -462,15 +478,23 @@ decl_module! {
         pub fn place_storage_order(
             origin,
             cid: MerkleRoot,
-            file_size: u64,
+            reported_file_size: u64,
             #[compact] tips: BalanceOf<T>,
             extend_replica: bool
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // TODO: 10% tax
             // 1. Calculate amount.
-            let amount = T::FileBaseFee::get() + Self::get_file_amount(file_size) + tips;
+            let mut charged_file_size = reported_file_size;
+            if let Some((file_info, _)) = Self::files(&cid) {
+                if file_info.file_size <= reported_file_size {
+                    // Charge user with real file size
+                    charged_file_size = file_info.file_size;
+                } else {
+                    Err(Error::<T>::FileSizeNotCorrect)?
+                }
+            }
+            let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
             // 2. This should not happen at all
             ensure!(amount >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
@@ -486,8 +510,8 @@ decl_module! {
             // 5. calculate payouts. Try to close file and decrease first party storage
             Self::calculate_payout(&cid, curr_bn);
 
-            // 6. three scenarios: new file, extend time or extend replica
-            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, file_size);
+            // 6. three scenarios: new file, extend time(refresh time) or extend replica
+            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
             // 7. Update storage price.
             #[cfg(not(test))]
@@ -508,6 +532,7 @@ decl_module! {
             let _ = ensure_signed(origin)?;
             let curr_bn = Self::get_current_block_number();
             Self::calculate_payout(&cid, curr_bn);
+            Self::try_to_close_file(&cid, curr_bn);
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
         }
@@ -596,10 +621,7 @@ impl<T: Config> Module<T> {
                     }
                     
                     // if that guy is poor, just pass him ☠️ 
-                    if Self::has_enough_pledge(&replica.who, &one_payout_amount) {
-                        <MerchantLedgers<T>>::mutate(&replica.who, |ledger| {
-                            ledger.reward += one_payout_amount.clone();
-                        });
+                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount) {
                         rewarded_amount += one_payout_amount.clone();
                         rewarded_count +=1;
                     }
@@ -607,6 +629,7 @@ impl<T: Config> Module<T> {
             }
 
             // 4.3 Update file info
+            // file status might become ready to be closed if claim_block == expired_on
             file_info.claimed_at = claim_block;
             file_info.amount = file_info.amount.saturating_sub(rewarded_amount);
             file_info.reported_replica_count = new_replicas.len() as u32;
@@ -619,11 +642,8 @@ impl<T: Config> Module<T> {
             // 4.5 Update first class storage size
             Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
         }
-                
-        // 5. Try to close file, judge if it is outdated
-        Self::try_to_close_file(cid, curr_bn);
 
-        // 6. Return the claimed block
+        // 5. Return the claimed block
         return claim_block;
     }
 
@@ -638,7 +658,7 @@ impl<T: Config> Module<T> {
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
-            if file_info.expired_on <= curr_bn {
+            if file_info.expired_on <= curr_bn && file_info.expired_on >= file_info.claimed_at {
                 Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
@@ -699,12 +719,19 @@ impl<T: Config> Module<T> {
         UsedTrashSizeII::mutate(|value| {*value = 0;});
     }
 
+
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_replica_count
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
+            // expired_on < claimed_at => file is not live yet. This situation only happen for new file.
+            // expired_on == claimed_at => file is ready to be closed(wait to be put into trash or refreshed).
+            // expired_on > claimed_at => file is ongoing.
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
+            } else if file_info.expired_on == file_info.claimed_at {
+                file_info.expired_on = curr_bn + T::FileDuration::get();
+                file_info.claimed_at = *curr_bn;
             }
             file_info.amount += amount.clone();
             if extend_replica {
@@ -717,7 +744,7 @@ impl<T: Config> Module<T> {
             // New file
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
                 file_size,
-                expired_on: curr_bn.clone(), // Not fixed, this will be changed, when first file is reported
+                expired_on: 0,
                 claimed_at: curr_bn.clone(),
                 amount: amount.clone(),
                 expected_replica_count: T::InitialReplica::get(),
@@ -819,14 +846,14 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> bool {
-        let mut is_counted = false;
+    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+        let mut used_size: u64 = 0;
         
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
             Some((_, ref mut used_info)) => {
                 if used_info.groups.take(anchor).is_some() {
-                    is_counted = true;
+                    used_size = used_info.used_size;
                 }
             },
             None => {}
@@ -837,7 +864,7 @@ impl<T: Config> Module<T> {
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.groups.take(anchor).is_some() {
-                    is_counted = true;
+                    used_size = used_info.used_size;
                     UsedTrashMappingI::mutate(anchor, |value| {
                         *value -= used_info.used_size;
                     });
@@ -850,7 +877,7 @@ impl<T: Config> Module<T> {
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.groups.take(anchor).is_some() {
-                    is_counted = true;
+                    used_size = used_info.used_size;
                     UsedTrashMappingII::mutate(anchor, |value| {
                         *value -= used_info.used_size;
                     });
@@ -859,7 +886,52 @@ impl<T: Config> Module<T> {
             None => {}
         });
 
-        is_counted
+        // 4. TODO: update other's used_info
+
+        used_size
+    }
+
+    fn maybe_upsert_file_size(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
+        if let Some((mut file_info, used_info)) = Self::files(cid) {
+            if file_info.replicas.len().is_zero() {
+                if file_info.file_size >= reported_file_size {
+                    file_info.file_size = reported_file_size;
+                    <Files<T>>::insert(cid, (file_info, used_info));
+                } else {
+                    if !Self::maybe_reward_merchant(who, &file_info.amount){
+                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                    }
+                    <Files<T>>::remove(cid);
+                }
+            }
+        }
+    }
+
+    fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>) -> bool {
+        if Self::has_enough_pledge(&who, amount) {
+            <MerchantLedgers<T>>::mutate(&who, |ledger| {
+                ledger.reward += amount.clone();
+            });
+            return true;
+        }
+        false
+    }
+
+    fn update_used_size(file_size: u64, replicas_count: usize) -> u64 {
+        let used_ratio: u64 = match replicas_count {
+            1..=10 => 2,
+            11..=20 => 4,
+            21..=30 => 6,
+            31..=40 => 8,
+            41..=70 => 10,
+            71..=80 => 8,
+            81..=90 => 6,
+            91..=100 => 4,
+            101..=200 => 2,
+            _ => return 0,
+        };
+
+        used_ratio * file_size
     }
 }
 

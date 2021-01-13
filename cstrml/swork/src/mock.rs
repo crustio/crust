@@ -622,9 +622,9 @@ pub fn add_wr(anchor: &SworkerAnchor, wr: &WorkReport) {
 
 pub fn add_not_live_files() {
     let files: Vec<(Vec<u8>, u64)> = [
-        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 100),
-        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 100),
-        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 100),
+        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408),
+        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408),
+        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816),
         (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 13), // A file
         (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 7),  // B file
         (hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 37),  // C file
@@ -637,7 +637,7 @@ pub fn add_not_live_files() {
             used_size: *file_size,
             groups: <BTreeSet<SworkerAnchor>>::new()
         };
-        insert_file(file, 1000, 1000, 1000, 4, 0, vec![], *file_size, used_info);
+        insert_file(file, 1000, 0, 1000, 4, 0, vec![], *file_size, used_info);
     }
 
     let storage_pot = Market::storage_pot();
@@ -646,8 +646,8 @@ pub fn add_not_live_files() {
 
 pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
     let files: Vec<(Vec<u8>, u64)> = [
-        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 100),
-        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 100)
+        (hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408),
+        (hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 7)
     ].to_vec();
 
     let replica_info = Replica {

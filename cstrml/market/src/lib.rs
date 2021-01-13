@@ -345,6 +345,8 @@ decl_error! {
         AlreadyRegistered,
         /// Reward length is too long
         RewardLengthTooLong,
+        /// File size is not correct
+        FileSizeNotCorrect
     }
 }
 
@@ -480,9 +482,16 @@ decl_module! {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // TODO: 10% tax
             // 1. Calculate amount.
-            let amount = T::FileBaseFee::get() + Self::get_file_amount(file_size) + tips;
+            let mut real_file_size = file_size;
+            if let Some((file_info, _)) = Self::files(&cid) {
+                if file_info.file_size <= file_size {
+                    real_file_size = file_info.file_size;
+                } else {
+                    Err(Error::<T>::FileSizeNotCorrect)?
+                }
+            }
+            let amount = T::FileBaseFee::get() + Self::get_file_amount(real_file_size) + tips;
 
             // 2. This should not happen at all
             ensure!(amount >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
@@ -499,7 +508,7 @@ decl_module! {
             Self::calculate_payout(&cid, curr_bn);
 
             // 6. three scenarios: new file, extend time or extend replica
-            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, file_size);
+            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, real_file_size);
 
             // 7. Update storage price.
             #[cfg(not(test))]
@@ -631,7 +640,7 @@ impl<T: Config> Module<T> {
             // 4.5 Update first class storage size
             Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
         }
-                
+
         // 5. Try to close file, judge if it is outdated
         Self::try_to_close_file(cid, curr_bn);
 

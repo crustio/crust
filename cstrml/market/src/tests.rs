@@ -1631,3 +1631,104 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         assert_eq!(Market::files(&cid2).is_none(), true);
     })
 }
+
+
+/// reported file size is not same with file size
+#[test]
+fn double_place_storage_order_file_size_check_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+
+        let cid1 =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 100; // should less than merchant
+        let reported_file_size_cid1 = 90;
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 20000);
+
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid1.clone(),
+            file_size, 0, false
+        ));
+        assert_eq!(Market::files(&cid1).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 50,
+                claimed_at: 50,
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: file_size,
+                groups: BTreeSet::from_iter(vec![].into_iter())
+            })
+        );
+
+        run_to_block(303);
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+        register(&legal_pk, LegalCode::get());
+        add_who_into_replica(&cid1, reported_file_size_cid1, merchant.clone(), legal_pk.clone(), None);
+        assert_eq!(Market::files(&cid1).unwrap_or_default(), (
+            FileInfo {
+                file_size: reported_file_size_cid1,
+                expired_on: 1303,
+                claimed_at: 303,
+                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+
+        assert_noop!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid1.clone(), 80, 0, false),
+            DispatchError::Module {
+                index: 0,
+                error: 6,
+                message: Some("FileSizeNotCorrect")
+            }
+        );
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid1.clone(),
+            120, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid1).unwrap_or_default(), (
+            FileInfo {
+                file_size: reported_file_size_cid1,
+                expired_on: 1303,
+                claimed_at: 303,
+                amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone()
+                }]
+            },
+            UsedInfo {
+                used_size: file_size,
+                groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
+            })
+        );
+    })
+}

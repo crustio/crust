@@ -1607,6 +1607,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
         register(&legal_pk, LegalCode::get());
+        // reported_file_size_cid1 = 90 < 100 => update file size in file info
         add_who_into_replica(&cid1, reported_file_size_cid1, merchant.clone(), legal_pk.clone(), None);
         assert_eq!(Market::files(&cid1).unwrap_or_default(), (
             FileInfo {
@@ -1627,8 +1628,13 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
+        // reported_file_size_cid2 = 1000 > 100 => close this file
         add_who_into_replica(&cid2, reported_file_size_cid2, merchant.clone(), legal_pk.clone(), None);
         assert_eq!(Market::files(&cid2).is_none(), true);
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 6000,
+            reward: 360
+        });
     })
 }
 
@@ -1697,6 +1703,7 @@ fn double_place_storage_order_file_size_check_should_work() {
             })
         );
 
+        // 80 < 100 => throw an error
         assert_noop!(Market::place_storage_order(
             Origin::signed(source.clone()), cid1.clone(), 80, 0, false),
             DispatchError::Module {
@@ -1706,9 +1713,10 @@ fn double_place_storage_order_file_size_check_should_work() {
             }
         );
 
+        // 12000000 > 100. Only need amount for 100
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid1.clone(),
-            120, 0, false
+            12000000, 0, false
         ));
 
         assert_eq!(Market::files(&cid1).unwrap_or_default(), (

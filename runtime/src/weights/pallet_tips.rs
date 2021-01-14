@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Crustio Technologies Ltd.
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
 #![allow(unused_parens)]

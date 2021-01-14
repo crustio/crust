@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Crustio Technologies Ltd.
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
 //! The Crust runtime. This can be compiled with `#[no_std]`, ready for Wasm.
@@ -397,6 +397,8 @@ parameter_types! {
     pub const SPowerRatio: u128 = 100;
     // 64 guarantors for one validator.
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
+    // 60 eras means 15 days if era = 6 hours
+    pub const MarketStakingPotDuration: u32 = 60;
 }
 
 impl staking::Config for Runtime {
@@ -418,8 +420,9 @@ impl staking::Config for Runtime {
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type MarketStakingPot = Market;
+    type MarketStakingPotDuration = MarketStakingPotDuration;
     type WeightInfo = staking::weight::WeightInfo;
 }
 
@@ -1023,7 +1026,7 @@ impl_runtime_apis! {
             add_benchmark!(params, batches, balances, Balances);
             add_benchmark!(params, batches, system, SystemBench::<Runtime>);
             add_benchmark!(params, batches, staking, Staking);
-            // add_benchmark!(params, batches, market, Market);
+            add_benchmark!(params, batches, market, Market);
             add_benchmark!(params, batches, swork, SworkBench::<Runtime>);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

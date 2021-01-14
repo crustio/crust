@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use super::*;
 
 use crate::mock::*;
@@ -279,7 +282,7 @@ fn report_works_should_work() {
 
             // Check same file all been confirmed
             assert_eq!(Market::files(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap()).unwrap_or_default().0, FileInfo {
-                file_size: 100,
+                file_size: 134289408,
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,
@@ -292,7 +295,7 @@ fn report_works_should_work() {
                 }]
             });
             assert_eq!(Market::files(hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()).unwrap_or_default().0, FileInfo {
-                file_size: 100,
+                file_size: 268578816,
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,
@@ -1028,14 +1031,14 @@ fn ab_upgrade_should_work() {
             // 11. Check B's work report and free & used again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
-                used: 3,
+                used: 134289403,
                 free: 4294967296,
                 reported_files_size: 3,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 3); // Added 2 and delete 1
+            assert_eq!(Swork::used(), 134289403); // Added 134289408 and delete 7
         });
 }
 

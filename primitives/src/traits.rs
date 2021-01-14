@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use frame_support::traits::LockableCurrency;
 use crate::{SworkerAnchor, MerkleRoot, BlockNumber};
 use sp_std::collections::btree_set::BTreeSet;
@@ -20,11 +23,13 @@ pub trait SworkerInterface<AccountId> {
 }
 
 /// Means for interacting with a specialized version of the `market` trait.
-pub trait MarketInterface<AccountId> {
+pub trait MarketInterface<AccountId, Balance> {
 	// used for `added_files`
-	// return is_added
-	fn upsert_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> bool;
+	// return real used size of this file
+	fn upsert_replicas(who: &AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> u64;
 	// used for `delete_files`
-	// return is_deleted
-	fn delete_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> bool;
+	// return real used size of this file
+	fn delete_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> u64;
+	// used for distribute market staking payout
+	fn withdraw_staking_pot() -> Balance;
 }

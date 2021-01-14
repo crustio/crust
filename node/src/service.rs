@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Crust Technologies Ltd.
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
 //! Crust service. Specialized wrapper over substrate service.

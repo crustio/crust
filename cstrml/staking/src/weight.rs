@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 //! THIS FILE WAS AUTO-GENERATED USING THE SUBSTRATE BENCHMARK CLI VERSION 2.0.0
 
 #![allow(unused_parens)]
@@ -75,5 +78,11 @@ impl crate::WeightInfo for WeightInfo {
 			.saturating_add(DbWeight::get().reads((118 as Weight).saturating_mul(n as Weight)))
 			.saturating_add(DbWeight::get().reads((1 as Weight).saturating_mul(m as Weight)))
 			.saturating_add(DbWeight::get().writes((270 as Weight).saturating_mul(v as Weight)))
+	}
+	fn recharge_staking_pot() -> Weight {
+		(64_828_000 as Weight)
+			.saturating_add(DbWeight::get().reads(1 as Weight))
+			.saturating_add(DbWeight::get().writes(1 as Weight))
+
 	}
 }

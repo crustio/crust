@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 #![feature(vec_remove_item)]
 #![recursion_limit = "128"]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -19,7 +22,7 @@ use frame_support::{
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
-        UnixTime, EnsureOrigin, Randomness, ExistenceRequirement::KeepAlive
+        UnixTime, EnsureOrigin, Randomness, ExistenceRequirement::{KeepAlive, AllowDeath}
     },
     dispatch::DispatchResult
 };
@@ -48,7 +51,7 @@ pub mod weight;
 use swork;
 use primitives::{
     constants::{currency::*, time::*},
-    traits::TransferrableCurrency
+    traits::{TransferrableCurrency, MarketInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -82,6 +85,7 @@ pub trait WeightInfo {
     // The following two doesn't used to generate weight info
     fn new_era(v: u32, n: u32, m: u32, ) -> Weight;
     fn select_and_update_validators(v: u32, n: u32, m: u32, ) -> Weight;
+    fn recharge_staking_pot() -> Weight;
 }
 
 /// Counter for the number of eras that have passed.
@@ -371,16 +375,6 @@ impl<T: Config> SessionInterface<<T as frame_system::Config>::AccountId> for T w
     }
 }
 
-pub trait SworkInterface: frame_system::Config {
-    fn update_identities();
-}
-
-impl<T: Config> SworkInterface for T where T: swork::Config {
-    fn update_identities() {
-        <swork::Module<T>>::update_identities();
-    }
-}
-
 pub trait Config: frame_system::Config {
     /// The staking's module id, used for staking pot
     type ModuleId: Get<ModuleId>;
@@ -438,11 +432,14 @@ pub trait Config: frame_system::Config {
     /// Interface for interacting with a session module.
     type SessionInterface: self::SessionInterface<Self::AccountId>;
 
-    /// Interface for interacting with a swork module
-    type SworkInterface: self::SworkInterface;
-
     /// Storage power ratio for crust network phase 1
     type SPowerRatio: Get<u128>;
+
+    /// Reference to Market staking pot.
+    type MarketStakingPot: MarketInterface<Self::AccountId, BalanceOf<Self>>;
+
+    /// Market Staking Pot Duration. Count of EraIndex
+    type MarketStakingPotDuration: Get<u32>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -536,6 +533,10 @@ decl_storage! {
         
         /// Total staking payout at era.
         pub ErasStakingPayout get(fn eras_staking_payout):
+            map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
+
+        /// Market staking payout of validator at era.
+        pub ErasMarketStakingPayout get(fn eras_market_staking_payout):
             map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
 
         /// Authoring payout of validator at era.
@@ -743,6 +744,8 @@ decl_error! {
         InvalidEraToReward,
         /// Claimed reward twice.
         AlreadyClaimed,
+        /// Don't have enough balance to recharge the staking pot
+        InsufficientCurrency,
     }
 }
 
@@ -769,6 +772,9 @@ decl_module! {
 
         /// The staking's module id, used for deriving its sovereign account ID.
         const ModuleId: ModuleId = T::ModuleId::get();
+
+        /// Total era duration for once dsm staking pot.
+        const MarketStakingPotDuration: u32 = T::MarketStakingPotDuration::get();
 
         type Error = Error<T>;
 
@@ -1205,6 +1211,15 @@ decl_module! {
         fn reward_stakers(origin, validator_stash: T::AccountId, era: EraIndex) -> DispatchResult {
             ensure_signed(origin)?;
             Self::do_reward_stakers(validator_stash, era)
+        }
+
+        /// Recharge the staking pot
+        #[weight = T::WeightInfo::recharge_staking_pot()]
+        fn recharge_staking_pot(origin, #[compact] value: BalanceOf<T>) {
+            let who = ensure_signed(origin)?;
+            ensure!(T::Currency::free_balance(&who) > value, Error::<T>::InsufficientCurrency);
+            let staking_pot = Self::staking_pot();
+            T::Currency::transfer(&who, &staking_pot, value, KeepAlive)?;
         }
 
         // ----- Root Calls ------
@@ -1644,6 +1659,9 @@ impl<T: Config> Module<T> {
         // `ledger.claimed_rewards` in this case.
         let era_staking_payout = <ErasStakingPayout<T>>::get(&era)
             .ok_or_else(|| Error::<T>::InvalidEraToReward)?;
+        let era_market_staking_payout = <ErasMarketStakingPayout<T>>::get(&era)
+            .unwrap_or(Zero::zero());
+        let total_era_staking_payout = era_staking_payout.saturating_add(era_market_staking_payout);
 
         let controller = Self::bonded(&validator_stash).ok_or(Error::<T>::NotStash)?;
         let mut ledger = <Ledger<T>>::get(&controller).ok_or_else(|| Error::<T>::NotController)?;
@@ -1668,7 +1686,7 @@ impl<T: Config> Module<T> {
 
         // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
-        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * era_staking_payout;
+        let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * total_era_staking_payout;
         let total = exposure.total.max(One::one());
         // 4. Calculate total rewards for staking
         let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * staking_reward;
@@ -1746,8 +1764,6 @@ impl<T: Config> Module<T> {
         }
 
         // Set staking information for new era.
-        // TODO: move this update 1 session in advance
-        T::SworkInterface::update_identities();
         Self::deposit_event(RawEvent::UpdateIdentitiesSuccess(current_era.clone()));
         let maybe_new_validators = Self::select_and_update_validators(current_era);
 
@@ -1846,8 +1862,8 @@ impl<T: Config> Module<T> {
                 let active_era_index = active_era.index.clone();
                 let points = <ErasRewardPoints<T>>::get(&active_era_index);
                 let mut imbalance = <PositiveImbalanceOf<T>>::zero();
-                let total_authoring_payout = Self::authoring_rewards_in_era();
-                let total_staking_payout = Self::staking_rewards_in_era(active_era_index);
+                let mut total_authoring_payout = Self::authoring_rewards_in_era();
+                let mut total_staking_payout = Self::staking_rewards_in_era(active_era_index);
 
                 // 1. Check whether staking pot has enough money
                 imbalance.subsume(T::Currency::burn(total_authoring_payout.clone()));
@@ -1856,13 +1872,15 @@ impl<T: Config> Module<T> {
                     &staking_pot,
                     imbalance,
                     WithdrawReasons::TRANSFER,
-                    KeepAlive
+                    AllowDeath
                 ) {
                     log!(
                         info,
                         "💸 Staking pot is not enough"
                     );
-                    return;
+                    // Market staking pot won't be skipped.
+                    total_authoring_payout = Zero::zero();
+                    total_staking_payout = Zero::zero();
                 }
                 // 2. Block authoring payout
                 for (v, p) in points.individual.iter() {
@@ -1875,8 +1893,11 @@ impl<T: Config> Module<T> {
     
                 // 3. Staking payout
                 <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
+
+                // 4. Market's staking payout
+                Self::distribute_market_staking_payout(active_era_index);
     
-                // 4. Deposit era reward event
+                // 5. Deposit era reward event
                 Self::deposit_event(RawEvent::EraReward(active_era_index, total_authoring_payout, total_staking_payout));
     
                 // TODO: enable treasury and might bring this back
@@ -1893,6 +1914,7 @@ impl<T: Config> Module<T> {
         <ErasStakersClipped<T>>::remove_prefix(era_index);
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
         <ErasStakingPayout<T>>::remove(era_index);
+        <ErasMarketStakingPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
         <ErasAuthoringPayout<T>>::remove_prefix(era_index);
         <ErasRewardPoints<T>>::remove(era_index);
@@ -1937,6 +1959,19 @@ impl<T: Config> Module<T> {
         let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
 
         reward_this_era.try_into().ok().unwrap()
+    }
+
+    fn distribute_market_staking_payout(active_era: EraIndex) {
+        let total_dsm_staking_payout = T::MarketStakingPot::withdraw_staking_pot();
+        let duration = T::MarketStakingPotDuration::get();
+        let dsm_staking_payout_per_era = Perbill::from_rational_approximation(1, duration) * total_dsm_staking_payout;
+        // Reward starts from this era.
+        for i in 0..duration {
+            <ErasMarketStakingPayout<T>>::mutate(active_era + i, |payout| match *payout {
+                Some(amount) => *payout = Some(amount.saturating_add(dsm_staking_payout_per_era.clone())),
+                None => *payout = Some(dsm_staking_payout_per_era.clone())
+            });
+        }
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.

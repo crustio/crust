@@ -115,10 +115,10 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         Self::reported_in_slot(&anchor, prev_rs)
     }
 
-    /// decrease the used value due to deleted files or dump trash
-    fn decrease_used(anchor: &SworkerAnchor, anchor_used: u64) {
+    /// update the used value due to deleted files, dump trash or calculate_payout
+    fn update_used(anchor: &SworkerAnchor, anchor_decrease_used: u64, anchor_increase_used: u64) {
         WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
-            Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_used),
+            Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_decrease_used).saturating_add(anchor_increase_used),
             ref mut i => *i = None,
         });
     }
@@ -132,6 +132,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     }
 
     /// get total used and free space
+    /// TODO: Self::used() cannot represent capacity anymore. Fix this code!
     fn get_total_capacity() -> u128 {
         return Self::used().saturating_add(Self::free());
     }

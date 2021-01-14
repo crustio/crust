@@ -107,6 +107,7 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
     for (file, file_size, _) in files.clone().iter() {
         let used_info = UsedInfo {
             used_size: *file_size,
+            reported_group_count: 0,
             groups: <BTreeSet<SworkerAnchor>>::new()
         };
         let mut replicas: Vec<Replica<T::AccountId>> = vec![];

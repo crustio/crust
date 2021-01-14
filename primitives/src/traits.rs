@@ -14,8 +14,8 @@ pub trait TransferrableCurrency<AccountId>: LockableCurrency<AccountId> {
 pub trait SworkerInterface<AccountId> {
 	// Check whether work report was reported in the last report slot according to given block number
 	fn is_wr_reported(anchor: &SworkerAnchor, bn: BlockNumber) -> bool;
-	// Decrease the used value in anchor's work report
-	fn decrease_used(anchor: &SworkerAnchor, used: u64);
+	// Update the used value in anchor's work report
+	fn update_used(anchor: &SworkerAnchor, decreased_used: u64, increased_used: u64);
     // Check whether the who and anchor is consistent with current status
 	fn check_anchor(who: &AccountId, anchor: &SworkerAnchor) -> bool;
 	// Get total used and free space

@@ -874,9 +874,9 @@ impl<T: Config> Module<T> {
             Some((ref file_info, ref mut used_info)) => {
                 if used_info.groups.take(anchor).is_some() {
                     used_size = used_info.used_size; // need to delete the used_size before the update
+                    used_info.reported_group_count -= 1;
+                    Self::update_groups_used_info(file_info.file_size, used_info);
                 }
-                used_info.reported_group_count -= 1;
-                Self::update_groups_used_info(file_info.file_size, used_info);
             },
             None => {}
         });

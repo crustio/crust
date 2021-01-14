@@ -182,7 +182,8 @@ fn place_storage_order_should_work() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -233,7 +234,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -259,7 +261,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -302,7 +305,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -326,7 +330,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -353,7 +358,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -380,7 +386,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -431,7 +438,8 @@ fn calculate_payout_should_work() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -476,7 +484,8 @@ fn calculate_payout_should_work() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -500,7 +509,8 @@ fn calculate_payout_should_work() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -544,7 +554,8 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -586,7 +597,8 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -609,7 +621,8 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -639,7 +652,8 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -684,7 +698,8 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -726,7 +741,8 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -738,7 +754,8 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         assert_eq!(Market::files(&cid), None);
 
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
@@ -791,7 +808,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -835,7 +853,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -858,7 +877,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -893,7 +913,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -937,7 +958,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
             })
         );
@@ -981,7 +1003,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
             })
         );
@@ -1030,7 +1053,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 2,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone(), hex::decode("11").unwrap()].into_iter())
             })
         );
@@ -1054,7 +1078,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
         groups.insert(legal_pk.clone());
         groups.insert(hex::decode("11").unwrap());
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups
         });
 
@@ -1110,7 +1135,8 @@ fn calculate_payout_should_fail_due_to_not_live() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -1133,7 +1159,8 @@ fn calculate_payout_should_fail_due_to_not_live() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -1152,7 +1179,8 @@ fn calculate_payout_should_fail_due_to_not_live() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -1198,7 +1226,8 @@ fn calculate_payout_should_work_for_more_replicas() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -1273,7 +1302,8 @@ fn calculate_payout_should_work_for_more_replicas() {
                 ]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 5,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1317,7 +1347,8 @@ fn calculate_payout_should_work_for_more_replicas() {
                 ]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1390,7 +1421,8 @@ fn clear_trash_should_work() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
             );
@@ -1420,7 +1452,8 @@ fn clear_trash_should_work() {
                     }]
                 },
                 UsedInfo {
-                    used_size: file_size,
+                    used_size: file_size * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
                 })
             );
@@ -1431,25 +1464,29 @@ fn clear_trash_should_work() {
         // close files one by one
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
         assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
         assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
         assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
         assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
         assert_eq!(Market::used_trash_i(&cid1), None);
@@ -1457,13 +1494,15 @@ fn clear_trash_should_work() {
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
         assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
         assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), UsedInfo {
-            used_size: file_size,
+            used_size: file_size * 2,
+            reported_group_count: 1,
             groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
         });
 
@@ -1545,7 +1584,8 @@ fn withdraw_staking_pot_should_work() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -1597,7 +1637,8 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                     replicas: vec![]
                 },
                 UsedInfo {
-                    used_size: file_size,
+                    used_size: 0,
+                    reported_group_count: 0,
                     groups: BTreeSet::from_iter(vec![].into_iter())
                 })
             );
@@ -1624,7 +1665,8 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: reported_file_size_cid1 * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1673,7 +1715,8 @@ fn double_place_storage_order_file_size_check_should_work() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -1698,7 +1741,8 @@ fn double_place_storage_order_file_size_check_should_work() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: reported_file_size_cid1 * 2,
+                reported_group_count: 1, // duplicate legal pk and this scenario only occurs in test
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1734,7 +1778,8 @@ fn double_place_storage_order_file_size_check_should_work() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1783,7 +1828,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 replicas: vec![]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![].into_iter())
             })
         );
@@ -1827,7 +1873,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1850,7 +1897,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 1,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1882,7 +1930,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                     }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: file_size * 2,
+                reported_group_count: 2,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );
@@ -1914,7 +1963,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                     }]
             },
             UsedInfo {
-                used_size: file_size,
+                used_size: 0,
+                reported_group_count: 0,
                 groups: BTreeSet::from_iter(vec![legal_pk.clone()].into_iter())
             })
         );

@@ -25,7 +25,8 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
     -> (FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)
 {
     let used_info = UsedInfo {
-        used_size: file_size,
+        used_size: file_size * 2,
+        reported_group_count: 1,
         groups: <BTreeSet<SworkerAnchor>>::new()
     };
     let mut replicas: Vec<Replica<T::AccountId>> = vec![];

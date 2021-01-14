@@ -239,7 +239,7 @@ fn report_works_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
-                used: legal_wr_info.used,
+                used: legal_wr_info.used * 2,
                 free: legal_wr_info.free,
                 reported_files_size: legal_wr_info.used,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
@@ -273,7 +273,7 @@ fn report_works_should_work() {
 
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 402868224);
+            assert_eq!(Swork::used(), 402868224 * 2);
             assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
 
             assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
@@ -1032,14 +1032,14 @@ fn ab_upgrade_should_work() {
             // 11. Check B's work report and free & used again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
-                used: 134289403,
+                used: 0, // 2 + 2 * 2 - 7 * 2
                 free: 4294967296,
                 reported_files_size: 3,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 134289403); // Added 134289408 and delete 7
+            assert_eq!(Swork::used(), 0); // 2 added 134289408 and delete 7
         });
 }
 
@@ -1517,7 +1517,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 UsedInfo {
-                    used_size: 13,
+                    used_size: 13 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1536,7 +1537,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 UsedInfo {
-                    used_size: 7,
+                    used_size: 7 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1555,13 +1557,14 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 UsedInfo {
-                    used_size: 37,
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 57,
+                used: 57 * 2,
                 free: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1605,7 +1608,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 7,
+                    used_size: 7 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1631,7 +1635,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1653,13 +1658,14 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 55,
+                used: 55 * 2,
                 free: 4294967296,
                 reported_files_size: 99,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1708,7 +1714,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1734,7 +1741,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
@@ -1756,13 +1764,14 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 22,
+                    used_size: 22 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![c_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 22,
+                used: 22 * 2,
                 free: 4294967296,
                 reported_files_size: 114,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1806,7 +1815,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 7,
+                    used_size: 7 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1832,7 +1842,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1859,13 +1870,14 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 55,
+                used: 55 * 2,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1904,7 +1916,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
                 })
             );
@@ -1925,7 +1938,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
                     groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
                 })
             );
@@ -1941,7 +1955,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![]
                 },
                 UsedInfo {
-                    used_size: 22,
+                    used_size: 0,
+                    reported_group_count: 0,
                     groups: BTreeSet::from_iter(vec![].into_iter())
                 })
             );
@@ -1970,7 +1985,7 @@ fn join_group_should_work_for_used_in_work_report() {
 
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 57,
+                used: 57 * 2,
                 free: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1979,7 +1994,7 @@ fn join_group_should_work_for_used_in_work_report() {
 
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 55,
+                used: 55 * 2,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2129,11 +2144,11 @@ fn join_group_should_work_for_stake_limit() {
             Swork::update_identities();
 
             assert_eq!(Swork::free(), 12884901888);
-            assert_eq!(Swork::used(), 134);
+            assert_eq!(Swork::used(), 134 * 2);
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
-            assert_eq!(*map.get(&ferdie).unwrap(), 12884902022u128);
+            assert_eq!(*map.get(&ferdie).unwrap(), 12884902156u128);
             assert_eq!(map.get(&alice).is_none(), true);
             assert_eq!(map.get(&bob).is_none(), true);
             assert_eq!(map.get(&eve).is_none(), true);

@@ -840,10 +840,11 @@ impl<T: Config> Module<T> {
     fn is_report_works_allow(pk: &SworkerPubKey, block_number: u64) -> bool {
         let mut pk_info = Self::pub_keys(pk);
         // first time, allow report or reported in the last time
-        let is_ok = pk_info.anchor.is_none() || pk_info.allow_missing == block_number || Self::reported_in_slot(&pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
-        if !is_ok {
-            pk_info.allow_missing = pk_info.allow_missing.min(block_number + T::PunishmentDuration::get() as u64 * REPORT_SLOT);
-            PubKeys::insert(&pk, pk_info);
+        let is_ok = pk_info.anchor.is_none() || pk_info.allow_missing == block_number || Self::reported_in_slot(pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
+        if !is_ok && block_number > pk_info.allow_missing{
+            let next_allow_missing = block_number + (T::PunishmentDuration::get() as u64 * REPORT_SLOT);
+            pk_info.allow_missing = next_allow_missing;
+            PubKeys::insert(pk, pk_info);
         }
         is_ok
     }

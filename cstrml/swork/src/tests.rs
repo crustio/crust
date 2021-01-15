@@ -5,8 +5,8 @@ use super::*;
 
 use crate::mock::*;
 use frame_support::{
-    assert_ok, assert_noop,
-    dispatch::DispatchError,
+    assert_ok, assert_noop, assert_err,
+    dispatch::{DispatchError, DispatchErrorWithPostInfo}, weights::PostDispatchInfo
 };
 use hex;
 use keyring::Sr25519Keyring;
@@ -2137,5 +2137,205 @@ fn join_group_should_work_for_stake_limit() {
             assert_eq!(map.get(&alice).is_none(), true);
             assert_eq!(map.get(&bob).is_none(), true);
             assert_eq!(map.get(&eve).is_none(), true);
+        });
+}
+
+/// Report works test cases
+#[test]
+fn report_works_punishment_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // Generate 303 blocks first
+            run_to_block(303);
+
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+            let legal_wr = WorkReport {
+                report_slot: legal_wr_info.block_number,
+                used: legal_wr_info.used,
+                free: legal_wr_info.free,
+                reported_files_size: legal_wr_info.used,
+                reported_srd_root: legal_wr_info.srd_root.clone(),
+                reported_files_root: legal_wr_info.files_root.clone()
+            };
+
+            register(&legal_pk, LegalCode::get());
+            add_not_live_files();
+
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+            // Check work report
+            assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
+            assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                group: None
+            });
+
+            run_to_block(603); // don't report works
+            run_to_block(903);
+            let legal_wr_info = legal_work_report_with_added_files();
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                900,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "PunishmentForbidden",
+                    ),
+                },
+            });
+
+            run_to_block(1203);
+            let legal_wr_info = legal_work_report_with_added_files();
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                1200,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "PunishmentForbidden",
+                    ),
+                },
+            });
+
+            run_to_block(2103);
+            let legal_wr_info = legal_work_report_with_added_files();
+            // error changed. pass the punishment check
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                2100,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 5,
+                    message: Some(
+                        "IllegalWorkReportSig",
+                    ),
+                },
+            });
+
+            // forbid the punishment again
+            run_to_block(2403);
+            let legal_wr_info = legal_work_report_with_added_files();
+            // error changed. pass the punishment check
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                2400,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "PunishmentForbidden",
+                    ),
+                },
+            });
+
+            // cannot pass the check since we don't allow it for 3900
+            run_to_block(3903);
+            let legal_wr_info = legal_work_report_with_added_files();
+            // error changed. pass the punishment check
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                3900,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "PunishmentForbidden",
+                    ),
+                },
+            });
+
         });
 }

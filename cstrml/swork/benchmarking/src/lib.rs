@@ -11,7 +11,7 @@ use sp_runtime::traits::StaticLookup;
 use codec::Decode;
 use market::{UsedInfo, FileInfo, Replica};
 use primitives::*;
-use sp_std::{vec, prelude::*, collections::btree_set::BTreeSet, iter::FromIterator};
+use sp_std::{vec, prelude::*, collections::{btree_set::BTreeSet, btree_map::BTreeMap}, iter::FromIterator};
 
 const SEED: u32 = 0;
 const EXPIRE_BLOCK_NUMBER: u32 = 2000;
@@ -108,7 +108,7 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
         let used_info = UsedInfo {
             used_size: *file_size,
             reported_group_count: 0,
-            groups: <BTreeSet<SworkerAnchor>>::new()
+            groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };
         let mut replicas: Vec<Replica<T::AccountId>> = vec![];
         for _ in 0..200 {

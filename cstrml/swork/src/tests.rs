@@ -1519,7 +1519,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 13 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_b).unwrap_or_default(), (
@@ -1539,7 +1539,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 7 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1559,7 +1559,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 37 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
@@ -1610,7 +1610,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 7 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1637,7 +1637,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 37 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1660,7 +1660,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 55 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
@@ -1716,7 +1716,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 37 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
@@ -1743,7 +1743,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 55 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1766,7 +1766,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 22 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![c_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(c_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
@@ -1817,7 +1817,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 7 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1844,7 +1844,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 37 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1872,7 +1872,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 55 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
@@ -1918,7 +1918,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 37 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
@@ -1940,7 +1940,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 55 * 2,
                     reported_group_count: 1,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1957,7 +1957,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 UsedInfo {
                     used_size: 0,
                     reported_group_count: 0,
-                    groups: BTreeSet::from_iter(vec![].into_iter())
+                    groups: BTreeMap::new()
                 })
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {

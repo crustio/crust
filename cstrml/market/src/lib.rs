@@ -15,7 +15,7 @@ use frame_support::{
         WithdrawReasons, Imbalance
     }
 };
-use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
+use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
     Perbill, ModuleId,
@@ -95,8 +95,8 @@ pub struct UsedInfo {
     pub used_size: u64,
     // The count of valid group in the previous report slot
     pub reported_group_count: u32,
-    // Anchors which is counted as contributor for this file in its own group
-    pub groups: BTreeSet<SworkerAnchor>
+    // Anchors which is counted as contributor for this file in its own group, bool means in the last check the group is calculated as reported_group_count
+    pub groups: BTreeMap<SworkerAnchor, bool>
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -138,7 +138,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 1. Check if the file is stored by other members
             if let Some(members) = maybe_members {
                 for replica in file_info.replicas.iter() {
-                    if used_info.groups.contains(&replica.anchor) && members.contains(&replica.who) {
+                    if used_info.groups.contains_key(&replica.anchor) && members.contains(&replica.who) {
                         if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
                             // duplicated in group and set is_counted to false
                             is_counted = false;
@@ -160,7 +160,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             if is_counted {
                 used_info.reported_group_count += 1;
                 Self::update_groups_used_info(file_info.file_size, &mut used_info);
-                used_info.groups.insert(anchor.clone());
+                used_info.groups.insert(anchor.clone(), true);
                 used_size = used_info.used_size; // need to add the used_size after the update
             };
 
@@ -190,13 +190,14 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
             let claimed_bn = Self::calculate_payout(cid, curr_bn);
             Self::try_to_close_file(cid, curr_bn);
-            
+
             // 2. Delete replica from file_info
             if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
                 // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
                 if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
                     // decrease it due to deletion
-                    file_info.reported_replica_count -= 1;
+                    // TODO: there is a bug
+                    file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
                     if file_info.reported_replica_count < file_info.expected_replica_count {
                         Self::update_files_size(file_info.file_size, 1, 0);
                     }
@@ -590,7 +591,7 @@ impl<T: Config> Module<T> {
         // TODO: Restrict the frequency of calculate payout(limit the duration of 2 claiming)
 
         // 4. Update used_info
-        used_info.reported_group_count = Self::count_valid_groups(&used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
+        used_info.reported_group_count = Self::count_valid_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
         Self::update_groups_used_info(file_info.file_size, &mut used_info);
 
         // Get the previous first class storage count
@@ -686,7 +687,7 @@ impl<T: Config> Module<T> {
             UsedTrashI::insert(cid, used_info.clone());
             UsedTrashSizeI::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for anchor in used_info.groups.iter() {
+            for (anchor, _) in used_info.groups.iter() {
                 UsedTrashMappingI::mutate(&anchor, |value| {
                     *value += used_info.used_size;
                 })
@@ -699,7 +700,7 @@ impl<T: Config> Module<T> {
             UsedTrashII::insert(cid, used_info.clone());
             UsedTrashSizeII::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for anchor in used_info.groups.iter() {
+            for (anchor, _) in used_info.groups.iter() {
                 UsedTrashMappingII::mutate(&anchor, |value| {
                     *value += used_info.used_size;
                 })
@@ -765,7 +766,7 @@ impl<T: Config> Module<T> {
             let used_info = UsedInfo {
                 used_size: 0,
                 reported_group_count: 0,
-                groups: <BTreeSet<SworkerAnchor>>::new()
+                groups: <BTreeMap<SworkerAnchor, bool>>::new()
             };
             <Files<T>>::insert(cid, (file_info, used_info));
         }
@@ -872,10 +873,12 @@ impl<T: Config> Module<T> {
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
             Some((ref file_info, ref mut used_info)) => {
-                if used_info.groups.take(anchor).is_some() {
+                if let Some(is_calculated_as_reported_group_count) = used_info.groups.remove(anchor) {
                     used_size = used_info.used_size; // need to delete the used_size before the update
-                    used_info.reported_group_count -= 1;
-                    Self::update_groups_used_info(file_info.file_size, used_info);
+                    if is_calculated_as_reported_group_count {
+                        used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
+                        Self::update_groups_used_info(file_info.file_size, used_info);
+                    }
                 }
             },
             None => {}
@@ -885,7 +888,7 @@ impl<T: Config> Module<T> {
         // 2. Delete trashI's anchor
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
-                if used_info.groups.take(anchor).is_some() {
+                if used_info.groups.remove(anchor).is_some() {
                     used_size = used_info.used_size;
                     UsedTrashMappingI::mutate(anchor, |value| {
                         *value -= used_info.used_size;
@@ -898,7 +901,7 @@ impl<T: Config> Module<T> {
         // 3. Delete trashII's anchor
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
-                if used_info.groups.take(anchor).is_some() {
+                if used_info.groups.remove(anchor).is_some() {
                     used_size = used_info.used_size;
                     UsedTrashMappingII::mutate(anchor, |value| {
                         *value -= used_info.used_size;
@@ -943,21 +946,22 @@ impl<T: Config> Module<T> {
         used_info.used_size = new_used_size;
     }
 
-    fn update_other_wr_used(groups: &BTreeSet<SworkerAnchor>, prev_used_size: u64, new_used_size: u64) {
+    fn update_other_wr_used(groups: &BTreeMap<SworkerAnchor, bool>, prev_used_size: u64, new_used_size: u64) {
         if prev_used_size == new_used_size {
             return;
         }
-        for owner in groups.iter() {
-            T::SworkerInterface::update_used(owner, prev_used_size, new_used_size);
+        for (anchor, _) in groups.iter() {
+            T::SworkerInterface::update_used(anchor, prev_used_size, new_used_size);
         }
     }
 
-    fn count_valid_groups(groups: &BTreeSet<SworkerAnchor>, curr_bn: BlockNumber) -> u32 {
+    fn count_valid_groups(groups: &mut BTreeMap<SworkerAnchor, bool>, curr_bn: BlockNumber) -> u32 {
         let mut count = 0;
-        for owner in groups.iter() {
-            if T::SworkerInterface::is_wr_reported(owner, curr_bn) {
+        for (anchor, is_calculated_as_reported_group_count) in groups.iter_mut() {
+            if T::SworkerInterface::is_wr_reported(anchor, curr_bn) {
                 count += 1;
-            }
+                *is_calculated_as_reported_group_count = true;
+            } else { *is_calculated_as_reported_group_count = false; }
         }
         return count;
     }

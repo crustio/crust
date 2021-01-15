@@ -2067,3 +2067,91 @@ fn dynamic_used_size_should_work() {
         );
     });
 }
+
+#[test]
+fn delete_used_size_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 134289408;
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let merchants = vec![merchant.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+        }
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                claimed_at: 50,
+                amount: 23400,
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+
+        run_to_block(303);
+
+        let mut expected_groups = BTreeMap::new();
+        for i in 10..30 {
+            let key = hex::decode(i.to_string()).unwrap();
+            add_who_into_replica(&cid, file_size, merchant.clone(), key.clone(), Some(303u32));
+            <swork::ReportedInSlot>::insert(key.clone(), 0, true);
+            expected_groups.insert(key.clone(), true);
+        }
+        assert_eq!(Market::files(&cid).unwrap_or_default().1,
+           UsedInfo {
+               used_size: file_size * 4,
+               reported_group_count: 20,
+               groups: expected_groups.clone()
+           }
+        );
+        Market::delete_replicas(&merchant, &cid, &hex::decode("10").unwrap(), 403u32);
+        expected_groups.remove(&hex::decode("10").unwrap());
+        assert_eq!(Market::files(&cid).unwrap_or_default().1,
+           UsedInfo {
+               used_size: file_size * 4,
+               reported_group_count: 19,
+               groups: expected_groups.clone()
+           }
+        );
+
+        for i in 11..20 {
+            let key = hex::decode(i.to_string()).unwrap();
+            <swork::ReportedInSlot>::insert(key.clone(), 300, true);
+            expected_groups.insert(key.clone(), true);
+        }
+        for i in 20..30 {
+            let key = hex::decode(i.to_string()).unwrap();
+            expected_groups.insert(key.clone(), false);
+        }
+        Market::delete_replicas(&merchant, &cid, &hex::decode("21").unwrap(), 603u32); // delete 21. 21 won't be deleted twice.
+        expected_groups.remove(&hex::decode("21").unwrap());
+        assert_eq!(Market::files(&cid).unwrap_or_default().1,
+           UsedInfo {
+               used_size: file_size * 2,
+               reported_group_count: 9, // this should be nine instead of eight.
+               groups: expected_groups.clone()
+           }
+        );
+    });
+}

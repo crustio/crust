@@ -669,6 +669,7 @@ fn init_swork_setup() {
     for (id, pk) in id_map {
         <swork::PubKeys>::insert(pk.clone(), swork::PKInfo {
             code: code.clone(),
+            allow_missing: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(id, swork::Identity {

@@ -182,7 +182,7 @@ impl Works<AccountId> for TestWorksInterface {
 }
 
 parameter_types! {
-    pub const PunishmentDuration: u32 = 1;
+    pub const PunishmentDuration: u32 = 4;
 }
 
 impl Config for Test {
@@ -617,6 +617,12 @@ pub fn register_identity(who: &AccountId, pk: &SworkerPubKey, anchor: &SworkerAn
     <self::Identities<Test>>::insert(who, Identity {
         anchor: anchor.clone(),
         group: None
+    });
+}
+
+pub fn allow_report_work(pk: &SworkerPubKey, slot: ReportSlot) {
+    <self::PubKeys>::mutate(pk, |pk_info| {
+        pk_info.allow_missing = slot;
     });
 }
 

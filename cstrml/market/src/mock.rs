@@ -214,6 +214,7 @@ pub fn init_swork_setup() {
     for ((pk, who), free) in pks.iter().zip(whos.iter()).zip(frees.iter()) {
         <swork::PubKeys>::insert(pk.clone(), PKInfo {
             code: code.clone(),
+            allow_missing: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(who, Identity {
@@ -270,6 +271,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
 pub fn register(pk: &SworkerPubKey, code: SworkerCode) {
     <swork::PubKeys>::insert(pk.clone(), PKInfo {
         code: code,
+        allow_missing: 0,
         anchor: None
     });
 }

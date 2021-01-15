@@ -239,7 +239,9 @@ decl_error! {
         /// Group already exist
         GroupAlreadyExist,
         /// Group owner cannot register
-        GroupOwnerForbidden
+        GroupOwnerForbidden,
+        /// Cannot report works right now due to offline in the past time
+        PunishmentForbidden
     }
 }
 
@@ -366,7 +368,7 @@ decl_module! {
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
             // 2. Ensure wr is allowed.
-            ensure!(Self::is_report_works_allow(&curr_pk, slot), Error::<T>::IllegalReporter);
+            ensure!(Self::is_report_works_allow(&curr_pk, slot), Error::<T>::PunishmentForbidden);
 
             // 3. Ensure who cannot be group owner
             ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);

@@ -37,6 +37,7 @@ fn register_should_work() {
         assert_eq!(Swork::identities(applier).is_none(), true);
         assert_eq!(Swork::pub_keys(legal_pk), PKInfo {
             code: legal_code,
+            allow_missing: 0,
             anchor: None
         });
     });
@@ -1485,6 +1486,7 @@ fn join_group_should_work_for_used_in_work_report() {
             run_to_block(303);
             add_not_live_files();
             // A report works in 303
+            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -1565,7 +1567,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -1663,7 +1665,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -1771,6 +1773,7 @@ fn join_group_should_work_for_used_in_work_report() {
             let eve_wr_info = group_work_report_eve_600();
 
             run_to_block(603);
+            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -1868,7 +1871,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -1982,7 +1985,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -2076,6 +2079,7 @@ fn join_group_should_work_for_stake_limit() {
             Swork::update_identities();
             add_not_live_files();
             // A report works in 303
+            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -2090,7 +2094,7 @@ fn join_group_should_work_for_stake_limit() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
-
+            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -2105,7 +2109,7 @@ fn join_group_should_work_for_stake_limit() {
                 bob_wr_info.files_root,
                 bob_wr_info.sig
             ));
-
+            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,

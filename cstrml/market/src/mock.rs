@@ -136,9 +136,14 @@ impl balances::Config for Test {
     type MaxLocks = ();
 }
 
+parameter_types! {
+    pub const PunishmentDuration: u32 = 1;
+}
+
 impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
+    type PunishmentDuration = PunishmentDuration;
     type Works = ();
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;

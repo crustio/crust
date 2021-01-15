@@ -181,9 +181,14 @@ impl Works<AccountId> for TestWorksInterface {
     }
 }
 
+parameter_types! {
+    pub const PunishmentDuration: u32 = 1;
+}
+
 impl Config for Test {
     type Currency = balances::Module<Self>;
     type Event = ();
+    type PunishmentDuration = PunishmentDuration;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
     type WeightInfo = weight::WeightInfo;

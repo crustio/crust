@@ -211,9 +211,14 @@ impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
     }
 }
 
+parameter_types! {
+    pub const PunishmentDuration: u32 = 1;
+}
+
 impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
+    type PunishmentDuration = PunishmentDuration;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
     type WeightInfo = swork::weight::WeightInfo;

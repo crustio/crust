@@ -622,7 +622,7 @@ pub fn register_identity(who: &AccountId, pk: &SworkerPubKey, anchor: &SworkerAn
 
 pub fn allow_report_work(pk: &SworkerPubKey, slot: ReportSlot) {
     <self::PubKeys>::mutate(pk, |pk_info| {
-        pk_info.allow_missing = slot;
+        pk_info.allow_report_slot = slot;
     });
 }
 

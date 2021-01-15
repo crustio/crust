@@ -37,7 +37,7 @@ fn register_should_work() {
         assert_eq!(Swork::identities(applier).is_none(), true);
         assert_eq!(Swork::pub_keys(legal_pk), PKInfo {
             code: legal_code,
-            allow_missing: 0,
+            allow_report_slot: 0,
             anchor: None
         });
     });

@@ -84,7 +84,7 @@ pub struct WorkReport {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PKInfo {
     pub code: SworkerCode,
-    pub allow_missing: ReportSlot,
+    pub allow_report_slot: ReportSlot,
     pub anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
 }
 
@@ -639,7 +639,7 @@ impl<T: Config> Module<T> {
     pub fn insert_pk_info(pk: SworkerPubKey, code: SworkerCode) {
         let pk_info = PKInfo {
             code,
-            allow_missing: 0,
+            allow_report_slot: 0,
             anchor: None
         };
 
@@ -840,10 +840,9 @@ impl<T: Config> Module<T> {
     fn is_report_works_allow(pk: &SworkerPubKey, block_number: u64) -> bool {
         let mut pk_info = Self::pub_keys(pk);
         // first time, allow report or reported in the last time
-        let is_ok = pk_info.anchor.is_none() || pk_info.allow_missing == block_number || Self::reported_in_slot(pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
-        if !is_ok && block_number > pk_info.allow_missing{
-            let next_allow_missing = block_number + (T::PunishmentDuration::get() as u64 * REPORT_SLOT);
-            pk_info.allow_missing = next_allow_missing;
+        let is_ok = pk_info.anchor.is_none() || pk_info.allow_report_slot == block_number || Self::reported_in_slot(pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
+        if !is_ok && block_number > pk_info.allow_report_slot{
+            pk_info.allow_report_slot = block_number + (T::PunishmentDuration::get() as u64 * REPORT_SLOT);
             PubKeys::insert(pk, pk_info);
         }
         is_ok

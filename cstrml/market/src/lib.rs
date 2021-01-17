@@ -760,14 +760,22 @@ impl<T: Config> Module<T> {
     }
 
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
-        let mut insert_index: usize = file_info.replicas.len();
-        for (index, replica) in file_info.replicas.iter().enumerate() {
-            if new_replica.valid_at < replica.valid_at {
-                insert_index = index;
-                break;
+        fn binary_search_index<AID>(replicas: &Vec<Replica<AID>>, new_replica: &Replica<AID>) -> usize {
+            let mut start = 0;
+            if replicas.len() == 0 { return start; }
+            let mut end = replicas.len().saturating_sub(1);
+            while start <= end {
+                let mid = start + (end - start) / 2;
+                let replica = replicas.get(mid).unwrap();
+                if new_replica.valid_at >= replica.valid_at {
+                    start = mid + 1;
+                } else {
+                    end = mid - 1;
+                }
             }
+            return start;
         }
-        file_info.replicas.insert(insert_index, new_replica);
+        file_info.replicas.insert(binary_search_index::<T::AccountId>(&file_info.replicas, &new_replica), new_replica);
     }
 
     fn init_pot(account: fn() -> T::AccountId) {

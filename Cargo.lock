@@ -1178,8 +1178,10 @@ dependencies = [
 name = "cstrml-claims"
 version = "0.11.0"
 dependencies = [
+ "cstrml-balances",
  "frame-support",
  "frame-system",
+ "hex-literal",
  "parity-scale-codec",
  "rustc-hex",
  "serde",

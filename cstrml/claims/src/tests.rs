@@ -18,12 +18,13 @@ fn happy_pass_should_work() {
         assert_eq!(CrustClaims::claims(&tx_hash), Some((eth_addr.clone(), 100))); // new tx
         assert_eq!(CrustClaims::claimed(&tx_hash), false); // tx has not be claimed
 
-        // 2. Claim it
+        // 2. Claim it with correct msg sig
         // Pay RUSTs to the TEST account:0100000000000000
         let sig = get_legal_eth_sig();
         assert_eq!(Balances::free_balance(1), 0);
         assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()));
 
+        // 3. Claim success
         assert_eq!(Balances::free_balance(1), 100);
         assert_eq!(CrustClaims::claimed(&tx_hash), true); // tx has already be claimed
     });
@@ -63,7 +64,7 @@ fn tx_should_exist() {
 }
 
 #[test]
-fn illegal_sig_should_failed() {
+fn illegal_sig_claim_should_failed() {
     new_test_ext().execute_with(|| {
         // 0. Set miner
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
@@ -74,12 +75,14 @@ fn illegal_sig_should_failed() {
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
 
         // 2. Claim it with illegal sig
+        // 2.1 Another eth account wanna this money, go fuck himself
         let sig1 = get_another_account_eth_sig();
         assert_noop!(
             CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig1.clone()),
             Error::<Test>::SignatureNotMatch
         );
 
+        // 2.2 Sig with wrong message should failed
         let sig2 = get_wrong_msg_eth_sig();
         assert_noop!(
             CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig2.clone()),

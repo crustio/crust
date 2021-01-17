@@ -11,8 +11,8 @@ use sp_runtime::{
 use hex_literal::hex;
 
 impl_outer_origin! {
-		pub enum Origin for Test {}
-	}
+    pub enum Origin for Test {}
+}
 
 impl_outer_dispatch! {
     pub enum Call for Test where origin: Origin {

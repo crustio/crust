@@ -4,12 +4,11 @@
 //! Module to process claims from Ethereum addresses.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-// TODO: delete unused dependencies
 use sp_std::prelude::*;
 use sp_io::{hashing::keccak_256, crypto::secp256k1_ecdsa_recover};
 use frame_support::{
     decl_event, decl_storage, decl_module, decl_error, ensure,
-    traits::{Currency, Get, EnsureOrigin}, weights::{Pays, DispatchClass}
+    traits::{Currency, Get}
 };
 use frame_system::{ensure_signed, ensure_root, ensure_none};
 use codec::{Encode, Decode};
@@ -17,12 +16,17 @@ use codec::{Encode, Decode};
 use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
 
 use sp_runtime::{
-    traits::{CheckedSub, SignedExtension, DispatchInfoOf}, RuntimeDebug, DispatchResult,
+    RuntimeDebug, DispatchResult,
     transaction_validity::{
-        TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction,
-        TransactionSource, TransactionValidityError,
+        TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
     },
 };
+
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
 
 /// The balance type of this module.
 pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -124,6 +128,8 @@ decl_event!(
 	{
 	    /// Someone be the new Miner
 	    MinerChanged(AccountId),
+	    /// Mint claims successfully
+	    MintSuccess(EthereumTxHash, EthereumAddress, Balance),
 		/// Someone claimed some CRUs. [who, ethereum_address, amount]
 		Claimed(AccountId, EthereumAddress, Balance),
 	}
@@ -135,12 +141,14 @@ decl_error! {
 	    MinerNotExist,
 	    /// Miner should be the registered
 	    IllegalMiner,
+	    /// Ethereum tx already be mint
+	    AlreadyBeMint,
+	    /// Ethereum tx already be claimed
+	    AlreadyBeClaimed,
 		/// Invalid Ethereum signature.
 		InvalidEthereumSignature,
 		/// Ethereum address has no claims.
 		SignerHasNoClaim,
-		/// Ethereum tx has no claims.
-		TxHasNoClaim,
 		/// Sign not match
 		SignatureNotMatch,
 	}
@@ -152,6 +160,7 @@ decl_storage! {
 	// keep things around between blocks.
 	trait Store for Module<T: Config> as Claims {
 		Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
+		Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
 		Miner get(fn miner): Option<T::AccountId>
 	}
 }
@@ -190,11 +199,17 @@ decl_module! {
             // 1. Check if miner is existed
             ensure!(maybe_miner.is_some(), Error::<T>::MinerNotExist);
 
-            // 2. Check if signer is miner
+            // 2. Check if this tx already be mint or be claimed
+            ensure!(!Claims::<T>::contains_key(&tx), Error::<T>::AlreadyBeMint);
+
+            // 3. Check if signer is miner
             ensure!(Some(&signer) == maybe_miner.as_ref(), Error::<T>::IllegalMiner);
 
             // 3. Save into claims
             Claims::<T>::insert(tx.clone(), (who.clone(), value.clone()));
+            Claimed::insert(tx, false);
+
+            Self::deposit_event(RawEvent::MintSuccess(tx, who, value));
             Ok(())
 		}
 
@@ -202,14 +217,15 @@ decl_module! {
 		fn claim(origin, dest: T::AccountId, tx: EthereumTxHash, sig: EcdsaSignature) -> DispatchResult {
 		    let _ = ensure_none(origin)?;
 
-		    // 1. Tx already be mint
+		    // 1. Check the tx already be mint and not be claimed
 		    ensure!(Claims::<T>::contains_key(&tx), Error::<T>::SignerHasNoClaim);
+		    ensure!(!Self::claimed(&tx), Error::<T>::AlreadyBeClaimed);
 
 		    // 2. Sign data
 		    let data = dest.using_encoded(to_ascii_hex);
 		    let signer = Self::eth_recover(&sig, &data, &[][..]).ok_or(Error::<T>::InvalidEthereumSignature)?;
 
-            // 3. Make sure signer already been mint
+            // 3. Make sure signer is match with claimer
             Self::process_claim(tx, signer, dest)
 		}
     }
@@ -258,18 +274,18 @@ impl<T: Config> Module<T> {
             // 1. Ensure signer matches claimer
             ensure!(claimer == signer, Error::<T>::SignatureNotMatch);
 
-            // 2. Give money to dest
+            // 2. Give money to signer
             T::Currency::deposit_creating(&dest, amount);
 
-            // 3. Delete claim
-            Claims::<T>::remove(tx);
+            // 3. Mark it be claimed
+            Claimed::insert(tx, true);
 
             // Let's deposit an event to let the outside world know who claimed money
             Self::deposit_event(RawEvent::Claimed(dest, signer, amount));
 
             Ok(())
         } else {
-            Err(Error::<T>::TxHasNoClaim)?
+            Err(Error::<T>::SignerHasNoClaim)?
         }
     }
 }
@@ -283,6 +299,8 @@ pub enum ValidityError {
     SignerHasNoClaim = 1,
     /// No permission to execute the call.
     SignatureNotMatch = 2,
+    /// This tx already be claimed.
+    AlreadyBeClaimed = 3,
 }
 
 impl From<ValidityError> for u8 {
@@ -315,6 +333,8 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
         let (claimer, _) = Self::claims(&tx).unwrap();
         ensure!(claimer == signer, e);
 
+        let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
+        ensure!(!Self::claimed(&tx), e);
 
         Ok(ValidTransaction {
             priority: PRIORITY,
@@ -325,4 +345,3 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
         })
     }
 }
-

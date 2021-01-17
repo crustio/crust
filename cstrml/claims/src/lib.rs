@@ -122,57 +122,57 @@ impl<'de> Deserialize<'de> for EthereumTxHash {
 }
 
 decl_event!(
-	pub enum Event<T> where
-		Balance = BalanceOf<T>,
-		AccountId = <T as frame_system::Config>::AccountId
-	{
-	    /// Someone be the new Miner
-	    MinerChanged(AccountId),
-	    /// Mint claims successfully
-	    MintSuccess(EthereumTxHash, EthereumAddress, Balance),
+    pub enum Event<T> where
+        Balance = BalanceOf<T>,
+        AccountId = <T as frame_system::Config>::AccountId
+    {
+        /// Someone be the new Miner
+        MinerChanged(AccountId),
+        /// Mint claims successfully
+        MintSuccess(EthereumTxHash, EthereumAddress, Balance),
         /// Someone claimed some CRUs. [who, ethereum_address, amount]
         Claimed(AccountId, EthereumAddress, Balance),
-	}
+    }
 );
 
 decl_error! {
-	pub enum Error for Module<T: Config> {
-	    /// Miner is not exist, should set it first
-	    MinerNotExist,
-	    /// Miner should be the registered
-	    IllegalMiner,
-	    /// Ethereum tx already be mint
-	    AlreadyBeMint,
-	    /// Ethereum tx already be claimed
-	    AlreadyBeClaimed,
+    pub enum Error for Module<T: Config> {
+        /// Miner is not exist, should set it first
+        MinerNotExist,
+        /// Miner should be the registered
+        IllegalMiner,
+        /// Ethereum tx already be mint
+        AlreadyBeMint,
+        /// Ethereum tx already be claimed
+        AlreadyBeClaimed,
         /// Invalid Ethereum signature.
         InvalidEthereumSignature,
         /// Ethereum address has no claims.
         SignerHasNoClaim,
         /// Sign not match
         SignatureNotMatch,
-	}
+    }
 }
 
 decl_storage! {
-	// A macro for the Storage config, and its implementation, for this module.
-	// This allows for type-safe usage of the Substrate storage database, so you can
-	// keep things around between blocks.
-	trait Store for Module<T: Config> as Claims {
-		Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
-		Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
-		Miner get(fn miner): Option<T::AccountId>
-	}
+    // A macro for the Storage config, and its implementation, for this module.
+    // This allows for type-safe usage of the Substrate storage database, so you can
+    // keep things around between blocks.
+    trait Store for Module<T: Config> as Claims {
+        Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
+        Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
+        Miner get(fn miner): Option<T::AccountId>
+    }
 }
 
 decl_module! {
     pub struct Module<T: Config> for enum Call where origin: T::Origin {
-	    type Error = Error<T>;
+        type Error = Error<T>;
 
         /// The Prefix that is used in signed Ethereum messages for this network
-	    const Prefix: &[u8] = T::Prefix::get();
+        const Prefix: &[u8] = T::Prefix::get();
 
-	    fn deposit_event() = default;
+        fn deposit_event() = default;
 
         /// Change miner address
         ///
@@ -180,19 +180,19 @@ decl_module! {
         ///
         /// Parameters:
         /// - `new_miner`: The new miner's address
-		#[weight = 0]
-		fn change_miner(origin, new_miner: T::AccountId) -> DispatchResult {
+        #[weight = 0]
+        fn change_miner(origin, new_miner: T::AccountId) -> DispatchResult {
             ensure_root(origin)?;
 
             Miner::<T>::put(new_miner.clone());
 
-			Self::deposit_event(RawEvent::MinerChanged(new_miner));
-			Ok(())
-		}
+            Self::deposit_event(RawEvent::MinerChanged(new_miner));
+            Ok(())
+        }
 
         /// Mint the claim
-	    #[weight = 0]
-	    fn mint_claim(origin, tx: EthereumTxHash, who: EthereumAddress, value: BalanceOf<T>) -> DispatchResult {
+        #[weight = 0]
+        fn mint_claim(origin, tx: EthereumTxHash, who: EthereumAddress, value: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_miner = Self::miner();
 
@@ -211,23 +211,23 @@ decl_module! {
 
             Self::deposit_event(RawEvent::MintSuccess(tx, who, value));
             Ok(())
-		}
+        }
 
-		#[weight = 0]
-		fn claim(origin, dest: T::AccountId, tx: EthereumTxHash, sig: EcdsaSignature) -> DispatchResult {
-		    let _ = ensure_none(origin)?;
+        #[weight = 0]
+        fn claim(origin, dest: T::AccountId, tx: EthereumTxHash, sig: EcdsaSignature) -> DispatchResult {
+            let _ = ensure_none(origin)?;
 
-		    // 1. Check the tx already be mint and not be claimed
-		    ensure!(Claims::<T>::contains_key(&tx), Error::<T>::SignerHasNoClaim);
-		    ensure!(!Self::claimed(&tx), Error::<T>::AlreadyBeClaimed);
+            // 1. Check the tx already be mint and not be claimed
+            ensure!(Claims::<T>::contains_key(&tx), Error::<T>::SignerHasNoClaim);
+            ensure!(!Self::claimed(&tx), Error::<T>::AlreadyBeClaimed);
 
-		    // 2. Sign data
-		    let data = dest.using_encoded(to_ascii_hex);
-		    let signer = Self::eth_recover(&sig, &data, &[][..]).ok_or(Error::<T>::InvalidEthereumSignature)?;
+            // 2. Sign data
+            let data = dest.using_encoded(to_ascii_hex);
+            let signer = Self::eth_recover(&sig, &data, &[][..]).ok_or(Error::<T>::InvalidEthereumSignature)?;
 
             // 3. Make sure signer is match with claimer
             Self::process_claim(tx, signer, dest)
-		}
+        }
     }
 }
 

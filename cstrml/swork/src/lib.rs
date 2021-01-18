@@ -1,17 +1,20 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
-    dispatch::DispatchResult,
+    dispatch::{DispatchResult, DispatchResultWithPostInfo},
     storage::IterableStorageMap,
-    traits::{Currency, ReservableCurrency},
+    traits::{Currency, ReservableCurrency, Get},
     weights::{
-        Weight, DispatchClass
+        Weight, DispatchClass, Pays
     }
 };
-use sp_runtime::traits::StaticLookup;
+use sp_runtime::traits::{StaticLookup, Zero};
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_root, ensure_signed};
 
@@ -81,6 +84,7 @@ pub struct WorkReport {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PKInfo {
     pub code: SworkerCode,
+    pub allow_report_slot: ReportSlot,
     pub anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
 }
 
@@ -142,11 +146,14 @@ pub trait Config: system::Config {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
 
+    /// Punishment duration if someone offline. It's the count of REPORT_SLOT
+    type PunishmentSlots: Get<u32>;
+
     /// The handler for reporting works.
     type Works: Works<Self::AccountId>;
 
     /// Interface for interacting with a market module.
-    type MarketInterface: MarketInterface<Self::AccountId>;
+    type MarketInterface: MarketInterface<Self::AccountId, BalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -232,7 +239,9 @@ decl_error! {
         /// Group already exist
         GroupAlreadyExist,
         /// Group owner cannot register
-        GroupOwnerForbidden
+        GroupOwnerForbidden,
+        /// Cannot report works right now due to offline in the past time
+        UnderPunishment
     }
 }
 
@@ -240,9 +249,22 @@ decl_module! {
     pub struct Module<T: Config> for enum Call where origin: T::Origin {
         type Error = Error<T>;
 
+        /// Punishment duration if someone offline
+        const PunishmentSlots: u32 = T::PunishmentSlots::get();
+
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
+
+
+        /// Called when a block is initialized. Will call update_identities to update stake limit
+        fn on_initialize(now: T::BlockNumber) -> Weight {
+            if (now % <T as frame_system::Config>::BlockNumber::from(REPORT_SLOT as u32)).is_zero()  {
+			    Self::update_identities();
+            }
+            // TODO: Recalculate this weight
+            0
+        }
 
         /// AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`
@@ -338,30 +360,33 @@ decl_module! {
             reported_srd_root: MerkleRoot,
             reported_files_root: MerkleRoot,
             sig: SworkerSignature
-        ) -> DispatchResult {
+        ) -> DispatchResultWithPostInfo {
             let reporter = ensure_signed(origin)?;
             let mut prev_pk = curr_pk.clone();
 
             // 1. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
-            // 2. Ensure who cannot be group owner
+            // 2. Ensure wr is allowed.
+            ensure!(Self::can_report_works(&curr_pk, slot), Error::<T>::UnderPunishment);
+
+            // 3. Ensure who cannot be group owner
             ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
             
-            // 3. Ensure reporter's code is legal
+            // 4. Ensure reporter's code is legal
             // ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
-            // 4. Decide which scenario
+            // 5. Decide which scenario
             let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
             let is_ab_upgrade = maybe_anchor.is_none() && !ab_upgrade_pk.is_empty();
             let is_first_report = maybe_anchor.is_none() && ab_upgrade_pk.is_empty();
 
-            // 5. Unique Check for normal report work for curr pk
+            // 6. Unique Check for normal report work for curr pk
             if let Some(anchor) = maybe_anchor {
                 // Normally report works.
-                // 3.1 Ensure Identity's anchor be same with current pk's anchor
+                // 6.1 Ensure Identity's anchor be same with current pk's anchor
                 ensure!(Self::identities(&reporter).unwrap_or_default().anchor == anchor, Error::<T>::IllegalReporter);
-                // 3.2 Already reported with same pub key in the same slot, return immediately
+                // 6.2 Already reported with same pub key in the same slot, return immediately
                 if Self::reported_in_slot(&anchor, slot) {
                     log!(
                         trace,
@@ -369,14 +394,15 @@ decl_module! {
                         curr_pk,
                         slot
                     );
-                    return Ok(())
+                    // This is weird and might be an attack.
+                    return Ok(Pays::Yes.into())
                 }
             }
 
-            // 6. Timing check
+            // 7. Timing check
             // ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 7. Ensure sig is legal
+            // 8. Ensure sig is legal
             // ensure!(
             //     Self::work_report_sig_check(
             //         &curr_pk,
@@ -394,15 +420,15 @@ decl_module! {
             //     Error::<T>::IllegalWorkReportSig
             // );
 
-            // 8. Files storage status transition check
+            // 9. Files storage status transition check
             if is_ab_upgrade {
-                // 8.1 Previous pk should already reported works
+                // 9.1 Previous pk should already reported works
                 ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
                 // unwrap_or_default is a small tricky solution
                 let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
 
-                // 8.2 Current work report should NOT be changed at all
+                // 9.2 Current work report should NOT be changed at all
                 let prev_wr = maybe_prev_wr.unwrap();
                 ensure!(added_files.is_empty() &&
                     deleted_files.is_empty() &&
@@ -410,7 +436,7 @@ decl_module! {
                     prev_wr.reported_srd_root == reported_srd_root,
                     Error::<T>::ABUpgradeFailed);
 
-                // 8.3 Set the real previous public key(contains work report);
+                // 9.3 Set the real previous public key(contains work report);
                 prev_pk = ab_upgrade_pk.clone();
             } else {
                 ensure!(
@@ -425,9 +451,9 @@ decl_module! {
                 );
             }
 
-            // 9. Finish register
+            // 10. Finish register
             if is_ab_upgrade {
-                // 9.1 Transfer A's status to B and delete old A's storage status
+                // 10.1 Transfer A's status to B and delete old A's storage status
                 let prev_pk_info = Self::pub_keys(&prev_pk);
                 PubKeys::mutate(&curr_pk, |curr_pk_info| {
                     curr_pk_info.anchor = prev_pk_info.anchor;
@@ -437,13 +463,13 @@ decl_module! {
             } else if is_first_report {
                 let mut pk_info = Self::pub_keys(&curr_pk);
                 match Self::identities(&reporter) {
-                    // 9.2 re-register scenario
+                    // 10.2 re-register scenario
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
                         <Identities<T>>::insert(&reporter, identity);
                     },
-                    // 9.3 first register scenario
+                    // 10.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),
@@ -456,7 +482,7 @@ decl_module! {
                 PubKeys::insert(&curr_pk, pk_info);
             }
 
-            // 10. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
+            // 11. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
             // a. Upsert work report
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
@@ -475,10 +501,10 @@ decl_module! {
                 slot,
             );
 
-            // 11. Emit work report event
+            // 12. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
-            Ok(())
+            Ok(Pays::No.into())
         }
 
         #[weight = 1000]
@@ -613,6 +639,7 @@ impl<T: Config> Module<T> {
     pub fn insert_pk_info(pk: SworkerPubKey, code: SworkerCode) {
         let pk_info = PKInfo {
             code,
+            allow_report_slot: 0,
             anchor: None
         };
 
@@ -702,21 +729,13 @@ impl<T: Config> Module<T> {
                         members= Some(Self::groups(owner));
                     }
                 };
-                if T::MarketInterface::upsert_replicas(reporter, cid, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members) {
-                    Some((cid.clone(), *size, *valid_at))
-                } else {
-                    None
-                }
+                Some((cid.clone(), T::MarketInterface::upsert_replicas(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members), *valid_at))
             }).collect()
         } else {
             let curr_bn = Self::get_current_block_number();
-            changed_files.iter().filter_map(|(cid, size, _)| {
+            changed_files.iter().filter_map(|(cid, _, _)| {
                 // 2. If mapping to storage orders
-                if T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn) {
-                    Some((cid.clone(), *size, curr_bn as u64))
-                } else {
-                    None
-                }
+                Some((cid.clone(), T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn), curr_bn as u64))
             }).collect()
         }
     }
@@ -816,6 +835,17 @@ impl<T: Config> Module<T> {
         );
 
         Ok(())
+    }
+
+    fn can_report_works(pk: &SworkerPubKey, block_number: u64) -> bool {
+        let mut pk_info = Self::pub_keys(pk);
+        // first time, allow report or reported in the last time
+        let is_ok = pk_info.anchor.is_none() || pk_info.allow_report_slot == block_number || Self::reported_in_slot(pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
+        if !is_ok && block_number > pk_info.allow_report_slot{
+            pk_info.allow_report_slot = block_number + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
+            PubKeys::insert(pk, pk_info);
+        }
+        is_ok
     }
 
     fn work_report_sig_check(

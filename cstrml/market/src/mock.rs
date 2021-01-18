@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use super::*;
 
 use frame_support::{
@@ -39,7 +42,7 @@ impl_outer_origin! {
 pub struct Test;
 
 thread_local! {
-    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
+    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(1);
     static LEGAL_CODE: Vec<u8> = hex::decode("781b537d3dcef39dec7b8bce6fdfcd032d8d846640e9b5598b4a9f627188a908").unwrap();
 }
 
@@ -133,9 +136,14 @@ impl balances::Config for Test {
     type MaxLocks = ();
 }
 
+parameter_types! {
+    pub const PunishmentSlots: u32 = 1;
+}
+
 impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
+    type PunishmentSlots = PunishmentSlots;
     type Works = ();
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;
@@ -206,6 +214,7 @@ pub fn init_swork_setup() {
     for ((pk, who), free) in pks.iter().zip(whos.iter()).zip(frees.iter()) {
         <swork::PubKeys>::insert(pk.clone(), PKInfo {
             code: code.clone(),
+            allow_report_slot: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(who, Identity {
@@ -224,8 +233,8 @@ pub fn init_swork_setup() {
 }
 
 // fake for report_works
-pub fn add_who_into_replica(cid: &MerkleRoot, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>) {
-    Market::upsert_replicas(&who, cid, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &None);
+pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>) {
+    Market::upsert_replicas(&who, cid, reported_size, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &None);
 }
 
 pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
@@ -262,6 +271,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
 pub fn register(pk: &SworkerPubKey, code: SworkerCode) {
     <swork::PubKeys>::insert(pk.clone(), PKInfo {
         code: code,
+        allow_report_slot: 0,
         anchor: None
     });
 }

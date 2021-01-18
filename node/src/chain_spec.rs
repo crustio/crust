@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use hex_literal::hex;
 use sp_core::{Pair, Public, sr25519, crypto::UncheckedInto};
 use crust_runtime::{

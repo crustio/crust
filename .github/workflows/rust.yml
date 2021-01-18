@@ -73,6 +73,12 @@ jobs:
           use-cross: false
           command: test
           args: --package cstrml-candy --lib tests
+      - name: Cargo test claims
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: test
+          args: --package cstrml-claims --lib tests
       - name: Cargo test swork benchmarking
         uses: actions-rs/cargo@v1
         with:

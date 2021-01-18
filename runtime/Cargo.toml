@@ -72,11 +72,14 @@ pallet-transaction-payment-rpc-runtime-api = { default-features = false, git = "
 # crust runtime modules
 balances = { version = "0.11.0", package = 'cstrml-balances', path = '../cstrml/balances', default-features = false }
 candy = { version = "0.11.0", package = 'cstrml-candy', path = '../cstrml/candy', default-features = false  }
+claims = { version = "0.11.0", package = 'cstrml-claims', path = '../cstrml/claims', default-features = false }
 market = { version = "0.11.0", package = 'cstrml-market', path = '../cstrml/market', default-features = false }
 primitives = { version = "0.11.0", package = 'cst-primitives', path = '../primitives', default-features = false }
 swork = { version = "0.11.0", package = 'cstrml-swork', path = '../cstrml/swork', default-features = false }
-swork-benchmarking = { version = "0.11.0", package = 'cstrml-swork-benchmarking', path = '../cstrml/swork/benchmarking', default-features = false, optional = true }
 staking = { version = "0.11.0", package = 'cstrml-staking', path = '../cstrml/staking', default-features = false }
+
+# crust benchmark dependencies
+swork-benchmarking = { version = "0.11.0", package = 'cstrml-swork-benchmarking', path = '../cstrml/swork/benchmarking', default-features = false, optional = true }
 
 [features]
 default = ['std']
@@ -105,6 +108,7 @@ std = [
     'balances/std',
     'pallet-bounties/std',
     'candy/std',
+    'claims/std',
     'pallet-collective/std',
     'pallet-elections-phragmen/std',
     'frame-executive/std',

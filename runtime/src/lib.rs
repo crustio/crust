@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Crustio Technologies Ltd.
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
 //! The Crust runtime. This can be compiled with `#[no_std]`, ready for Wasm.
@@ -397,6 +397,8 @@ parameter_types! {
     pub const SPowerRatio: u128 = 100;
     // 64 guarantors for one validator.
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
+    // 60 eras means 15 days if era = 6 hours
+    pub const MarketStakingPotDuration: u32 = 60;
 }
 
 impl staking::Config for Runtime {
@@ -418,8 +420,9 @@ impl staking::Config for Runtime {
     // A majority of the council can cancel the slash.
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type MarketStakingPot = Market;
+    type MarketStakingPotDuration = MarketStakingPotDuration;
     type WeightInfo = staking::weight::WeightInfo;
 }
 
@@ -672,6 +675,16 @@ impl candy::Config for Runtime {
     type Balance = Balance;
 }
 
+parameter_types! {
+	pub Prefix: &'static [u8] = b"Pay CRUs to the Crust account:";
+}
+
+impl claims::Config for Runtime {
+    type Event = Event;
+    type Currency = Balances;
+    type Prefix = Prefix;
+}
+
 // TODO: better way to deal with fee(s)
 parameter_types! {
     pub const TransactionBaseFee: Balance = 1 * CENTS;
@@ -694,9 +707,14 @@ impl pallet_sudo::Config for Runtime {
     type Call = Call;
 }
 
+parameter_types! {
+    pub const PunishmentSlots: u32 = 60;
+}
+
 impl swork::Config for Runtime {
     type Currency = Balances;
     type Event = Event;
+    type PunishmentSlots = PunishmentSlots;
     type Works = Staking;
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;
@@ -792,8 +810,9 @@ construct_runtime! {
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
 
-        // Token candy
+        // Token candy and claims bridge
         Candy: candy::{Module, Call, Storage, Event<T>},
+        Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
     }
 }
 
@@ -1023,7 +1042,7 @@ impl_runtime_apis! {
             add_benchmark!(params, batches, balances, Balances);
             add_benchmark!(params, batches, system, SystemBench::<Runtime>);
             add_benchmark!(params, batches, staking, Staking);
-            // add_benchmark!(params, batches, market, Market);
+            add_benchmark!(params, batches, market, Market);
             add_benchmark!(params, batches, swork, SworkBench::<Runtime>);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

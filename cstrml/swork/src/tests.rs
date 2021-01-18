@@ -1,9 +1,12 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use super::*;
 
 use crate::mock::*;
 use frame_support::{
-    assert_ok, assert_noop,
-    dispatch::DispatchError,
+    assert_ok, assert_noop, assert_err,
+    dispatch::{DispatchError, DispatchErrorWithPostInfo}, weights::PostDispatchInfo
 };
 use hex;
 use keyring::Sr25519Keyring;
@@ -34,6 +37,7 @@ fn register_should_work() {
         assert_eq!(Swork::identities(applier).is_none(), true);
         assert_eq!(Swork::pub_keys(legal_pk), PKInfo {
             code: legal_code,
+            allow_report_slot: 0,
             anchor: None
         });
     });
@@ -279,7 +283,7 @@ fn report_works_should_work() {
 
             // Check same file all been confirmed
             assert_eq!(Market::files(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap()).unwrap_or_default().0, FileInfo {
-                file_size: 100,
+                file_size: 134289408,
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,
@@ -292,7 +296,7 @@ fn report_works_should_work() {
                 }]
             });
             assert_eq!(Market::files(hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()).unwrap_or_default().0, FileInfo {
-                file_size: 100,
+                file_size: 268578816,
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,
@@ -1028,14 +1032,14 @@ fn ab_upgrade_should_work() {
             // 11. Check B's work report and free & used again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
-                used: 3,
+                used: 134289403,
                 free: 4294967296,
                 reported_files_size: 3,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 3); // Added 2 and delete 1
+            assert_eq!(Swork::used(), 134289403); // Added 134289408 and delete 7
         });
 }
 
@@ -1482,6 +1486,7 @@ fn join_group_should_work_for_used_in_work_report() {
             run_to_block(303);
             add_not_live_files();
             // A report works in 303
+            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -1562,7 +1567,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -1660,7 +1665,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -1768,6 +1773,7 @@ fn join_group_should_work_for_used_in_work_report() {
             let eve_wr_info = group_work_report_eve_600();
 
             run_to_block(603);
+            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -1865,7 +1871,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -1979,7 +1985,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -2073,6 +2079,7 @@ fn join_group_should_work_for_stake_limit() {
             Swork::update_identities();
             add_not_live_files();
             // A report works in 303
+            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -2087,7 +2094,7 @@ fn join_group_should_work_for_stake_limit() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
-
+            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -2102,7 +2109,7 @@ fn join_group_should_work_for_stake_limit() {
                 bob_wr_info.files_root,
                 bob_wr_info.sig
             ));
-
+            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -2130,5 +2137,206 @@ fn join_group_should_work_for_stake_limit() {
             assert_eq!(map.get(&alice).is_none(), true);
             assert_eq!(map.get(&bob).is_none(), true);
             assert_eq!(map.get(&eve).is_none(), true);
+        });
+}
+
+/// Report works test cases
+#[test]
+fn report_works_punishment_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // Generate 303 blocks first
+            run_to_block(303);
+
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+            let legal_wr = WorkReport {
+                report_slot: legal_wr_info.block_number,
+                used: legal_wr_info.used,
+                free: legal_wr_info.free,
+                reported_files_size: legal_wr_info.used,
+                reported_srd_root: legal_wr_info.srd_root.clone(),
+                reported_files_root: legal_wr_info.files_root.clone()
+            };
+
+            register(&legal_pk, LegalCode::get());
+            add_not_live_files();
+
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+            // Check work report
+            assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
+            assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                group: None
+            });
+
+            run_to_block(603); // don't report works
+            run_to_block(903);
+            let legal_wr_info = legal_work_report_with_added_files();
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                900,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "UnderPunishment",
+                    ),
+                },
+            });
+
+            run_to_block(1203);
+            let legal_wr_info = legal_work_report_with_added_files();
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                1200,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "UnderPunishment",
+                    ),
+                },
+            });
+
+            // 900 1200 1500 1800 cannot pass the check since we set punishment for four report_slots
+            run_to_block(2103);
+            let legal_wr_info = legal_work_report_with_added_files();
+            // error changed. pass the punishment check
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                2100,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 5,
+                    message: Some(
+                        "IllegalWorkReportSig",
+                    ),
+                },
+            });
+
+            // forbid the punishment again
+            run_to_block(2403);
+            let legal_wr_info = legal_work_report_with_added_files();
+            // error changed. pass the punishment check
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                2400,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "UnderPunishment",
+                    ),
+                },
+            });
+
+            // cannot pass the check since we don't allow it for 3900
+            run_to_block(3903);
+            let legal_wr_info = legal_work_report_with_added_files();
+            // error changed. pass the punishment check
+            assert_err!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                3900,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ), DispatchErrorWithPostInfo {
+                post_info: PostDispatchInfo {
+                    actual_weight: None,
+                    pays_fee: Pays::Yes,
+                },
+                error: DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some(
+                        "UnderPunishment",
+                    ),
+                },
+            });
+
         });
 }

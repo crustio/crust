@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 //! Test utilities
 
 use crate::*;
@@ -44,6 +47,7 @@ thread_local! {
     static SLASH_DEFER_DURATION: RefCell<EraIndex> = RefCell::new(0);
     static OWN_WORKLOAD: RefCell<u128> = RefCell::new(0);
     static TOTAL_WORKLOAD: RefCell<u128> = RefCell::new(0);
+    static DSM_STAKING_PAYOUT: RefCell<Balance> = RefCell::new(0);
 }
 
 pub struct TestSessionHandler;
@@ -199,14 +203,22 @@ impl swork::Works<AccountId> for TestStaking {
     }
 }
 
-impl<AID> MarketInterface<AID> for TestStaking {
-    fn upsert_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32, _: &Option<BTreeSet<AID>>) -> bool { false }
-    fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> bool { false }
+impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
+    fn upsert_replicas(_: &AID, _: &MerkleRoot, _: u64, _: &SworkerAnchor, _: u32, _: &Option<BTreeSet<AID>>) -> u64 { 0 }
+    fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> u64 { 0 }
+    fn withdraw_staking_pot() -> BalanceOf<Test> {
+        BalanceOf::<Test>::from(DSM_STAKING_PAYOUT.with(|v| *v.borrow()))
+    }
+}
+
+parameter_types! {
+    pub const PunishmentSlots: u32 = 1;
 }
 
 impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
+    type PunishmentSlots = PunishmentSlots;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
     type WeightInfo = swork::weight::WeightInfo;
@@ -218,6 +230,7 @@ parameter_types! {
     pub const BondingDuration: EraIndex = 3;
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
+    pub const MarketStakingPotDuration: u32 = 5;
 }
 
 impl Config for Test {
@@ -236,8 +249,9 @@ impl Config for Test {
     type SlashDeferDuration = SlashDeferDuration;
     type SlashCancelOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type SessionInterface = Self;
-    type SworkInterface = Self;
     type SPowerRatio = SPowerRatio;
+    type MarketStakingPot = TestStaking;
+    type MarketStakingPotDuration = MarketStakingPotDuration;
     type WeightInfo = weight::WeightInfo;
 }
 
@@ -253,7 +267,8 @@ pub struct ExtBuilder {
     invulnerables: Vec<u128>,
     own_workload: u128,
     total_workload: u128,
-    staking_pot: Balance
+    staking_pot: Balance,
+    dsm_staking_payout: Balance
 }
 
 impl Default for ExtBuilder {
@@ -270,7 +285,8 @@ impl Default for ExtBuilder {
             invulnerables: vec![],
             own_workload: 3000,
             total_workload: 3000,
-            staking_pot: 1_000_000_000_000_000_000
+            staking_pot: 1_000_000_000_000_000_000,
+            dsm_staking_payout: 0
         }
     }
 }
@@ -324,11 +340,16 @@ impl ExtBuilder {
         self.staking_pot = amount;
         self
     }
+    pub fn dsm_staking_payout(mut self, amount: Balance) -> Self {
+        self.dsm_staking_payout = amount;
+        self
+    }
     pub fn set_associated_consts(&self) {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow_mut() = self.existential_deposit);
         SLASH_DEFER_DURATION.with(|v| *v.borrow_mut() = self.slash_defer_duration);
         OWN_WORKLOAD.with(|v| *v.borrow_mut() = self.own_workload);
         TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = self.total_workload);
+        DSM_STAKING_PAYOUT.with(|v| *v.borrow_mut() = self.dsm_staking_payout);
     }
     pub fn build(self) -> sp_io::TestExternalities {
         self.set_associated_consts();
@@ -448,6 +469,7 @@ pub type Balances = balances::Module<Test>;
 pub type Session = pallet_session::Module<Test>;
 pub type Timestamp = pallet_timestamp::Module<Test>;
 pub type Staking = Module<Test>;
+pub type Swork = swork::Module<Test>;
 
 pub fn check_exposure_all() {
     // a check per validator to ensure the exposure struct is always sane.
@@ -543,6 +565,7 @@ pub fn advance_session() {
 pub fn start_session(session_index: SessionIndex, with_reward: bool) {
     // Compensate for session delay
     for i in Session::current_index()..session_index {
+        Swork::on_initialize(System::block_number());
         Staking::on_finalize(System::block_number());
         System::set_block_number(((i+1)*100).into());
         if with_reward {
@@ -646,6 +669,7 @@ fn init_swork_setup() {
     for (id, pk) in id_map {
         <swork::PubKeys>::insert(pk.clone(), swork::PKInfo {
             code: code.clone(),
+            allow_report_slot: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(id, swork::Identity {

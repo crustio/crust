@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use sp_runtime::traits::{Convert, SaturatedConversion};
 use frame_support::traits::{OnUnbalanced, Imbalance, Currency};
 use crate::NegativeImbalance;

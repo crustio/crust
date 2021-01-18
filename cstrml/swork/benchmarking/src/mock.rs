@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
+// This file is part of Crust.
+
 use crate::*;
 
 pub use frame_support::{
@@ -122,9 +125,14 @@ impl Works<AccountId> for TestWorksInterface {
     fn report_works(_: &AccountId, _: u128, _: u128) { }
 }
 
+parameter_types! {
+    pub const PunishmentSlots: u32 = 1;
+}
+
 impl swork::Config for Test {
     type Currency = balances::Module<Self>;
     type Event = ();
+    type PunishmentSlots = PunishmentSlots;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;

@@ -12,6 +12,8 @@ exclude = [
 
 members = [
     'cstrml/balances',
+    'cstrml/candy',
+    'cstrml/claims',
     'cstrml/staking',
     'cstrml/swork',
     'cstrml/market',

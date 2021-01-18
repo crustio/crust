@@ -1045,6 +1045,7 @@ dependencies = [
  "cst-primitives",
  "cstrml-balances",
  "cstrml-candy",
+ "cstrml-claims",
  "cstrml-market",
  "cstrml-staking",
  "cstrml-swork",
@@ -1167,6 +1168,24 @@ dependencies = [
  "hex",
  "parity-scale-codec",
  "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-claims"
+version = "0.11.0"
+dependencies = [
+ "cstrml-balances",
+ "frame-support",
+ "frame-system",
+ "hex-literal",
+ "parity-scale-codec",
+ "rustc-hex",
+ "serde",
+ "serde_derive",
  "sp-core",
  "sp-io",
  "sp-runtime",

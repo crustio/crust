@@ -1,6 +1,6 @@
 {
-  "name": "Crust Maxwell CC2",
-  "id": "mwlcc2",
+  "name": "Crust Maxwell",
+  "id": "crumwl",
   "chainType": "Live",
   "bootNodes": [],
   "telemetryEndpoints": [
@@ -9,8 +9,9 @@
       0
     ]
   ],
-  "protocolId": "max2",
+  "protocolId": "crumwl",
   "properties": {
+    "ss58Format": 22,
     "tokenSymbol": "CRU",
     "tokenDecimals": 12
   },

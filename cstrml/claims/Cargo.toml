@@ -1,0 +1,41 @@
+[package]
+name = "cstrml-claims"
+version = "0.11.0"
+authors = ["crustio"]
+edition = "2018"
+license = "GPL-3.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
+
+[dependencies]
+serde = { version = "1.0.116", default-features = false }
+serde_derive = { version = "1.0.102", optional = true }
+codec = { package = "parity-scale-codec", version = "1.3.4", default-features = false }
+rustc-hex = { version = "2.0.1", default-features = false }
+
+# substrate frame dependencies
+frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "master" }
+
+[dev-dependencies]
+balances = { path = "../balances", package = "cstrml-balances" }
+hex-literal = "0.3.1"
+
+[features]
+default = ["std"]
+std = [
+    "serde/std",
+    "serde_derive",
+    "rustc-hex/std",
+    "codec/std",
+    "sp-core/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "sp-io/std",
+    "frame-support/std",
+    "frame-system/std",
+]

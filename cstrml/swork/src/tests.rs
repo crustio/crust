@@ -2169,7 +2169,7 @@ fn report_works_punishment_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
-                used: legal_wr_info.used,
+                used: legal_wr_info.used * 2,
                 free: legal_wr_info.free,
                 reported_files_size: legal_wr_info.used,
                 reported_srd_root: legal_wr_info.srd_root.clone(),

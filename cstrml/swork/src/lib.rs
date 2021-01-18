@@ -454,7 +454,7 @@ decl_module! {
 
             // 10. Finish register
             if is_ab_upgrade {
-                // 9.1 Transfer A's status to B and delete old A's storage status
+                // 10.1 Transfer A's status to B and delete old A's storage status
                 let prev_pk_info = Self::pub_keys(&prev_pk);
                 PubKeys::mutate(&curr_pk, |curr_pk_info| {
                     curr_pk_info.anchor = prev_pk_info.anchor;
@@ -464,13 +464,13 @@ decl_module! {
             } else if is_first_report {
                 let mut pk_info = Self::pub_keys(&curr_pk);
                 match Self::identities(&reporter) {
-                    // 9.2 re-register scenario
+                    // 10.2 re-register scenario
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
                         <Identities<T>>::insert(&reporter, identity);
                     },
-                    // 9.3 first register scenario
+                    // 10.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),

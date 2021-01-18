@@ -591,7 +591,7 @@ impl<T: Config> Module<T> {
         // TODO: Restrict the frequency of calculate payout(limit the duration of 2 claiming)
 
         // 4. Update used_info
-        used_info.reported_group_count = Self::count_valid_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
+        used_info.reported_group_count = Self::count_reported_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
         Self::update_groups_used_info(file_info.file_size, &mut used_info);
 
         // Get the previous first class storage count
@@ -687,7 +687,7 @@ impl<T: Config> Module<T> {
             UsedTrashI::insert(cid, used_info.clone());
             UsedTrashSizeI::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for (anchor, _) in used_info.groups.iter() {
+            for anchor in used_info.groups.keys() {
                 UsedTrashMappingI::mutate(&anchor, |value| {
                     *value += used_info.used_size;
                 })
@@ -700,7 +700,7 @@ impl<T: Config> Module<T> {
             UsedTrashII::insert(cid, used_info.clone());
             UsedTrashSizeII::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for (anchor, _) in used_info.groups.iter() {
+            for anchor in used_info.groups.keys() {
                 UsedTrashMappingII::mutate(&anchor, |value| {
                     *value += used_info.used_size;
                 })
@@ -813,7 +813,7 @@ impl<T: Config> Module<T> {
         let (numerator, denominator) = T::StorageReferenceRatio::get();
         let files_size = Self::files_size();
         let mut file_price = Self::file_price();
-        if files_size !=0 {
+        if files_size != 0 {
             // Too much supply => decrease the price
             if files_size.saturating_mul(denominator) < total_capacity.saturating_mul(numerator) {
                 let gap = T::StorageDecreaseRatio::get() * file_price;
@@ -874,7 +874,11 @@ impl<T: Config> Module<T> {
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
             Some((ref file_info, ref mut used_info)) => {
                 if let Some(is_calculated_as_reported_group_count) = used_info.groups.remove(anchor) {
-                    used_size = used_info.used_size; // need to delete the used_size before the update
+                    // need to delete the used_size before the update.
+                    // we should always return the used_size no matter `is_calculated_as_reported_group_count` is true of false.
+                    // `is_calculated_as_reported_group_count` only change the used_size factor.
+                    // we should delete the used from wr no matter what's the factor right now.
+                    used_size = used_info.used_size;
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
                         Self::update_groups_used_info(file_info.file_size, used_info);
@@ -942,20 +946,16 @@ impl<T: Config> Module<T> {
 
     fn update_groups_used_info(file_size: u64, used_info: &mut UsedInfo) {
         let new_used_size = Self::calculate_used_size(file_size, used_info.reported_group_count);
-        Self::update_other_wr_used(&used_info.groups, used_info.used_size, new_used_size);
+        let prev_used_size = used_info.used_size;
+        if prev_used_size != new_used_size {
+            for anchor in used_info.groups.keys() {
+                T::SworkerInterface::update_used(anchor, prev_used_size, new_used_size);
+            }
+        }
         used_info.used_size = new_used_size;
     }
 
-    fn update_other_wr_used(groups: &BTreeMap<SworkerAnchor, bool>, prev_used_size: u64, new_used_size: u64) {
-        if prev_used_size == new_used_size {
-            return;
-        }
-        for (anchor, _) in groups.iter() {
-            T::SworkerInterface::update_used(anchor, prev_used_size, new_used_size);
-        }
-    }
-
-    fn count_valid_groups(groups: &mut BTreeMap<SworkerAnchor, bool>, curr_bn: BlockNumber) -> u32 {
+    fn count_reported_groups(groups: &mut BTreeMap<SworkerAnchor, bool>, curr_bn: BlockNumber) -> u32 {
         let mut count = 0;
         for (anchor, is_calculated_as_reported_group_count) in groups.iter_mut() {
             if T::SworkerInterface::is_wr_reported(anchor, curr_bn) {

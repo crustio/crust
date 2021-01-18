@@ -211,9 +211,14 @@ impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
     }
 }
 
+parameter_types! {
+    pub const PunishmentSlots: u32 = 1;
+}
+
 impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
+    type PunishmentSlots = PunishmentSlots;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
     type WeightInfo = swork::weight::WeightInfo;
@@ -664,6 +669,7 @@ fn init_swork_setup() {
     for (id, pk) in id_map {
         <swork::PubKeys>::insert(pk.clone(), swork::PKInfo {
             code: code.clone(),
+            allow_report_slot: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(id, swork::Identity {

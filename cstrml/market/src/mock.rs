@@ -136,9 +136,14 @@ impl balances::Config for Test {
     type MaxLocks = ();
 }
 
+parameter_types! {
+    pub const PunishmentSlots: u32 = 1;
+}
+
 impl swork::Config for Test {
     type Currency = Balances;
     type Event = ();
+    type PunishmentSlots = PunishmentSlots;
     type Works = ();
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;
@@ -209,6 +214,7 @@ pub fn init_swork_setup() {
     for ((pk, who), free) in pks.iter().zip(whos.iter()).zip(frees.iter()) {
         <swork::PubKeys>::insert(pk.clone(), PKInfo {
             code: code.clone(),
+            allow_report_slot: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(who, Identity {
@@ -265,6 +271,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
 pub fn register(pk: &SworkerPubKey, code: SworkerCode) {
     <swork::PubKeys>::insert(pk.clone(), PKInfo {
         code: code,
+        allow_report_slot: 0,
         anchor: None
     });
 }

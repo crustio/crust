@@ -707,9 +707,14 @@ impl pallet_sudo::Config for Runtime {
     type Call = Call;
 }
 
+parameter_types! {
+    pub const PunishmentSlots: u32 = 60;
+}
+
 impl swork::Config for Runtime {
     type Currency = Balances;
     type Event = Event;
+    type PunishmentSlots = PunishmentSlots;
     type Works = Staking;
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;

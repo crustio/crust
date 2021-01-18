@@ -181,9 +181,14 @@ impl Works<AccountId> for TestWorksInterface {
     }
 }
 
+parameter_types! {
+    pub const PunishmentSlots: u32 = 4;
+}
+
 impl Config for Test {
     type Currency = balances::Module<Self>;
     type Event = ();
+    type PunishmentSlots = PunishmentSlots;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
     type WeightInfo = weight::WeightInfo;
@@ -612,6 +617,12 @@ pub fn register_identity(who: &AccountId, pk: &SworkerPubKey, anchor: &SworkerAn
     <self::Identities<Test>>::insert(who, Identity {
         anchor: anchor.clone(),
         group: None
+    });
+}
+
+pub fn allow_report_work(pk: &SworkerPubKey, slot: ReportSlot) {
+    <self::PubKeys>::mutate(pk, |pk_info| {
+        pk_info.allow_report_slot = slot;
     });
 }
 

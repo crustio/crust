@@ -11,7 +11,7 @@ use sp_runtime::traits::StaticLookup;
 use codec::Decode;
 use market::{UsedInfo, FileInfo, Replica};
 use primitives::*;
-use sp_std::{vec, prelude::*, collections::btree_set::BTreeSet, iter::FromIterator};
+use sp_std::{vec, prelude::*, collections::{btree_set::BTreeSet, btree_map::BTreeMap}, iter::FromIterator};
 
 const SEED: u32 = 0;
 const EXPIRE_BLOCK_NUMBER: u32 = 2000;
@@ -107,7 +107,8 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
     for (file, file_size, _) in files.clone().iter() {
         let used_info = UsedInfo {
             used_size: *file_size,
-            groups: <BTreeSet<SworkerAnchor>>::new()
+            reported_group_count: 0,
+            groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };
         let mut replicas: Vec<Replica<T::AccountId>> = vec![];
         for _ in 0..200 {
@@ -190,7 +191,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), wr.used as u128);
+        assert_eq!(swork::Module::<T>::used(), (wr.used * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
@@ -252,7 +253,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), wr.used as u128);
+        assert_eq!(swork::Module::<T>::used(), (wr.used * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 

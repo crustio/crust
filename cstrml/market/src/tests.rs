@@ -301,7 +301,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -326,7 +327,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -354,7 +356,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -382,7 +385,8 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -480,7 +484,8 @@ fn calculate_payout_should_work() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -505,7 +510,8 @@ fn calculate_payout_should_work() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -593,7 +599,8 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -617,7 +624,8 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -648,7 +656,8 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -737,7 +746,8 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -849,7 +859,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -873,7 +884,8 @@ fn calculate_payout_should_work_in_complex_timeline() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -904,12 +916,14 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     Replica {
                         who: merchant.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     }]
             },
             UsedInfo {
@@ -944,17 +958,20 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     Replica {
                         who: merchant.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: dave.clone(),
                         valid_at: 703, // did't report. change it to curr bn
-                        anchor: hex::decode("11").unwrap()
+                        anchor: hex::decode("11").unwrap(),
+                        is_reported: false
                     }]
             },
             UsedInfo {
@@ -989,17 +1006,20 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     Replica {
                         who: dave.clone(),
                         valid_at: 703,
-                        anchor: hex::decode("11").unwrap()
+                        anchor: hex::decode("11").unwrap(),
+                        is_reported: true
                     },
                     Replica {
                         who: merchant.clone(),
                         valid_at: 903, // did't report. change it to curr bn
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: false
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 903, // did't report. change it to curr bn
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: false
                     }]
             },
             UsedInfo {
@@ -1039,17 +1059,20 @@ fn calculate_payout_should_work_in_complex_timeline() {
                     Replica {
                         who: dave.clone(),
                         valid_at: 703,
-                        anchor: hex::decode("11").unwrap()
+                        anchor: hex::decode("11").unwrap(),
+                        is_reported: true
                     },
                     Replica {
                         who: merchant.clone(),
                         valid_at: 903,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 903,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     }]
             },
             UsedInfo {
@@ -1274,27 +1297,32 @@ fn calculate_payout_should_work_for_more_replicas() {
                     Replica {
                         who: ferdie.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: merchant.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 403,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: dave.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: eve.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     }
                 ]
             },
@@ -1319,27 +1347,32 @@ fn calculate_payout_should_work_for_more_replicas() {
                     Replica {
                         who: ferdie.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: merchant.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 403,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: dave.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: eve.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     }
                 ]
             },
@@ -1445,7 +1478,8 @@ fn clear_trash_should_work() {
                     replicas: vec![Replica {
                         who: merchant.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     }]
                 },
                 UsedInfo {
@@ -1658,7 +1692,8 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -1734,7 +1769,8 @@ fn double_place_storage_order_file_size_check_should_work() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -1771,7 +1807,8 @@ fn double_place_storage_order_file_size_check_should_work() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: false
                 }]
             },
             UsedInfo {
@@ -1866,7 +1903,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -1890,7 +1928,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 replicas: vec![Replica {
                     who: merchant.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             },
             UsedInfo {
@@ -1918,12 +1957,14 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                     Replica {
                         who: merchant.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     }]
             },
             UsedInfo {
@@ -1951,12 +1992,14 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                     Replica {
                         who: merchant.clone(),
                         valid_at: 303,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     },
                     Replica {
                         who: charlie.clone(),
                         valid_at: 503,
-                        anchor: legal_pk.clone()
+                        anchor: legal_pk.clone(),
+                        is_reported: true
                     }]
             },
             UsedInfo {

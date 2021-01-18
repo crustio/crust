@@ -666,6 +666,7 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
         who: who.clone(),
         valid_at: 200,
         anchor: anchor.clone(),
+        is_reported: true
     };
     for (file, file_size) in files.iter() {
         let used_info = UsedInfo {

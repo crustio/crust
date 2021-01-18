@@ -2211,7 +2211,7 @@ fn report_works_punishment_should_work() {
                     index: 0,
                     error: 16,
                     message: Some(
-                        "PunishmentForbidden",
+                        "UnderPunishment",
                     ),
                 },
             });
@@ -2240,11 +2240,12 @@ fn report_works_punishment_should_work() {
                     index: 0,
                     error: 16,
                     message: Some(
-                        "PunishmentForbidden",
+                        "UnderPunishment",
                     ),
                 },
             });
 
+            // 900 1200 1500 1800 cannot pass the check since we set punishment for four report_slots
             run_to_block(2103);
             let legal_wr_info = legal_work_report_with_added_files();
             // error changed. pass the punishment check
@@ -2301,7 +2302,7 @@ fn report_works_punishment_should_work() {
                     index: 0,
                     error: 16,
                     message: Some(
-                        "PunishmentForbidden",
+                        "UnderPunishment",
                     ),
                 },
             });
@@ -2332,7 +2333,7 @@ fn report_works_punishment_should_work() {
                     index: 0,
                     error: 16,
                     message: Some(
-                        "PunishmentForbidden",
+                        "UnderPunishment",
                     ),
                 },
             });

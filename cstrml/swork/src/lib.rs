@@ -147,7 +147,7 @@ pub trait Config: system::Config {
     type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
 
     /// Punishment duration if someone offline. It's the count of REPORT_SLOT
-    type PunishmentDuration: Get<u32>;
+    type PunishmentSlots: Get<u32>;
 
     /// The handler for reporting works.
     type Works: Works<Self::AccountId>;
@@ -241,7 +241,7 @@ decl_error! {
         /// Group owner cannot register
         GroupOwnerForbidden,
         /// Cannot report works right now due to offline in the past time
-        PunishmentForbidden
+        UnderPunishment
     }
 }
 
@@ -250,7 +250,7 @@ decl_module! {
         type Error = Error<T>;
 
         /// Punishment duration if someone offline
-        const PunishmentDuration: u32 = T::PunishmentDuration::get();
+        const PunishmentSlots: u32 = T::PunishmentSlots::get();
 
         // Initializing events
         // this is needed only if you are using events in your module
@@ -368,7 +368,7 @@ decl_module! {
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
             // 2. Ensure wr is allowed.
-            ensure!(Self::is_report_works_allow(&curr_pk, slot), Error::<T>::PunishmentForbidden);
+            ensure!(Self::can_report_works(&curr_pk, slot), Error::<T>::UnderPunishment);
 
             // 3. Ensure who cannot be group owner
             ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
@@ -837,12 +837,12 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
-    fn is_report_works_allow(pk: &SworkerPubKey, block_number: u64) -> bool {
+    fn can_report_works(pk: &SworkerPubKey, block_number: u64) -> bool {
         let mut pk_info = Self::pub_keys(pk);
         // first time, allow report or reported in the last time
         let is_ok = pk_info.anchor.is_none() || pk_info.allow_report_slot == block_number || Self::reported_in_slot(pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
         if !is_ok && block_number > pk_info.allow_report_slot{
-            pk_info.allow_report_slot = block_number + (T::PunishmentDuration::get() as u64 * REPORT_SLOT);
+            pk_info.allow_report_slot = block_number + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
             PubKeys::insert(pk, pk_info);
         }
         is_ok

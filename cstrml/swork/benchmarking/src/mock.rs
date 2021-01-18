@@ -126,13 +126,13 @@ impl Works<AccountId> for TestWorksInterface {
 }
 
 parameter_types! {
-    pub const PunishmentDuration: u32 = 1;
+    pub const PunishmentSlots: u32 = 1;
 }
 
 impl swork::Config for Test {
     type Currency = balances::Module<Self>;
     type Event = ();
-    type PunishmentDuration = PunishmentDuration;
+    type PunishmentSlots = PunishmentSlots;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;

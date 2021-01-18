@@ -708,13 +708,13 @@ impl pallet_sudo::Config for Runtime {
 }
 
 parameter_types! {
-    pub const PunishmentDuration: u32 = 60;
+    pub const PunishmentSlots: u32 = 60;
 }
 
 impl swork::Config for Runtime {
     type Currency = Balances;
     type Event = Event;
-    type PunishmentDuration = PunishmentDuration;
+    type PunishmentSlots = PunishmentSlots;
     type Works = Staking;
     type MarketInterface = Market;
     type WeightInfo = swork::weight::WeightInfo;

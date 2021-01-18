@@ -195,8 +195,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             Self::try_to_close_file(cid, curr_bn);
 
             // 2. Delete replica from file_info
-            let mut is_to_decreased = false;
             if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+                let mut is_to_decreased = false;
                 file_info.replicas.retain(|replica| {
                     if replica.who == *who && replica.is_reported {
                         // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`

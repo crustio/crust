@@ -34,7 +34,8 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
         let new_replica = Replica {
             who: user.clone(),
             valid_at,
-            anchor: pub_key.clone()
+            anchor: pub_key.clone(),
+            is_reported: true
         };
         replicas.push(new_replica);
     }

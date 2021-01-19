@@ -83,6 +83,8 @@ pub struct Replica<AccountId> {
     pub valid_at: BlockNumber,
     // The anchor associated to the node mapping with file
     pub anchor: SworkerAnchor,
+    // Is reported in the last check
+    pub is_reported: bool
 }
 
 /// According to the definition, we should put this one into swork pallet.
@@ -152,9 +154,10 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                 who: who.clone(),
                 valid_at,
                 anchor: anchor.clone(),
+                is_reported: true
             };
-            file_info.reported_replica_count += 1;
             Self::insert_replica(&mut file_info, new_replica);
+            file_info.reported_replica_count += 1;
 
             // 3. Update used_info
             if is_counted {
@@ -188,23 +191,25 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> u64 {
         if <Files<T>>::get(cid).is_some() {
             // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
-            let claimed_bn = Self::calculate_payout(cid, curr_bn);
+            Self::calculate_payout(cid, curr_bn);
             Self::try_to_close_file(cid, curr_bn);
 
             // 2. Delete replica from file_info
             if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
-                // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
-                if T::SworkerInterface::is_wr_reported(&anchor, claimed_bn) {
-                    // decrease it due to deletion
-                    // TODO: there is a bug
+                let mut is_to_decreased = false;
+                file_info.replicas.retain(|replica| {
+                    if replica.who == *who && replica.is_reported {
+                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
+                        is_to_decreased = true;
+                    }
+                    replica.who != *who
+                });
+                if is_to_decreased {
                     file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
                     if file_info.reported_replica_count < file_info.expected_replica_count {
                         Self::update_files_size(file_info.file_size, 1, 0);
                     }
                 }
-                file_info.replicas.retain(|replica| {
-                    replica.who != *who
-                });
                 <Files<T>>::insert(cid, (file_info, used_info));
             }
         }
@@ -575,18 +580,16 @@ impl<T: Config> Module<T> {
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
-    /// return:
-    ///     claimed_bn: BlockNumber
-    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber) -> BlockNumber
+    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
-        if Self::files(cid).is_none() { return curr_bn; }
+        if Self::files(cid).is_none() { return; }
         
         // 2. File must already started
         let (mut file_info, mut used_info) = Self::files(cid).unwrap_or_default();
         
         // 3. File already expired
-        if file_info.expired_on <= file_info.claimed_at { return file_info.claimed_at; }
+        if file_info.expired_on <= file_info.claimed_at { return; }
         
         // TODO: Restrict the frequency of calculate payout(limit the duration of 2 claiming)
 
@@ -616,12 +619,15 @@ impl<T: Config> Module<T> {
                     let mut invalid_replica = replica.clone();
                     // update the valid_at to the curr_bn
                     invalid_replica.valid_at = curr_bn;
+                    invalid_replica.is_reported = false;
                     // move it to the end of replica
                     invalid_replicas.push(invalid_replica);
                     // TODO: kick this anchor out of used info
                 // b. keep the replica's sequence
                 } else {
-                    new_replicas.push(replica.clone());
+                    let mut valid_replica = replica.clone();
+                    valid_replica.is_reported = true;
+                    new_replicas.push(valid_replica);
                     
                     // if payouts is full, just continue
                     if rewarded_count == target_reward_count {
@@ -650,9 +656,6 @@ impl<T: Config> Module<T> {
 
         // 6 Update files
         <Files<T>>::insert(cid, (file_info, used_info));
-
-        // 7. Return the claimed block
-        return claim_block;
     }
 
     /// Update the first class storage's size

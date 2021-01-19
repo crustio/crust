@@ -292,7 +292,8 @@ fn report_works_should_work() {
                 replicas: vec![Replica {
                     who: reporter.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             });
             assert_eq!(Market::files(hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()).unwrap_or_default().0, FileInfo {
@@ -305,7 +306,8 @@ fn report_works_should_work() {
                 replicas: vec![Replica {
                     who: reporter,
                     valid_at: 303,
-                    anchor: legal_pk
+                    anchor: legal_pk,
+                    is_reported: true
                 }]
             });
         });
@@ -1513,7 +1515,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![Replica {
                         who: alice.clone(),
                         valid_at: 303,
-                        anchor: a_pk.clone()
+                        anchor: a_pk.clone(),
+                        is_reported: true
                     }]
                 },
                 UsedInfo {
@@ -1533,7 +1536,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![Replica {
                         who: alice.clone(),
                         valid_at: 303,
-                        anchor: a_pk.clone()
+                        anchor: a_pk.clone(),
+                        is_reported: true
                     }]
                 },
                 UsedInfo {
@@ -1553,7 +1557,8 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![Replica {
                         who: alice.clone(),
                         valid_at: 303,
-                        anchor: a_pk.clone()
+                        anchor: a_pk.clone(),
+                        is_reported: true
                     }]
                 },
                 UsedInfo {
@@ -1598,12 +1603,14 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1625,12 +1632,14 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1653,7 +1662,8 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1699,17 +1709,20 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1731,12 +1744,14 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1759,7 +1774,8 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1810,7 +1826,8 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1832,12 +1849,14 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1860,12 +1879,14 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1911,7 +1932,8 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
@@ -1933,7 +1955,8 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },

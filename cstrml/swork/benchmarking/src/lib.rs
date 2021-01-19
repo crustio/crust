@@ -115,7 +115,8 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
             let new_replica = Replica {
                 who: user.clone(),
                 valid_at: 300,
-                anchor: pub_key.clone()
+                anchor: pub_key.clone(),
+                is_reported: true
             };
             replicas.push(new_replica);
         }

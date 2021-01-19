@@ -15,6 +15,10 @@ pub mod currency {
     pub const FIRST_YEAR_REWARDS: Balance = 5_000_000 * CRUS;
     // Block authoring rewards per year
     pub const BLOCK_AUTHORING_REWARDS: Balance = 100_000 * CRUS;
+    // Staking rewards in the first quarter
+    pub const FIRST_QUARTER_STAKING_REWARDS: Balance = 216_000 * CRUS;
+    // Block authoring rewards in the first quarter
+    pub const FIRST_QUARTER_AUTHORING_REWARDS: Balance = 54_000 * CRUS;
 }
 
 /// Time and blocks.

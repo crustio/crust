@@ -283,7 +283,7 @@ fn rewards_should_work() {
 
             // Compute total payout now for whole duration as other parameter won't change
             let staking_reward = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-            let authoring_reward = Staking::authoring_rewards_in_era();
+            let authoring_reward = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert_eq!(Staking::eras_total_stakes(0), 2001);
             assert_eq!(Balances::total_balance(&2), init_balance_2);
             assert_eq!(Balances::total_balance(&10), init_balance_10);
@@ -347,7 +347,7 @@ fn multi_era_reward_should_work() {
             ));
 
             // Compute now as other parameter won't change
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
             assert_eq!(Staking::eras_total_stakes(0), 2001);
@@ -377,14 +377,13 @@ fn multi_era_reward_should_work() {
             start_session(4, true);
 
             <Module<Test>>::reward_by_ids(vec![(21, 101)]); // meaningless points
-            let total_authoring_payout_1 = Staking::authoring_rewards_in_era();
+            let total_authoring_payout_1 = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             // new era is triggered here.
             start_session(5, true);
             start_session(6, true);
             let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_1 > 10); // Test is meaningful if reward something
             payout_all_stakers(1);
-            assert_eq!(Staking::eras_total_stakes(2), 148371513234946);
             // pay time
             assert_eq!(
                 Balances::total_balance(&10) / 10000000,
@@ -411,7 +410,7 @@ fn era_reward_with_dsm_staking_pot_should_work() {
     ExtBuilder::default()
         .guarantee(false)
         .own_workload(u128::max_value())
-        .staking_pot(400_000_000_000_000)
+        .staking_pot(100_000_000_000_000)
         .dsm_staking_payout(dsm_staking_payout_per_era * 5)
         .build()
         .execute_with(|| {
@@ -425,7 +424,7 @@ fn era_reward_with_dsm_staking_pot_should_work() {
             ));
 
             // Compute now as other parameter won't change
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
             assert_eq!(Staking::eras_total_stakes(0), 2001);
@@ -459,7 +458,6 @@ fn era_reward_with_dsm_staking_pot_should_work() {
             start_session(5, true);
             start_session(6, true);
             payout_all_stakers(1);
-            assert_eq!(Staking::eras_total_stakes(2), 198396500634946);
             // pay time
             // staking pot is not enough
             // only dsm staking payout
@@ -487,7 +485,7 @@ fn era_reward_should_fail_due_to_insufficient_staking_pot() {
     // total_stakes and session_reward.
     ExtBuilder::default()
         .guarantee(false)
-        .staking_pot(400_000_000_000_000)
+        .staking_pot(100_000_000_000_000)
         .own_workload(u128::max_value())
         .build()
         .execute_with(|| {
@@ -501,7 +499,7 @@ fn era_reward_should_fail_due_to_insufficient_staking_pot() {
             ));
 
             // Compute now as other parameter won't change
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
             assert_eq!(Staking::eras_total_stakes(0), 2001);
@@ -539,7 +537,7 @@ fn era_reward_should_fail_due_to_insufficient_staking_pot() {
             // Payout would fail because staking pot doesn't have enough money
             payout_all_stakers(1);
 
-            assert_eq!(Staking::eras_total_stakes(2), 148371513234946);
+            assert_eq!(Staking::eras_total_stakes(2), 36981737287258);
             // Staking pot doesn't have enough money
             assert_eq!(
                 Balances::total_balance(&10) / 10000000,
@@ -555,7 +553,7 @@ fn era_reward_should_fail_due_to_insufficient_staking_pot() {
             );
             assert_eq!(
                 Balances::total_balance(&Staking::staking_pot()) / 1000000,
-                109103353 // 400_000_000_000_000 - 285192790326260 - 5703855806525
+                38384299 // 100_000_000_000_000 - 285192790326260 - 5703855806525
             );
         });
 }
@@ -781,7 +779,7 @@ fn guaranteeing_and_rewards_should_work() {
             ));
 
             // the total reward for era 0
-            let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
+            let total_authoring_payout_0 = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 100); // Test is meaningful if reward something
             <Module<Test>>::reward_by_ids(vec![(21, 1)]);
@@ -797,10 +795,10 @@ fn guaranteeing_and_rewards_should_work() {
 
             payout_all_stakers(0);
             // OLD validators must have already received some rewards.
-            assert_eq!(Balances::total_balance(&20), 1 + total_authoring_payout_0 / 4 + total_staking_payout_0 / 4);
-            assert_eq!(Balances::total_balance(&30), 1000 + total_authoring_payout_0 / 4 + total_staking_payout_0 / 4);
-            assert_eq!(Balances::total_balance(&40), 1000 + total_authoring_payout_0 / 4 + total_staking_payout_0 / 4);
-            assert_eq!(Balances::total_balance(&10), 1 + total_authoring_payout_0 / 4 + total_staking_payout_0 / 4);
+            assert_eq!(Balances::total_balance(&20), 1 + (total_authoring_payout_0 + total_staking_payout_0) / 4);
+            assert_eq!(Balances::total_balance(&30), 1000 + (total_authoring_payout_0 + total_staking_payout_0) / 4);
+            assert_eq!(Balances::total_balance(&40), 1000 + (total_authoring_payout_0 + total_staking_payout_0) / 4);
+            assert_eq!(Balances::total_balance(&10), 1 + (total_authoring_payout_0 + total_staking_payout_0) / 4);
 
             // ------ check the staked value of all parties.
             if cfg!(feature = "equalize") {
@@ -1345,7 +1343,7 @@ fn cannot_reserve_staked_balance() {
             );
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
@@ -1437,7 +1435,7 @@ fn cannot_reserve_staked_balance() {
 }*/
 
 #[test]
-fn staking_reward_change_work() {
+fn staking_and_authoring_reward_change_work() {
     ExtBuilder::default()
         .guarantee(false)
         .build()
@@ -1445,15 +1443,20 @@ fn staking_reward_change_work() {
             // Make 1 account be max balance
             let _ = Balances::make_free_balance_be(&11, Balance::max_value());
             // If 1 era is 30 min, Julian year should contains 17532 eras.
-            // If era_num < 17532, staking_rewards should be
-            assert_eq!(Staking::staking_rewards_in_era(17530), 285192790326260);
-            assert_eq!(Staking::staking_rewards_in_era(17531), 285192790326260);
-            // era_num >= 17532 & era_num <= 35064, staking_rewards should be
-            assert_eq!(Staking::staking_rewards_in_era(35000), 228154232261008);
-            // TODO: for test case max issue is 18446744
-            // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be
-            assert_eq!(Balances::total_issuance(), u64::max_value());
-            assert_eq!(Staking::staking_rewards_in_era(631152), (184467440737095516 / ((36525*48) / 100)));
+            // If era_num < 4382, staking_rewards should be
+            assert_eq!(Staking::staking_rewards_in_era(4381), 49292560474669);
+            assert_eq!(Staking::staking_rewards_in_era(4382), 24646280237334);
+            // era_num >= 4382 & era_num <= 8763, staking_rewards should be
+            assert_eq!(Staking::staking_rewards_in_era(8764), 12323140118667);
+
+            assert_eq!(Staking::authoring_rewards_in_era(4381), 12323140118667);
+            assert_eq!(Staking::authoring_rewards_in_era(4382), 6161570059333);
+            // era_num >= 4382 & era_num <= 8763, staking_rewards should be
+            assert_eq!(Staking::authoring_rewards_in_era(8764), 3080785029666);
+            // // TODO: for test case max issue is 18446744
+            // // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be
+            // assert_eq!(Balances::total_issuance(), u64::max_value());
+            // assert_eq!(Staking::staking_rewards_in_era(631152), (184467440737095516 / ((36525*48) / 100)));
         })
 }
 
@@ -1511,7 +1514,7 @@ fn validator_payment_prefs_work() {
         );
 
         // Compute total payout now for whole duration as other parameter won't change
-        let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
+        let total_authoring_payout_0 = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
         let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
         assert_eq!(Staking::eras_total_stakes(0), 2001); // Test is meaningfull if reward something
         <Module<Test>>::reward_by_ids(vec![(11, 1)]);
@@ -1867,7 +1870,7 @@ fn too_many_unbond_calls_should_not_work() {
             );
 
             // Compute total payout now for whole duration as other parameter won't change
-            let total_authoring_payout_0 = Staking::authoring_rewards_in_era();
+            let total_authoring_payout_0 = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 100); // Test is meaningfull if reward something
             <Module<Test>>::reward_by_ids(vec![(11, 1)]);
@@ -2273,9 +2276,9 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
 
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
-            assert_eq!(total_staking_payout_0, 285192790326260);
-            assert_eq!(total_authoring_payout, 5703855806525);
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert_eq!(total_staking_payout_0, 49292560474669); // ~ 50/era
+            assert_eq!(total_authoring_payout, 12323140118667);
             reward_all_elected();
             start_era(1, true);
 
@@ -2294,25 +2297,24 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             assert_eq!(Balances::free_balance(&2), init_balance_2);
 
             let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-            assert_eq!(total_staking_payout_1, 285192790326260); // Test is meaningful if reward something
+            assert_eq!(total_staking_payout_1, 49292560474669); // Test is meaningful if reward something
             reward_all_elected();
             start_era(2, true);
 
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
-            // Stake limit strategy effecting
-            assert_eq!(Staking::eras_total_stakes(2), /*291396645848756*/ 144426417598396);
+            assert_eq!(Staking::eras_total_stakes(2), /*291396645848756*/ 28741676580276);
             payout_all_stakers(1);
             Staking::reward_stakers(Origin::signed(10), 1, 1).unwrap();
             // round to 0.000001 CRU
             assert_eq!(
                 Balances::free_balance(&2) / 1000000,
-                (init_balance_2 + total_authoring_payout / 3 + total_staking_payout_1 * 2 / 2002) / 1000000 - 1,
+                (init_balance_2 + total_authoring_payout / 3 + total_staking_payout_1 * 2 / 2002) / 1000000,
             );
             // round to 0.000001 CRU
             assert_eq!(
                 Balances::free_balance(&10) / 1000000,
                 (init_balance_10 + total_authoring_payout / 3 * 2 +
-                    total_staking_payout_0 * 1000 / 2001 + total_staking_payout_1 * 1000 / 2002) / 1000000 - 1,
+                    total_staking_payout_0 * 1000 / 2001 + total_staking_payout_1 * 1000 / 2002) / 1000000,
             );
             check_exposure_all();
             check_guarantor_all();
@@ -2369,8 +2371,8 @@ fn reward_with_no_stake_limit() {
             ));
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
-            assert_eq!(total_authoring_payout, 5703855806525);
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
+            assert_eq!(total_authoring_payout, 12323140118667); // ~ 12.5/era
             reward_all_elected();
             start_era(1, true);
 
@@ -4271,7 +4273,7 @@ fn double_claim_rewards_should_fail() {
             ));
 
             // Compute now as other parameter won't change
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_authoring_payout > 10); // Test is meaningful if reward something
             assert_eq!(Staking::eras_total_stakes(0), 2001);
@@ -4393,14 +4395,14 @@ fn payout_to_any_account_works() {
 fn recharge_staking_pot_should_work() {
     ExtBuilder::default()
         .guarantee(false)
-        .staking_pot(400_000_000_000_000)
+        .staking_pot(100_000_000_000_000)
         .own_workload(u128::max_value())
         .build()
         .execute_with(|| {
             let init_balance_10 = Balances::total_balance(&10);
             let init_balance_21 = Balances::total_balance(&21);
             let founder = 9999;
-            let _ = Balances::deposit_creating(&founder, 400_000_000_000_000);
+            let _ = Balances::deposit_creating(&founder, 150_000_000_000_000);
 
             // Set payee to controller
             assert_ok!(Staking::set_payee(
@@ -4409,7 +4411,7 @@ fn recharge_staking_pot_should_work() {
             ));
 
             // Compute now as other parameter won't change
-            let total_authoring_payout = Staking::authoring_rewards_in_era();
+            let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
             assert_eq!(Staking::eras_total_stakes(0), 2001);
@@ -4439,13 +4441,12 @@ fn recharge_staking_pot_should_work() {
             start_session(4, true);
 
             <Module<Test>>::reward_by_ids(vec![(21, 101)]); // meaningless points
-            Staking::recharge_staking_pot(Origin::signed(founder), 300_000_000_000_000).expect("Something wrong during recharging the staking pot");
+            Staking::recharge_staking_pot(Origin::signed(founder), 100_000_000_000_000).expect("Something wrong during recharging the staking pot");
             // new era is triggered here.
             start_session(5, true);
             start_session(6, true);
             let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             payout_all_stakers(1);
-            assert_eq!(Staking::eras_total_stakes(2), 148371513234946);
             // pay time
             assert_eq!(
                 Balances::total_balance(&10) / 10000000,
@@ -4462,10 +4463,10 @@ fn recharge_staking_pot_should_work() {
             );
             assert_eq!(
                 Balances::total_balance(&Staking::staking_pot()) / 1000000,
-                118206707 // 400_000_000_000_000 - 285192790326260 - 5703855806525 + 300_000_000_000_000 - 285192790326260 - 5703855806525
+                76768598 // 100_000_000_000_000 - 49292560474669 - 12323140118667 + 150_000_000_000_000 - 49292560474669 - 12323140118667
             );
             assert_noop!(
-                Staking::recharge_staking_pot(Origin::signed(founder), 300_000_000_000_000),
+                Staking::recharge_staking_pot(Origin::signed(founder), 200_000_000_000_000),
                 DispatchError::Module {
                     index: 0,
                     error: 13,

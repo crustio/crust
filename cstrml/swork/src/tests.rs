@@ -282,7 +282,6 @@ fn report_works_should_work() {
             });
             assert_eq!(Swork::pub_keys(legal_pk.clone()), PKInfo {
                 code: LegalCode::get(),
-                allow_report_slot: 0,
                 anchor: Some(legal_pk.clone())
             });
 

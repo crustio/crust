@@ -1934,7 +1934,7 @@ impl<T: Config> Module<T> {
         // reward_this_era.try_into().ok().unwrap()
         let mut maybe_rewards_this_quarter = FIRST_QUARTER_AUTHORING_REWARDS ;
         const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9131 / 100;
-        // 1 quarter = (30.44d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+        // 1 quarter = (91.31d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
         let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
         let quarter_num = active_era as u64 / quarter_in_eras;
         for _ in 0..quarter_num {
@@ -1972,7 +1972,7 @@ impl<T: Config> Module<T> {
         // reward_this_era.try_into().ok().unwrap()
         let mut maybe_rewards_this_quarter = FIRST_QUARTER_STAKING_REWARDS ;
         const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9131 / 100;
-        // 1 quarter = (30.44d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+        // 1 quarter = (91.31d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
         let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
         let quarter_num = active_era as u64 / quarter_in_eras;
         for _ in 0..quarter_num {

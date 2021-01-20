@@ -463,6 +463,7 @@ decl_module! {
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
+                        identity.punishment_deadline = slot;
                         <Identities<T>>::insert(&reporter, identity);
                     },
                     // 9.3 first register scenario
@@ -600,8 +601,8 @@ impl<T: Config> Module<T> {
         );
         // 2. Loop all identities and get the workload map
         let mut workload_map= BTreeMap::new();
-        for (reporter, id) in <Identities<T>>::iter() {
-            let (free, used) = Self::get_workload(&reporter, &id, current_rs);
+        for (reporter, mut id) in <Identities<T>>::iter() {
+            let (free, used) = Self::get_workload(&reporter, &mut id, current_rs);
             total_used = total_used.saturating_add(used);
             total_free = total_free.saturating_add(free);
             let mut owner = reporter;
@@ -742,10 +743,10 @@ impl<T: Config> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(reporter: &T::AccountId, id: &Identity<T::AccountId>, current_rs: u64) -> (u128, u128) {
+    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(&id.anchor) {
-            if Self::can_add_stake_limit(reporter, id, current_rs) {
+            if Self::is_fully_reported(reporter, id, current_rs) {
                 return (wr.free as u128, wr.used as u128)
             }
         }
@@ -759,16 +760,14 @@ impl<T: Config> Module<T> {
         (0, 0)
     }
 
-    fn can_add_stake_limit(reporter: &T::AccountId, id: &Identity<T::AccountId>, current_rs: u64) -> bool {
+    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {
         if current_rs < id.punishment_deadline {
             // punish it anyway and don't refresh the deadline.
             return false;
         } else if !Self::reported_in_slot(&id.anchor, current_rs) {
             // should have wr. punish it again and refresh the deadline.
-            <Identities<T>>::mutate(reporter, |maybe_id| match *maybe_id {
-                Some(ref mut id) => id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT),
-                None => {}
-            });
+            id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
+            <Identities<T>>::insert(reporter, id);
             return false;
         }
         return true;

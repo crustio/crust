@@ -392,9 +392,6 @@ decl_module! {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // TODO: Remove this check later
-            ensure!(Self::is_allowed(&who), Error::<T>::NotPermitted);
-
             // 1. Reject a pledge which is considered to be _dust_.
             ensure!(pledge >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
@@ -433,9 +430,6 @@ decl_module! {
         pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // TODO: Remove this check later
-            ensure!(Self::is_allowed(&who), Error::<T>::NotPermitted);
-
             // 1. Reject a pledge which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
@@ -467,9 +461,6 @@ decl_module! {
         #[weight = 1000]
         pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
-
-            // TODO: Remove this check later
-            ensure!(Self::is_allowed(&who), Error::<T>::NotPermitted);
 
             // 1. Reject a pledge which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
@@ -508,7 +499,7 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // TODO: Remove this check later
-            ensure!(Self::is_allowed(&who), Error::<T>::NotPermitted);
+            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
 
             // 1. Calculate amount.
             let mut charged_file_size = reported_file_size;
@@ -558,7 +549,7 @@ decl_module! {
             let who = ensure_signed(origin)?;
 
             // TODO: Remove this check later
-            ensure!(Self::is_allowed(&who), Error::<T>::NotPermitted);
+            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
 
             let curr_bn = Self::get_current_block_number();
             Self::calculate_payout(&cid, curr_bn);
@@ -609,11 +600,6 @@ impl<T: Config> Module<T> {
     pub fn reserved_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "rese" is 16 bytes
         T::ModuleId::get().into_sub_account("rese")
-    }
-
-    fn is_allowed(who: &T::AccountId) -> bool {
-        let members = Self::allow_list();
-        members.contains(who)
     }
 
     /// Calculate payout from file's replica

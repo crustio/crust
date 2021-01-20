@@ -2353,13 +2353,16 @@ fn allow_list_should_work() {
         // generate 50 blocks first
         run_to_block(50);
 
-        let merchant = ZIKUN;
-        let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
+        let source = ZIKUN;
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 134289408; // should less than merchant
 
         assert_noop!(
-            Market::register(
-                Origin::signed(merchant.clone()),
-                6_000_000
+            Market::place_storage_order(
+                Origin::signed(source.clone()), cid.clone(),
+                file_size, 0, false
             ),
             DispatchError::Module {
                 index: 0,
@@ -2367,7 +2370,10 @@ fn allow_list_should_work() {
                 message: Some("NotPermitted")
             }
         );
-        assert_ok!(Market::add_member_into_allow_list(Origin::root(), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
+        assert_ok!(Market::add_member_into_allow_list(Origin::root(), source.clone()));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
     });
 }

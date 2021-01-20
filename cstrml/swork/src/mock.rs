@@ -616,13 +616,8 @@ pub fn register_identity(who: &AccountId, pk: &SworkerPubKey, anchor: &SworkerAn
     });
     <self::Identities<Test>>::insert(who, Identity {
         anchor: anchor.clone(),
+        punishment_deadline: 0,
         group: None
-    });
-}
-
-pub fn allow_report_work(pk: &SworkerPubKey, slot: ReportSlot) {
-    <self::PubKeys>::mutate(pk, |pk_info| {
-        pk_info.allow_report_slot = slot;
     });
 }
 

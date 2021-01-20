@@ -84,7 +84,6 @@ pub struct WorkReport {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PKInfo {
     pub code: SworkerCode,
-    pub allow_report_slot: ReportSlot,
     pub anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
 }
 
@@ -94,6 +93,7 @@ pub struct Identity<AccountId> {
     /// The unique identity associated to one account id.
     /// During the AB upgrade, this anchor would keep and won't change.
     pub anchor: SworkerAnchor,
+    pub punishment_deadline: ReportSlot,
     pub group: Option<AccountId>
 }
 
@@ -240,9 +240,7 @@ decl_error! {
         /// Group already exist
         GroupAlreadyExist,
         /// Group owner cannot register
-        GroupOwnerForbidden,
-        /// Cannot report works right now due to offline in the past time
-        UnderPunishment
+        GroupOwnerForbidden
     }
 }
 
@@ -368,26 +366,23 @@ decl_module! {
             // 1. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
-            // 2. Ensure wr is allowed.
-            ensure!(Self::can_report_works(&curr_pk, slot), Error::<T>::UnderPunishment);
-
-            // 3. Ensure who cannot be group owner
+            // 2. Ensure who cannot be group owner
             ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
             
-            // 4. Ensure reporter's code is legal
+            // 3. Ensure reporter's code is legal
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
-            // 5. Decide which scenario
+            // 4. Decide which scenario
             let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
             let is_ab_upgrade = maybe_anchor.is_none() && !ab_upgrade_pk.is_empty();
             let is_first_report = maybe_anchor.is_none() && ab_upgrade_pk.is_empty();
 
-            // 6. Unique Check for normal report work for curr pk
+            // 5. Unique Check for normal report work for curr pk
             if let Some(anchor) = maybe_anchor {
                 // Normally report works.
-                // 6.1 Ensure Identity's anchor be same with current pk's anchor
+                // 5.1 Ensure Identity's anchor be same with current pk's anchor
                 ensure!(Self::identities(&reporter).unwrap_or_default().anchor == anchor, Error::<T>::IllegalReporter);
-                // 6.2 Already reported with same pub key in the same slot, return immediately
+                // 5.2 Already reported with same pub key in the same slot, return immediately
                 if Self::reported_in_slot(&anchor, slot) {
                     log!(
                         trace,
@@ -400,10 +395,10 @@ decl_module! {
                 }
             }
 
-            // 7. Timing check
+            // 6. Timing check
             ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 8. Ensure sig is legal
+            // 7. Ensure sig is legal
             ensure!(
                 Self::work_report_sig_check(
                     &curr_pk,
@@ -421,15 +416,15 @@ decl_module! {
                 Error::<T>::IllegalWorkReportSig
             );
 
-            // 9. Files storage status transition check
+            // 8. Files storage status transition check
             if is_ab_upgrade {
-                // 9.1 Previous pk should already reported works
+                // 8.1 Previous pk should already reported works
                 ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
                 // unwrap_or_default is a small tricky solution
                 let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
 
-                // 9.2 Current work report should NOT be changed at all
+                // 8.2 Current work report should NOT be changed at all
                 let prev_wr = maybe_prev_wr.unwrap();
                 ensure!(added_files.is_empty() &&
                     deleted_files.is_empty() &&
@@ -437,7 +432,7 @@ decl_module! {
                     prev_wr.reported_srd_root == reported_srd_root,
                     Error::<T>::ABUpgradeFailed);
 
-                // 9.3 Set the real previous public key(contains work report);
+                // 8.3 Set the real previous public key(contains work report);
                 prev_pk = ab_upgrade_pk.clone();
             } else {
                 ensure!(
@@ -452,9 +447,9 @@ decl_module! {
                 );
             }
 
-            // 10. Finish register
+            // 9. Finish register
             if is_ab_upgrade {
-                // 10.1 Transfer A's status to B and delete old A's storage status
+                // 9.1 Transfer A's status to B and delete old A's storage status
                 let prev_pk_info = Self::pub_keys(&prev_pk);
                 PubKeys::mutate(&curr_pk, |curr_pk_info| {
                     curr_pk_info.anchor = prev_pk_info.anchor;
@@ -464,16 +459,18 @@ decl_module! {
             } else if is_first_report {
                 let mut pk_info = Self::pub_keys(&curr_pk);
                 match Self::identities(&reporter) {
-                    // 10.2 re-register scenario
+                    // 9.2 re-register scenario
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
+                        identity.punishment_deadline = slot;
                         <Identities<T>>::insert(&reporter, identity);
                     },
-                    // 10.3 first register scenario
+                    // 9.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),
+                            punishment_deadline: slot,
                             group: None
                         };
                         <Identities<T>>::insert(&reporter, identity);
@@ -483,7 +480,7 @@ decl_module! {
                 PubKeys::insert(&curr_pk, pk_info);
             }
 
-            // 11. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
+            // 10. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
             // a. Upsert work report
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
@@ -502,7 +499,7 @@ decl_module! {
                 slot,
             );
 
-            // 12. Emit work report event
+            // 11. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
             Ok(Pays::No.into())
@@ -604,8 +601,8 @@ impl<T: Config> Module<T> {
         );
         // 2. Loop all identities and get the workload map
         let mut workload_map= BTreeMap::new();
-        for (reporter, id) in <Identities<T>>::iter() {
-            let (free, used) = Self::get_workload(&id.anchor, current_rs);
+        for (reporter, mut id) in <Identities<T>>::iter() {
+            let (free, used) = Self::get_workload(&reporter, &mut id, current_rs);
             total_used = total_used.saturating_add(used);
             total_free = total_free.saturating_add(free);
             let mut owner = reporter;
@@ -640,7 +637,6 @@ impl<T: Config> Module<T> {
     pub fn insert_pk_info(pk: SworkerPubKey, code: SworkerCode) {
         let pk_info = PKInfo {
             code,
-            allow_report_slot: 0,
             anchor: None
         };
 
@@ -747,10 +743,10 @@ impl<T: Config> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(anchor: &SworkerAnchor, current_rs: u64) -> (u128, u128) {
+    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128) {
         // Got work report
-        if let Some(wr) = Self::work_reports(anchor) {
-            if Self::reported_in_slot(anchor, current_rs) {
+        if let Some(wr) = Self::work_reports(&id.anchor) {
+            if Self::is_fully_reported(reporter, id, current_rs) {
                 return (wr.free as u128, wr.used as u128)
             }
         }
@@ -758,10 +754,23 @@ impl<T: Config> Module<T> {
         log!(
             debug,
             "🔒 No workload for anchor {:?} in slot {:?}",
-            anchor,
+            &id.anchor,
             current_rs
         );
         (0, 0)
+    }
+
+    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {
+        if current_rs < id.punishment_deadline {
+            // punish it anyway and don't refresh the deadline.
+            return false;
+        } else if !Self::reported_in_slot(&id.anchor, current_rs) {
+            // should have wr. punish it again and refresh the deadline.
+            id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
+            <Identities<T>>::insert(reporter, id);
+            return false;
+        }
+        return true;
     }
 
     // PRIVATE IMMUTABLES
@@ -836,17 +845,6 @@ impl<T: Config> Module<T> {
         );
 
         Ok(())
-    }
-
-    fn can_report_works(pk: &SworkerPubKey, block_number: u64) -> bool {
-        let mut pk_info = Self::pub_keys(pk);
-        // first time, allow report or reported in the last time
-        let is_ok = pk_info.anchor.is_none() || pk_info.allow_report_slot == block_number || Self::reported_in_slot(pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
-        if !is_ok && block_number > pk_info.allow_report_slot{
-            pk_info.allow_report_slot = block_number + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
-            PubKeys::insert(pk, pk_info);
-        }
-        is_ok
     }
 
     fn work_report_sig_check(

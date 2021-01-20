@@ -56,6 +56,8 @@ benchmarks! {
 
     register {
         let user = create_funded_user::<T>("user", 100);
+        let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
+        Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
     verify {
         assert_eq!(Market::<T>::merchant_ledgers(&user), MerchantLedger {
@@ -66,6 +68,8 @@ benchmarks! {
 
     pledge_extra {
         let user = create_funded_user::<T>("user", 100);
+        let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
+        Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
         Market::<T>::register(RawOrigin::Signed(user.clone()).into(), T::Currency::minimum_balance() * 10u32.into()).expect("Something wrong during registering");
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
     verify {
@@ -77,6 +81,8 @@ benchmarks! {
 
     cut_pledge {
         let user = create_funded_user::<T>("user", 100);
+        let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
+        Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
         Market::<T>::register(RawOrigin::Signed(user.clone()).into(), T::Currency::minimum_balance() * 100u32.into()).expect("Something wrong during registering");
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
     verify {
@@ -88,6 +94,8 @@ benchmarks! {
 
     place_storage_order {
         let user = create_funded_user::<T>("user", 100);
+        let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
+        Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];
@@ -100,6 +108,8 @@ benchmarks! {
 
     calculate_reward {
         let user = create_funded_user::<T>("user", 100);
+        let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
+        Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];

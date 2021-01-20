@@ -2346,3 +2346,28 @@ fn files_size_should_not_be_decreased_twice() {
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
     });
 }
+
+#[test]
+fn allow_list_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let merchant = ZIKUN;
+        let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
+
+        assert_noop!(
+            Market::register(
+                Origin::signed(merchant.clone()),
+                6_000_000
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 7,
+                message: Some("NotPermitted")
+            }
+        );
+        assert_ok!(Market::add_member_into_allow_list(Origin::root(), merchant.clone()));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
+    });
+}

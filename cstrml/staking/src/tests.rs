@@ -1458,6 +1458,11 @@ fn staking_and_authoring_reward_change_work() {
             assert_eq!(Staking::authoring_rewards_in_era(14382), 6161570059333);
             // era_num >= 4382 & era_num <= 8763, staking_rewards should be
             assert_eq!(Staking::authoring_rewards_in_era(18764), 3080785029666);
+
+            assert_ok!(Staking::set_start_reward_era(Origin::root(), 20000));
+            assert_eq!(Staking::staking_rewards_in_era(18764), 49292560474669);
+            assert_eq!(Staking::staking_rewards_in_era(18765), 49292560474669);
+            assert_eq!(Staking::staking_rewards_in_era(24382), 24646280237334);
             // // TODO: for test case max issue is 18446744
             // // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be
             // assert_eq!(Balances::total_issuance(), u64::max_value());

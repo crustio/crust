@@ -280,6 +280,10 @@ fn report_works_should_work() {
                 punishment_deadline: 300,
                 group: None
             });
+            assert_eq!(Swork::pub_keys(legal_pk.clone()), PKInfo {
+                code: LegalCode::get(),
+                anchor: Some(legal_pk.clone())
+            });
 
             // Check same file all been confirmed
             assert_eq!(Market::files(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap()).unwrap_or_default().0, FileInfo {

@@ -472,6 +472,9 @@ decl_storage! {
         /// Information is kept for eras in `[current_era - history_depth; current_era]`.
         HistoryDepth get(fn history_depth) config(): u32 = 84;
 
+        /// Start era for reward curve
+        StartRewardEra get(fn start_reward_era) config(): EraIndex = 100000;
+
         /// Map from all locked "stash" accounts to the controller account.
         pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
 
@@ -1388,6 +1391,13 @@ decl_module! {
             Self::kill_stash(&stash)?;
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
+
+        // TODO: Remove it in the main net
+        #[weight = 1000]
+        fn set_start_reward_era(origin, start_reward_era: EraIndex) {
+            ensure_root(origin)?;
+            StartRewardEra::put(start_reward_era);
+        }
     }
 }
 
@@ -1936,7 +1946,7 @@ impl<T: Config> Module<T> {
         const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9131 / 100;
         // 1 quarter = (91.31d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
         let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        let quarter_num = active_era as u64 / quarter_in_eras;
+        let quarter_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / quarter_in_eras;
         for _ in 0..quarter_num {
             maybe_rewards_this_quarter = maybe_rewards_this_quarter / 2;
         }
@@ -1974,7 +1984,7 @@ impl<T: Config> Module<T> {
         const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9131 / 100;
         // 1 quarter = (91.31d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
         let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        let quarter_num = active_era as u64 / quarter_in_eras;
+        let quarter_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / quarter_in_eras;
         for _ in 0..quarter_num {
             maybe_rewards_this_quarter = maybe_rewards_this_quarter / 2;
         }

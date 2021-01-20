@@ -1438,21 +1438,26 @@ fn cannot_reserve_staked_balance() {
 fn staking_and_authoring_reward_change_work() {
     ExtBuilder::default()
         .guarantee(false)
+        .start_reward_era(10000)
         .build()
         .execute_with(|| {
             // Make 1 account be max balance
             let _ = Balances::make_free_balance_be(&11, Balance::max_value());
+            // less than 10000
+            assert_eq!(Staking::staking_rewards_in_era(4381), 49292560474669);
+            assert_eq!(Staking::staking_rewards_in_era(8382), 49292560474669);
             // If 1 era is 30 min, Julian year should contains 17532 eras.
             // If era_num < 4382, staking_rewards should be
-            assert_eq!(Staking::staking_rewards_in_era(4381), 49292560474669);
-            assert_eq!(Staking::staking_rewards_in_era(4382), 24646280237334);
+            assert_eq!(Staking::staking_rewards_in_era(14381), 49292560474669);
+            assert_eq!(Staking::staking_rewards_in_era(14381), 49292560474669);
+            assert_eq!(Staking::staking_rewards_in_era(14382), 24646280237334);
             // era_num >= 4382 & era_num <= 8763, staking_rewards should be
-            assert_eq!(Staking::staking_rewards_in_era(8764), 12323140118667);
+            assert_eq!(Staking::staking_rewards_in_era(18764), 12323140118667);
 
-            assert_eq!(Staking::authoring_rewards_in_era(4381), 12323140118667);
-            assert_eq!(Staking::authoring_rewards_in_era(4382), 6161570059333);
+            assert_eq!(Staking::authoring_rewards_in_era(14381), 12323140118667);
+            assert_eq!(Staking::authoring_rewards_in_era(14382), 6161570059333);
             // era_num >= 4382 & era_num <= 8763, staking_rewards should be
-            assert_eq!(Staking::authoring_rewards_in_era(8764), 3080785029666);
+            assert_eq!(Staking::authoring_rewards_in_era(18764), 3080785029666);
             // // TODO: for test case max issue is 18446744
             // // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be
             // assert_eq!(Balances::total_issuance(), u64::max_value());

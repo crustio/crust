@@ -537,7 +537,7 @@ fn era_reward_should_fail_due_to_insufficient_staking_pot() {
             // Payout would fail because staking pot doesn't have enough money
             payout_all_stakers(1);
 
-            assert_eq!(Staking::eras_total_stakes(2), 36981737287258);
+            assert_eq!(Staking::eras_total_stakes(2), 37512493702001);
             // Staking pot doesn't have enough money
             assert_eq!(
                 Balances::total_balance(&10) / 10000000,
@@ -553,7 +553,7 @@ fn era_reward_should_fail_due_to_insufficient_staking_pot() {
             );
             assert_eq!(
                 Balances::total_balance(&Staking::staking_pot()) / 1000000,
-                38384299 // 100_000_000_000_000 - 285192790326260 - 5703855806525
+                37500000 // 100_000_000_000_000 - 5000000000000 - 125000000000
             );
         });
 }
@@ -1444,25 +1444,24 @@ fn staking_and_authoring_reward_change_work() {
             // Make 1 account be max balance
             let _ = Balances::make_free_balance_be(&11, Balance::max_value());
             // less than 10000
-            assert_eq!(Staking::staking_rewards_in_era(4381), 49292560474669);
-            assert_eq!(Staking::staking_rewards_in_era(8382), 49292560474669);
+            assert_eq!(Staking::staking_rewards_in_era(4381), 50000000000000);
+            assert_eq!(Staking::staking_rewards_in_era(8382), 50000000000000);
             // If 1 era is 30 min, Julian year should contains 17532 eras.
             // If era_num < 4382, staking_rewards should be
-            assert_eq!(Staking::staking_rewards_in_era(14381), 49292560474669);
-            assert_eq!(Staking::staking_rewards_in_era(14381), 49292560474669);
-            assert_eq!(Staking::staking_rewards_in_era(14382), 24646280237334);
+            assert_eq!(Staking::staking_rewards_in_era(14319), 50000000000000);
+            assert_eq!(Staking::staking_rewards_in_era(14320), 25000000000000);
             // era_num >= 4382 & era_num <= 8763, staking_rewards should be
-            assert_eq!(Staking::staking_rewards_in_era(18764), 12323140118667);
+            assert_eq!(Staking::staking_rewards_in_era(18640), 12500000000000);
 
-            assert_eq!(Staking::authoring_rewards_in_era(14381), 12323140118667);
-            assert_eq!(Staking::authoring_rewards_in_era(14382), 6161570059333);
+            assert_eq!(Staking::authoring_rewards_in_era(14319), 12500000000000);
+            assert_eq!(Staking::authoring_rewards_in_era(14320), 6250000000000);
             // era_num >= 4382 & era_num <= 8763, staking_rewards should be
-            assert_eq!(Staking::authoring_rewards_in_era(18764), 3080785029666);
+            assert_eq!(Staking::authoring_rewards_in_era(18640), 3125000000000);
 
             assert_ok!(Staking::set_start_reward_era(Origin::root(), 20000));
-            assert_eq!(Staking::staking_rewards_in_era(18764), 49292560474669);
-            assert_eq!(Staking::staking_rewards_in_era(18765), 49292560474669);
-            assert_eq!(Staking::staking_rewards_in_era(24382), 24646280237334);
+            assert_eq!(Staking::staking_rewards_in_era(18640), 50000000000000);
+            assert_eq!(Staking::staking_rewards_in_era(18640), 50000000000000);
+            assert_eq!(Staking::staking_rewards_in_era(24320), 25000000000000);
             // // TODO: for test case max issue is 18446744
             // // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be
             // assert_eq!(Balances::total_issuance(), u64::max_value());
@@ -2287,8 +2286,8 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
 
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
-            assert_eq!(total_staking_payout_0, 49292560474669); // ~ 50/era
-            assert_eq!(total_authoring_payout, 12323140118667);
+            assert_eq!(total_staking_payout_0, 50000000000000); // ~ 50/era
+            assert_eq!(total_authoring_payout, 12500000000000);
             reward_all_elected();
             start_era(1, true);
 
@@ -2307,12 +2306,12 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             assert_eq!(Balances::free_balance(&2), init_balance_2);
 
             let total_staking_payout_1 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-            assert_eq!(total_staking_payout_1, 49292560474669); // Test is meaningful if reward something
+            assert_eq!(total_staking_payout_1, 50000000000000); // Test is meaningful if reward something
             reward_all_elected();
             start_era(2, true);
 
             assert_eq_uvec!(validator_controllers(), vec![20, 10, 2]);
-            assert_eq!(Staking::eras_total_stakes(2), /*291396645848756*/ 28741676580276);
+            assert_eq!(Staking::eras_total_stakes(2), /*29154172864502*/ 29154172864502);
             payout_all_stakers(1);
             Staking::reward_stakers(Origin::signed(10), 1, 1).unwrap();
             // round to 0.000001 CRU
@@ -2382,7 +2381,7 @@ fn reward_with_no_stake_limit() {
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
             let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
-            assert_eq!(total_authoring_payout, 12323140118667); // ~ 12.5/era
+            assert_eq!(total_authoring_payout, 12500000000000); // ~ 12.5/era
             reward_all_elected();
             start_era(1, true);
 
@@ -4473,7 +4472,7 @@ fn recharge_staking_pot_should_work() {
             );
             assert_eq!(
                 Balances::total_balance(&Staking::staking_pot()) / 1000000,
-                76768598 // 100_000_000_000_000 - 49292560474669 - 12323140118667 + 150_000_000_000_000 - 49292560474669 - 12323140118667
+                75000000 // 100_000_000_000_000 - 50000000000000 - 1250000000000 + 150_000_000_000_000 - 50000000000000 - 1250000000000
             );
             assert_noop!(
                 Staking::recharge_staking_pot(Origin::signed(founder), 200_000_000_000_000),

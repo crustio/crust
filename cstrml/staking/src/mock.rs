@@ -669,11 +669,11 @@ fn init_swork_setup() {
     for (id, pk) in id_map {
         <swork::PubKeys>::insert(pk.clone(), swork::PKInfo {
             code: code.clone(),
-            allow_report_slot: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(id, swork::Identity {
             anchor: pk.clone(),
+            punishment_deadline: 0,
             group: None
         });
         <swork::WorkReports>::insert(pk.clone(), swork::WorkReport {

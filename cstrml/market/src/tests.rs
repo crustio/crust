@@ -2346,3 +2346,34 @@ fn files_size_should_not_be_decreased_twice() {
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
     });
 }
+
+#[test]
+fn allow_list_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ZIKUN;
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let cid =
+            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+        let file_size = 134289408; // should less than merchant
+
+        assert_noop!(
+            Market::place_storage_order(
+                Origin::signed(source.clone()), cid.clone(),
+                file_size, 0, false
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 7,
+                message: Some("NotPermitted")
+            }
+        );
+        assert_ok!(Market::add_member_into_allow_list(Origin::root(), source.clone()));
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+    });
+}

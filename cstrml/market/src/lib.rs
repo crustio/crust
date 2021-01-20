@@ -16,10 +16,10 @@ use frame_support::{
     }
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
-use frame_system::{self as system, ensure_signed};
+use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_runtime::{
     Perbill, ModuleId,
-    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
+    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}
 };
 
 #[cfg(feature = "std")]
@@ -296,6 +296,9 @@ pub trait Config: system::Config {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Config> as Market {
+        /// Allow List
+        pub AllowList get(fn allow_list): BTreeSet<T::AccountId>;
+
         /// Merchant Ledger
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
@@ -356,7 +359,10 @@ decl_error! {
         /// Reward length is too long
         RewardLengthTooLong,
         /// File size is not correct
-        FileSizeNotCorrect
+        FileSizeNotCorrect,
+        /// You are not permitted to this function
+        /// You are not in the whitelist
+        NotPermitted
     }
 }
 
@@ -492,6 +498,9 @@ decl_module! {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
+            // TODO: Remove this check later
+            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
+
             // 1. Calculate amount.
             let mut charged_file_size = reported_file_size;
             if let Some((file_info, _)) = Self::files(&cid) {
@@ -537,7 +546,11 @@ decl_module! {
             origin,
             cid: MerkleRoot,
         ) -> DispatchResult {
-            let _ = ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
+
+            // TODO: Remove this check later
+            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
+
             let curr_bn = Self::get_current_block_number();
             Self::calculate_payout(&cid, curr_bn);
             Self::try_to_close_file(&cid, curr_bn);
@@ -546,6 +559,21 @@ decl_module! {
         }
 
         // TODO: add claim_reward
+
+        /// Add it into allow list
+        #[weight = 1000]
+        pub fn add_member_into_allow_list(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            let member = T::Lookup::lookup(target)?;
+
+            <AllowList<T>>::mutate(|members| {
+                members.insert(member);
+            });
+            Ok(())
+        }
     }
 }
 

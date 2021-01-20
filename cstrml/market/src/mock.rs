@@ -30,6 +30,7 @@ pub const EVE: AccountId32 = AccountId32::new([4u8; 32]);
 pub const MERCHANT: AccountId32 = AccountId32::new([5u8; 32]);
 pub const DAVE: AccountId32 = AccountId32::new([6u8; 32]);
 pub const FERDIE: AccountId32 = AccountId32::new([7u8; 32]);
+pub const ZIKUN: AccountId32 = AccountId32::new([8u8; 32]);
 
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
@@ -200,10 +201,18 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     let mut ext: sp_io::TestExternalities = t.into();
     ext.execute_with(|| {
+        add_allow_list();
         init_swork_setup();
     });
 
     ext
+}
+
+pub fn add_allow_list() {
+    let allow_list = [ALICE, BOB, CHARLIE, EVE, MERCHANT, DAVE, FERDIE];
+    for member in allow_list.iter() {
+        Market::add_member_into_allow_list(Origin::root(), member.clone()).expect("Give permission failed");
+    }
 }
 
 pub fn init_swork_setup() {

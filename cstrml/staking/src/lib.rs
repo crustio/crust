@@ -472,6 +472,9 @@ decl_storage! {
         /// Information is kept for eras in `[current_era - history_depth; current_era]`.
         HistoryDepth get(fn history_depth) config(): u32 = 84;
 
+        /// Start era for reward curve
+        StartRewardEra get(fn start_reward_era) config(): EraIndex = 100000;
+
         /// Map from all locked "stash" accounts to the controller account.
         pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
 
@@ -1388,6 +1391,13 @@ decl_module! {
             Self::kill_stash(&stash)?;
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
+
+        // TODO: Remove it in the main net
+        #[weight = 1000]
+        fn set_start_reward_era(origin, start_reward_era: EraIndex) {
+            ensure_root(origin)?;
+            StartRewardEra::put(start_reward_era);
+        }
     }
 }
 
@@ -1862,7 +1872,7 @@ impl<T: Config> Module<T> {
                 let active_era_index = active_era.index.clone();
                 let points = <ErasRewardPoints<T>>::get(&active_era_index);
                 let mut imbalance = <PositiveImbalanceOf<T>>::zero();
-                let mut total_authoring_payout = Self::authoring_rewards_in_era();
+                let mut total_authoring_payout = Self::authoring_rewards_in_era(active_era_index);
                 let mut total_staking_payout = Self::staking_rewards_in_era(active_era_index);
 
                 // 1. Check whether staking pot has enough money
@@ -1922,42 +1932,63 @@ impl<T: Config> Module<T> {
     }
 
     /// Block authoring rewards per era, this won't be changed in every era
-    fn authoring_rewards_in_era() -> BalanceOf<T> {
-        // Milliseconds per year for the Julian year (365.25 days).
-        const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
-        // Initial with total rewards per year
-        let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-
-        let reward_this_era = BLOCK_AUTHORING_REWARDS / year_in_eras as u128;
-
+    fn authoring_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
+        // TODO: Enable this in the main net
+        // // Milliseconds per year for the Julian year (365.25 days).
+        // const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+        // // Initial with total rewards per year
+        // let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+        //
+        // let reward_this_era = BLOCK_AUTHORING_REWARDS / year_in_eras as u128;
+        //
+        // reward_this_era.try_into().ok().unwrap()
+        let mut maybe_rewards_this_quarter = FIRST_QUARTER_AUTHORING_REWARDS ;
+        const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9000 / 100;
+        // 1 quarter = (90d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+        let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+        let quarter_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / quarter_in_eras;
+        for _ in 0..quarter_num {
+            maybe_rewards_this_quarter = maybe_rewards_this_quarter / 2;
+        }
+        let reward_this_era = maybe_rewards_this_quarter / quarter_in_eras as u128;
         reward_this_era.try_into().ok().unwrap()
     }
 
     /// Staking rewards per era
-    fn staking_rewards_in_era(current_era: EraIndex) -> BalanceOf<T> {
-        let mut maybe_rewards_this_year = FIRST_YEAR_REWARDS ;
-        let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
-            .ok()
-            .unwrap();
-
-        // Milliseconds per year for the Julian year (365.25 days).
-        // TODO: add era duration to calculate each era's rewards
-        const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
-        // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
-        let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        let year_num = current_era as u64 / year_in_eras;
-        for _ in 0..year_num {
-            // If inflation <= 1%, stop reduce
-            if maybe_rewards_this_year <= total_issuance / 100 {
-                maybe_rewards_this_year = total_issuance / 100;
-                break;
-            }
-
-            maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
+    fn staking_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
+        // TODO: Enable this in the main net
+        // let mut maybe_rewards_this_year = FIRST_YEAR_REWARDS ;
+        // let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
+        //     .ok()
+        //     .unwrap();
+        //
+        // // Milliseconds per year for the Julian year (365.25 days).
+        // const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+        // // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+        // let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+        // let year_num = active_era as u64 / year_in_eras;
+        // for _ in 0..year_num {
+        //     // If inflation <= 1%, stop reduce
+        //     if maybe_rewards_this_year <= total_issuance / 100 {
+        //         maybe_rewards_this_year = total_issuance / 100;
+        //         break;
+        //     }
+        //
+        //     maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
+        // }
+        //
+        // let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
+        //
+        // reward_this_era.try_into().ok().unwrap()
+        let mut maybe_rewards_this_quarter = FIRST_QUARTER_STAKING_REWARDS ;
+        const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9000 / 100;
+        // 1 quarter = (90d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+        let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+        let quarter_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / quarter_in_eras;
+        for _ in 0..quarter_num {
+            maybe_rewards_this_quarter = maybe_rewards_this_quarter / 2;
         }
-
-        let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
-
+        let reward_this_era = maybe_rewards_this_quarter / quarter_in_eras as u128;
         reward_this_era.try_into().ok().unwrap()
     }
 

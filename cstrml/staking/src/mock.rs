@@ -268,7 +268,8 @@ pub struct ExtBuilder {
     own_workload: u128,
     total_workload: u128,
     staking_pot: Balance,
-    dsm_staking_payout: Balance
+    dsm_staking_payout: Balance,
+    start_reward_era: u32
 }
 
 impl Default for ExtBuilder {
@@ -286,7 +287,8 @@ impl Default for ExtBuilder {
             own_workload: 3000,
             total_workload: 3000,
             staking_pot: 1_000_000_000_000_000_000,
-            dsm_staking_payout: 0
+            dsm_staking_payout: 0,
+            start_reward_era: 0
         }
     }
 }
@@ -342,6 +344,10 @@ impl ExtBuilder {
     }
     pub fn dsm_staking_payout(mut self, amount: Balance) -> Self {
         self.dsm_staking_payout = amount;
+        self
+    }
+    pub fn start_reward_era(mut self, era_index: u32) -> Self {
+        self.start_reward_era = era_index;
         self
     }
     pub fn set_associated_consts(&self) {
@@ -436,6 +442,7 @@ impl ExtBuilder {
             minimum_validator_count: self.minimum_validator_count,
             invulnerables: self.invulnerables,
             slash_reward_fraction: Perbill::from_percent(10),
+            start_reward_era: self.start_reward_era,
             ..Default::default()
         }
         .assimilate_storage(&mut storage);

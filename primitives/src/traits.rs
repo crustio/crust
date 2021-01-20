@@ -29,7 +29,7 @@ pub trait MarketInterface<AccountId, Balance> {
 	fn upsert_replicas(who: &AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> u64;
 	// used for `delete_files`
 	// return real used size of this file
-	fn delete_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> u64;
+	fn delete_replicas(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64;
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;
 }

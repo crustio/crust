@@ -1820,7 +1820,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 7,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 1,
@@ -1843,7 +1843,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 2,
@@ -1925,7 +1925,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 1,
@@ -1948,7 +1948,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 55,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 1,
@@ -1972,7 +1972,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 22,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 0,
@@ -2040,6 +2040,12 @@ fn join_group_should_work_for_used_in_work_report() {
                 alice_wr_info.sig
             ));
 
+
+            // delete won't call calculate payout anymore and won't close the file
+            assert_eq!(Market::files(&file_a).is_some(), true);
+            assert_eq!(Market::files(&file_b).is_some(), true);
+            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_a.clone()));
+            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_b.clone()));
             assert_eq!(Market::files(&file_a), None);
             assert_eq!(Market::files(&file_b), None);
             assert_eq!(Market::used_trash_i(&file_b).is_some(), true);

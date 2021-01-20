@@ -205,7 +205,7 @@ impl swork::Works<AccountId> for TestStaking {
 
 impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
     fn upsert_replicas(_: &AID, _: &MerkleRoot, _: u64, _: &SworkerAnchor, _: u32, _: &Option<BTreeSet<AID>>) -> u64 { 0 }
-    fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> u64 { 0 }
+    fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor) -> u64 { 0 }
     fn withdraw_staking_pot() -> BalanceOf<Test> {
         BalanceOf::<Test>::from(DSM_STAKING_PAYOUT.with(|v| *v.borrow()))
     }

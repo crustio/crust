@@ -215,6 +215,14 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     // withdraw market staking pot for distributing staking reward
     fn withdraw_staking_pot() -> BalanceOf<T> {
         let staking_pot = Self::staking_pot();
+        if T::Currency::free_balance(&staking_pot) < T::Currency::minimum_balance() {
+            log!(
+                info,
+                "🏢 Market Staking Pot is empty."
+            );
+
+            return Zero::zero();
+        }
         // Leave the minimum balance to keep this account live.
         let staking_amount = T::Currency::free_balance(&staking_pot) - T::Currency::minimum_balance();
         let mut imbalance = <PositiveImbalanceOf<T>>::zero();
@@ -227,7 +235,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         ) {
             log!(
                 warn,
-                "🏢 Something wrong during withdrawing staking pot. This should never happen!"
+                "🏢 Something wrong during withdrawing staking pot. Admin/Council should pay attention to it."
             );
 
             return Zero::zero();

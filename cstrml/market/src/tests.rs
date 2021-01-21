@@ -1593,6 +1593,7 @@ fn withdraw_staking_pot_should_work() {
         let reserved_pot = Market::reserved_pot();
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
+        assert_eq!(Market::withdraw_staking_pot(), 0);
         assert_eq!(Balances::free_balance(&staking_pot), 0);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);

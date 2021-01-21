@@ -732,7 +732,7 @@ impl<T: Config> Module<T> {
             let curr_bn = Self::get_current_block_number();
             changed_files.iter().filter_map(|(cid, _, _)| {
                 // 2. If mapping to storage orders
-                Some((cid.clone(), T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn), curr_bn as u64))
+                Some((cid.clone(), T::MarketInterface::delete_replicas(reporter, cid, anchor), curr_bn as u64))
             }).collect()
         }
     }

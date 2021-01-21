@@ -2100,12 +2100,12 @@ fn dynamic_used_size_should_work() {
            }
         );
         for _ in 0..140 {
-            Market::delete_replicas(&merchant, &cid, &legal_pk, 403u32);
+            Market::delete_replicas(&merchant, &cid, &legal_pk);
         }
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            UsedInfo {
                used_size: 0,
-               reported_group_count: 0, // This would never happen in the real world.
+               reported_group_count: 219, // This would never happen in the real world.
                groups: BTreeMap::new()
            }
         );
@@ -2169,7 +2169,7 @@ fn delete_used_size_should_work() {
                groups: expected_groups.clone()
            }
         );
-        Market::delete_replicas(&merchant, &cid, &hex::decode("10").unwrap(), 403u32);
+        Market::delete_replicas(&merchant, &cid, &hex::decode("10").unwrap());
         expected_groups.remove(&hex::decode("10").unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            UsedInfo {
@@ -2179,21 +2179,17 @@ fn delete_used_size_should_work() {
            }
         );
 
-        for i in 11..20 {
+        for i in 11..30 {
             let key = hex::decode(i.to_string()).unwrap();
             <swork::ReportedInSlot>::insert(key.clone(), 300, true);
             expected_groups.insert(key.clone(), true);
         }
-        for i in 20..30 {
-            let key = hex::decode(i.to_string()).unwrap();
-            expected_groups.insert(key.clone(), false);
-        }
-        Market::delete_replicas(&merchant, &cid, &hex::decode("21").unwrap(), 603u32); // delete 21. 21 won't be deleted twice.
+        Market::delete_replicas(&merchant, &cid, &hex::decode("21").unwrap()); // delete 21. 21 won't be deleted twice.
         expected_groups.remove(&hex::decode("21").unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            UsedInfo {
-               used_size: file_size * 2,
-               reported_group_count: 9, // this should be nine instead of eight.
+               used_size: file_size * 4,
+               reported_group_count: 18, // this should be nine instead of eight.
                groups: expected_groups.clone()
            }
         );
@@ -2314,7 +2310,7 @@ fn files_size_should_not_be_decreased_twice() {
             })
         );
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
-        Market::delete_replicas(&dave, &cid, &hex::decode("11").unwrap(), 703u32); // delete 11. 11 won't be deleted twice.
+        Market::delete_replicas(&dave, &cid, &hex::decode("11").unwrap()); // delete 11. 11 won't be deleted twice.
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,

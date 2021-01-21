@@ -188,33 +188,27 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
     /// Returns the real used size of this file
-    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor, curr_bn: BlockNumber) -> u64 {
-        if <Files<T>>::get(cid).is_some() {
-            // 1. Calculate payouts. Try to close file and decrease first party storage(due to no wr)
-            Self::calculate_payout(cid, curr_bn);
-            Self::try_to_close_file(cid, curr_bn);
-
-            // 2. Delete replica from file_info
-            if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
-                let mut is_to_decreased = false;
-                file_info.replicas.retain(|replica| {
-                    if replica.who == *who && replica.is_reported {
-                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
-                        is_to_decreased = true;
-                    }
-                    replica.who != *who
-                });
-                if is_to_decreased {
-                    file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
-                    if file_info.reported_replica_count < file_info.expected_replica_count {
-                        Self::update_files_size(file_info.file_size, 1, 0);
-                    }
+    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+        // 1. Delete replica from file_info
+        if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+            let mut is_to_decreased = false;
+            file_info.replicas.retain(|replica| {
+                if replica.who == *who && replica.is_reported {
+                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
+                    is_to_decreased = true;
                 }
-                <Files<T>>::insert(cid, (file_info, used_info));
+                replica.who != *who
+            });
+            if is_to_decreased {
+                file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
+                if file_info.reported_replica_count < file_info.expected_replica_count {
+                    Self::update_files_size(file_info.file_size, 1, 0);
+                }
             }
+            <Files<T>>::insert(cid, (file_info, used_info));
         }
 
-        // 3. Delete anchor from file_info/file_trash and return whether it is counted
+        // 2. Delete anchor from file_info/file_trash and return whether it is counted
         Self::delete_used_anchor(cid, anchor)
     }
 

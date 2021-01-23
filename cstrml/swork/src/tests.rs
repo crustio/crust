@@ -273,6 +273,7 @@ fn report_works_should_work() {
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 402868224 * 2);
+            assert_eq!(Swork::reported_files_size(), 402868224);
             assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
 
             assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
@@ -353,6 +354,7 @@ fn report_works_should_work_without_files() {
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 402868224);
         });
 }
 
@@ -705,7 +707,7 @@ fn incremental_report_should_work_with_files_change() {
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 0);
-
+            assert_eq!(Swork::reported_files_size(), 0);
         });
 }
 
@@ -832,6 +834,7 @@ fn update_identities_should_work() {
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 300);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
 
@@ -854,6 +857,7 @@ fn update_identities_should_work() {
             // 3. Free and used should already been updated
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
 
             // 4. Runs to 606
@@ -863,6 +867,7 @@ fn update_identities_should_work() {
             // 5. Free and used should not change, but current_rs should already been updated
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 600);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4294967298u128);
 
@@ -873,6 +878,7 @@ fn update_identities_should_work() {
             // 7. Free and used should goes to 0, and the corresponding storage order should failed
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 0u128);
         });
@@ -905,6 +911,7 @@ fn abnormal_era_should_work() {
             // 2. Everything goes well
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
 
             // 4. Abnormal era happened, new era goes like 404
             run_to_block(404);
@@ -913,6 +920,7 @@ fn abnormal_era_should_work() {
             // 5. Free and used should not change
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
         });
 }
 
@@ -973,6 +981,7 @@ fn ab_upgrade_should_work() {
             });
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
 
             // 4. Runs to 606, and do sWorker upgrade
@@ -1010,6 +1019,7 @@ fn ab_upgrade_should_work() {
             });
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
             assert_eq!(Swork::reported_in_slot(&a_pk, 600), true);
 
@@ -1045,7 +1055,8 @@ fn ab_upgrade_should_work() {
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 0); // 2 added 134289408 and delete 7
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 3);
         });
 }
 
@@ -2172,6 +2183,7 @@ fn join_group_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 12884901888);
             assert_eq!(Swork::used(), 134 * 2);
+            assert_eq!(Swork::reported_files_size(), 270); // 57 + 99 + 134
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2230,6 +2242,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2241,6 +2254,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2252,6 +2266,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 1800);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2277,6 +2292,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 2100);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2288,6 +2304,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 2400);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2298,6 +2315,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             Swork::update_identities();
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 3300);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2309,6 +2327,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 3600);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2333,6 +2352,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 4500);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
@@ -2344,6 +2364,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 4800);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.

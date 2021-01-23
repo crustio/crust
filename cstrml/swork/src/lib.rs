@@ -131,10 +131,9 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         false
     }
 
-    /// get total used and free space
-    /// TODO: Self::used() cannot represent capacity anymore. Fix this code!
+    /// get total reported files size and free space
     fn get_total_capacity() -> u128 {
-        return Self::used().saturating_add(Self::free());
+        return Self::reported_files_size().saturating_add(Self::free());
     }
 }
 
@@ -199,6 +198,10 @@ decl_storage! {
         /// The used workload, used for calculating stake limit in the end of era
         /// default is 0
         pub Used get(fn used): u128 = 0;
+
+        /// The total reported files workload, used for calculating total_capacity for market module
+        /// default is 0
+        pub ReportedFilesSize get(fn reported_files_size): u128 = 0;
 
         /// The free workload, used for calculating stake limit in the end of era
         /// default is 0
@@ -593,6 +596,7 @@ impl<T: Config> Module<T> {
 
         let mut total_used = 0u128;
         let mut total_free = 0u128;
+        let mut total_reported_files_size = 0u128;
 
         log!(
             trace,
@@ -602,9 +606,10 @@ impl<T: Config> Module<T> {
         // 2. Loop all identities and get the workload map
         let mut workload_map= BTreeMap::new();
         for (reporter, mut id) in <Identities<T>>::iter() {
-            let (free, used) = Self::get_workload(&reporter, &mut id, current_rs);
+            let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);
             total_used = total_used.saturating_add(used);
             total_free = total_free.saturating_add(free);
+            total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
             let mut owner = reporter;
             if let Some(group) = id.group {
                 owner = group;
@@ -617,6 +622,7 @@ impl<T: Config> Module<T> {
 
         Used::put(total_used);
         Free::put(total_free);
+        ReportedFilesSize::put(total_reported_files_size);
         let total_workload = total_used.saturating_add(total_free);
 
         // 3. Update current report slot
@@ -673,6 +679,7 @@ impl<T: Config> Module<T> {
     ) {
         let mut old_used: u64 = 0;
         let mut old_free: u64 = 0;
+        let mut old_reported_files_size: u64 = 0;
         // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
 
@@ -686,6 +693,7 @@ impl<T: Config> Module<T> {
         if let Some(old_wr) = Self::work_reports(&anchor) {
             old_used = old_wr.used;
             old_free = old_wr.free;
+            old_reported_files_size = old_wr.reported_files_size;
         }
 
         // 4. Construct work report
@@ -705,9 +713,11 @@ impl<T: Config> Module<T> {
         // 6. Update workload
         let total_used = Self::used().saturating_sub(old_used as u128).saturating_add(used as u128);
         let total_free = Self::free().saturating_sub(old_free as u128).saturating_add(reported_srd_size as u128);
+        let total_reported_files_size = Self::reported_files_size().saturating_sub(old_reported_files_size as u128).saturating_add(reported_files_size as u128);
 
         Used::put(total_used);
         Free::put(total_free);
+        ReportedFilesSize::put(total_reported_files_size);
     }
 
     /// Update sOrder information based on changed files, return the real changed files
@@ -743,11 +753,11 @@ impl<T: Config> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128) {
+    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(&id.anchor) {
             if Self::is_fully_reported(reporter, id, current_rs) {
-                return (wr.free as u128, wr.used as u128)
+                return (wr.free as u128, wr.used as u128, wr.reported_files_size as u128)
             }
         }
         // Or nope, idk wtf? 🙂
@@ -757,7 +767,7 @@ impl<T: Config> Module<T> {
             &id.anchor,
             current_rs
         );
-        (0, 0)
+        (0, 0, 0)
     }
 
     fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {

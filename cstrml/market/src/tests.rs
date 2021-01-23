@@ -1554,7 +1554,7 @@ fn update_price_should_work() {
         run_to_block(50);
         // first class storage is 0
         <swork::Free>::put(10000);
-        <swork::Used>::put(10000);
+        <swork::ReportedFilesSize>::put(10000);
         assert_eq!(Swork::get_total_capacity(), 20000);
         Market::update_file_price();
         assert_eq!(Market::file_price(), 980);

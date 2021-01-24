@@ -147,6 +147,7 @@ use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr, convert::Infallible};
 use codec::{Codec, Encode, Decode};
 use frame_support::{
 	StorageValue, Parameter, decl_event, decl_storage, decl_module, decl_error, ensure,
+	weights::Weight,
 	traits::{
 		Currency, OnKilledAccount, OnUnbalanced, TryDrop, StoredMap,
 		WithdrawReasons, LockIdentifier, LockableCurrency, ExistenceRequirement,
@@ -162,6 +163,7 @@ use sp_runtime::{
 	},
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
+use frame_support::storage::migration::remove_storage_prefix;
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 pub use weights::WeightInfo;
 
@@ -422,6 +424,25 @@ decl_module! {
 		const ExistentialDeposit: T::Balance = T::ExistentialDeposit::get();
 
 		fn deposit_event() = default;
+
+		// upgrade for 0.12.2 and spec 6
+        fn on_runtime_upgrade() -> Weight {
+        	for (who, _) in Locks::<T, I>::iter() {
+        	    Locks::<T, I>::remove(&who);
+				system::Module::<T>::dec_ref(&who);
+        	}
+
+        	for (who, _) in <system::Account<T>>::iter() {
+				Self::mutate_account(&who, |b| {
+					b.free = Zero::zero();
+					b.reserved = Zero::zero();
+					b.misc_frozen = Zero::zero();
+					b.fee_frozen = Zero::zero();
+				});
+        	}
+        	remove_storage_prefix(b"Balances", b"TotalIssuance", &[]);
+            10_000
+        }
 
 		/// Transfer some liquid free balance to another account.
 		///

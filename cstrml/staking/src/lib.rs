@@ -40,6 +40,7 @@ use sp_staking::{
 };
 
 use sp_std::{convert::TryInto, prelude::*, collections::btree_map::BTreeMap};
+use frame_support::storage::migration::remove_storage_prefix;
 
 use frame_system::{ensure_root, ensure_signed};
 #[cfg(feature = "std")]
@@ -1388,6 +1389,12 @@ decl_module! {
             Self::kill_stash(&stash)?;
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
+
+        // upgrade for 0.12.2 and spec 6
+        fn on_runtime_upgrade() -> Weight {
+            Self::do_upgrade();
+            10_000
+        }
     }
 }
 
@@ -2245,6 +2252,66 @@ impl<T: Config> Module<T> {
         .map(|(who, _stakes)| who.clone())
         .collect::<Vec<T::AccountId>>();
         elected_stashes
+    }
+
+    /// Upgrade storage to current version to support new MPoW
+    /// * removal of:
+    ///   * Identities
+    ///   * WorkReports
+    ///   * ReportedInSlot
+    ///   * Used
+    ///   * Reserved
+    fn do_upgrade() {
+        // 1. Kill Staking storage
+        remove_storage_prefix(b"Staking", b"Bonded", &[]);
+        remove_storage_prefix(b"Staking", b"Ledger", &[]);
+        remove_storage_prefix(b"Staking", b"Payee", &[]);
+        remove_storage_prefix(b"Staking", b"Validators", &[]);
+        remove_storage_prefix(b"Staking", b"Guarantors", &[]);
+        remove_storage_prefix(b"Staking", b"StakeLimit", &[]);
+        remove_storage_prefix(b"Staking", b"ErasStakers", &[]);
+        remove_storage_prefix(b"Staking", b"ErasStakersClipped", &[]);
+        remove_storage_prefix(b"Staking", b"ErasValidatorPrefs", &[]);
+        remove_storage_prefix(b"Staking", b"ErasStakingPayout", &[]);
+        remove_storage_prefix(b"Staking", b"ErasMarketStakingPayout", &[]);
+        remove_storage_prefix(b"Staking", b"ErasAuthoringPayout", &[]);
+        remove_storage_prefix(b"Staking", b"ErasTotalStakes", &[]);
+        remove_storage_prefix(b"Staking", b"CurrentElected", &[]);
+        remove_storage_prefix(b"Staking", b"ErasRewardPoints", &[]);
+        remove_storage_prefix(b"Staking", b"CanceledSlashPayout", &[]);
+        remove_storage_prefix(b"Staking", b"UnappliedSlashes", &[]);
+        remove_storage_prefix(b"Staking", b"ValidatorSlashInEra", &[]);
+        remove_storage_prefix(b"Staking", b"GuarantorSlashInEra", &[]);
+        remove_storage_prefix(b"Staking", b"SlashingSpans", &[]);
+        remove_storage_prefix(b"Staking", b"SpanSlash", &[]);
+        remove_storage_prefix(b"Staking", b"EarliestUnappliedSlash", &[]);
+
+        // 2. Kill PhragmenElection storage
+        remove_storage_prefix(b"PhragmenElection", b"Members", &[]);
+        remove_storage_prefix(b"PhragmenElection", b"RunnersUp", &[]);
+        remove_storage_prefix(b"PhragmenElection", b"ElectionRounds", &[]);
+        remove_storage_prefix(b"PhragmenElection", b"Voting", &[]);
+        remove_storage_prefix(b"PhragmenElection", b"Candidates", &[]);
+
+        // 3. Kill Treasury storage
+        remove_storage_prefix(b"Treasury", b"ProposalCount", &[]);
+        remove_storage_prefix(b"Treasury", b"Proposals", &[]);
+        remove_storage_prefix(b"Treasury", b"Approvals", &[]);
+
+        // 4. Kill Democracy storage
+        remove_storage_prefix(b"Democracy", b"PublicPropCount", &[]);
+        remove_storage_prefix(b"Democracy", b"PublicProps", &[]);
+        remove_storage_prefix(b"Democracy", b"DepositOf", &[]);
+        remove_storage_prefix(b"Democracy", b"Preimages", &[]);
+        remove_storage_prefix(b"Democracy", b"ReferendumCount", &[]);
+        remove_storage_prefix(b"Democracy", b"LowestUnbaked", &[]);
+        remove_storage_prefix(b"Democracy", b"ReferendumInfoOf", &[]);
+        remove_storage_prefix(b"Democracy", b"VotingOf", &[]);
+        remove_storage_prefix(b"Democracy", b"Locks", &[]);
+        remove_storage_prefix(b"Democracy", b"LastTabledWasExternal", &[]);
+        remove_storage_prefix(b"Democracy", b"NextExternal", &[]);
+        remove_storage_prefix(b"Democracy", b"Blacklist", &[]);
+        remove_storage_prefix(b"Democracy", b"Cancellations", &[]);
     }
 
     // fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {

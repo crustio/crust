@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-swork-benchmarking"
-version = "0.11.0"
+version = "0.11.1"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"

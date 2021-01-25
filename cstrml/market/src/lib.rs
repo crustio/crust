@@ -13,7 +13,8 @@ use frame_support::{
         Currency, ReservableCurrency, Get,
         ExistenceRequirement::{AllowDeath, KeepAlive},
         WithdrawReasons, Imbalance
-    }
+    },
+    weights::Weight
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed, ensure_root};
@@ -24,6 +25,8 @@ use sp_runtime::{
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
+
+pub mod weight;
 
 #[cfg(test)]
 mod mock;
@@ -52,6 +55,14 @@ macro_rules! log {
             $patter $(, $values)*
         )
     };
+}
+
+pub trait WeightInfo {
+    fn register() -> Weight;
+    fn pledge_extra() -> Weight;
+    fn cut_pledge() -> Weight;
+    fn place_storage_order() -> Weight;
+    fn calculate_reward() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -293,6 +304,9 @@ pub trait Config: system::Config {
 
     /// UsedTrashMaxSize.
     type UsedTrashMaxSize: Get<u128>;
+
+    /// Weight information for extrinsics in this pallet.
+    type WeightInfo: WeightInfo;
 }
 
 // This module's storage items.
@@ -387,7 +401,7 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = 1000]
+        #[weight = T::WeightInfo::register()]
         pub fn register(
             origin,
             #[compact] pledge: BalanceOf<T>
@@ -428,7 +442,7 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = 1000]
+        #[weight = T::WeightInfo::pledge_extra()]
         pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -460,7 +474,7 @@ decl_module! {
         /// - Read: Pledge
         /// - Write: Pledge
         /// # </weight>
-        #[weight = 1000]
+        #[weight = T::WeightInfo::cut_pledge()]
         pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -489,8 +503,7 @@ decl_module! {
         }
 
         /// Place a storage order
-        /// TODO: Reconsider this weight
-        #[weight = 1000]
+        #[weight = T::WeightInfo::place_storage_order()]
         pub fn place_storage_order(
             origin,
             cid: MerkleRoot,
@@ -542,8 +555,7 @@ decl_module! {
         }
 
         /// Calculate the payout
-        /// TODO: Reconsider this weight
-        #[weight = 1000]
+        #[weight = T::WeightInfo::calculate_reward()]
         pub fn calculate_reward(
             origin,
             cid: MerkleRoot,

@@ -542,7 +542,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 70_000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -635,9 +635,9 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
             })
         );
 
-        // pledge is 60 < 121 reward
+        // pledge is 7020 * 10 < 70000 reward
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 60,
+            pledge: 70_000,
             reward: 0
         });
 
@@ -668,7 +668,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         );
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_060,
+            pledge: 6_070_000,
             reward: 10028
         });
     });

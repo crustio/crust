@@ -393,8 +393,8 @@ parameter_types! {
     pub const BondingDuration: staking::EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).
     pub const SlashDeferDuration: staking::EraIndex = 28;
-    // 100 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `100`
-    pub const SPowerRatio: u128 = 100;
+    // 1 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `1`
+    pub const SPowerRatio: u128 = 1;
     // 64 guarantors for one validator.
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
     // 60 eras means 15 days if era = 6 hours
@@ -687,8 +687,8 @@ impl claims::Config for Runtime {
 
 // TODO: better way to deal with fee(s)
 parameter_types! {
-    pub const TransactionBaseFee: Balance = 1 * CENTS;
-    pub const TransactionByteFee: Balance = 10 * MILLICENTS;
+    pub const TransactionBaseFee: Balance = MILLICENTS / 100;
+    pub const TransactionByteFee: Balance = MILLICENTS / 100;
     pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
 	pub AdjustmentVariable: Multiplier = Multiplier::saturating_from_rational(1, 100_000);
 	pub MinimumMultiplier: Multiplier = Multiplier::saturating_from_rational(1, 1_000_000_000u128);
@@ -708,7 +708,7 @@ impl pallet_sudo::Config for Runtime {
 }
 
 parameter_types! {
-    pub const PunishmentSlots: u32 = 60;
+    pub const PunishmentSlots: u32 = 2;
 }
 
 impl swork::Config for Runtime {
@@ -725,8 +725,8 @@ parameter_types! {
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 15 * DAYS;
     pub const InitialReplica: u32 = 4;
-    pub const FileBaseFee: Balance = CENTS / 20;  // roughly equal to 1RMB / month
-    pub const FileInitPrice: Balance = MILLICENTS / 10; // Need align with FileDuration and InitialReplica
+    pub const FileBaseFee: Balance = MILLICENTS * 2;
+    pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and InitialReplica
     pub const ClaimLimit: u32 = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);

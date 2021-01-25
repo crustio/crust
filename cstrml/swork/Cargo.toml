@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-swork"
-version = "0.10.2"
+version = "0.11.2"
 authors = ["crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -16,7 +16,7 @@ signatory = "0.20.0"
 signatory-ring = "0.20.0"
 hex = '0.4.2'
 base64 = "0.12.2"
-openssl = { optional = true, version = "0.10.29" }
+openssl = { optional = true, version = "0.11.29" }
 
 # substrate frame dependencies
 frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
@@ -31,12 +31,12 @@ sp-std = { default-features = false, git = "https://github.com/paritytech/substr
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652", default-features = false, optional = true }
 
 # crust runtime modules
-market = { version = "0.10.2", package = 'cstrml-market', path = '../market', default-features = false }
-primitives = { version = "0.10.2", package = 'cst-primitives', path = '../../primitives', default-features = false }
+market = { version = "0.11.2", package = 'cstrml-market', path = '../market', default-features = false }
+primitives = { version = "0.11.2", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
 keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
-balances = { version = "0.10.2", package = 'cstrml-balances', path = '../balances' }
+balances = { version = "0.11.2", package = 'cstrml-balances', path = '../balances' }
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }
 hex = '0.4.2'
 

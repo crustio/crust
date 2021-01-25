@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-balances"
-version = "0.10.2"
+version = "0.11.2"
 authors = ["Crustio"]
 edition = "2018"
 license = "GPL-3.0"
@@ -20,7 +20,7 @@ frame-support = { git = "https://github.com/paritytech/substrate", rev = "668eca
 frame-system = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652", default-features = false }
 
 # crust runtime modules
-primitives = { version = "0.10.2", package = 'cst-primitives', path = '../../primitives', default-features = false }
+primitives = { version = "0.11.2", package = 'cst-primitives', path = '../../primitives', default-features = false }
 
 [dev-dependencies]
 sp-io = { git = "https://github.com/paritytech/substrate", rev = "668ecade60abe5a644868aefd3d231c9839fe652" }

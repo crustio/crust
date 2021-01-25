@@ -725,7 +725,7 @@ parameter_types! {
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 15 * DAYS;
     pub const InitialReplica: u32 = 4;
-    pub const FileBaseFee: Balance = MILLICENTS * 2;  // roughly equal to 1RMB / month
+    pub const FileBaseFee: Balance = MILLICENTS * 2;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and InitialReplica
     pub const ClaimLimit: u32 = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%

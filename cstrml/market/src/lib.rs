@@ -849,8 +849,7 @@ impl<T: Config> Module<T> {
 
     fn has_enough_pledge(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
         let ledger = Self::merchant_ledgers(who);
-        // TODO: 10x pledge value
-        ledger.reward + *value <= ledger.pledge
+        (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.pledge
     }
 
     pub fn update_file_price() {

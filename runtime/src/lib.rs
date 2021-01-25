@@ -717,7 +717,7 @@ impl swork::Config for Runtime {
     type PunishmentSlots = PunishmentSlots;
     type Works = Staking;
     type MarketInterface = Market;
-    type WeightInfo = swork::weight::WeightInfo;
+    type WeightInfo = swork::weight::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -755,7 +755,7 @@ impl market::Config for Runtime {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
-    type WeightInfo = market::weight::WeightInfo;
+    type WeightInfo = market::weight::WeightInfo<Runtime>;
 }
 
 construct_runtime! {

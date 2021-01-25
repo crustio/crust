@@ -61,7 +61,8 @@ pub trait WeightInfo {
     fn upgrade() -> Weight;
     fn register() -> Weight;
     fn report_works() -> Weight;
-    fn chill_pk() -> Weight;
+    fn create_group() -> Weight;
+    fn join_group() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -508,7 +509,7 @@ decl_module! {
             Ok(Pays::No.into())
         }
 
-        #[weight = 1000]
+        #[weight = T::WeightInfo::create_group()]
         pub fn create_group(
             origin
         ) -> DispatchResult {
@@ -529,7 +530,7 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = 1000]
+        #[weight = T::WeightInfo::join_group()]
         pub fn join_group(
             origin,
             target: <T::Lookup as StaticLookup>::Source

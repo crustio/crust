@@ -171,6 +171,7 @@ impl market::Config for Test {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
+    type WeightInfo = market::weight::WeightInfo;
 }
 
 pub struct TestWorksInterface;

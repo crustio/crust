@@ -755,6 +755,7 @@ impl market::Config for Runtime {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
+    type WeightInfo = market::weight::WeightInfo;
 }
 
 construct_runtime! {

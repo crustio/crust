@@ -183,6 +183,7 @@ impl Config for Test {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
+    type WeightInfo = weight::WeightInfo;
 }
 
 pub type Market = Module<Test>;

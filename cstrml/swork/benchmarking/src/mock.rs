@@ -117,7 +117,7 @@ impl market::Config for Test {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
-    type WeightInfo = market::weight::WeightInfo;
+    type WeightInfo = market::weight::WeightInfo<Test>;
 }
 
 pub struct TestWorksInterface;
@@ -136,7 +136,7 @@ impl swork::Config for Test {
     type PunishmentSlots = PunishmentSlots;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
-    type WeightInfo = swork::weight::WeightInfo;
+    type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 
 impl crate::Config for Test {}

@@ -147,7 +147,7 @@ impl swork::Config for Test {
     type PunishmentSlots = PunishmentSlots;
     type Works = ();
     type MarketInterface = Market;
-    type WeightInfo = swork::weight::WeightInfo;
+    type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 
 parameter_types! {
@@ -183,7 +183,7 @@ impl Config for Test {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
-    type WeightInfo = weight::WeightInfo;
+    type WeightInfo = weight::WeightInfo<Test>;
 }
 
 pub type Market = Module<Test>;

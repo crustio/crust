@@ -221,7 +221,7 @@ impl swork::Config for Test {
     type PunishmentSlots = PunishmentSlots;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
-    type WeightInfo = swork::weight::WeightInfo;
+    type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 
 parameter_types! {

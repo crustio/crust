@@ -244,7 +244,9 @@ decl_error! {
         /// Group already exist
         GroupAlreadyExist,
         /// Group owner cannot register
-        GroupOwnerForbidden
+        GroupOwnerForbidden,
+        /// Not in a group
+        NotJoint
     }
 }
 
@@ -561,6 +563,43 @@ decl_module! {
                 Some(Identity { ref mut group, .. }) => *group = Some(owner.clone()),
                 ref mut i => *i = None,
             });
+
+            // 7. Emit event
+            Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
+
+            Ok(())
+        }
+
+        #[weight = T::WeightInfo::join_group()]
+        pub fn quit_group(
+            origin
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let mut onwer = None;
+
+            // 1. Ensure who has identity information
+            ensure!(Self::identities(&who).is_some(), Error::<T>::IdentityNotExist);
+            let identity = Self::identities(&who).unwrap();
+
+            // 2. Ensure who joint group right now
+            ensure!(identity.group.is_some(), Error::<T>::AlreadyJoint);
+
+            // 3. remove the group owner
+            <Identities<T>>::mutate_exists(&who, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut group, .. }) => *group = None,
+                ref mut i => *i = None,
+            });
+
+            // 3. Ensure owner's group exist
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
+
+
+            // 5. Join the group
+            <Groups<T>>::mutate(&owner, |members| {
+                members.insert(who.clone());
+            });
+
+
 
             // 7. Emit event
             Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));

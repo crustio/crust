@@ -60,7 +60,7 @@ macro_rules! log {
 pub trait WeightInfo {
     fn upgrade() -> Weight;
     fn register() -> Weight;
-    fn report_works() -> Weight;
+    fn report_works(added: u32, deleted: u32) -> Weight;
     fn create_group() -> Weight;
     fn join_group() -> Weight;
 }
@@ -348,7 +348,7 @@ decl_module! {
         /// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
         /// - Write: WorkReport, ReportedInSlot, market.SOrder
         /// # </weight>
-        #[weight = (T::WeightInfo::report_works(), DispatchClass::Operational)]
+        #[weight = (T::WeightInfo::report_works(added_files.len() as u32, deleted_files.len() as u32), DispatchClass::Operational)]
         pub fn report_works(
             origin,
             curr_pk: SworkerPubKey,

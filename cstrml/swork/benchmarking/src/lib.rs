@@ -37,6 +37,34 @@ struct ReportWorksInfo {
     pub sig: SworkerSignature
 }
 
+fn legal_work_report_with_srd() -> ReportWorksInfo {
+    let curr_pk = vec![45, 134, 206, 46, 43, 60, 2, 133, 235, 80, 26, 90, 52, 220, 26, 131, 87, 173, 158, 54, 92, 150, 74, 80, 210, 208, 241, 182, 250, 47, 129, 234, 184, 17, 23, 208, 94, 152, 157, 216, 156, 208, 38, 198, 57, 29, 231, 76, 56, 146, 150, 108, 58, 186, 94, 149, 117, 245, 199, 24, 204, 209, 71, 195];
+    let prev_pk: Vec<u8> = vec![];
+    let block_number = 300;
+    let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    let free: u64 = 4294967296;
+    let used: u64 = 0;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
+    let files_root: Vec<u8> = vec![17];
+    let srd_root: Vec<u8> = vec![0];
+    let sig: Vec<u8> = vec![169, 219, 186, 233, 110, 149, 28, 104, 209, 118, 50, 172, 135, 123, 20, 174, 233, 212, 147, 135, 191, 225, 46, 173, 189, 19, 100, 10, 255, 77, 195, 10, 181, 232, 172, 4, 53, 129, 149, 14, 47, 239, 176, 67, 15, 71, 197, 194, 100, 146, 243, 82, 21, 62, 247, 225, 208, 46, 4, 254, 121, 71, 118, 92];
+
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
+    }
+}
+
 fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let curr_pk = vec![105,129,135,206,41,52,134,230,86,57,211,151,97,151,229,104,163,246,160,7,110,85,25,197,107,63,124,60,13,12,92,18,199,28,200,78,79,183,127,80,225,146,152,242,175,40,225,51,49,14,8,194,240,215,71,42,135,144,132,183,35,121,115,177];
     let prev_pk: Vec<u8> = vec![];
@@ -155,6 +183,42 @@ benchmarks! {
         let sig: Vec<u8> = vec![153,15,132,203,16,61,189,174,53,69,117,139,125,120,121,86,243,25,28,226,237,230,56,194,238,228,22,182,116,166,245,27,86,43,129,7,122,13,3,143,247,159,97,239,88,200,8,51,238,45,204,71,25,38,46,164,18,85,82,175,13,48,15,190];
     }: {
         swork::Module::<T>::register(RawOrigin::Signed(caller.clone()).into(), ias_sig.to_vec(), ias_cert.to_vec(), caller.clone(), isv_body.to_vec(), sig).expect("Something wrong during registering");
+    }
+
+    report_works_with_srd {
+        let code: Vec<u8> = vec![120,27,83,125,61,206,243,157,236,123,139,206,111,223,205,3,45,141,132,102,64,233,181,89,139,74,159,98,113,136,169,8];
+        swork::Module::<T>::upgrade(RawOrigin::Root.into(), code.clone(), EXPIRE_BLOCK_NUMBER.into()).expect("failed to insert code");
+
+        // Prepare legal work report
+        let user: Vec<u8> = vec![212,53,147,199,21,253,211,28,97,20,26,189,4,169,159,214,130,44,133,88,133,76,205,227,154,86,132,231,165,109,162,125]; // Alice
+        let caller = T::AccountId::decode(&mut &user[..]).unwrap_or_default();
+        let wr = legal_work_report_with_srd();
+
+        // Set block number, system hash and pk in swork
+        swork::Module::<T>::insert_pk_info(wr.curr_pk.clone(), code.clone());
+        system::Module::<T>::set_block_number(303u32.into());
+        let fake_bh:T::Hash = T::Hash::decode(&mut &wr.block_hash[..]).unwrap_or_default();
+        let target_block_number:T::BlockNumber = 300u32.into();
+        <system::BlockHash<T>>::insert(target_block_number, fake_bh);
+    }: {
+        swork::Module::<T>::report_works(
+            RawOrigin::Signed(caller.clone()).into(),
+            wr.curr_pk.clone(),
+            wr.prev_pk,
+            wr.block_number,
+            wr.block_hash,
+            wr.free,
+            wr.used,
+            wr.added_files,
+            wr.deleted_files,
+            wr.srd_root,
+            wr.files_root,
+            wr.sig
+        ).expect("Something wrong during reporting works");
+    } verify {
+        assert_eq!(swork::Module::<T>::free(), wr.free as u128);
+        assert_eq!(swork::Module::<T>::used(), 0 as u128);
+        assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
     report_works_with_added_files {
@@ -333,6 +397,13 @@ mod tests {
     fn report_works_with_added_files() {
         ExtBuilder::default().build().execute_with(|| {
             assert_ok!(test_benchmark_report_works_with_added_files::<Test>());
+        });
+    }
+
+    #[test]
+    fn report_works_with_srd() {
+        ExtBuilder::default().build().execute_with(|| {
+            assert_ok!(test_benchmark_report_works_with_srd::<Test>());
         });
     }
 

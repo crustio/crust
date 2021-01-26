@@ -184,7 +184,7 @@ impl Works<AccountId> for TestWorksInterface {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 4;
-    pub const MaxMembersLimit: u32 = 5;
+    pub const MaxMembersLimit: u32 = 4;
 }
 
 impl Config for Test {

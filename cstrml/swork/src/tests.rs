@@ -1363,6 +1363,10 @@ fn join_group_should_fail_due_to_invalid_situations() {
         .execute_with(|| {
             let alice = Sr25519Keyring::Alice.to_account_id();
             let bob = Sr25519Keyring::Bob.to_account_id();
+            let charlie = Sr25519Keyring::Charlie.to_account_id();
+            let dave = Sr25519Keyring::Dave.to_account_id();
+            let eve = Sr25519Keyring::Eve.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
 
             let b_wr_info = ab_upgrade_work_report();
             let b_pk = b_wr_info.curr_pk.clone();
@@ -1378,8 +1382,12 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 message: Some("IdentityNotExist"),
             });
 
-
             register_identity(&bob, &b_pk, &b_pk);
+            register_identity(&charlie, &b_pk, &b_pk);
+            register_identity(&dave, &b_pk, &b_pk);
+            register_identity(&eve, &b_pk, &b_pk);
+            register_identity(&ferdie, &b_pk, &b_pk);
+
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
                 used: 100,
@@ -1430,6 +1438,27 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 Origin::signed(bob.clone()),
                 alice.clone()
             ));
+            assert_ok!(Swork::join_group(
+                Origin::signed(charlie.clone()),
+                alice.clone()
+            ));
+            assert_ok!(Swork::join_group(
+                Origin::signed(dave.clone()),
+                alice.clone()
+            ));
+            assert_ok!(Swork::join_group(
+                Origin::signed(eve.clone()),
+                alice.clone()
+            ));
+            assert_noop!(Swork::join_group(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 17,
+                message: Some("ExceedGroupLimit"),
+            });
 
             assert_eq!(Swork::identities(&bob).unwrap_or_default(), Identity {
                 anchor: b_pk.clone(),
@@ -2191,6 +2220,165 @@ fn join_group_should_work_for_stake_limit() {
             assert_eq!(map.get(&alice).is_none(), true);
             assert_eq!(map.get(&bob).is_none(), true);
             assert_eq!(map.get(&eve).is_none(), true);
+        });
+}
+
+#[test]
+fn quit_group_should_work_for_stake_limit() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+
+            assert_noop!(
+                Swork::quit_group(
+                    Origin::signed(alice.clone())
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 10,
+                    message: Some("IdentityNotExist"),
+                }
+            );
+
+            let alice_wr_info = group_work_report_alice_300();
+            let a_pk = alice_wr_info.curr_pk.clone();
+
+            register(&a_pk, LegalCode::get());
+            register_identity(&alice, &a_pk, &a_pk);
+            assert_noop!(
+                Swork::quit_group(
+                    Origin::signed(alice.clone())
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some("NotJoint"),
+                }
+            );
+
+            // alice, bob and eve become a group
+            assert_ok!(Swork::create_group(
+                Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::join_group(
+                Origin::signed(alice.clone()),
+                ferdie.clone()
+            ));
+
+            run_to_block(303);
+            Swork::update_identities();
+            add_not_live_files();
+            // A report works in 303
+            assert_ok!(Swork::report_works(
+                Origin::signed(alice.clone()),
+                alice_wr_info.curr_pk,
+                alice_wr_info.prev_pk,
+                alice_wr_info.block_number,
+                alice_wr_info.block_hash,
+                alice_wr_info.free,
+                alice_wr_info.used,
+                alice_wr_info.added_files,
+                alice_wr_info.deleted_files,
+                alice_wr_info.srd_root,
+                alice_wr_info.files_root,
+                alice_wr_info.sig
+            ));
+
+            run_to_block(603);
+
+            assert_ok!(Swork::quit_group(
+                Origin::signed(alice.clone())
+            ));
+            assert_eq!(Swork::groups(ferdie.clone()), BTreeSet::from_iter(vec![].into_iter()));
+
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57); // 57
+            assert_eq!(Swork::current_report_slot(), 600);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+            assert_eq!(*map.get(&alice).unwrap(), 4294967410u128);
+        });
+}
+
+#[test]
+fn kick_out_should_work_for_stake_limit() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+
+            assert_noop!(
+                Swork::kick_out(
+                    Origin::signed(ferdie.clone()),
+                    alice.clone()
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 12,
+                    message: Some("NotOwner"),
+                }
+            );
+
+            let alice_wr_info = group_work_report_alice_300();
+            let a_pk = alice_wr_info.curr_pk.clone();
+
+            register(&a_pk, LegalCode::get());
+            register_identity(&alice, &a_pk, &a_pk);
+            // alice, bob and eve become a group
+            assert_ok!(Swork::create_group(
+                Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::join_group(
+                Origin::signed(alice.clone()),
+                ferdie.clone()
+            ));
+
+            run_to_block(303);
+            Swork::update_identities();
+            add_not_live_files();
+            // A report works in 303
+            assert_ok!(Swork::report_works(
+                Origin::signed(alice.clone()),
+                alice_wr_info.curr_pk,
+                alice_wr_info.prev_pk,
+                alice_wr_info.block_number,
+                alice_wr_info.block_hash,
+                alice_wr_info.free,
+                alice_wr_info.used,
+                alice_wr_info.added_files,
+                alice_wr_info.deleted_files,
+                alice_wr_info.srd_root,
+                alice_wr_info.files_root,
+                alice_wr_info.sig
+            ));
+
+            run_to_block(603);
+
+            assert_ok!(Swork::kick_out(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
+            ));
+            assert_eq!(Swork::groups(ferdie.clone()), BTreeSet::from_iter(vec![].into_iter()));
+
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57); // 57
+            assert_eq!(Swork::current_report_slot(), 600);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+            assert_eq!(*map.get(&alice).unwrap(), 4294967410u128);
         });
 }
 

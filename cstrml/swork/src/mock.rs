@@ -184,6 +184,7 @@ impl Works<AccountId> for TestWorksInterface {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 4;
+    pub const MaxMembersLimit: u32 = 5;
 }
 
 impl Config for Test {
@@ -192,6 +193,7 @@ impl Config for Test {
     type PunishmentSlots = PunishmentSlots;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
+    type MaxMembersLimit = MaxMembersLimit;
     type WeightInfo = weight::WeightInfo<Test>;
 }
 

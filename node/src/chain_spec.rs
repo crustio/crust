@@ -446,8 +446,8 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     )];
 
     // Constants
-    const ENDOWMENT: u128 = 2_500_000 * CRUS;
-    const STASH: u128 = 1_250_000 * CRUS;
+    const ENDOWMENT: u128 = 200 * CRUS;
+    const STASH: u128 = 100 * CRUS;
 
     GenesisConfig {
         pallet_sudo: Some(SudoConfig {

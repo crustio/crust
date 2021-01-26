@@ -17,7 +17,6 @@ use frame_support::{
 use sp_runtime::traits::{StaticLookup, Zero};
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_root, ensure_signed};
-use frame_support::storage::migration::remove_storage_prefix;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -258,20 +257,6 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
-
-        fn on_runtime_upgrade() -> Weight {
-            remove_storage_prefix(b"Swork", b"WorkReports", &[]);
-            remove_storage_prefix(b"Swork", b"Identities", &[]);
-            remove_storage_prefix(b"Swork", b"IdBonds", &[]);
-            remove_storage_prefix(b"Market", b"Merchants", &[]);
-            remove_storage_prefix(b"Market", b"Clients", &[]);
-            remove_storage_prefix(b"Market", b"SorderInfos", &[]);
-            remove_storage_prefix(b"Market", b"SorderStatuses", &[]);
-            remove_storage_prefix(b"Market", b"SorderPunishments", &[]);
-            remove_storage_prefix(b"Market", b"Pledges", &[]);
-            10_000
-        }
-
 
         /// Called when a block is initialized. Will call update_identities to update stake limit
         fn on_initialize(now: T::BlockNumber) -> Weight {

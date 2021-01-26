@@ -2,7 +2,10 @@
   "name": "Crust Maxwell",
   "id": "crumwl",
   "chainType": "Live",
-  "bootNodes": [],
+  "bootNodes": [
+    "/dns/p2p.mwl-0.crust.network/tcp/30333/p2p/12D3KooWKb7AtPGHXr97TagPkwnS56sGSvgJYBB1izCa2cKazVcm",
+    "/dns/p2p.mwl-1.crust.network/tcp/30333/p2p/12D3KooWMasP2U8otXCSRkw2dFnRsevsYurXfPEc2p2vGA4fZtYC"
+  ],
   "telemetryEndpoints": [
     [
       "wss://telemetry.polkadot.io/submit/",

@@ -528,24 +528,21 @@ decl_module! {
             }
             let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
-            // 2. This should not happen at all
-            ensure!(amount >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
-
-            // 3. Check client can afford the sorder
+            // 2. Check client can afford the sorder
             ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
-            // 4. Split into storage and staking account.
+            // 3. Split into storage and staking account.
             let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
 
             let curr_bn = Self::get_current_block_number();
 
-            // 5. calculate payouts. Try to close file and decrease first party storage
+            // 4. calculate payouts. Try to close file and decrease first party storage
             Self::calculate_payout(&cid, curr_bn);
 
-            // 6. three scenarios: new file, extend time(refresh time) or extend replica
+            // 5. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
-            // 7. Update storage price.
+            // 6. Update storage price.
             #[cfg(not(test))]
             Self::update_file_price();
 

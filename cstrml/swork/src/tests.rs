@@ -260,8 +260,8 @@ fn report_works_should_work() {
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
                 legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
+                legal_wr_info.added_files.clone(),
+                legal_wr_info.deleted_files.clone(),
                 legal_wr_info.srd_root,
                 legal_wr_info.files_root,
                 legal_wr_info.sig
@@ -287,7 +287,7 @@ fn report_works_should_work() {
             });
 
             // Check same file all been confirmed
-            assert_eq!(Market::files(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap()).unwrap_or_default().0, FileInfo {
+            assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default().0, FileInfo {
                 file_size: 134289408,
                 expired_on: 1303,
                 claimed_at: 303,
@@ -301,7 +301,7 @@ fn report_works_should_work() {
                     is_reported: true
                 }]
             });
-            assert_eq!(Market::files(hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()).unwrap_or_default().0, FileInfo {
+            assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default().0, FileInfo {
                 file_size: 268578816,
                 expired_on: 1303,
                 claimed_at: 303,
@@ -1048,15 +1048,15 @@ fn ab_upgrade_should_work() {
             // 11. Check B's work report and free & used again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
-                used: 0, // 2 + 2 * 2 - 7 * 2
+                used: 62, // 2 + 2 * 37 - 7 * 2
                 free: 4294967296,
-                reported_files_size: 3,
+                reported_files_size: 32,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 0);
-            assert_eq!(Swork::reported_files_size(), 3);
+            assert_eq!(Swork::used(), 62);
+            assert_eq!(Swork::reported_files_size(), 32);
         });
 }
 
@@ -1476,11 +1476,11 @@ fn join_group_should_work_for_used_in_work_report() {
             register_identity(&eve, &c_pk, &c_pk);
 
             // We have five test files
-            let file_a = hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(); // A file
-            let file_b = hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(); // B file
-            let file_c = hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(); // C file
-            let file_d = hex::decode("66a706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b110").unwrap(); // D file
-            let file_e = hex::decode("33cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae12e").unwrap(); // E file
+            let file_a = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oA".as_bytes().to_vec(); // A file
+            let file_b = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(); // B file
+            let file_c = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(); // C file
+            let file_d = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oD".as_bytes().to_vec(); // D file
+            let file_e = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oE".as_bytes().to_vec(); // E file
 
             // alice, bob and eve become a group
             assert_ok!(Swork::create_group(

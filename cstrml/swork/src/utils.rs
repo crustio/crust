@@ -166,7 +166,7 @@ pub fn encode_files(fs: &Vec<(Vec<u8>, u64, u64)>) -> Vec<u8> {
     let len = fs.len();
     for (pos, (hash, size, block_num)) in fs.iter().enumerate() {
         rst.extend(cid_bytes.clone());
-        rst.extend(encode_file_root(hash.clone()));
+        rst.extend(hash.clone());
         rst.extend(size_bytes.clone());
         rst.extend(encode_u64_to_string_to_bytes(*size));
         rst.extend(block_num_bytes.clone());
@@ -218,16 +218,16 @@ pub fn encode_u64_to_string_to_bytes(number: u64) -> Vec<u8> {
     encoded_number
 }
 
-// encode file root hash to hex based string
-// then represent this string to vec u8
-// eg. [91, 92] -> [5b, 5c] -> ["5b", "5c"] -> [53, 98, 53, 99]
-fn encode_file_root(fs: Vec<u8>) -> Vec<u8> {
-    let mut rst: Vec<u8> = [].to_vec();
-    for v in fs.iter() {
-        rst.extend(encode_u8_to_hex_string_to_bytes(*v));
-    }
-    rst
-}
+// // encode file root hash to hex based string
+// // then represent this string to vec u8
+// // eg. [91, 92] -> [5b, 5c] -> ["5b", "5c"] -> [53, 98, 53, 99]
+// fn encode_file_root(fs: Vec<u8>) -> Vec<u8> {
+//     let mut rst: Vec<u8> = [].to_vec();
+//     for v in fs.iter() {
+//         rst.extend(encode_u8_to_hex_string_to_bytes(*v));
+//     }
+//     rst
+// }
 
 // encode one u8 value to hex based string
 // then encode this string to vec u8

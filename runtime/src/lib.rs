@@ -26,9 +26,22 @@ use sp_runtime::{
 use sp_std::prelude::*;
 
 use pallet_grandpa::{AuthorityId as GrandpaId, fg_primitives, AuthorityList as GrandpaAuthorityList};
-pub use pallet_transaction_payment::{Multiplier, TargetedFeeAdjustment, CurrencyAdapter};
+pub use pallet_transaction_payment::{Multiplier, TargetedFeeAdjustment, FeeDetails};
 use sp_api::impl_runtime_apis;
 use sp_staking::SessionIndex;
+
+// XCM imports
+use polkadot_parachain::primitives::Sibling;
+use xcm::v0::{Junction, MultiLocation, NetworkId};
+use xcm_builder::{
+    AccountId32Aliases, CurrencyAdapter, LocationInverter, ParentIsDefault, RelayChainAsNative,
+    SiblingParachainAsNative, SiblingParachainConvertsVia, SignedAccountId32AsNative,
+    SovereignSignedViaLocation,
+};
+use xcm_executor::{
+    traits::{IsConcrete, NativeAsset},
+    Config, XcmExecutor,
+};
 
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -416,7 +429,10 @@ parameter_types! {
 
 parameter_types! {
 	pub const CandidacyBond: Balance = 10 * DOLLARS;
-	pub const VotingBond: Balance = 1 * DOLLARS;
+	// 1 storage item created, key size is 32 bytes, value size is 16+16.
+	pub const VotingBondBase: Balance = 400 * CENTS;
+	// additional data per vote is 32 bytes (account id).
+	pub const VotingBondFactor: Balance = 200 * CENTS;
 	pub const TermDuration: BlockNumber = 7 * DAYS;
 	pub const DesiredMembers: u32 = 13;
 	pub const DesiredRunnersUp: u32 = 7;
@@ -435,9 +451,9 @@ impl pallet_elections_phragmen::Config for Runtime {
 	type InitializeMembers = Council;
 	type CurrencyToVote = U128CurrencyToVote;
 	type CandidacyBond = CandidacyBond;
-	type VotingBond = VotingBond;
 	type LoserCandidate = ();
-	type BadReport = ();
+    type VotingBondBase = VotingBondBase;
+    type VotingBondFactor = VotingBondFactor;
 	type KickedMember = ();
 	type DesiredMembers = DesiredMembers;
 	type DesiredRunnersUp = DesiredRunnersUp;
@@ -655,7 +671,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Config for Runtime {
-    type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees>;
+    type OnChargeTransaction = pallet_transaction_payment::CurrencyAdapter<Balances, DealWithFees>;
     type TransactionByteFee = TransactionByteFee;
     type WeightToFee = IdentityFee<Balance>;
     type FeeMultiplierUpdate =
@@ -702,17 +718,67 @@ impl market::Config for Runtime {
     type WeightInfo = market::weight::WeightInfo;
 }
 
-impl cumulus_parachain_upgrade::Config for Runtime {
+impl parachain_info::Config for Runtime {}
+
+impl cumulus_parachain_system::Config for Runtime {
     type Event = Event;
     type OnValidationData = ();
-}
-
-impl cumulus_message_broker::Config for Runtime {
+    type SelfParaId = parachain_info::Module<Runtime>;
     type DownwardMessageHandlers = ();
     type HrmpMessageHandlers = ();
 }
 
-impl parachain_info::Config for Runtime {}
+parameter_types! {
+	pub const RococoLocation: MultiLocation = MultiLocation::X1(Junction::Parent);
+	pub const RococoNetwork: NetworkId = NetworkId::Polkadot;
+	pub RelayChainOrigin: Origin = xcm_handler::Origin::Relay.into();
+	pub Ancestry: MultiLocation = Junction::Parachain {
+		id: ParachainInfo::parachain_id().into()
+	}.into();
+}
+
+type LocationConverter = (
+    ParentIsDefault<AccountId>,
+    SiblingParachainConvertsVia<Sibling, AccountId>,
+    AccountId32Aliases<RococoNetwork, AccountId>,
+);
+
+type LocalAssetTransactor = CurrencyAdapter<
+    // Use this currency:
+    Balances,
+    // Use this currency when it is a fungible asset matching the given location or name:
+    IsConcrete<RococoLocation>,
+    // Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
+    LocationConverter,
+    // Our chain's account ID type (we can't get away without mentioning it explicitly):
+    AccountId,
+>;
+
+type LocalOriginConverter = (
+    SovereignSignedViaLocation<LocationConverter, Origin>,
+    RelayChainAsNative<RelayChainOrigin, Origin>,
+    SiblingParachainAsNative<xcm_handler::Origin, Origin>,
+    SignedAccountId32AsNative<RococoNetwork, Origin>,
+);
+
+pub struct XcmConfig;
+impl Config for XcmConfig {
+    type Call = Call;
+    type XcmSender = XcmHandler;
+    // How to withdraw and deposit an asset.
+    type AssetTransactor = LocalAssetTransactor;
+    type OriginConverter = LocalOriginConverter;
+    type IsReserve = NativeAsset;
+    type IsTeleporter = ();
+    type LocationInverter = LocationInverter<Ancestry>;
+}
+
+impl xcm_handler::Config for Runtime {
+    type Event = Event;
+    type XcmExecutor = XcmExecutor<XcmConfig>;
+    type UpwardMessageSender = ParachainSystem;
+    type HrmpMessageSender = ParachainSystem;
+}
 
 construct_runtime! {
     pub enum Runtime where
@@ -771,9 +837,9 @@ construct_runtime! {
         // Token candy
         Candy: candy::{Module, Call, Storage, Event<T>},
 
-		ParachainUpgrade: cumulus_parachain_upgrade::{Module, Call, Storage, Inherent, Event},
-		MessageBroker: cumulus_message_broker::{Module, Storage, Call, Inherent},
+		ParachainSystem: cumulus_parachain_system::{Module, Call, Storage, Inherent, Event},
 		ParachainInfo: parachain_info::{Module, Storage, Config},
+		XcmHandler: xcm_handler::{Module, Event<T>, Origin},
     }
 }
 
@@ -989,6 +1055,9 @@ impl_runtime_apis! {
             len: u32
         ) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
 			TransactionPayment::query_info(uxt, len)
+		}
+		fn query_fee_details(uxt: <Block as BlockT>::Extrinsic, len: u32) -> FeeDetails<Balance> {
+			TransactionPayment::query_fee_details(uxt, len)
 		}
     }
 

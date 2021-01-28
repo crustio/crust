@@ -784,7 +784,11 @@ impl<T: Config> Module<T> {
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             } else if file_info.expired_on == file_info.claimed_at {
-                file_info.expired_on = curr_bn + T::FileDuration::get();
+                if file_info.replicas.len() == 0 {
+                    file_info.expired_on = 0;
+                } else {
+                    file_info.expired_on = curr_bn + T::FileDuration::get();
+                }
                 file_info.claimed_at = *curr_bn;
             }
             file_info.amount += amount.clone();

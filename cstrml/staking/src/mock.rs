@@ -213,6 +213,7 @@ impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
+    pub const MaxGroupSize: u32 = 100;
 }
 
 impl swork::Config for Test {
@@ -221,6 +222,7 @@ impl swork::Config for Test {
     type PunishmentSlots = PunishmentSlots;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
+    type MaxGroupSize = MaxGroupSize;
     type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 

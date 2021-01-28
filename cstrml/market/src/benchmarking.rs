@@ -25,15 +25,17 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
     -> (FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)
 {
     let used_info = UsedInfo {
-        used_size: file_size,
-        groups: <BTreeSet<SworkerAnchor>>::new()
+        used_size: file_size * 2,
+        reported_group_count: 1,
+        groups: <BTreeMap<SworkerAnchor, bool>>::new()
     };
     let mut replicas: Vec<Replica<T::AccountId>> = vec![];
     for _ in 0..200 {
         let new_replica = Replica {
             who: user.clone(),
             valid_at,
-            anchor: pub_key.clone()
+            anchor: pub_key.clone(),
+            is_reported: true
         };
         replicas.push(new_replica);
     }
@@ -86,6 +88,8 @@ benchmarks! {
 
     place_storage_order {
         let user = create_funded_user::<T>("user", 100);
+        let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
+        Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];
@@ -98,6 +102,8 @@ benchmarks! {
 
     calculate_reward {
         let user = create_funded_user::<T>("user", 100);
+        let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
+        Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];

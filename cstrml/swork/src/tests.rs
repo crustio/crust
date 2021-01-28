@@ -5,8 +5,8 @@ use super::*;
 
 use crate::mock::*;
 use frame_support::{
-    assert_ok, assert_noop, assert_err,
-    dispatch::{DispatchError, DispatchErrorWithPostInfo}, weights::PostDispatchInfo
+    assert_ok, assert_noop,
+    dispatch::DispatchError
 };
 use hex;
 use keyring::Sr25519Keyring;
@@ -37,7 +37,6 @@ fn register_should_work() {
         assert_eq!(Swork::identities(applier).is_none(), true);
         assert_eq!(Swork::pub_keys(legal_pk), PKInfo {
             code: legal_code,
-            allow_report_slot: 0,
             anchor: None
         });
     });
@@ -239,7 +238,7 @@ fn report_works_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
-                used: legal_wr_info.used,
+                used: legal_wr_info.used * 2,
                 free: legal_wr_info.free,
                 reported_files_size: legal_wr_info.used,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
@@ -261,8 +260,8 @@ fn report_works_should_work() {
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
                 legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
+                legal_wr_info.added_files.clone(),
+                legal_wr_info.deleted_files.clone(),
                 legal_wr_info.srd_root,
                 legal_wr_info.files_root,
                 legal_wr_info.sig
@@ -273,16 +272,22 @@ fn report_works_should_work() {
 
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 402868224);
+            assert_eq!(Swork::used(), 402868224 * 2);
+            assert_eq!(Swork::reported_files_size(), 402868224);
             assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
 
             assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
                 anchor: legal_pk.clone(),
+                punishment_deadline: 300,
                 group: None
+            });
+            assert_eq!(Swork::pub_keys(legal_pk.clone()), PKInfo {
+                code: LegalCode::get(),
+                anchor: Some(legal_pk.clone())
             });
 
             // Check same file all been confirmed
-            assert_eq!(Market::files(hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap()).unwrap_or_default().0, FileInfo {
+            assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default().0, FileInfo {
                 file_size: 134289408,
                 expired_on: 1303,
                 claimed_at: 303,
@@ -292,10 +297,11 @@ fn report_works_should_work() {
                 replicas: vec![Replica {
                     who: reporter.clone(),
                     valid_at: 303,
-                    anchor: legal_pk.clone()
+                    anchor: legal_pk.clone(),
+                    is_reported: true
                 }]
             });
-            assert_eq!(Market::files(hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap()).unwrap_or_default().0, FileInfo {
+            assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default().0, FileInfo {
                 file_size: 268578816,
                 expired_on: 1303,
                 claimed_at: 303,
@@ -305,7 +311,8 @@ fn report_works_should_work() {
                 replicas: vec![Replica {
                     who: reporter,
                     valid_at: 303,
-                    anchor: legal_pk
+                    anchor: legal_pk,
+                    is_reported: true
                 }]
             });
         });
@@ -347,6 +354,7 @@ fn report_works_should_work_without_files() {
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 402868224);
         });
 }
 
@@ -699,7 +707,7 @@ fn incremental_report_should_work_with_files_change() {
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 0);
-
+            assert_eq!(Swork::reported_files_size(), 0);
         });
 }
 
@@ -826,6 +834,7 @@ fn update_identities_should_work() {
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 300);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
 
@@ -848,6 +857,7 @@ fn update_identities_should_work() {
             // 3. Free and used should already been updated
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
 
             // 4. Runs to 606
@@ -857,6 +867,7 @@ fn update_identities_should_work() {
             // 5. Free and used should not change, but current_rs should already been updated
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 600);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4294967298u128);
 
@@ -867,6 +878,7 @@ fn update_identities_should_work() {
             // 7. Free and used should goes to 0, and the corresponding storage order should failed
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 0u128);
         });
@@ -899,6 +911,7 @@ fn abnormal_era_should_work() {
             // 2. Everything goes well
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
 
             // 4. Abnormal era happened, new era goes like 404
             run_to_block(404);
@@ -907,6 +920,7 @@ fn abnormal_era_should_work() {
             // 5. Free and used should not change
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
         });
 }
 
@@ -967,6 +981,7 @@ fn ab_upgrade_should_work() {
             });
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
 
             // 4. Runs to 606, and do sWorker upgrade
@@ -1004,6 +1019,7 @@ fn ab_upgrade_should_work() {
             });
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
             assert_eq!(Swork::reported_in_slot(&a_pk, 600), true);
 
@@ -1032,14 +1048,15 @@ fn ab_upgrade_should_work() {
             // 11. Check B's work report and free & used again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
-                used: 134289403,
+                used: 62, // 2 + 2 * 37 - 7 * 2
                 free: 4294967296,
-                reported_files_size: 3,
+                reported_files_size: 32,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 134289403); // Added 134289408 and delete 7
+            assert_eq!(Swork::used(), 62);
+            assert_eq!(Swork::reported_files_size(), 32);
         });
 }
 
@@ -1223,6 +1240,7 @@ fn create_and_join_group_should_work() {
 
             assert_eq!(Swork::identities(&bob).unwrap_or_default(), Identity {
                 anchor: b_pk.clone(),
+                punishment_deadline: 0,
                 group: Some(alice.clone())
             });
         });
@@ -1345,6 +1363,10 @@ fn join_group_should_fail_due_to_invalid_situations() {
         .execute_with(|| {
             let alice = Sr25519Keyring::Alice.to_account_id();
             let bob = Sr25519Keyring::Bob.to_account_id();
+            let charlie = Sr25519Keyring::Charlie.to_account_id();
+            let dave = Sr25519Keyring::Dave.to_account_id();
+            let eve = Sr25519Keyring::Eve.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
 
             let b_wr_info = ab_upgrade_work_report();
             let b_pk = b_wr_info.curr_pk.clone();
@@ -1360,8 +1382,12 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 message: Some("IdentityNotExist"),
             });
 
-
             register_identity(&bob, &b_pk, &b_pk);
+            register_identity(&charlie, &b_pk, &b_pk);
+            register_identity(&dave, &b_pk, &b_pk);
+            register_identity(&eve, &b_pk, &b_pk);
+            register_identity(&ferdie, &b_pk, &b_pk);
+
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
                 used: 100,
@@ -1412,9 +1438,31 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 Origin::signed(bob.clone()),
                 alice.clone()
             ));
+            assert_ok!(Swork::join_group(
+                Origin::signed(charlie.clone()),
+                alice.clone()
+            ));
+            assert_ok!(Swork::join_group(
+                Origin::signed(dave.clone()),
+                alice.clone()
+            ));
+            assert_ok!(Swork::join_group(
+                Origin::signed(eve.clone()),
+                alice.clone()
+            ));
+            assert_noop!(Swork::join_group(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 17,
+                message: Some("ExceedGroupLimit"),
+            });
 
             assert_eq!(Swork::identities(&bob).unwrap_or_default(), Identity {
                 anchor: b_pk.clone(),
+                punishment_deadline: 0,
                 group: Some(alice.clone())
             });
 
@@ -1457,11 +1505,11 @@ fn join_group_should_work_for_used_in_work_report() {
             register_identity(&eve, &c_pk, &c_pk);
 
             // We have five test files
-            let file_a = hex::decode("5aa706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(); // A file
-            let file_b = hex::decode("99cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(); // B file
-            let file_c = hex::decode("77cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(); // C file
-            let file_d = hex::decode("66a706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b110").unwrap(); // D file
-            let file_e = hex::decode("33cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae12e").unwrap(); // E file
+            let file_a = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oA".as_bytes().to_vec(); // A file
+            let file_b = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(); // B file
+            let file_c = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(); // C file
+            let file_d = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oD".as_bytes().to_vec(); // D file
+            let file_e = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oE".as_bytes().to_vec(); // E file
 
             // alice, bob and eve become a group
             assert_ok!(Swork::create_group(
@@ -1486,7 +1534,6 @@ fn join_group_should_work_for_used_in_work_report() {
             run_to_block(303);
             add_not_live_files();
             // A report works in 303
-            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -1513,12 +1560,14 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![Replica {
                         who: alice.clone(),
                         valid_at: 303,
-                        anchor: a_pk.clone()
+                        anchor: a_pk.clone(),
+                        is_reported: true
                     }]
                 },
                 UsedInfo {
-                    used_size: 13,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 13 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_b).unwrap_or_default(), (
@@ -1532,12 +1581,14 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![Replica {
                         who: alice.clone(),
                         valid_at: 303,
-                        anchor: a_pk.clone()
+                        anchor: a_pk.clone(),
+                        is_reported: true
                     }]
                 },
                 UsedInfo {
-                    used_size: 7,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 7 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1551,23 +1602,24 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![Replica {
                         who: alice.clone(),
                         valid_at: 303,
-                        anchor: a_pk.clone()
+                        anchor: a_pk.clone(),
+                        is_reported: true
                     }]
                 },
                 UsedInfo {
-                    used_size: 37,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 57,
+                used: 57 * 2,
                 free: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -1595,18 +1647,21 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 7,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 7 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
@@ -1621,18 +1676,21 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1648,24 +1706,25 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 55,
+                used: 55 * 2,
                 free: 4294967296,
                 reported_files_size: 99,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -1693,23 +1752,27 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
@@ -1724,18 +1787,21 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1751,18 +1817,20 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 22,
-                    groups: BTreeSet::from_iter(vec![c_pk.clone()].into_iter())
+                    used_size: 22 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(c_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 22,
+                used: 22 * 2,
                 free: 4294967296,
                 reported_files_size: 114,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1773,7 +1841,6 @@ fn join_group_should_work_for_used_in_work_report() {
             let eve_wr_info = group_work_report_eve_600();
 
             run_to_block(603);
-            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -1793,7 +1860,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 7,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 1,
@@ -1801,20 +1868,22 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 7,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 7 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 2,
@@ -1822,18 +1891,21 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1849,29 +1921,31 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         },
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
-                            anchor: c_pk.clone()
+                            anchor: c_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 55,
+                used: 55 * 2,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -1891,7 +1965,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 1,
@@ -1899,20 +1973,22 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
-                            anchor: a_pk.clone()
+                            anchor: a_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 37,
-                    groups: BTreeSet::from_iter(vec![a_pk.clone()].into_iter())
+                    used_size: 37 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
                 FileInfo {
                     file_size: 55,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 1,
@@ -1920,13 +1996,15 @@ fn join_group_should_work_for_used_in_work_report() {
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
-                            anchor: b_pk.clone()
+                            anchor: b_pk.clone(),
+                            is_reported: true
                         }
                     ]
                 },
                 UsedInfo {
-                    used_size: 55,
-                    groups: BTreeSet::from_iter(vec![b_pk.clone()].into_iter())
+                    used_size: 55 * 2,
+                    reported_group_count: 1,
+                    groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
 
@@ -1934,15 +2012,16 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 22,
                     expired_on: 1303,
-                    claimed_at: 603,
+                    claimed_at: 303,
                     amount: 1000,
                     expected_replica_count: 4,
                     reported_replica_count: 0,
                     replicas: vec![]
                 },
                 UsedInfo {
-                    used_size: 22,
-                    groups: BTreeSet::from_iter(vec![].into_iter())
+                    used_size: 0,
+                    reported_group_count: 0,
+                    groups: BTreeMap::new()
                 })
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
@@ -1956,6 +2035,7 @@ fn join_group_should_work_for_used_in_work_report() {
 
             run_to_block(1500);
             let alice_wr_info = group_work_report_alice_1500();
+            Market::add_member_into_allow_list(Origin::root(), eve.clone()).expect("Give permission failed");
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_c.clone()));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_d.clone()));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_e.clone()));
@@ -1970,7 +2050,7 @@ fn join_group_should_work_for_used_in_work_report() {
 
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 57,
+                used: 57 * 2,
                 free: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1979,13 +2059,12 @@ fn join_group_should_work_for_used_in_work_report() {
 
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 55,
+                used: 55 * 2,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -2001,6 +2080,12 @@ fn join_group_should_work_for_used_in_work_report() {
                 alice_wr_info.sig
             ));
 
+
+            // delete won't call calculate payout anymore and won't close the file
+            assert_eq!(Market::files(&file_a).is_some(), true);
+            assert_eq!(Market::files(&file_b).is_some(), true);
+            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_a.clone()));
+            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_b.clone()));
             assert_eq!(Market::files(&file_a), None);
             assert_eq!(Market::files(&file_b), None);
             assert_eq!(Market::used_trash_i(&file_b).is_some(), true);
@@ -2079,7 +2164,6 @@ fn join_group_should_work_for_stake_limit() {
             Swork::update_identities();
             add_not_live_files();
             // A report works in 303
-            allow_report_work(&alice_wr_info.curr_pk, alice_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -2094,7 +2178,6 @@ fn join_group_should_work_for_stake_limit() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
-            allow_report_work(&bob_wr_info.curr_pk, bob_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -2109,7 +2192,6 @@ fn join_group_should_work_for_stake_limit() {
                 bob_wr_info.files_root,
                 bob_wr_info.sig
             ));
-            allow_report_work(&eve_wr_info.curr_pk, eve_wr_info.block_number);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -2129,214 +2211,351 @@ fn join_group_should_work_for_stake_limit() {
             Swork::update_identities();
 
             assert_eq!(Swork::free(), 12884901888);
-            assert_eq!(Swork::used(), 134);
+            assert_eq!(Swork::used(), 134 * 2);
+            assert_eq!(Swork::reported_files_size(), 270); // 57 + 99 + 134
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
-            assert_eq!(*map.get(&ferdie).unwrap(), 12884902022u128);
+            assert_eq!(*map.get(&ferdie).unwrap(), 12884902156u128);
             assert_eq!(map.get(&alice).is_none(), true);
             assert_eq!(map.get(&bob).is_none(), true);
             assert_eq!(map.get(&eve).is_none(), true);
         });
 }
 
-/// Report works test cases
 #[test]
-fn report_works_punishment_should_work() {
+fn quit_group_should_work_for_stake_limit() {
     ExtBuilder::default()
         .build()
         .execute_with(|| {
-            // Generate 303 blocks first
-            run_to_block(303);
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
 
-            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
-            let legal_wr_info = legal_work_report_with_added_files();
-            let legal_pk = legal_wr_info.curr_pk.clone();
-            let legal_wr = WorkReport {
-                report_slot: legal_wr_info.block_number,
-                used: legal_wr_info.used,
-                free: legal_wr_info.free,
-                reported_files_size: legal_wr_info.used,
-                reported_srd_root: legal_wr_info.srd_root.clone(),
-                reported_files_root: legal_wr_info.files_root.clone()
-            };
+            assert_noop!(
+                Swork::quit_group(
+                    Origin::signed(alice.clone())
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 10,
+                    message: Some("IdentityNotExist"),
+                }
+            );
 
-            register(&legal_pk, LegalCode::get());
-            add_not_live_files();
+            let alice_wr_info = group_work_report_alice_300();
+            let a_pk = alice_wr_info.curr_pk.clone();
 
-            assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
-                legal_wr_info.curr_pk,
-                legal_wr_info.prev_pk,
-                legal_wr_info.block_number,
-                legal_wr_info.block_hash,
-                legal_wr_info.free,
-                legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
-                legal_wr_info.srd_root,
-                legal_wr_info.files_root,
-                legal_wr_info.sig
+            register(&a_pk, LegalCode::get());
+            register_identity(&alice, &a_pk, &a_pk);
+            assert_noop!(
+                Swork::quit_group(
+                    Origin::signed(alice.clone())
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 16,
+                    message: Some("NotJoint"),
+                }
+            );
+
+            // alice, bob and eve become a group
+            assert_ok!(Swork::create_group(
+                Origin::signed(ferdie.clone())
             ));
 
-            // Check work report
-            assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
-            assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
-                anchor: legal_pk.clone(),
-                group: None
-            });
+            assert_ok!(Swork::join_group(
+                Origin::signed(alice.clone()),
+                ferdie.clone()
+            ));
 
-            run_to_block(603); // don't report works
+            run_to_block(303);
+            Swork::update_identities();
+            add_not_live_files();
+            // A report works in 303
+            assert_ok!(Swork::report_works(
+                Origin::signed(alice.clone()),
+                alice_wr_info.curr_pk,
+                alice_wr_info.prev_pk,
+                alice_wr_info.block_number,
+                alice_wr_info.block_hash,
+                alice_wr_info.free,
+                alice_wr_info.used,
+                alice_wr_info.added_files,
+                alice_wr_info.deleted_files,
+                alice_wr_info.srd_root,
+                alice_wr_info.files_root,
+                alice_wr_info.sig
+            ));
+
+            run_to_block(603);
+
+            assert_ok!(Swork::quit_group(
+                Origin::signed(alice.clone())
+            ));
+            assert_eq!(Swork::groups(ferdie.clone()), BTreeSet::from_iter(vec![].into_iter()));
+
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57); // 57
+            assert_eq!(Swork::current_report_slot(), 600);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+            assert_eq!(*map.get(&alice).unwrap(), 4294967410u128);
+        });
+}
+
+#[test]
+fn kick_out_should_work_for_stake_limit() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+
+            assert_noop!(
+                Swork::kick_out(
+                    Origin::signed(ferdie.clone()),
+                    alice.clone()
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 12,
+                    message: Some("NotOwner"),
+                }
+            );
+
+            let alice_wr_info = group_work_report_alice_300();
+            let a_pk = alice_wr_info.curr_pk.clone();
+
+            register(&a_pk, LegalCode::get());
+            register_identity(&alice, &a_pk, &a_pk);
+            // alice, bob and eve become a group
+            assert_ok!(Swork::create_group(
+                Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::join_group(
+                Origin::signed(alice.clone()),
+                ferdie.clone()
+            ));
+
+            run_to_block(303);
+            Swork::update_identities();
+            add_not_live_files();
+            // A report works in 303
+            assert_ok!(Swork::report_works(
+                Origin::signed(alice.clone()),
+                alice_wr_info.curr_pk,
+                alice_wr_info.prev_pk,
+                alice_wr_info.block_number,
+                alice_wr_info.block_hash,
+                alice_wr_info.free,
+                alice_wr_info.used,
+                alice_wr_info.added_files,
+                alice_wr_info.deleted_files,
+                alice_wr_info.srd_root,
+                alice_wr_info.files_root,
+                alice_wr_info.sig
+            ));
+
+            run_to_block(603);
+
+            assert_ok!(Swork::kick_out(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
+            ));
+            assert_eq!(Swork::groups(ferdie.clone()), BTreeSet::from_iter(vec![].into_iter()));
+
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57); // 57
+            assert_eq!(Swork::current_report_slot(), 600);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+            assert_eq!(*map.get(&alice).unwrap(), 4294967410u128);
+        });
+}
+
+#[test]
+fn punishment_by_offline_should_work_for_stake_limit() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+
+            let alice_wr_info = group_work_report_alice_300();
+            let a_pk = alice_wr_info.curr_pk.clone();
+
+            register(&a_pk, LegalCode::get());
+            register_identity(&alice, &a_pk, &a_pk);
+
+            // alice join the ferdie's group
+            assert_ok!(Swork::create_group(
+                Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::join_group(
+                Origin::signed(alice.clone()),
+                ferdie.clone()
+            ));
+
+            run_to_block(303);
+            Swork::update_identities();
+            add_not_live_files();
+            // A report works in 303
+            assert_ok!(Swork::report_works(
+                Origin::signed(alice.clone()),
+                alice_wr_info.curr_pk,
+                alice_wr_info.prev_pk,
+                alice_wr_info.block_number,
+                alice_wr_info.block_hash,
+                alice_wr_info.free,
+                alice_wr_info.used,
+                alice_wr_info.added_files,
+                alice_wr_info.deleted_files,
+                alice_wr_info.srd_root,
+                alice_wr_info.files_root,
+                alice_wr_info.sig
+            ));
+
+            run_to_block(603);
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
+            assert_eq!(Swork::current_report_slot(), 600);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 4294967410u128);
+
             run_to_block(903);
-            let legal_wr_info = legal_work_report_with_added_files();
-            assert_err!(Swork::report_works(
-                Origin::signed(reporter.clone()),
-                legal_wr_info.curr_pk,
-                legal_wr_info.prev_pk,
-                900,
-                legal_wr_info.block_hash,
-                legal_wr_info.free,
-                legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
-                legal_wr_info.srd_root,
-                legal_wr_info.files_root,
-                legal_wr_info.sig
-            ), DispatchErrorWithPostInfo {
-                post_info: PostDispatchInfo {
-                    actual_weight: None,
-                    pays_fee: Pays::Yes,
-                },
-                error: DispatchError::Module {
-                    index: 0,
-                    error: 16,
-                    message: Some(
-                        "UnderPunishment",
-                    ),
-                },
-            });
+            // Punishment happen. Can't find report work at 600 report_slot. punishment deadline would be 1800. Block would be after 2100
+            Swork::update_identities();
 
-            run_to_block(1203);
-            let legal_wr_info = legal_work_report_with_added_files();
-            assert_err!(Swork::report_works(
-                Origin::signed(reporter.clone()),
-                legal_wr_info.curr_pk,
-                legal_wr_info.prev_pk,
-                1200,
-                legal_wr_info.block_hash,
-                legal_wr_info.free,
-                legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
-                legal_wr_info.srd_root,
-                legal_wr_info.files_root,
-                legal_wr_info.sig
-            ), DispatchErrorWithPostInfo {
-                post_info: PostDispatchInfo {
-                    actual_weight: None,
-                    pays_fee: Pays::Yes,
-                },
-                error: DispatchError::Module {
-                    index: 0,
-                    error: 16,
-                    message: Some(
-                        "UnderPunishment",
-                    ),
-                },
-            });
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 900);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
 
-            // 900 1200 1500 1800 cannot pass the check since we set punishment for four report_slots
+            // Check 1500 and would still be punished.
+            run_to_block(2000);
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 1800);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+
+
+            let mut alice_wr_info = group_work_report_alice_300();
+            alice_wr_info.block_number = 1800;
+            let a_pk = alice_wr_info.curr_pk.clone();
+            let legal_wr = WorkReport {
+                report_slot: alice_wr_info.block_number,
+                used: alice_wr_info.used * 2,
+                free: alice_wr_info.free,
+                reported_files_size: alice_wr_info.used,
+                reported_srd_root: alice_wr_info.srd_root.clone(),
+                reported_files_root: alice_wr_info.files_root.clone()
+            };
+            add_wr(&a_pk, &legal_wr);
+
+            // Check 1800 and would success since alice reported at 1800
             run_to_block(2103);
-            let legal_wr_info = legal_work_report_with_added_files();
-            // error changed. pass the punishment check
-            assert_err!(Swork::report_works(
-                Origin::signed(reporter.clone()),
-                legal_wr_info.curr_pk,
-                legal_wr_info.prev_pk,
-                2100,
-                legal_wr_info.block_hash,
-                legal_wr_info.free,
-                legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
-                legal_wr_info.srd_root,
-                legal_wr_info.files_root,
-                legal_wr_info.sig
-            ), DispatchErrorWithPostInfo {
-                post_info: PostDispatchInfo {
-                    actual_weight: None,
-                    pays_fee: Pays::Yes,
-                },
-                error: DispatchError::Module {
-                    index: 0,
-                    error: 5,
-                    message: Some(
-                        "IllegalWorkReportSig",
-                    ),
-                },
-            });
+            Swork::update_identities();
 
-            // forbid the punishment again
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
+            assert_eq!(Swork::current_report_slot(), 2100);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 4294967410u128);
+
+            // Check 2100 and would be punished till 3300
             run_to_block(2403);
-            let legal_wr_info = legal_work_report_with_added_files();
-            // error changed. pass the punishment check
-            assert_err!(Swork::report_works(
-                Origin::signed(reporter.clone()),
-                legal_wr_info.curr_pk,
-                legal_wr_info.prev_pk,
-                2400,
-                legal_wr_info.block_hash,
-                legal_wr_info.free,
-                legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
-                legal_wr_info.srd_root,
-                legal_wr_info.files_root,
-                legal_wr_info.sig
-            ), DispatchErrorWithPostInfo {
-                post_info: PostDispatchInfo {
-                    actual_weight: None,
-                    pays_fee: Pays::Yes,
-                },
-                error: DispatchError::Module {
-                    index: 0,
-                    error: 16,
-                    message: Some(
-                        "UnderPunishment",
-                    ),
-                },
-            });
+            Swork::update_identities();
 
-            // cannot pass the check since we don't allow it for 3900
-            run_to_block(3903);
-            let legal_wr_info = legal_work_report_with_added_files();
-            // error changed. pass the punishment check
-            assert_err!(Swork::report_works(
-                Origin::signed(reporter.clone()),
-                legal_wr_info.curr_pk,
-                legal_wr_info.prev_pk,
-                3900,
-                legal_wr_info.block_hash,
-                legal_wr_info.free,
-                legal_wr_info.used,
-                legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
-                legal_wr_info.srd_root,
-                legal_wr_info.files_root,
-                legal_wr_info.sig
-            ), DispatchErrorWithPostInfo {
-                post_info: PostDispatchInfo {
-                    actual_weight: None,
-                    pays_fee: Pays::Yes,
-                },
-                error: DispatchError::Module {
-                    index: 0,
-                    error: 16,
-                    message: Some(
-                        "UnderPunishment",
-                    ),
-                },
-            });
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 2400);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
 
+
+            run_to_block(3303);
+            Swork::update_identities();
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 3300);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+
+            // Check 3300 and would be punished again till 4500
+            run_to_block(3603);
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 3600);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+
+            let mut alice_wr_info = group_work_report_alice_300();
+            alice_wr_info.block_number = 4500;
+            let a_pk = alice_wr_info.curr_pk.clone();
+            let legal_wr = WorkReport {
+                report_slot: alice_wr_info.block_number,
+                used: alice_wr_info.used * 2,
+                free: alice_wr_info.free,
+                reported_files_size: alice_wr_info.used,
+                reported_srd_root: alice_wr_info.srd_root.clone(),
+                reported_files_root: alice_wr_info.files_root.clone()
+            };
+            add_wr(&a_pk, &legal_wr);
+
+            // Check 4200 and still in punishment duration
+            run_to_block(4503);
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 4500);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+
+            // Check 4500 and would success
+            run_to_block(4803);
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
+            assert_eq!(Swork::current_report_slot(), 4800);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 4294967410u128);
         });
 }

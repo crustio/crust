@@ -11,7 +11,7 @@ use sp_runtime::traits::StaticLookup;
 use codec::Decode;
 use market::{UsedInfo, FileInfo, Replica};
 use primitives::*;
-use sp_std::{vec, prelude::*, collections::btree_set::BTreeSet, iter::FromIterator};
+use sp_std::{vec, prelude::*, collections::{btree_set::BTreeSet, btree_map::BTreeMap}, iter::FromIterator};
 
 const SEED: u32 = 0;
 const EXPIRE_BLOCK_NUMBER: u32 = 2000;
@@ -37,23 +37,51 @@ struct ReportWorksInfo {
     pub sig: SworkerSignature
 }
 
-fn legal_work_report_with_added_files() -> ReportWorksInfo {
-    let curr_pk = vec![105,129,135,206,41,52,134,230,86,57,211,151,97,151,229,104,163,246,160,7,110,85,25,197,107,63,124,60,13,12,92,18,199,28,200,78,79,183,127,80,225,146,152,242,175,40,225,51,49,14,8,194,240,215,71,42,135,144,132,183,35,121,115,177];
+fn legal_work_report_with_srd() -> ReportWorksInfo {
+    let curr_pk = vec![195,241,106,199,76,125,81,125,26,117,176,66,252,255,206,238,68,30,96,209,41,237,109,243,254,76,189,155,229,59,97,72,5,116,123,242,43,147,98,200,159,209,55,186,10,144,58,167,242,242,168,41,216,173,145,161,38,58,49,164,243,161,139,172];
     let prev_pk: Vec<u8> = vec![];
+    let block_number = 300;
+    let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    let free: u64 = 4294967296;
+    let used: u64 = 0;
+    let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
+    let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
+    let files_root: Vec<u8> = vec![17];
+    let srd_root: Vec<u8> = vec![0];
+    let sig: Vec<u8> = vec![69,32,178,210,198,138,27,191,83,171,4,191,140,59,105,47,52,3,0,232,73,165,244,110,146,115,115,228,184,14,208,143,114,74,232,108,228,122,84,196,102,14,57,36,199,177,125,220,246,24,205,197,205,153,194,238,43,111,221,124,147,34,61,14];
+
+    ReportWorksInfo {
+        curr_pk,
+        prev_pk,
+        block_number,
+        block_hash,
+        free,
+        used,
+        srd_root,
+        files_root,
+        added_files,
+        deleted_files,
+        sig
+    }
+}
+
+fn legal_work_report_with_added_files() -> ReportWorksInfo {
+    let curr_pk = vec![195,241,106,199,76,125,81,125,26,117,176,66,252,255,206,238,68,30,96,209,41,237,109,243,254,76,189,155,229,59,97,72,5,116,123,242,43,147,98,200,159,209,55,186,10,144,58,167,242,242,168,41,216,173,145,161,38,58,49,164,243,161,139,172];    let prev_pk: Vec<u8> = vec![];
     let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
     let used: u64 = 1000;
     let mut added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     for i in 0..used {
-        let upper = (i / 256) as u8;
-        let lower = (i % 256) as u8;
-        added_files.push((vec![upper, lower], 1, 303));
+        let a = ((i / 26) / 26 % 26 + 97) as u8;
+        let b = ((i / 26) % 26 + 97) as u8;
+        let c = ((i % 26) + 97) as u8;
+        added_files.push((vec![a, b, c], 1, 303));
     }
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let files_root: Vec<u8> = vec![17];
     let srd_root: Vec<u8> = vec![0];
-    let sig: Vec<u8> = vec![66,70,118,81,131,105,13,230,117,199,215,28,17,249,37,63,16,227,29,228,2,135,35,68,52,230,96,110,196,64,228,69,149,246,230,55,137,25,30,65,76,198,179,195,130,49,16,99,167,76,43,160,189,251,30,148,198,64,11,127,28,231,38,8];
+    let sig: Vec<u8> = vec![227,84,25,58,45,65,13,231,118,42,217,119,77,184,180,72,120,245,135,53,171,158,244,118,182,82,228,67,129,221,66,142,89,54,164,112,232,22,63,17,189,79,100,199,75,100,220,53,83,12,193,230,52,154,107,30,86,59,36,121,134,248,106,186];
 
     ReportWorksInfo {
         curr_pk,
@@ -71,8 +99,7 @@ fn legal_work_report_with_added_files() -> ReportWorksInfo {
 }
 
 fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
-    let curr_pk = vec![105,129,135,206,41,52,134,230,86,57,211,151,97,151,229,104,163,246,160,7,110,85,25,197,107,63,124,60,13,12,92,18,199,28,200,78,79,183,127,80,225,146,152,242,175,40,225,51,49,14,8,194,240,215,71,42,135,144,132,183,35,121,115,177];
-    let prev_pk: Vec<u8> = vec![];
+    let curr_pk = vec![195,241,106,199,76,125,81,125,26,117,176,66,252,255,206,238,68,30,96,209,41,237,109,243,254,76,189,155,229,59,97,72,5,116,123,242,43,147,98,200,159,209,55,186,10,144,58,167,242,242,168,41,216,173,145,161,38,58,49,164,243,161,139,172];    let prev_pk: Vec<u8> = vec![];
     let block_number = 600;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
@@ -80,13 +107,14 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let mut deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     for i in 0..1000 {
-        let upper = (i / 256) as u8;
-        let lower = (i % 256) as u8;
-        deleted_files.push((vec![upper, lower], 1, 603));
+        let a = ((i / 26) / 26 % 26 + 97) as u8;
+        let b = ((i / 26) % 26 + 97) as u8;
+        let c = ((i % 26) + 97) as u8;
+        deleted_files.push((vec![a, b, c], 1, 603));
     }
     let files_root: Vec<u8> = vec![17];
     let srd_root: Vec<u8> = vec![0];
-    let sig: Vec<u8> = vec![159,147,255,189,121,120,74,136,29,153,105,90,25,235,208,54,216,152,193,180,130,219,85,110,231,179,185,183,153,15,200,219,102,209,133,211,160,150,196,215,119,187,27,2,125,60,231,73,11,34,160,88,235,54,204,58,69,206,236,56,231,37,186,211];
+    let sig: Vec<u8> = vec![170,32,5,198,9,181,153,22,228,68,191,174,90,188,145,49,189,220,29,6,205,165,228,8,53,163,26,22,54,201,23,168,105,79,189,58,188,230,107,39,81,28,113,235,246,12,57,94,246,121,161,88,162,114,182,218,244,220,12,205,205,197,156,191];
 
     ReportWorksInfo {
         curr_pk,
@@ -107,14 +135,16 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
     for (file, file_size, _) in files.clone().iter() {
         let used_info = UsedInfo {
             used_size: *file_size,
-            groups: <BTreeSet<SworkerAnchor>>::new()
+            reported_group_count: 0,
+            groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };
         let mut replicas: Vec<Replica<T::AccountId>> = vec![];
         for _ in 0..200 {
             let new_replica = Replica {
                 who: user.clone(),
                 valid_at: 300,
-                anchor: pub_key.clone()
+                anchor: pub_key.clone(),
+                is_reported: true
             };
             replicas.push(new_replica);
         }
@@ -155,6 +185,42 @@ benchmarks! {
         swork::Module::<T>::register(RawOrigin::Signed(caller.clone()).into(), ias_sig.to_vec(), ias_cert.to_vec(), caller.clone(), isv_body.to_vec(), sig).expect("Something wrong during registering");
     }
 
+    report_works_with_srd {
+        let code: Vec<u8> = vec![120,27,83,125,61,206,243,157,236,123,139,206,111,223,205,3,45,141,132,102,64,233,181,89,139,74,159,98,113,136,169,8];
+        swork::Module::<T>::upgrade(RawOrigin::Root.into(), code.clone(), EXPIRE_BLOCK_NUMBER.into()).expect("failed to insert code");
+
+        // Prepare legal work report
+        let user: Vec<u8> = vec![212,53,147,199,21,253,211,28,97,20,26,189,4,169,159,214,130,44,133,88,133,76,205,227,154,86,132,231,165,109,162,125]; // Alice
+        let caller = T::AccountId::decode(&mut &user[..]).unwrap_or_default();
+        let wr = legal_work_report_with_srd();
+
+        // Set block number, system hash and pk in swork
+        swork::Module::<T>::insert_pk_info(wr.curr_pk.clone(), code.clone());
+        system::Module::<T>::set_block_number(303u32.into());
+        let fake_bh:T::Hash = T::Hash::decode(&mut &wr.block_hash[..]).unwrap_or_default();
+        let target_block_number:T::BlockNumber = 300u32.into();
+        <system::BlockHash<T>>::insert(target_block_number, fake_bh);
+    }: {
+        swork::Module::<T>::report_works(
+            RawOrigin::Signed(caller.clone()).into(),
+            wr.curr_pk.clone(),
+            wr.prev_pk,
+            wr.block_number,
+            wr.block_hash,
+            wr.free,
+            wr.used,
+            wr.added_files,
+            wr.deleted_files,
+            wr.srd_root,
+            wr.files_root,
+            wr.sig
+        ).expect("Something wrong during reporting works");
+    } verify {
+        assert_eq!(swork::Module::<T>::free(), wr.free as u128);
+        assert_eq!(swork::Module::<T>::used(), 0 as u128);
+        assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
+    }
+
     report_works_with_added_files {
         let code: Vec<u8> = vec![120,27,83,125,61,206,243,157,236,123,139,206,111,223,205,3,45,141,132,102,64,233,181,89,139,74,159,98,113,136,169,8];
         swork::Module::<T>::upgrade(RawOrigin::Root.into(), code.clone(), EXPIRE_BLOCK_NUMBER.into()).expect("failed to insert code");
@@ -190,7 +256,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), wr.used as u128);
+        assert_eq!(swork::Module::<T>::used(), (wr.used * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
@@ -252,7 +318,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), wr.used as u128);
+        assert_eq!(swork::Module::<T>::used(), (wr.used * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
@@ -331,6 +397,13 @@ mod tests {
     fn report_works_with_added_files() {
         ExtBuilder::default().build().execute_with(|| {
             assert_ok!(test_benchmark_report_works_with_added_files::<Test>());
+        });
+    }
+
+    #[test]
+    fn report_works_with_srd() {
+        ExtBuilder::default().build().execute_with(|| {
+            assert_ok!(test_benchmark_report_works_with_srd::<Test>());
         });
     }
 

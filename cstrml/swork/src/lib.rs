@@ -60,8 +60,11 @@ macro_rules! log {
 pub trait WeightInfo {
     fn upgrade() -> Weight;
     fn register() -> Weight;
-    fn report_works() -> Weight;
-    fn chill_pk() -> Weight;
+    fn report_works(added: u32, deleted: u32) -> Weight;
+    fn create_group() -> Weight;
+    fn join_group() -> Weight;
+    fn quit_group() -> Weight;
+    fn kick_out() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -84,7 +87,6 @@ pub struct WorkReport {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct PKInfo {
     pub code: SworkerCode,
-    pub allow_report_slot: ReportSlot,
     pub anchor: Option<SworkerAnchor> // is bonded to an account or not in report work
 }
 
@@ -94,6 +96,7 @@ pub struct Identity<AccountId> {
     /// The unique identity associated to one account id.
     /// During the AB upgrade, this anchor would keep and won't change.
     pub anchor: SworkerAnchor,
+    pub punishment_deadline: ReportSlot,
     pub group: Option<AccountId>
 }
 
@@ -115,10 +118,10 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         Self::reported_in_slot(&anchor, prev_rs)
     }
 
-    /// decrease the used value due to deleted files or dump trash
-    fn decrease_used(anchor: &SworkerAnchor, anchor_used: u64) {
+    /// update the used value due to deleted files, dump trash or calculate_payout
+    fn update_used(anchor: &SworkerAnchor, anchor_decrease_used: u64, anchor_increase_used: u64) {
         WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
-            Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_used),
+            Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_decrease_used).saturating_add(anchor_increase_used),
             ref mut i => *i = None,
         });
     }
@@ -131,9 +134,9 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         false
     }
 
-    /// get total used and free space
+    /// get total reported files size and free space
     fn get_total_capacity() -> u128 {
-        return Self::used().saturating_add(Self::free());
+        return Self::reported_files_size().saturating_add(Self::free());
     }
 }
 
@@ -154,6 +157,9 @@ pub trait Config: system::Config {
 
     /// Interface for interacting with a market module.
     type MarketInterface: MarketInterface<Self::AccountId, BalanceOf<Self>>;
+
+    /// Max number of members in one group
+    type MaxGroupSize: Get<u32>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -199,6 +205,10 @@ decl_storage! {
         /// default is 0
         pub Used get(fn used): u128 = 0;
 
+        /// The total reported files workload, used for calculating total_capacity for market module
+        /// default is 0
+        pub ReportedFilesSize get(fn reported_files_size): u128 = 0;
+
         /// The free workload, used for calculating stake limit in the end of era
         /// default is 0
         pub Free get(fn free): u128 = 0;
@@ -240,8 +250,10 @@ decl_error! {
         GroupAlreadyExist,
         /// Group owner cannot register
         GroupOwnerForbidden,
-        /// Cannot report works right now due to offline in the past time
-        UnderPunishment
+        /// Member is not in a group
+        NotJoint,
+        /// Exceed the limit of members number in one group
+        ExceedGroupLimit
     }
 }
 
@@ -346,7 +358,7 @@ decl_module! {
         /// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
         /// - Write: WorkReport, ReportedInSlot, market.SOrder
         /// # </weight>
-        #[weight = (T::WeightInfo::report_works(), DispatchClass::Operational)]
+        #[weight = (T::WeightInfo::report_works(added_files.len() as u32, deleted_files.len() as u32), DispatchClass::Operational)]
         pub fn report_works(
             origin,
             curr_pk: SworkerPubKey,
@@ -367,26 +379,23 @@ decl_module! {
             // 1. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
-            // 2. Ensure wr is allowed.
-            ensure!(Self::can_report_works(&curr_pk, slot), Error::<T>::UnderPunishment);
-
-            // 3. Ensure who cannot be group owner
+            // 2. Ensure who cannot be group owner
             ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
-            
-            // 4. Ensure reporter's code is legal
-            // ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
-            // 5. Decide which scenario
+            // 3. Ensure reporter's code is legal
+            ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
+
+            // 4. Decide which scenario
             let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
             let is_ab_upgrade = maybe_anchor.is_none() && !ab_upgrade_pk.is_empty();
             let is_first_report = maybe_anchor.is_none() && ab_upgrade_pk.is_empty();
 
-            // 6. Unique Check for normal report work for curr pk
+            // 5. Unique Check for normal report work for curr pk
             if let Some(anchor) = maybe_anchor {
                 // Normally report works.
-                // 6.1 Ensure Identity's anchor be same with current pk's anchor
+                // 5.1 Ensure Identity's anchor be same with current pk's anchor
                 ensure!(Self::identities(&reporter).unwrap_or_default().anchor == anchor, Error::<T>::IllegalReporter);
-                // 6.2 Already reported with same pub key in the same slot, return immediately
+                // 5.2 Already reported with same pub key in the same slot, return immediately
                 if Self::reported_in_slot(&anchor, slot) {
                     log!(
                         trace,
@@ -395,40 +404,40 @@ decl_module! {
                         slot
                     );
                     // This is weird and might be an attack.
-                    return Ok(Pays::Yes.into())
+                    return Ok(Some(0 as Weight).into())
                 }
             }
 
-            // 7. Timing check
-            // ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
+            // 6. Timing check
+            ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 8. Ensure sig is legal
-            // ensure!(
-            //     Self::work_report_sig_check(
-            //         &curr_pk,
-            //         &ab_upgrade_pk,
-            //         slot,
-            //         &slot_hash,
-            //         reported_srd_size,
-            //         reported_files_size,
-            //         &reported_srd_root,
-            //         &reported_files_root,
-            //         &added_files,
-            //         &deleted_files,
-            //         &sig
-            //     ),
-            //     Error::<T>::IllegalWorkReportSig
-            // );
+            // 7. Ensure sig is legal
+            ensure!(
+                Self::work_report_sig_check(
+                    &curr_pk,
+                    &ab_upgrade_pk,
+                    slot,
+                    &slot_hash,
+                    reported_srd_size,
+                    reported_files_size,
+                    &reported_srd_root,
+                    &reported_files_root,
+                    &added_files,
+                    &deleted_files,
+                    &sig
+                ),
+                Error::<T>::IllegalWorkReportSig
+            );
 
-            // 9. Files storage status transition check
+            // 8. Files storage status transition check
             if is_ab_upgrade {
-                // 9.1 Previous pk should already reported works
+                // 8.1 Previous pk should already reported works
                 ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
                 // unwrap_or_default is a small tricky solution
                 let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
 
-                // 9.2 Current work report should NOT be changed at all
+                // 8.2 Current work report should NOT be changed at all
                 let prev_wr = maybe_prev_wr.unwrap();
                 ensure!(added_files.is_empty() &&
                     deleted_files.is_empty() &&
@@ -436,7 +445,7 @@ decl_module! {
                     prev_wr.reported_srd_root == reported_srd_root,
                     Error::<T>::ABUpgradeFailed);
 
-                // 9.3 Set the real previous public key(contains work report);
+                // 8.3 Set the real previous public key(contains work report);
                 prev_pk = ab_upgrade_pk.clone();
             } else {
                 ensure!(
@@ -451,7 +460,7 @@ decl_module! {
                 );
             }
 
-            // 10. Finish register
+            // 9. Finish register
             if is_ab_upgrade {
                 // 10.1 Transfer A's status to B and delete old A's storage status
                 let prev_pk_info = Self::pub_keys(&prev_pk);
@@ -467,12 +476,14 @@ decl_module! {
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
+                        identity.punishment_deadline = slot;
                         <Identities<T>>::insert(&reporter, identity);
                     },
                     // 10.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),
+                            punishment_deadline: slot,
                             group: None
                         };
                         <Identities<T>>::insert(&reporter, identity);
@@ -482,7 +493,7 @@ decl_module! {
                 PubKeys::insert(&curr_pk, pk_info);
             }
 
-            // 11. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
+            // 10. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
             // a. Upsert work report
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
@@ -501,13 +512,13 @@ decl_module! {
                 slot,
             );
 
-            // 12. Emit work report event
+            // 11. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
             Ok(Pays::No.into())
         }
 
-        #[weight = 1000]
+        #[weight = T::WeightInfo::create_group()]
         pub fn create_group(
             origin
         ) -> DispatchResult {
@@ -528,7 +539,7 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = 1000]
+        #[weight = T::WeightInfo::join_group()]
         pub fn join_group(
             origin,
             target: <T::Lookup as StaticLookup>::Source
@@ -546,27 +557,91 @@ decl_module! {
             // 3. Ensure owner's group exist
             ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
-            // 4. Ensure who's wr's used is zero
+            // 4. Ensure owner's group has space
+            ensure!(Self::groups(&owner).len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedGroupLimit);
+
+            // 5. Ensure who's wr's used is zero
             ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
 
-            // 5. Join the group
+            // 6. Join the group
             <Groups<T>>::mutate(&owner, |members| {
                 members.insert(who.clone());
             });
 
-            // 6. Mark the group owner
-            <Identities<T>>::mutate_exists(&who, |maybe_i| match *maybe_i {
+            // 7. Mark the group owner
+            <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
                 Some(Identity { ref mut group, .. }) => *group = Some(owner.clone()),
-                ref mut i => *i = None,
+                None => {},
             });
 
-            // 7. Emit event
+            // 8. Emit event
             Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
 
             Ok(())
         }
 
-        // TODO: quit the group
+        #[weight = T::WeightInfo::quit_group()]
+        pub fn quit_group(
+            origin
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Ensure who has identity information
+            ensure!(Self::identities(&who).is_some(), Error::<T>::IdentityNotExist);
+            let identity = Self::identities(&who).unwrap();
+
+            // 2. Ensure who joint group before
+            ensure!(identity.group.is_some(), Error::<T>::NotJoint);
+
+            let owner = identity.group.unwrap();
+            // 3. Ensure owner's group exist
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotJoint);
+
+            // 4. Remove the group owner
+            <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut group, .. }) => *group = None,
+                None => {},
+            });
+
+            // 5. Quit the group
+            <Groups<T>>::mutate(&owner, |members| {
+                members.remove(&who);
+            });
+
+            // 6. Emit event
+            Self::deposit_event(RawEvent::QuitGroupSuccess(who, owner));
+
+            Ok(())
+        }
+
+        #[weight = T::WeightInfo::kick_out()]
+        pub fn kick_out(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let owner = ensure_signed(origin)?;
+            let member = T::Lookup::lookup(target)?;
+
+            // 1. Ensure who is a group owner right now
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
+
+            // 2. Remove the group owner
+            <Identities<T>>::mutate(&member, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut group, .. }) => *group = None,
+                None => {},
+            });
+
+            // 3. Quit the group
+            <Groups<T>>::mutate(&owner, |members| {
+                members.remove(&member);
+            });
+
+            // 4. Emit event
+            Self::deposit_event(RawEvent::KickOutSuccess(member));
+
+            Ok(())
+        }
+
         // TODO: chill anchor, identity and pk
 
     }
@@ -595,6 +670,7 @@ impl<T: Config> Module<T> {
 
         let mut total_used = 0u128;
         let mut total_free = 0u128;
+        let mut total_reported_files_size = 0u128;
 
         log!(
             trace,
@@ -603,10 +679,11 @@ impl<T: Config> Module<T> {
         );
         // 2. Loop all identities and get the workload map
         let mut workload_map= BTreeMap::new();
-        for (reporter, id) in <Identities<T>>::iter() {
-            let (free, used) = Self::get_workload(&id.anchor, current_rs);
+        for (reporter, mut id) in <Identities<T>>::iter() {
+            let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);
             total_used = total_used.saturating_add(used);
             total_free = total_free.saturating_add(free);
+            total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
             let mut owner = reporter;
             if let Some(group) = id.group {
                 owner = group;
@@ -619,6 +696,7 @@ impl<T: Config> Module<T> {
 
         Used::put(total_used);
         Free::put(total_free);
+        ReportedFilesSize::put(total_reported_files_size);
         let total_workload = total_used.saturating_add(total_free);
 
         // 3. Update current report slot
@@ -639,7 +717,6 @@ impl<T: Config> Module<T> {
     pub fn insert_pk_info(pk: SworkerPubKey, code: SworkerCode) {
         let pk_info = PKInfo {
             code,
-            allow_report_slot: 0,
             anchor: None
         };
 
@@ -676,6 +753,7 @@ impl<T: Config> Module<T> {
     ) {
         let mut old_used: u64 = 0;
         let mut old_free: u64 = 0;
+        let mut old_reported_files_size: u64 = 0;
         // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
 
@@ -689,6 +767,7 @@ impl<T: Config> Module<T> {
         if let Some(old_wr) = Self::work_reports(&anchor) {
             old_used = old_wr.used;
             old_free = old_wr.free;
+            old_reported_files_size = old_wr.reported_files_size;
         }
 
         // 4. Construct work report
@@ -708,9 +787,11 @@ impl<T: Config> Module<T> {
         // 6. Update workload
         let total_used = Self::used().saturating_sub(old_used as u128).saturating_add(used as u128);
         let total_free = Self::free().saturating_sub(old_free as u128).saturating_add(reported_srd_size as u128);
+        let total_reported_files_size = Self::reported_files_size().saturating_sub(old_reported_files_size as u128).saturating_add(reported_files_size as u128);
 
         Used::put(total_used);
         Free::put(total_free);
+        ReportedFilesSize::put(total_reported_files_size);
     }
 
     /// Update sOrder information based on changed files, return the real changed files
@@ -735,7 +816,7 @@ impl<T: Config> Module<T> {
             let curr_bn = Self::get_current_block_number();
             changed_files.iter().filter_map(|(cid, _, _)| {
                 // 2. If mapping to storage orders
-                Some((cid.clone(), T::MarketInterface::delete_replicas(reporter, cid, anchor, curr_bn), curr_bn as u64))
+                Some((cid.clone(), T::MarketInterface::delete_replicas(reporter, cid, anchor), curr_bn as u64))
             }).collect()
         }
     }
@@ -746,21 +827,34 @@ impl<T: Config> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(anchor: &SworkerAnchor, current_rs: u64) -> (u128, u128) {
+    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128, u128) {
         // Got work report
-        if let Some(wr) = Self::work_reports(anchor) {
-            if Self::reported_in_slot(anchor, current_rs) {
-                return (wr.free as u128, wr.used as u128)
+        if let Some(wr) = Self::work_reports(&id.anchor) {
+            if Self::is_fully_reported(reporter, id, current_rs) {
+                return (wr.free as u128, wr.used as u128, wr.reported_files_size as u128)
             }
         }
         // Or nope, idk wtf? 🙂
         log!(
             debug,
             "🔒 No workload for anchor {:?} in slot {:?}",
-            anchor,
+            &id.anchor,
             current_rs
         );
-        (0, 0)
+        (0, 0, 0)
+    }
+
+    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {
+        if current_rs < id.punishment_deadline {
+            // punish it anyway and don't refresh the deadline.
+            return false;
+        } else if !Self::reported_in_slot(&id.anchor, current_rs) {
+            // should have wr. punish it again and refresh the deadline.
+            id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
+            <Identities<T>>::insert(reporter, id);
+            return false;
+        }
+        return true;
     }
 
     // PRIVATE IMMUTABLES
@@ -835,17 +929,6 @@ impl<T: Config> Module<T> {
         );
 
         Ok(())
-    }
-
-    fn can_report_works(pk: &SworkerPubKey, block_number: u64) -> bool {
-        let mut pk_info = Self::pub_keys(pk);
-        // first time, allow report or reported in the last time
-        let is_ok = pk_info.anchor.is_none() || pk_info.allow_report_slot == block_number || Self::reported_in_slot(pk_info.anchor.clone().unwrap(), block_number - REPORT_SLOT);
-        if !is_ok && block_number > pk_info.allow_report_slot{
-            pk_info.allow_report_slot = block_number + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
-            PubKeys::insert(pk, pk_info);
-        }
-        is_ok
     }
 
     fn work_report_sig_check(
@@ -926,6 +1009,8 @@ decl_event!(
         ChillSuccess(AccountId, SworkerPubKey),
         SworkerUpgradeSuccess(SworkerCode, BlockNumber),
         JoinGroupSuccess(AccountId, AccountId),
+        QuitGroupSuccess(AccountId, AccountId),
         CreateGroupSuccess(AccountId),
+        KickOutSuccess(AccountId),
     }
 );

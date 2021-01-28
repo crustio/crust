@@ -393,8 +393,8 @@ parameter_types! {
     pub const BondingDuration: staking::EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).
     pub const SlashDeferDuration: staking::EraIndex = 28;
-    // 100 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `100`
-    pub const SPowerRatio: u128 = 100;
+    // 1 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `1`
+    pub const SPowerRatio: u128 = 1;
     // 64 guarantors for one validator.
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
     // 60 eras means 15 days if era = 6 hours
@@ -687,8 +687,8 @@ impl claims::Config for Runtime {
 
 // TODO: better way to deal with fee(s)
 parameter_types! {
-    pub const TransactionBaseFee: Balance = 1 * CENTS;
-    pub const TransactionByteFee: Balance = 10 * MILLICENTS;
+    pub const TransactionBaseFee: Balance = MILLICENTS / 100;
+    pub const TransactionByteFee: Balance = MILLICENTS / 100;
     pub const TargetBlockFullness: Perquintill = Perquintill::from_percent(25);
 	pub AdjustmentVariable: Multiplier = Multiplier::saturating_from_rational(1, 100_000);
 	pub MinimumMultiplier: Multiplier = Multiplier::saturating_from_rational(1, 1_000_000_000u128);
@@ -709,6 +709,7 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
+    pub const MaxGroupSize: u32 = 100;
 }
 
 impl swork::Config for Runtime {
@@ -717,7 +718,8 @@ impl swork::Config for Runtime {
     type PunishmentSlots = PunishmentSlots;
     type Works = Staking;
     type MarketInterface = Market;
-    type WeightInfo = swork::weight::WeightInfo;
+    type MaxGroupSize = MaxGroupSize;
+    type WeightInfo = swork::weight::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -754,6 +756,7 @@ impl market::Config for Runtime {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
+    type WeightInfo = market::weight::WeightInfo<Runtime>;
 }
 
 construct_runtime! {

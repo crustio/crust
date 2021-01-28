@@ -205,7 +205,7 @@ impl swork::Works<AccountId> for TestStaking {
 
 impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
     fn upsert_replicas(_: &AID, _: &MerkleRoot, _: u64, _: &SworkerAnchor, _: u32, _: &Option<BTreeSet<AID>>) -> u64 { 0 }
-    fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor, _: u32) -> u64 { 0 }
+    fn delete_replicas(_: &AID, _: &MerkleRoot, _: &SworkerAnchor) -> u64 { 0 }
     fn withdraw_staking_pot() -> BalanceOf<Test> {
         BalanceOf::<Test>::from(DSM_STAKING_PAYOUT.with(|v| *v.borrow()))
     }
@@ -213,6 +213,7 @@ impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
+    pub const MaxGroupSize: u32 = 100;
 }
 
 impl swork::Config for Test {
@@ -221,7 +222,8 @@ impl swork::Config for Test {
     type PunishmentSlots = PunishmentSlots;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
-    type WeightInfo = swork::weight::WeightInfo;
+    type MaxGroupSize = MaxGroupSize;
+    type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 
 parameter_types! {
@@ -268,7 +270,8 @@ pub struct ExtBuilder {
     own_workload: u128,
     total_workload: u128,
     staking_pot: Balance,
-    dsm_staking_payout: Balance
+    dsm_staking_payout: Balance,
+    start_reward_era: u32
 }
 
 impl Default for ExtBuilder {
@@ -286,7 +289,8 @@ impl Default for ExtBuilder {
             own_workload: 3000,
             total_workload: 3000,
             staking_pot: 1_000_000_000_000_000_000,
-            dsm_staking_payout: 0
+            dsm_staking_payout: 0,
+            start_reward_era: 0
         }
     }
 }
@@ -342,6 +346,10 @@ impl ExtBuilder {
     }
     pub fn dsm_staking_payout(mut self, amount: Balance) -> Self {
         self.dsm_staking_payout = amount;
+        self
+    }
+    pub fn start_reward_era(mut self, era_index: u32) -> Self {
+        self.start_reward_era = era_index;
         self
     }
     pub fn set_associated_consts(&self) {
@@ -436,6 +444,7 @@ impl ExtBuilder {
             minimum_validator_count: self.minimum_validator_count,
             invulnerables: self.invulnerables,
             slash_reward_fraction: Perbill::from_percent(10),
+            start_reward_era: self.start_reward_era,
             ..Default::default()
         }
         .assimilate_storage(&mut storage);
@@ -669,11 +678,11 @@ fn init_swork_setup() {
     for (id, pk) in id_map {
         <swork::PubKeys>::insert(pk.clone(), swork::PKInfo {
             code: code.clone(),
-            allow_report_slot: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(id, swork::Identity {
             anchor: pk.clone(),
+            punishment_deadline: 0,
             group: None
         });
         <swork::WorkReports>::insert(pk.clone(), swork::WorkReport {

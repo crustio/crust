@@ -30,6 +30,7 @@ pub const EVE: AccountId32 = AccountId32::new([4u8; 32]);
 pub const MERCHANT: AccountId32 = AccountId32::new([5u8; 32]);
 pub const DAVE: AccountId32 = AccountId32::new([6u8; 32]);
 pub const FERDIE: AccountId32 = AccountId32::new([7u8; 32]);
+pub const ZIKUN: AccountId32 = AccountId32::new([8u8; 32]);
 
 impl_outer_origin! {
     pub enum Origin for Test where system = system {}
@@ -138,6 +139,7 @@ impl balances::Config for Test {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
+    pub const MaxGroupSize: u32 = 100;
 }
 
 impl swork::Config for Test {
@@ -146,7 +148,8 @@ impl swork::Config for Test {
     type PunishmentSlots = PunishmentSlots;
     type Works = ();
     type MarketInterface = Market;
-    type WeightInfo = swork::weight::WeightInfo;
+    type MaxGroupSize = MaxGroupSize;
+    type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 
 parameter_types! {
@@ -182,6 +185,7 @@ impl Config for Test {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
+    type WeightInfo = weight::WeightInfo<Test>;
 }
 
 pub type Market = Module<Test>;
@@ -200,10 +204,18 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     let mut ext: sp_io::TestExternalities = t.into();
     ext.execute_with(|| {
+        add_allow_list();
         init_swork_setup();
     });
 
     ext
+}
+
+pub fn add_allow_list() {
+    let allow_list = [ALICE, BOB, CHARLIE, EVE, MERCHANT, DAVE, FERDIE];
+    for member in allow_list.iter() {
+        Market::add_member_into_allow_list(Origin::root(), member.clone()).expect("Give permission failed");
+    }
 }
 
 pub fn init_swork_setup() {
@@ -214,11 +226,11 @@ pub fn init_swork_setup() {
     for ((pk, who), free) in pks.iter().zip(whos.iter()).zip(frees.iter()) {
         <swork::PubKeys>::insert(pk.clone(), PKInfo {
             code: code.clone(),
-            allow_report_slot: 0,
             anchor: Some(pk.clone())
         });
         <swork::Identities<Test>>::insert(who, Identity {
             anchor: pk.clone(),
+            punishment_deadline: 0,
             group: None
         });
         <swork::WorkReports>::insert(pk.clone(), swork::WorkReport{
@@ -238,20 +250,20 @@ pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId
 }
 
 pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
-    let curr_pk = hex::decode("8b1412c4eed29d29389f8a66aa61f0c0fdea30c7e384ca8086d72cf84c4b96dd7967f5841ba8b784c4de881fe073b1437051db1ee9ab0fe491df0df3792bce5d").unwrap();
+    let curr_pk = hex::decode("7137dc62f9a8ba82fae62f5306981b7b39a82ff0e730739c9d8998eec0ab37f02e734e65fc518df5e6263d657faac48242ec1972b5dca058d9b78a6844c7a19c").unwrap();
     let prev_pk = hex::decode("").unwrap();
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
     let used: u64 = 402868224;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [
-        (hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap(), 134289408, 303),
-        (hex::decode("88cdb315c8c37e2dc00fa2a8c7fe51b8149b363d29f404441982f96d2bbae65f").unwrap(), 268578816, 303)
+        ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(), 134289408, 303),
+        ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oH".as_bytes().to_vec(), 268578816, 303)
     ].to_vec();
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let files_root = hex::decode("11").unwrap();
     let srd_root = hex::decode("00").unwrap();
-    let sig = hex::decode("9b775ad3a8469b7affacd0252bd5fdaa69a2a22dffec9c428faa5c12fce6886accc19446d1c833d9cd46e4f78d31d2544b91a644702308f9c4211448484ef3a9").unwrap();
+    let sig = hex::decode("d254eb42c15384b8019d676b1cf83c11a6cf0121c47381cabfea44844421cc231e244f83c2c4af3140880c534b672196b147e8b63708c871cc87f1230dbca12f").unwrap();
 
     ReportWorksInfo {
         curr_pk,
@@ -271,7 +283,6 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
 pub fn register(pk: &SworkerPubKey, code: SworkerCode) {
     <swork::PubKeys>::insert(pk.clone(), PKInfo {
         code: code,
-        allow_report_slot: 0,
         anchor: None
     });
 }

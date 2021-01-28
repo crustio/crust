@@ -801,6 +801,7 @@ impl<T: Config> Module<T> {
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         } else {
+            Self::check_and_maybe_clear_trash(cid);
             // New file
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
                 file_size,
@@ -818,6 +819,34 @@ impl<T: Config> Module<T> {
             };
             <Files<T>>::insert(cid, (file_info, used_info));
         }
+    }
+
+    fn check_and_maybe_clear_trash(cid: &MerkleRoot) {
+        // 1. Delete trashI's anchor
+        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.groups.remove(anchor).is_some() {
+                    UsedTrashMappingI::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                    T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                }
+            },
+            None => {}
+        });
+
+        // 2. Delete trashII's anchor
+        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.groups.remove(anchor).is_some() {
+                    UsedTrashMappingII::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                    T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                }
+            },
+            None => {}
+        });
     }
 
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {

@@ -63,6 +63,8 @@ pub trait WeightInfo {
     fn report_works(added: u32, deleted: u32) -> Weight;
     fn create_group() -> Weight;
     fn join_group() -> Weight;
+    fn quit_group() -> Weight;
+    fn kick_out() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -156,6 +158,9 @@ pub trait Config: system::Config {
     /// Interface for interacting with a market module.
     type MarketInterface: MarketInterface<Self::AccountId, BalanceOf<Self>>;
 
+    /// Max number of members in one group
+    type MaxGroupSize: Get<u32>;
+
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
 }
@@ -244,7 +249,11 @@ decl_error! {
         /// Group already exist
         GroupAlreadyExist,
         /// Group owner cannot register
-        GroupOwnerForbidden
+        GroupOwnerForbidden,
+        /// Member is not in a group
+        NotJoint,
+        /// Exceed the limit of members number in one group
+        ExceedGroupLimit
     }
 }
 
@@ -547,27 +556,91 @@ decl_module! {
             // 3. Ensure owner's group exist
             ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
-            // 4. Ensure who's wr's used is zero
+            // 4. Ensure owner's group has space
+            ensure!(Self::groups(&owner).len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedGroupLimit);
+
+            // 5. Ensure who's wr's used is zero
             ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
 
-            // 5. Join the group
+            // 6. Join the group
             <Groups<T>>::mutate(&owner, |members| {
                 members.insert(who.clone());
             });
 
-            // 6. Mark the group owner
-            <Identities<T>>::mutate_exists(&who, |maybe_i| match *maybe_i {
+            // 7. Mark the group owner
+            <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
                 Some(Identity { ref mut group, .. }) => *group = Some(owner.clone()),
-                ref mut i => *i = None,
+                None => {},
             });
 
-            // 7. Emit event
+            // 8. Emit event
             Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
 
             Ok(())
         }
 
-        // TODO: quit the group
+        #[weight = T::WeightInfo::quit_group()]
+        pub fn quit_group(
+            origin
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Ensure who has identity information
+            ensure!(Self::identities(&who).is_some(), Error::<T>::IdentityNotExist);
+            let identity = Self::identities(&who).unwrap();
+
+            // 2. Ensure who joint group before
+            ensure!(identity.group.is_some(), Error::<T>::NotJoint);
+
+            let owner = identity.group.unwrap();
+            // 3. Ensure owner's group exist
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotJoint);
+
+            // 4. Remove the group owner
+            <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut group, .. }) => *group = None,
+                None => {},
+            });
+
+            // 5. Quit the group
+            <Groups<T>>::mutate(&owner, |members| {
+                members.remove(&who);
+            });
+
+            // 6. Emit event
+            Self::deposit_event(RawEvent::QuitGroupSuccess(who, owner));
+
+            Ok(())
+        }
+
+        #[weight = T::WeightInfo::kick_out()]
+        pub fn kick_out(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let owner = ensure_signed(origin)?;
+            let member = T::Lookup::lookup(target)?;
+
+            // 1. Ensure who is a group owner right now
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
+
+            // 2. Remove the group owner
+            <Identities<T>>::mutate(&member, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut group, .. }) => *group = None,
+                None => {},
+            });
+
+            // 3. Quit the group
+            <Groups<T>>::mutate(&owner, |members| {
+                members.remove(&member);
+            });
+
+            // 4. Emit event
+            Self::deposit_event(RawEvent::KickOutSuccess(member));
+
+            Ok(())
+        }
+
         // TODO: chill anchor, identity and pk
 
     }
@@ -935,6 +1008,8 @@ decl_event!(
         ChillSuccess(AccountId, SworkerPubKey),
         SworkerUpgradeSuccess(SworkerCode, BlockNumber),
         JoinGroupSuccess(AccountId, AccountId),
+        QuitGroupSuccess(AccountId, AccountId),
         CreateGroupSuccess(AccountId),
+        KickOutSuccess(AccountId),
     }
 );

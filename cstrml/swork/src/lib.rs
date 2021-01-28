@@ -394,7 +394,7 @@ decl_module! {
                         slot
                     );
                     // This is weird and might be an attack.
-                    return Ok(Pays::Yes.into())
+                    return Ok(Some(0 as Weight).into())
                 }
             }
 

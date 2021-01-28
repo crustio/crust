@@ -207,7 +207,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // 134289408 / 1_048_576 = 129
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
@@ -414,7 +414,7 @@ fn calculate_payout_should_work() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // 134289408 / 1_048_576 = 129
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
@@ -537,7 +537,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
@@ -684,7 +684,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
@@ -783,7 +783,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
         run_to_block(50);
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let source = ALICE;
         let merchant = BOB;
@@ -1130,7 +1130,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 100; // should less than merchant
 
         let _ = Balances::make_free_balance_be(&source, 20000);
@@ -1221,7 +1221,7 @@ fn calculate_payout_should_work_for_more_replicas() {
         let ferdie = FERDIE;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408;
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
@@ -1417,7 +1417,7 @@ fn clear_trash_should_work() {
         let merchant = MERCHANT;
 
         let cid1 =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let cid2 =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b661").unwrap();
         let cid3 =
@@ -1641,7 +1641,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let merchant = MERCHANT;
 
         let cid1 =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let cid2 =
             hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b661").unwrap();
         let file_lists = vec![cid1.clone(), cid2.clone()];
@@ -1725,7 +1725,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         let merchant = MERCHANT;
 
         let cid1 =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 100; // should less than merchant
         let reported_file_size_cid1 = 90;
         let _ = Balances::make_free_balance_be(&source, 20000);
@@ -1828,7 +1828,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         run_to_block(50);
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let source = ALICE;
         let merchant = BOB;
@@ -2033,7 +2033,7 @@ fn dynamic_used_size_should_work() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408;
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone()];
@@ -2122,7 +2122,7 @@ fn delete_used_size_should_work() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408;
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone()];
@@ -2204,7 +2204,7 @@ fn files_size_should_not_be_decreased_twice() {
         run_to_block(50);
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let source = ALICE;
         let merchant = BOB;
@@ -2353,7 +2353,7 @@ fn allow_list_should_work() {
         let source = ZIKUN;
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
 
         assert_noop!(

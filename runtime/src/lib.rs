@@ -709,7 +709,7 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 2;
-    pub const MaxMembersLimit: u32 = 100;
+    pub const MaxGroupSize: u32 = 100;
 }
 
 impl swork::Config for Runtime {
@@ -718,7 +718,7 @@ impl swork::Config for Runtime {
     type PunishmentSlots = PunishmentSlots;
     type Works = Staking;
     type MarketInterface = Market;
-    type MaxMembersLimit = MaxMembersLimit;
+    type MaxGroupSize = MaxGroupSize;
     type WeightInfo = swork::weight::WeightInfo<Runtime>;
 }
 

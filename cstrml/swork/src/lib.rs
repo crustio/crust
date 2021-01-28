@@ -159,7 +159,7 @@ pub trait Config: system::Config {
     type MarketInterface: MarketInterface<Self::AccountId, BalanceOf<Self>>;
 
     /// Max number of members in one group
-    type MaxMembersLimit: Get<u32>;
+    type MaxGroupSize: Get<u32>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -558,7 +558,7 @@ decl_module! {
             ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
             // 4. Ensure owner's group has space
-            ensure!(Self::groups(&owner).len() < T::MaxMembersLimit::get() as usize, Error::<T>::ExceedGroupLimit);
+            ensure!(Self::groups(&owner).len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedGroupLimit);
 
             // 5. Ensure who's wr's used is zero
             ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);

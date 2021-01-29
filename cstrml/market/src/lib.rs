@@ -823,29 +823,31 @@ impl<T: Config> Module<T> {
 
     fn check_and_maybe_clear_trash(cid: &MerkleRoot) {
         // 1. Delete trashI's anchor
-        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
+        UsedTrashI::mutate_exists(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
+                for anchor in used_info.groups.keys() {
                     UsedTrashMappingI::mutate(anchor, |value| {
                         *value -= used_info.used_size;
                     });
                     T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
                 }
+                return None;
             },
-            None => {}
+            None => None
         });
 
         // 2. Delete trashII's anchor
-        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
+        UsedTrashII::mutate_exists(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
+                for anchor in used_info.groups.keys() {
                     UsedTrashMappingII::mutate(anchor, |value| {
                         *value -= used_info.used_size;
                     });
                     T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
                 }
+                return None;
             },
-            None => {}
+            None => None
         });
     }
 

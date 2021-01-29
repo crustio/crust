@@ -585,6 +585,19 @@ decl_module! {
             });
             Ok(())
         }
+
+        #[weight = 1000]
+        pub fn show_account(
+            origin
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            let pledge_pot = Self::pledge_pot();
+            let storage_pot = Self::storage_pot();
+            let staking_pot = Self::staking_pot();
+            let reserved_pot = Self::reserved_pot();
+            Self::deposit_event(RawEvent::AccountList(pledge_pot, storage_pot, staking_pot, reserved_pot));
+            Ok(())
+        }
     }
 }
 
@@ -1029,5 +1042,6 @@ decl_event!(
         CutPledgeSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
+        AccountList(AccountId, AccountId, AccountId, AccountId),
     }
 );

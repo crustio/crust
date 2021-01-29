@@ -682,8 +682,6 @@ impl<T: Config> Module<T> {
             }
 
             // 5.3 Update file info
-            // file status might become ready to be closed if claim_block == expired_on
-            file_info.claimed_at = claim_block;
             file_info.amount = file_info.amount.saturating_sub(rewarded_amount);
             file_info.reported_replica_count = new_replicas.len() as u32;
             new_replicas.append(&mut invalid_replicas);
@@ -693,7 +691,9 @@ impl<T: Config> Module<T> {
             Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
         }
 
-        // 6 Update files
+        // 6. File status might become ready to be closed if claim_block == expired_on
+        file_info.claimed_at = claim_block;
+        // 7. Update files
         <Files<T>>::insert(cid, (file_info, used_info));
     }
 
@@ -784,7 +784,13 @@ impl<T: Config> Module<T> {
             if file_info.expired_on > file_info.claimed_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             } else if file_info.expired_on == file_info.claimed_at {
-                file_info.expired_on = curr_bn + T::FileDuration::get();
+                if file_info.replicas.len() == 0 {
+                    // turn this file into pending status since replicas.len() is zero
+                    // we keep the original amount and expected_replica_count
+                    file_info.expired_on = 0;
+                } else {
+                    file_info.expired_on = curr_bn + T::FileDuration::get();
+                }
                 file_info.claimed_at = *curr_bn;
             }
             file_info.amount += amount.clone();

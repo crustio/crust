@@ -785,6 +785,8 @@ impl<T: Config> Module<T> {
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             } else if file_info.expired_on == file_info.claimed_at {
                 if file_info.replicas.len() == 0 {
+                    // turn this file into pending status since replicas.len() is zero
+                    // we keep the original amount and expected_replica_count
                     file_info.expired_on = 0;
                 } else {
                     file_info.expired_on = curr_bn + T::FileDuration::get();

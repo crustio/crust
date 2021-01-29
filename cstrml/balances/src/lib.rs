@@ -146,7 +146,6 @@ use sp_std::prelude::*;
 use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr, convert::Infallible};
 use codec::{Codec, Encode, Decode};
 use frame_support::{
-	weights::Weight,
 	StorageValue, Parameter, decl_event, decl_storage, decl_module, decl_error, ensure,
 	traits::{
 		Currency, OnKilledAccount, OnUnbalanced, TryDrop, StoredMap,
@@ -165,7 +164,6 @@ use sp_runtime::{
 use frame_system::{self as system, ensure_signed, ensure_root};
 pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 pub use weights::WeightInfo;
-use frame_support::storage::migration::remove_storage_prefix;
 
 // Crust primitives
 use primitives::traits::TransferrableCurrency;
@@ -424,43 +422,6 @@ decl_module! {
 		const ExistentialDeposit: T::Balance = T::ExistentialDeposit::get();
 
 		fn deposit_event() = default;
-
-		// upgrade for 0.11.1 and spec 6
-		fn on_runtime_upgrade() -> Weight {
-			for (who, _) in Locks::<T, I>::iter() {
-				Locks::<T, I>::remove(&who);
-				system::Module::<T>::dec_ref(&who);
-			}
-			// 1. Kill Staking storage
-			remove_storage_prefix(b"Staking", b"Bonded", &[]);
-			remove_storage_prefix(b"Staking", b"Ledger", &[]);
-			remove_storage_prefix(b"Staking", b"Payee", &[]);
-			remove_storage_prefix(b"Staking", b"Validators", &[]);
-			remove_storage_prefix(b"Staking", b"Guarantors", &[]);
-			remove_storage_prefix(b"Staking", b"StakeLimit", &[]);
-			remove_storage_prefix(b"Staking", b"ErasStakers", &[]);
-			remove_storage_prefix(b"Staking", b"ErasStakersClipped", &[]);
-			remove_storage_prefix(b"Staking", b"ErasValidatorPrefs", &[]);
-			remove_storage_prefix(b"Staking", b"ErasStakingPayout", &[]);
-			remove_storage_prefix(b"Staking", b"ErasMarketStakingPayout", &[]);
-			remove_storage_prefix(b"Staking", b"ErasAuthoringPayout", &[]);
-			remove_storage_prefix(b"Staking", b"ErasTotalStakes", &[]);
-			remove_storage_prefix(b"Staking", b"CurrentElected", &[]);
-			remove_storage_prefix(b"Staking", b"ErasRewardPoints", &[]);
-			remove_storage_prefix(b"Staking", b"CanceledSlashPayout", &[]);
-			remove_storage_prefix(b"Staking", b"UnappliedSlashes", &[]);
-			remove_storage_prefix(b"Staking", b"ValidatorSlashInEra", &[]);
-			remove_storage_prefix(b"Staking", b"GuarantorSlashInEra", &[]);
-			remove_storage_prefix(b"Staking", b"SlashingSpans", &[]);
-			remove_storage_prefix(b"Staking", b"SpanSlash", &[]);
-			remove_storage_prefix(b"Staking", b"EarliestUnappliedSlash", &[]);
-
-			// 2. Kill PhragmenElection storage
-			remove_storage_prefix(b"PhragmenElection", b"Members", &[]);
-			remove_storage_prefix(b"PhragmenElection", b"Voting", &[]);
-
-			10_000
-		}
 
 		/// Transfer some liquid free balance to another account.
 		///

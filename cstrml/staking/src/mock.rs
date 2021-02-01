@@ -195,11 +195,13 @@ impl pallet_timestamp::Config for Test {
 }
 pub struct TestStaking;
 impl swork::Works<AccountId> for TestStaking {
-    fn report_works(controller: &AccountId, _own_workload: u128, _total_workload: u128) {
+    fn report_works(workload_map: BTreeMap<AccountId, u128>, _total_workload: u128) {
         // Disable work report in mock test
-        Staking::update_stake_limit(controller,
-            OWN_WORKLOAD.with(|v| *v.borrow()),
-            TOTAL_WORKLOAD.with(|v| *v.borrow()));
+        for (controller, _) in workload_map.iter() {
+            Staking::update_stake_limit(controller,
+                                        OWN_WORKLOAD.with(|v| *v.borrow()),
+                                        TOTAL_WORKLOAD.with(|v| *v.borrow()));
+        }
     }
 }
 

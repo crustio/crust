@@ -2344,8 +2344,10 @@ impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, 
 
 
 impl<T: Config> swork::Works<T::AccountId> for Module<T> {
-    fn report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
-        Self::update_stake_limit(controller, own_workload, total_workload);
+    fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
+        for (contronller, _) in <Validators<T>>::iter() {
+            Self::update_stake_limit(&contronller, *workload_map.get(&contronller).unwrap_or(&0u128), total_workload);
+        }
     }
 }
 

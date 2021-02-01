@@ -2093,7 +2093,7 @@ impl<T: Config> Module<T> {
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
-            let v_controller = Self::bonded(v_stash).unwrap_or_default();
+            let v_controller = Self::bonded(v_stash).unwrap();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
 

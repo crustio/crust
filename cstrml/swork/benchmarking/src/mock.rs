@@ -123,7 +123,7 @@ impl market::Config for Test {
 pub struct TestWorksInterface;
 
 impl Works<AccountId> for TestWorksInterface {
-    fn report_works(_: &AccountId, _: u128, _: u128) { }
+    fn report_works(_: BTreeMap<AccountId, u128>, _: u128) {}
 }
 
 parameter_types! {

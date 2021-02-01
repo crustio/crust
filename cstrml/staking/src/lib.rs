@@ -2337,13 +2337,10 @@ impl<T: Config> swork::Works<T::AccountId> for Module<T> {
     fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
         for (v_stash, _) in <Validators<T>>::iter() {
             let v_controller = Self::bonded(&v_stash).unwrap();
-            let mut v_own_workload = 0;
-            if let Some(workload) = workload_map.get(&v_controller) {
-                v_own_workload = *workload;
-            }
+            let v_own_workload = workload_map.get(&v_controller).unwrap_or(&0u128);
             Self::upsert_stake_limit(
                 &v_stash,
-                Self::stake_limit_of(v_own_workload, total_workload),
+                Self::stake_limit_of(*v_own_workload, total_workload),
             );
         }
     }

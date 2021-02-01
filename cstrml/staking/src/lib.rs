@@ -1427,7 +1427,7 @@ impl<T: Config> Module<T> {
     /// - O(1).
     /// - 0 DB entry.
     /// # </weight>
-    fn stake_limit_of(own_workloads: u128, _: u128) -> BalanceOf<T> {
+    pub fn stake_limit_of(own_workloads: u128, _: u128) -> BalanceOf<T> {
         // TODO: Stake limit calculation, this should be enable and adjust in olympus phase.
         /*let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
             .ok()
@@ -1602,7 +1602,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Insert new or update old stake limit
-    fn upsert_stake_limit(account_id: &T::AccountId, limit: BalanceOf<T>) {
+    pub fn upsert_stake_limit(account_id: &T::AccountId, limit: BalanceOf<T>) {
         <StakeLimit<T>>::insert(account_id, limit);
     }
 
@@ -2207,16 +2207,6 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
-    /// This function will update the stash's stake limit
-    fn update_stake_limit(controller: &T::AccountId, own_workloads: u128, total_workloads: u128) {
-        if let Some(ledger) = Self::ledger(&controller) {
-            Self::upsert_stake_limit(
-                &ledger.stash,
-                Self::stake_limit_of(own_workloads, total_workloads),
-            );
-        }
-    }
-
     /// Add reward points to validators using their stash account ID.
     ///
     /// Validators are keyed by stash account ID and must be in the current elected set.
@@ -2344,8 +2334,15 @@ impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, 
 
 
 impl<T: Config> swork::Works<T::AccountId> for Module<T> {
-    fn report_works(controller: &T::AccountId, own_workload: u128, total_workload: u128) {
-        Self::update_stake_limit(controller, own_workload, total_workload);
+    fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
+        for (v_stash, _) in <Validators<T>>::iter() {
+            let v_controller = Self::bonded(&v_stash).unwrap_or_default();
+            let v_own_workload = workload_map.get(&v_controller).unwrap_or(&0u128);
+            Self::upsert_stake_limit(
+                &v_stash,
+                Self::stake_limit_of(*v_own_workload, total_workload),
+            );
+        }
     }
 }
 

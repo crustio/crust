@@ -716,7 +716,7 @@ decl_event!(
         /// Update the identities success. The stake limit of each identity would be updated.
         UpdateIdentitiesSuccess(EraIndex),
         /// Staking pot address
-        AccountList(AccountId),
+        PotList(AccountId),
     }
 );
 
@@ -1402,12 +1402,12 @@ decl_module! {
         }
 
         #[weight = 1000]
-        pub fn show_account(
+        pub fn show_pots(
             origin
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
             let staking_pot = Self::staking_pot();
-            Self::deposit_event(RawEvent::AccountList(staking_pot));
+            Self::deposit_event(RawEvent::PotList(staking_pot));
             Ok(())
         }
     }

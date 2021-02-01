@@ -715,6 +715,8 @@ decl_event!(
         ChillSuccess(AccountId, AccountId),
         /// Update the identities success. The stake limit of each identity would be updated.
         UpdateIdentitiesSuccess(EraIndex),
+        /// Staking pot address
+        PotList(AccountId),
     }
 );
 
@@ -1397,6 +1399,16 @@ decl_module! {
         fn set_start_reward_era(origin, start_reward_era: EraIndex) {
             ensure_root(origin)?;
             StartRewardEra::put(start_reward_era);
+        }
+
+        #[weight = 1000]
+        pub fn show_pots(
+            origin
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            let staking_pot = Self::staking_pot();
+            Self::deposit_event(RawEvent::PotList(staking_pot));
+            Ok(())
         }
     }
 }

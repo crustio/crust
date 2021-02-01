@@ -16,6 +16,7 @@ use sp_runtime::{
 };
 use sp_staking::offence::OffenceDetails;
 use substrate_test_utils::assert_eq_uvec;
+use swork::Works;
 
 #[test]
 fn force_unstake_works() {
@@ -4484,6 +4485,67 @@ fn recharge_staking_pot_should_work() {
             );
         });
 }
+
+#[test]
+fn update_stake_limit_according_to_mpow_should_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .staking_pot(100_000_000_000_000)
+        .own_workload(u128::max_value())
+        .build()
+        .execute_with(|| {
+            for i in 1..10 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            Staking::upsert_stake_limit(&1, 5000);
+            Staking::upsert_stake_limit(&3, 5000);
+            Staking::upsert_stake_limit(&5, 5000);
+            Staking::upsert_stake_limit(&7, 5000);
+
+            // Add a new validator
+            assert_ok!(Staking::bond(
+                Origin::signed(1),
+                2,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::bond(
+                Origin::signed(3),
+                4,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::bond(
+                Origin::signed(5),
+                6,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::bond(
+                Origin::signed(7),
+                8,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
+            assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
+            assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
+            assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
+
+            let mut workload_map = BTreeMap::new();
+            workload_map.insert(2, 3);
+            workload_map.insert(4, 2);
+            workload_map.insert(6, 5);
+            Staking::report_works(workload_map, 10);
+            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 7500);
+            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 5000);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 12500);
+            assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
+        });
+}
+
 
 // #[test]
 // fn randomly_select_validators_works() {

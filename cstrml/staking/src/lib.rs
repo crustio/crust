@@ -2093,7 +2093,7 @@ impl<T: Config> Module<T> {
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
         for (v_stash, voters) in vg_graph.iter() {
-            let v_controller = Self::bonded(v_stash).unwrap();
+            let v_controller = Self::bonded(v_stash).unwrap_or_default();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
 
@@ -2336,7 +2336,7 @@ impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, 
 impl<T: Config> swork::Works<T::AccountId> for Module<T> {
     fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
         for (v_stash, _) in <Validators<T>>::iter() {
-            let v_controller = Self::bonded(&v_stash).unwrap();
+            let v_controller = Self::bonded(&v_stash).unwrap_or_default();
             let v_own_workload = workload_map.get(&v_controller).unwrap_or(&0u128);
             Self::upsert_stake_limit(
                 &v_stash,

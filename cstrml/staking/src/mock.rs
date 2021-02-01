@@ -198,9 +198,12 @@ impl swork::Works<AccountId> for TestStaking {
     fn report_works(workload_map: BTreeMap<AccountId, u128>, _total_workload: u128) {
         // Disable work report in mock test
         for (controller, _) in workload_map.iter() {
-            Staking::update_stake_limit(controller,
-                                        OWN_WORKLOAD.with(|v| *v.borrow()),
-                                        TOTAL_WORKLOAD.with(|v| *v.borrow()));
+            if let Some(ledger) = <Ledger<Test>>::get(&controller) {
+                Staking::upsert_stake_limit(
+                    &ledger.stash,
+                    Staking::stake_limit_of(OWN_WORKLOAD.with(|v| *v.borrow()), TOTAL_WORKLOAD.with(|v| *v.borrow())),
+                );
+            }
         }
     }
 }

@@ -2095,7 +2095,7 @@ impl<T: Config> Module<T> {
         for (v_stash, voters) in vg_graph.iter() {
             let v_controller = Self::bonded(v_stash).unwrap_or_default();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
-                Self::ledger(&v_controller).unwrap();
+                Self::ledger(&v_controller).unwrap_or_default();
 
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
 

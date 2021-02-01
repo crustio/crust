@@ -642,6 +642,29 @@ decl_module! {
             Ok(())
         }
 
+        #[weight = 1000]
+        pub fn cancel_punishment(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            let who = T::Lookup::lookup(target)?;
+
+            // 1. Ensure who has identity information
+            ensure!(Self::identities(&who).is_some(), Error::<T>::IdentityNotExist);
+
+            // 2. Cancel the punishment
+            <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut punishment_deadline, .. }) => *punishment_deadline = 0,
+                None => {},
+            });
+
+            // 3. Emit event
+            Self::deposit_event(RawEvent::CancelPunishmentSuccess(who));
+
+            Ok(())
+        }
+
         // TODO: chill anchor, identity and pk
 
     }
@@ -1012,5 +1035,6 @@ decl_event!(
         QuitGroupSuccess(AccountId, AccountId),
         CreateGroupSuccess(AccountId),
         KickOutSuccess(AccountId),
+        CancelPunishmentSuccess(AccountId),
     }
 );

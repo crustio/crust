@@ -2559,3 +2559,116 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             assert_eq!(*map.get(&ferdie).unwrap(), 4294967410u128);
         });
 }
+
+#[test]
+fn cancel_punishment_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+
+            let alice_wr_info = group_work_report_alice_300();
+            let a_pk = alice_wr_info.curr_pk.clone();
+
+            register(&a_pk, LegalCode::get());
+            register_identity(&alice, &a_pk, &a_pk);
+
+            // alice join the ferdie's group
+            assert_ok!(Swork::create_group(
+                Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::join_group(
+                Origin::signed(alice.clone()),
+                ferdie.clone()
+            ));
+
+            run_to_block(303);
+            Swork::update_identities();
+            add_not_live_files();
+            // A report works in 303
+            assert_ok!(Swork::report_works(
+                Origin::signed(alice.clone()),
+                alice_wr_info.curr_pk,
+                alice_wr_info.prev_pk,
+                alice_wr_info.block_number,
+                alice_wr_info.block_hash,
+                alice_wr_info.free,
+                alice_wr_info.used,
+                alice_wr_info.added_files,
+                alice_wr_info.deleted_files,
+                alice_wr_info.srd_root,
+                alice_wr_info.files_root,
+                alice_wr_info.sig
+            ));
+
+            run_to_block(603);
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
+            assert_eq!(Swork::current_report_slot(), 600);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 4294967410u128);
+
+            run_to_block(903);
+            // Punishment happen. Can't find report work at 600 report_slot. punishment deadline would be 1800. Block would be after 2100
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 900);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+
+            // Check 1200 and would still be punished.
+            run_to_block(1600);
+
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 1500);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 0);
+
+
+            let mut alice_wr_info = group_work_report_alice_300();
+            alice_wr_info.block_number = 1500;
+            let a_pk = alice_wr_info.curr_pk.clone();
+            let legal_wr = WorkReport {
+                report_slot: alice_wr_info.block_number,
+                used: alice_wr_info.used * 2,
+                free: alice_wr_info.free,
+                reported_files_size: alice_wr_info.used,
+                reported_srd_root: alice_wr_info.srd_root.clone(),
+                reported_files_root: alice_wr_info.files_root.clone()
+            };
+            add_wr(&a_pk, &legal_wr);
+
+            // Check 1500 and would success since punishment is cancelled
+            run_to_block(2000);
+            assert_ok!(Swork::cancel_punishment(Origin::root(), alice.clone()));
+            assert_eq!(Swork::identities(alice.clone()).unwrap_or_default(), Identity {
+                anchor: a_pk.clone(),
+                punishment_deadline: 0,
+                group: Some(ferdie.clone())
+            });
+            Swork::update_identities();
+
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::used(), 57 * 2);
+            assert_eq!(Swork::reported_files_size(), 57);
+            assert_eq!(Swork::current_report_slot(), 1800);
+            let map = WorkloadMap::get().borrow().clone();
+            // All workload is counted to alice. bob and eve is None.
+            assert_eq!(*map.get(&ferdie).unwrap(), 4294967410u128);
+        });
+}

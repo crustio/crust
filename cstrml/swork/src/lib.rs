@@ -102,11 +102,11 @@ pub struct Identity<AccountId> {
 
 /// An event handler for reporting works
 pub trait Works<AccountId> {
-    fn report_works(reporter: &AccountId, own_workload: u128, total_workload: u128);
+    fn report_works(workload_map: BTreeMap<AccountId, u128>, total_workload: u128);
 }
 
 impl<AId> Works<AId> for () {
-    fn report_works(_: &AId, _: u128, _: u128) {}
+    fn report_works(_: BTreeMap<AId, u128>, _: u128) {}
 }
 
 /// Implement market's file inspector
@@ -642,6 +642,29 @@ decl_module! {
             Ok(())
         }
 
+        #[weight = 1000]
+        pub fn cancel_punishment(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            let who = T::Lookup::lookup(target)?;
+
+            // 1. Ensure who has identity information
+            ensure!(Self::identities(&who).is_some(), Error::<T>::IdentityNotExist);
+
+            // 2. Cancel the punishment
+            <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
+                Some(Identity { ref mut punishment_deadline, .. }) => *punishment_deadline = 0,
+                None => {},
+            });
+
+            // 3. Emit event
+            Self::deposit_event(RawEvent::CancelPunishmentSuccess(who));
+
+            Ok(())
+        }
+
         // TODO: chill anchor, identity and pk
 
     }
@@ -707,9 +730,7 @@ impl<T: Config> Module<T> {
             trace,
             "🔒 Update stake limit for all reporters."
         );
-        for (reporter, own_workload) in workload_map.iter() {
-            T::Works::report_works(&reporter, *own_workload, total_workload);
-        }
+        T::Works::report_works(workload_map, total_workload);
     }
 
     // PRIVATE MUTABLES
@@ -1012,5 +1033,6 @@ decl_event!(
         QuitGroupSuccess(AccountId, AccountId),
         CreateGroupSuccess(AccountId),
         KickOutSuccess(AccountId),
+        CancelPunishmentSuccess(AccountId),
     }
 );

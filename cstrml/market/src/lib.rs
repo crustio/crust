@@ -773,7 +773,7 @@ impl<T: Config> Module<T> {
         UsedTrashSizeII::mutate(|value| {*value = 0;});
     }
 
-    fn maybe_delete_one_file_from_used_trash_i(cid: &MerkleRoot) {
+    fn maybe_delete_file_from_used_trash_i(cid: &MerkleRoot) {
         // 1. Delete trashI's anchor
         UsedTrashI::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
@@ -792,7 +792,7 @@ impl<T: Config> Module<T> {
         });
     }
 
-    fn maybe_delete_one_file_from_used_trash_ii(cid: &MerkleRoot) {
+    fn maybe_delete_file_from_used_trash_ii(cid: &MerkleRoot) {
         // 1. Delete trashII's anchor
         UsedTrashII::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
@@ -811,7 +811,7 @@ impl<T: Config> Module<T> {
         });
     }
 
-    fn maybe_delete_one_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn maybe_delete_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut used_size = 0;
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
@@ -827,7 +827,7 @@ impl<T: Config> Module<T> {
         used_size
     }
 
-    fn maybe_delete_one_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn maybe_delete_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut used_size = 0;
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
@@ -892,9 +892,9 @@ impl<T: Config> Module<T> {
 
     fn check_file_in_trash(cid: &MerkleRoot) {
         // I. Delete trashI's anchor
-        Self::maybe_delete_one_file_from_used_trash_i(cid);
+        Self::maybe_delete_file_from_used_trash_i(cid);
         // 2. Delete trashII's anchor
-        Self::maybe_delete_one_file_from_used_trash_ii(cid);
+        Self::maybe_delete_file_from_used_trash_ii(cid);
     }
 
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
@@ -999,10 +999,10 @@ impl<T: Config> Module<T> {
         });
 
         // 2. Delete trashI's anchor
-        used_size = used_size.max(Self::maybe_delete_one_anchor_from_used_trash_i(cid, anchor));
+        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_i(cid, anchor));
 
         // 3. Delete trashII's anchor
-        used_size = used_size.max(Self::maybe_delete_one_anchor_from_used_trash_ii(cid, anchor));
+        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_ii(cid, anchor));
 
         used_size
     }

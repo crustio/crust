@@ -2885,3 +2885,120 @@ fn allow_list_should_work() {
         ));
     });
 }
+
+#[test]
+fn clear_same_file_in_trash_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // should less than merchant
+        let source = ALICE;
+        let merchant = BOB;
+        let charlie = CHARLIE;
+        let dave = DAVE;
+
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let merchants = vec![merchant.clone(), charlie.clone(), dave.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+        }
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                claimed_at: 50,
+                amount: 23400,
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        run_to_block(503);
+        add_who_into_replica(&cid, file_size, charlie.clone(), legal_pk.clone(), None);
+        run_to_block(603);
+        add_who_into_replica(&cid, file_size, dave.clone(), hex::decode("11").unwrap(), None);
+        run_to_block(1803);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 1500, true);
+        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 1500, true);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+
+        // Prepare a file in the trash
+        assert_eq!(Market::files(&cid).is_none(), true);
+        assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), (
+            UsedInfo {
+                used_size: file_size * 2,
+                reported_group_count: 1,
+                groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), true)].into_iter())
+            })
+        );
+        assert_eq!(Market::used_trash_mapping_i(legal_pk.clone()), file_size * 2);
+        assert_eq!(Market::used_trash_mapping_i(hex::decode("11").unwrap()), file_size * 2);
+        assert_eq!(Market::used_trash_size_i(), 1);
+
+        // place a same storage order
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                claimed_at: 1803,
+                amount: 23400,
+                expected_replica_count: 4,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+        // trash has been cleared.
+        assert_eq!(Market::used_trash_i(&cid).is_none(), true);
+        assert_eq!(Market::used_trash_mapping_i(legal_pk.clone()), 0);
+        assert_eq!(Market::used_trash_mapping_i(hex::decode("11").unwrap()), 0);
+        assert_eq!(Market::used_trash_size_i(), 0);
+    });
+}

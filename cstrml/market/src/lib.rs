@@ -786,6 +786,75 @@ impl<T: Config> Module<T> {
         UsedTrashSizeII::mutate(|value| {*value = 0;});
     }
 
+    fn maybe_delete_file_from_used_trash_i(cid: &MerkleRoot) {
+        // 1. Delete trashI's anchor
+        UsedTrashI::mutate_exists(cid, |maybe_used| {
+            match *maybe_used {
+                Some(ref mut used_info) => {
+                    for anchor in used_info.groups.keys() {
+                        UsedTrashMappingI::mutate(anchor, |value| {
+                            *value -= used_info.used_size;
+                        });
+                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                    }
+                    UsedTrashSizeI::mutate(|value| {*value -= 1;});
+                },
+                None => {}
+            }
+            *maybe_used = None;
+        });
+    }
+
+    fn maybe_delete_file_from_used_trash_ii(cid: &MerkleRoot) {
+        // 1. Delete trashII's anchor
+        UsedTrashII::mutate_exists(cid, |maybe_used| {
+            match *maybe_used {
+                Some(ref mut used_info) => {
+                    for anchor in used_info.groups.keys() {
+                        UsedTrashMappingII::mutate(anchor, |value| {
+                            *value -= used_info.used_size;
+                        });
+                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                    }
+                    UsedTrashSizeII::mutate(|value| {*value -= 1;});
+                },
+                None => {}
+            }
+            *maybe_used = None;
+        });
+    }
+
+    fn maybe_delete_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+        let mut used_size = 0;
+        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.groups.remove(anchor).is_some() {
+                    used_size = used_info.used_size;
+                    UsedTrashMappingI::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
+        used_size
+    }
+
+    fn maybe_delete_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+        let mut used_size = 0;
+        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.groups.remove(anchor).is_some() {
+                    used_size = used_info.used_size;
+                    UsedTrashMappingII::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
+        used_size
+    }
 
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_replica_count
@@ -814,6 +883,7 @@ impl<T: Config> Module<T> {
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         } else {
+            Self::check_file_in_trash(cid);
             // New file
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
                 file_size,
@@ -831,6 +901,13 @@ impl<T: Config> Module<T> {
             };
             <Files<T>>::insert(cid, (file_info, used_info));
         }
+    }
+
+    fn check_file_in_trash(cid: &MerkleRoot) {
+        // I. Delete trashI's anchor
+        Self::maybe_delete_file_from_used_trash_i(cid);
+        // 2. Delete trashII's anchor
+        Self::maybe_delete_file_from_used_trash_ii(cid);
     }
 
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
@@ -933,33 +1010,12 @@ impl<T: Config> Module<T> {
             },
             None => {}
         });
-        
 
         // 2. Delete trashI's anchor
-        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
-            Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
-                    used_size = used_info.used_size;
-                    UsedTrashMappingI::mutate(anchor, |value| {
-                        *value -= used_info.used_size;
-                    });
-                }
-            },
-            None => {}
-        });
+        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_i(cid, anchor));
 
         // 3. Delete trashII's anchor
-        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
-            Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
-                    used_size = used_info.used_size;
-                    UsedTrashMappingII::mutate(anchor, |value| {
-                        *value -= used_info.used_size;
-                    });
-                }
-            },
-            None => {}
-        });
+        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_ii(cid, anchor));
 
         used_size
     }

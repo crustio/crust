@@ -311,8 +311,8 @@ impl pallet_grandpa::Config for Runtime {
 
 parameter_types! {
 	// Minimum 100 bytes/CRU deposited (1 CENT/byte)
-	pub const BasicDeposit: Balance = 10 * DOLLARS;       // 258 bytes on-chain
-	pub const FieldDeposit: Balance = 250 * CENTS;        // 66 bytes on-chain
+	pub const BasicDeposit: Balance = 5 * DOLLARS;       // 258 bytes on-chain
+	pub const FieldDeposit: Balance = 1 * DOLLARS;        // 66 bytes on-chain
 	pub const SubAccountDeposit: Balance = 2 * DOLLARS;   // 53 bytes on-chain
 	pub const MaxSubAccounts: u32 = 100;
 	pub const MaxAdditionalFields: u32 = 100;
@@ -409,7 +409,7 @@ impl staking::Config for Runtime {
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
     type Event = Event;
-    type Slash = ();
+    type Slash = Treasury;
     type Reward = ();
     type Randomness = RandomnessCollectiveFlip;
     type SessionsPerEra = SessionsPerEra;
@@ -446,7 +446,7 @@ parameter_types! {
 	pub const CandidacyBond: Balance = 10 * DOLLARS;
 	pub const VotingBond: Balance = 1 * DOLLARS;
 	pub const TermDuration: BlockNumber = 7 * DAYS;
-	pub const DesiredMembers: u32 = 13;
+	pub const DesiredMembers: u32 = 7;
 	pub const DesiredRunnersUp: u32 = 7;
 	pub const ElectionsPhragmenModuleId: LockIdentifier = *b"phrelect";
 }
@@ -495,7 +495,7 @@ parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const ProposalBondMinimum: Balance = 20 * DOLLARS;
 	pub const SpendPeriod: BlockNumber = 6 * DAYS;
-	pub const Burn: Permill = Permill::from_perthousand(2);
+	pub const Burn: Permill = Permill::from_perthousand(0);
 	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
 
 	pub const TipCountdown: BlockNumber = 1 * DAYS;

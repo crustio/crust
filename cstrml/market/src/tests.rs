@@ -3073,7 +3073,7 @@ fn reward_liquidator_should_work() {
             DispatchError::Module {
                 index: 0,
                 error: 9,
-                message: Some("InvalidFile")
+                message: Some("NotInRewardPeriod")
         });
 
         run_to_block(2503);

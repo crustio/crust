@@ -381,8 +381,8 @@ decl_error! {
         NotPermitted,
         /// File does not exist
         FileNotExist,
-        /// File is not valid for calculate reward
-        InvalidFile
+        /// File is not in the reward period
+        NotInRewardPeriod
     }
 }
 
@@ -572,7 +572,7 @@ decl_module! {
             let curr_bn = Self::get_current_block_number();
 
             // 2. Calculate reward should be after expired_on
-            ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::InvalidFile);
+            ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::NotInRewardPeriod);
 
             Self::maybe_reward_liquidator(&cid, curr_bn, &who);
             Self::calculate_payout(&cid, curr_bn);
@@ -862,7 +862,7 @@ impl<T: Config> Module<T> {
             // 3. curr_bn > expired_on + T::FileDuration::get() * 2 => all amount would be rewarded to the liquidator
             let reward_liquidator_amount = Perbill::from_rational_approximation(curr_bn.saturating_sub(file_info.expired_on).saturating_sub(T::FileDuration::get()), T::FileDuration::get()) * file_info.amount;
             if !reward_liquidator_amount.is_zero() {
-                file_info.amount -= reward_liquidator_amount;
+                file_info.amount = file_info.amount.saturating_sub(reward_liquidator_amount);
                 T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive).expect("Something wrong during transferring");
                 <Files<T>>::insert(cid, (file_info, used_info));
             }

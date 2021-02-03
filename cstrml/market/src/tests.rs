@@ -2900,6 +2900,10 @@ fn clear_same_file_in_trash_should_work() {
         let charlie = CHARLIE;
         let dave = DAVE;
 
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&storage_pot), 0);
+        let _ = Balances::make_free_balance_be(&storage_pot, 1);
+
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone()];
         for who in merchants.iter() {

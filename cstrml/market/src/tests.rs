@@ -315,7 +315,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         // Calculate mannual claim reward should work
         run_to_block(500);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -498,7 +498,7 @@ fn calculate_payout_should_work() {
         // 3. Go along with some time, and get reward
         run_to_block(606);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -612,7 +612,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
 
         run_to_block(603);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -644,7 +644,7 @@ fn calculate_payout_should_fail_due_to_insufficient_pledge() {
         run_to_block(903);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 600, true);
         assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 6_000_000));
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -872,7 +872,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
 
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -903,7 +903,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
 
         run_to_block(603);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -945,7 +945,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
 
         add_who_into_replica(&cid, file_size, dave.clone(), hex::decode("11").unwrap(), None);
         run_to_block(703);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -993,7 +993,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
 
         run_to_block(903);
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 600, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -1046,7 +1046,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
         run_to_block(1203);
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 900, true);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -1186,7 +1186,7 @@ fn calculate_payout_should_fail_due_to_not_live() {
         );
 
         run_to_block(1506);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
@@ -1334,7 +1334,7 @@ fn calculate_payout_should_work_for_more_replicas() {
         );
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -2225,7 +2225,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
 
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -2428,7 +2428,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
 
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -2489,7 +2489,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
         Market::delete_replicas(&charlie, &cid, &legal_pk);
 
         run_to_block(903);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         // claimed_at should be updated
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
@@ -2785,7 +2785,7 @@ fn files_size_should_not_be_decreased_twice() {
         assert_eq!(Market::files_size(), (file_size * 3) as u128);
         run_to_block(703);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        Market::calculate_payout(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,

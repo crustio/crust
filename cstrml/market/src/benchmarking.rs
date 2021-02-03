@@ -108,10 +108,11 @@ benchmarks! {
         let file_size: u64 = 10;
         let pub_key = vec![1];
         <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000, 4));
-        system::Module::<T>::set_block_number(600u32.into());
+        system::Module::<T>::set_block_number(2600u32.into());
+        <T as crate::Config>::Currency::make_free_balance_be(&crate::Module::<T>::storage_pot(), 2000u32.into());
     }: _(RawOrigin::Signed(user.clone()), cid.clone())
     verify {
-        assert_eq!(Market::<T>::files(&cid).unwrap_or_default().0.claimed_at, 600);
+        assert_eq!(Market::<T>::used_trash_i(&cid).is_some(), true);
     }
 
 }

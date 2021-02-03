@@ -378,7 +378,11 @@ decl_error! {
         FileSizeNotCorrect,
         /// You are not permitted to this function
         /// You are not in the whitelist
-        NotPermitted
+        NotPermitted,
+        /// File does not exist
+        FileNotExist,
+        /// File is not valid for calculate reward
+        InvalidFile
     }
 }
 
@@ -562,7 +566,15 @@ decl_module! {
             // TODO: Remove this check later
             ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
 
+            // 1. Ensure file exist
+            ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
+
             let curr_bn = Self::get_current_block_number();
+
+            // 2. Calculate reward should be after expired_on
+            ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::InvalidFile);
+
+            Self::maybe_reward_liquidator(&cid, curr_bn, &who);
             Self::calculate_payout(&cid, curr_bn);
             Self::try_to_close_file(&cid, curr_bn);
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
@@ -619,7 +631,7 @@ impl<T: Config> Module<T> {
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
-    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber)
+    pub fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
         if Self::files(cid).is_none() { return; }
@@ -841,6 +853,20 @@ impl<T: Config> Module<T> {
             None => {}
         });
         used_size
+    }
+
+    fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
+        if let Some((mut file_info, used_info)) = Self::files(cid) {
+            // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
+            // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator
+            // 3. curr_bn > expired_on + T::FileDuration::get() * 2 => all amount would be rewarded to the liquidator
+            let reward_liquidator_amount = Perbill::from_rational_approximation(curr_bn.saturating_sub(file_info.expired_on).saturating_sub(T::FileDuration::get()), T::FileDuration::get()) * file_info.amount;
+            if !reward_liquidator_amount.is_zero() {
+                file_info.amount -= reward_liquidator_amount;
+                T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive).expect("Something wrong during transferring");
+                <Files<T>>::insert(cid, (file_info, used_info));
+            }
+        }
     }
 
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {

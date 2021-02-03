@@ -20,6 +20,9 @@ use sp_runtime::{
     transaction_validity::{
         TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
     },
+    traits::{
+        Zero, StaticLookup, Saturating
+    },
 };
 
 #[cfg(test)]
@@ -126,8 +129,12 @@ decl_event!(
         Balance = BalanceOf<T>,
         AccountId = <T as frame_system::Config>::AccountId
     {
+        /// Someone be the new Reviewer
+        SuperiorChanged(AccountId),
         /// Someone be the new Miner
         MinerChanged(AccountId),
+        /// Set limit successfully
+        SetLimitSuccess(Balance),
         /// Mint claims successfully
         MintSuccess(EthereumTxHash, EthereumAddress, Balance),
         /// Someone claimed some CRUs. [who, ethereum_address, amount]
@@ -137,6 +144,8 @@ decl_event!(
 
 decl_error! {
     pub enum Error for Module<T: Config> {
+        /// Superior not exist, should set it first
+        IllegalSuperior,
         /// Miner is not exist, should set it first
         MinerNotExist,
         /// Miner should be the registered
@@ -151,6 +160,8 @@ decl_error! {
         SignerHasNoClaim,
         /// Sign not match
         SignatureNotMatch,
+        /// Exceed claim limitation
+        ExceedClaimLimit,
     }
 }
 
@@ -159,9 +170,11 @@ decl_storage! {
     // This allows for type-safe usage of the Substrate storage database, so you can
     // keep things around between blocks.
     trait Store for Module<T: Config> as Claims {
+        ClaimLimit get(fn claim_limit): BalanceOf<T> = Zero::zero();
         Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
         Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
-        Miner get(fn miner): Option<T::AccountId>
+        Superior get(fn superior): Option<T::AccountId>;
+        Miner get(fn miner): Option<T::AccountId>;
     }
 }
 
@@ -174,19 +187,60 @@ decl_module! {
 
         fn deposit_event() = default;
 
-        /// Change miner address
+
+        /// Change superior
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        ///
+        /// Parameter:
+        /// - `new_superior`: The new superior's address
+        #[weight = 0]
+        fn change_superior(origin, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+            ensure_root(origin)?;
+
+            let new_superior = T::Lookup::lookup(new_superior)?;
+
+            Superior::<T>::put(new_superior.clone());
+
+            Self::deposit_event(RawEvent::SuperiorChanged(new_superior));
+
+            Ok(())
+        }
+
+        /// Change miner
         ///
         /// The dispatch origin for this call must be _Root_.
         ///
         /// Parameters:
         /// - `new_miner`: The new miner's address
         #[weight = 0]
-        fn change_miner(origin, new_miner: T::AccountId) -> DispatchResult {
+        fn change_miner(origin, new_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
+
+            let new_miner = T::Lookup::lookup(new_miner)?;
 
             Miner::<T>::put(new_miner.clone());
 
             Self::deposit_event(RawEvent::MinerChanged(new_miner));
+            Ok(())
+        }
+
+        /// Set claim limit
+        #[weight = 0]
+        fn set_claim_limit(origin, limit: BalanceOf<T>) -> DispatchResult {
+            let signer = ensure_signed(origin)?;
+            let maybe_superior = Self::superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::IllegalSuperior);
+
+            // 2. Check if signer is superior
+            ensure!(Some(&signer) == maybe_superior.as_ref(), Error::<T>::IllegalSuperior);
+
+            // 3. Set claim limit
+            ClaimLimit::<T>::put(limit);
+
+            Self::deposit_event(RawEvent::SetLimitSuccess(limit));
             Ok(())
         }
 
@@ -196,7 +250,7 @@ decl_module! {
             let signer = ensure_signed(origin)?;
             let maybe_miner = Self::miner();
 
-            // 1. Check if miner is existed
+            // 1. Check if miner exist
             ensure!(maybe_miner.is_some(), Error::<T>::MinerNotExist);
 
             // 2. Check if this tx already be mint or be claimed
@@ -205,9 +259,15 @@ decl_module! {
             // 3. Check if signer is miner
             ensure!(Some(&signer) == maybe_miner.as_ref(), Error::<T>::IllegalMiner);
 
-            // 3. Save into claims
+            // 4. Check limit
+            ensure!(Self::claim_limit() >= value, Error::<T>::ExceedClaimLimit);
+
+            // 5. Save into claims
             Claims::<T>::insert(tx.clone(), (who.clone(), value.clone()));
             Claimed::insert(tx, false);
+
+            // 6. Reduce claim limit
+            ClaimLimit::<T>::mutate(|l| *l = l.saturating_sub(value));
 
             Self::deposit_event(RawEvent::MintSuccess(tx, who, value));
             Ok(())

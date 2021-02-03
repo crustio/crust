@@ -205,7 +205,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             let mut is_to_decreased = false;
             file_info.replicas.retain(|replica| {
                 if replica.who == *who && replica.is_reported {
-                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
+                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_claim_reward`
                     is_to_decreased = true;
                 }
                 replica.who != *who
@@ -540,8 +540,8 @@ decl_module! {
 
             let curr_bn = Self::get_current_block_number();
 
-            // 4. calculate payouts. Try to close file and decrease first party storage
-            Self::calculate_payout(&cid, curr_bn);
+            // 4. do claim reward. Try to close file and decrease first party storage
+            Self::do_claim_reward(&cid, curr_bn);
 
             // 5. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
@@ -575,7 +575,7 @@ decl_module! {
             ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::NotInRewardPeriod);
 
             Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
-            Self::calculate_payout(&cid, curr_bn);
+            Self::do_claim_reward(&cid, curr_bn);
             Self::try_to_close_file(&cid, curr_bn);
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
@@ -625,13 +625,13 @@ impl<T: Config> Module<T> {
         T::ModuleId::get().into_sub_account("rese")
     }
 
-    /// Calculate payout from file's replica
+    /// Calculate reward from file's replica
     /// This function will calculate the file's reward, update replicas
     /// and (maybe) insert file's status(files_size and delete file)
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
-    pub fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber)
+    pub fn do_claim_reward(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
         if Self::files(cid).is_none() { return; }

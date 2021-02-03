@@ -809,7 +809,7 @@ construct_runtime! {
 
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config},
-        Market: market::{Module, Call, Storage, Event<T>},
+        Market: market::{Module, Call, Storage, Event<T>, Config},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},

@@ -62,7 +62,7 @@ pub trait WeightInfo {
     fn pledge_extra() -> Weight;
     fn cut_pledge() -> Weight;
     fn place_storage_order() -> Weight;
-    fn calculate_reward() -> Weight;
+    fn claim_reward() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -205,7 +205,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             let mut is_to_decreased = false;
             file_info.replicas.retain(|replica| {
                 if replica.who == *who && replica.is_reported {
-                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
+                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_claim_reward`
                     is_to_decreased = true;
                 }
                 replica.who != *who
@@ -378,7 +378,11 @@ decl_error! {
         FileSizeNotCorrect,
         /// You are not permitted to this function
         /// You are not in the whitelist
-        NotPermitted
+        NotPermitted,
+        /// File does not exist
+        FileNotExist,
+        /// File is not in the reward period
+        NotInRewardPeriod
     }
 }
 
@@ -494,7 +498,7 @@ decl_module! {
             <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
             // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
 
             // 6. Emit success
             Self::deposit_event(RawEvent::CutPledgeSuccess(who, value));
@@ -536,8 +540,8 @@ decl_module! {
 
             let curr_bn = Self::get_current_block_number();
 
-            // 4. calculate payouts. Try to close file and decrease first party storage
-            Self::calculate_payout(&cid, curr_bn);
+            // 4. do claim reward. Try to close file and decrease first party storage
+            Self::do_claim_reward(&cid, curr_bn);
 
             // 5. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
@@ -552,18 +556,26 @@ decl_module! {
         }
 
         /// Calculate the payout
-        #[weight = T::WeightInfo::calculate_reward()]
-        pub fn calculate_reward(
+        #[weight = T::WeightInfo::claim_reward()]
+        pub fn claim_reward(
             origin,
             cid: MerkleRoot,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
+            let claimer = ensure_signed(origin)?;
 
             // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
+            ensure!(Self::allow_list().contains(&claimer), Error::<T>::NotPermitted);
+
+            // 1. Ensure file exist
+            ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
 
             let curr_bn = Self::get_current_block_number();
-            Self::calculate_payout(&cid, curr_bn);
+
+            // 2. Calculate reward should be after expired_on
+            ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::NotInRewardPeriod);
+
+            Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
+            Self::do_claim_reward(&cid, curr_bn);
             Self::try_to_close_file(&cid, curr_bn);
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
@@ -626,13 +638,13 @@ impl<T: Config> Module<T> {
         T::ModuleId::get().into_sub_account("rese")
     }
 
-    /// Calculate payout from file's replica
+    /// Calculate reward from file's replica
     /// This function will calculate the file's reward, update replicas
     /// and (maybe) insert file's status(files_size and delete file)
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
-    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber)
+    pub fn do_claim_reward(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
         if Self::files(cid).is_none() { return; }
@@ -725,7 +737,7 @@ impl<T: Config> Module<T> {
                 Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
-                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                 }
                 Self::move_into_trash(cid, used_info, file_info.file_size);
             };
@@ -854,6 +866,20 @@ impl<T: Config> Module<T> {
             None => {}
         });
         used_size
+    }
+
+    fn maybe_reward_claimer(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
+        if let Some((mut file_info, used_info)) = Self::files(cid) {
+            // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
+            // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator
+            // 3. curr_bn > expired_on + T::FileDuration::get() * 2 => all amount would be rewarded to the liquidator
+            let reward_liquidator_amount = Perbill::from_rational_approximation(curr_bn.saturating_sub(file_info.expired_on).saturating_sub(T::FileDuration::get()), T::FileDuration::get()) * file_info.amount;
+            if !reward_liquidator_amount.is_zero() {
+                file_info.amount = file_info.amount.saturating_sub(reward_liquidator_amount);
+                T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive).expect("Something wrong during transferring");
+                <Files<T>>::insert(cid, (file_info, used_info));
+            }
+        }
     }
 
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
@@ -1028,7 +1054,7 @@ impl<T: Config> Module<T> {
                     <Files<T>>::insert(cid, (file_info, used_info));
                 } else {
                     if !Self::maybe_reward_merchant(who, &file_info.amount){
-                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
                 }

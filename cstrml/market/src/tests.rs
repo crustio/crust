@@ -760,7 +760,7 @@ fn calculate_payout_should_move_file_to_trash_due_to_expired() {
         run_to_block(1506);
         // expired_on is 1303. So to check 900
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::files(&cid), None);
 
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
@@ -1096,7 +1096,7 @@ fn calculate_payout_should_work_in_complex_timeline() {
         assert_eq!(Market::files_size(), (file_size * 3) as u128);
 
         run_to_block(1803);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
@@ -1801,28 +1801,28 @@ fn clear_trash_should_work() {
         run_to_block(1500);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
         // close files one by one
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid1.clone()));
         assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
         });
 
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid2.clone()));
         assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
         });
 
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid3.clone()));
         assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
         });
 
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid4.clone()));
         assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
@@ -1831,14 +1831,14 @@ fn clear_trash_should_work() {
         assert_eq!(Market::used_trash_i(&cid1), None);
         assert_eq!(Market::used_trash_i(&cid2), None);
 
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid5.clone()));
         assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
         });
 
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid6.clone()));
         assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
@@ -2962,7 +2962,7 @@ fn clear_same_file_in_trash_should_work() {
         run_to_block(1803);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 1500, true);
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 1500, true);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid.clone()));
 
         // Prepare a file in the trash
         assert_eq!(Market::files(&cid).is_none(), true);
@@ -3034,7 +3034,7 @@ fn reward_liquidator_should_work() {
         }
 
         assert_noop!(
-            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+            Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 0,
                 error: 8,
@@ -3069,7 +3069,7 @@ fn reward_liquidator_should_work() {
         ));
 
         assert_noop!(
-            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+            Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 0,
                 error: 9,
@@ -3078,7 +3078,7 @@ fn reward_liquidator_should_work() {
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 4680);
         assert_eq!(Market::files(&cid).is_none(), true);
         assert_eq!(Market::used_trash_i(&cid).is_some(), true);
@@ -3091,7 +3091,7 @@ fn reward_liquidator_should_work() {
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None);
 
         run_to_block(4000); // 3503 - 4503 => no reward to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 4680);
 
         assert_ok!(Market::place_storage_order(
@@ -3102,7 +3102,7 @@ fn reward_liquidator_should_work() {
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None);
 
         run_to_block(8000); // expired_on 6000 => all reward to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 28080);
     });
 }

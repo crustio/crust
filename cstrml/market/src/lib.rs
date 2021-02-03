@@ -62,7 +62,7 @@ pub trait WeightInfo {
     fn pledge_extra() -> Weight;
     fn cut_pledge() -> Weight;
     fn place_storage_order() -> Weight;
-    fn calculate_reward() -> Weight;
+    fn claim_reward() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -556,15 +556,15 @@ decl_module! {
         }
 
         /// Calculate the payout
-        #[weight = T::WeightInfo::calculate_reward()]
-        pub fn calculate_reward(
+        #[weight = T::WeightInfo::claim_reward()]
+        pub fn claim_reward(
             origin,
             cid: MerkleRoot,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
+            let claimer = ensure_signed(origin)?;
 
             // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
+            ensure!(Self::allow_list().contains(&claimer), Error::<T>::NotPermitted);
 
             // 1. Ensure file exist
             ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
@@ -574,7 +574,7 @@ decl_module! {
             // 2. Calculate reward should be after expired_on
             ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::NotInRewardPeriod);
 
-            Self::maybe_reward_liquidator(&cid, curr_bn, &who);
+            Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
             Self::calculate_payout(&cid, curr_bn);
             Self::try_to_close_file(&cid, curr_bn);
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
@@ -855,7 +855,7 @@ impl<T: Config> Module<T> {
         used_size
     }
 
-    fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
+    fn maybe_reward_claimer(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
             // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator

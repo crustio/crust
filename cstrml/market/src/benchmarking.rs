@@ -100,7 +100,7 @@ benchmarks! {
         assert_eq!(Market::<T>::files(&cid).unwrap_or_default().0.claimed_at, 600);
     }
 
-    calculate_reward {
+    claim_reward {
         let user = create_funded_user::<T>("user", 100);
         let member_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(user.clone());
         Market::<T>::add_member_into_allow_list(RawOrigin::Root.into(), member_lookup).expect("Give permission failed");
@@ -152,9 +152,9 @@ mod tests {
     }
 
     #[test]
-    fn calculate_reward() {
+    fn claim_reward() {
         new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_calculate_reward::<Test>());
+            assert_ok!(test_benchmark_claim_reward::<Test>());
         });
     }
 

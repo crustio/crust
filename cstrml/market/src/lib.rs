@@ -498,7 +498,7 @@ decl_module! {
             <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
             // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
 
             // 6. Emit success
             Self::deposit_event(RawEvent::CutPledgeSuccess(who, value));
@@ -724,7 +724,7 @@ impl<T: Config> Module<T> {
                 Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
-                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                 }
                 Self::move_into_trash(cid, used_info, file_info.file_size);
             };
@@ -1041,7 +1041,7 @@ impl<T: Config> Module<T> {
                     <Files<T>>::insert(cid, (file_info, used_info));
                 } else {
                     if !Self::maybe_reward_merchant(who, &file_info.amount){
-                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
                 }

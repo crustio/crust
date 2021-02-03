@@ -3002,3 +3002,103 @@ fn clear_same_file_in_trash_should_work() {
         assert_eq!(Market::used_trash_size_i(), 0);
     });
 }
+
+
+#[test]
+fn reward_liquidator_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // should less than merchant
+        let source = ALICE;
+        let merchant = BOB;
+        let charlie = CHARLIE;
+
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&storage_pot), 0);
+        let _ = Balances::make_free_balance_be(&storage_pot, 1);
+
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let merchants = vec![merchant.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+        }
+
+        assert_noop!(
+            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+            DispatchError::Module {
+                index: 0,
+                error: 8,
+                message: Some("FileNotExist")
+        });
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
+        ));
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+        ));
+
+        assert_noop!(
+            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+            DispatchError::Module {
+                index: 0,
+                error: 9,
+                message: Some("InvalidFile")
+        });
+
+        run_to_block(2503);
+        // 20% would be rewarded to liquidator charlie
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_eq!(Balances::free_balance(&charlie), 4680);
+        assert_eq!(Market::files(&cid).is_none(), true);
+        assert_eq!(Market::used_trash_i(&cid).is_some(), true);
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
+        ));
+
+        add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None);
+
+        run_to_block(4000); // 3503 - 4503 => no reward to liquidator charlie
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_eq!(Balances::free_balance(&charlie), 4680);
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
+        ));
+
+        add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None);
+
+        run_to_block(8000); // expired_on 6000 => all reward to liquidator charlie
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_eq!(Balances::free_balance(&charlie), 28080);
+    });
+}

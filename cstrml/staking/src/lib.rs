@@ -1222,7 +1222,7 @@ decl_module! {
             let who = ensure_signed(origin)?;
             ensure!(T::Currency::free_balance(&who) > value, Error::<T>::InsufficientCurrency);
             let staking_pot = Self::staking_pot();
-            T::Currency::transfer(&who, &staking_pot, value, KeepAlive)?;
+            T::Currency::transfer(&who, &staking_pot, value, AllowDeath)?;
         }
 
         // ----- Root Calls ------
@@ -1882,7 +1882,7 @@ impl<T: Config> Module<T> {
                     &staking_pot,
                     imbalance,
                     WithdrawReasons::TRANSFER,
-                    AllowDeath
+                    KeepAlive
                 ) {
                     log!(
                         info,

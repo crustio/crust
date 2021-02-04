@@ -779,6 +779,9 @@ decl_module! {
         /// Total era duration for once dsm staking pot.
         const MarketStakingPotDuration: u32 = T::MarketStakingPotDuration::get();
 
+        /// Storage power ratio for crust network phase 1
+        const SPowerRatio: u128 = T::SPowerRatio::get();
+
         type Error = Error<T>;
 
         fn deposit_event() = default;

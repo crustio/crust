@@ -441,6 +441,9 @@ pub trait Config: frame_system::Config {
     /// Market Staking Pot Duration. Count of EraIndex
     type MarketStakingPotDuration: Get<u32>;
 
+    /// Authoring and Staking ratio for market staking pot
+    type AuthoringAndStakingRatio: Get<Perbill>;
+
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
 }
@@ -781,6 +784,9 @@ decl_module! {
 
         /// Storage power ratio for crust network phase 1
         const SPowerRatio: u128 = T::SPowerRatio::get();
+
+        /// Authoring and Staking ratio for market staking pot
+        const AuthoringAndStakingRatio: Perbill = T::AuthoringAndStakingRatio::get();
 
         type Error = Error<T>;
 
@@ -1895,8 +1901,8 @@ impl<T: Config> Module<T> {
 
                 // 2. Market's staking payout
                 let (market_authoring_payout, market_staking_payout) = Self::distribute_market_staking_payout(active_era_index);
-                total_authoring_payout.saturating_add(market_authoring_payout);
-                total_staking_payout.saturating_add(market_staking_payout);
+                total_authoring_payout = total_authoring_payout.saturating_add(market_authoring_payout);
+                total_staking_payout = total_staking_payout.saturating_add(market_staking_payout);
 
                 // 3. Block authoring payout
                 for (v, p) in points.individual.iter() {
@@ -2006,9 +2012,10 @@ impl<T: Config> Module<T> {
                 None => *payout = Some(dsm_staking_payout_per_era.clone())
             });
         }
-        let total_market_payout = Self::eras_market_payout(active_era);
-        let market_authoring_payout = Perbill::from_percent(80) * total_market_payout;
-        let market_staking_payout = total_market_payout - market_authoring_payout;
+        let total_market_payout = Self::eras_market_payout(active_era).unwrap();
+        // TODO: merge this logic with GPoS's reward mechanism
+        let market_authoring_payout = T::AuthoringAndStakingRatio::get() * total_market_payout;
+        let market_staking_payout = total_market_payout.saturating_sub(market_authoring_payout);
         (market_authoring_payout, market_staking_payout)
     }
 

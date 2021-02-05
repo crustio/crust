@@ -427,6 +427,8 @@ fn era_reward_with_dsm_staking_pot_should_work() {
             // Compute now as other parameter won't change
             let total_authoring_payout = Staking::authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = Staking::staking_rewards_in_era(Staking::current_era().unwrap_or(0));
+            let market_authoring_payout = <<Test as Config>::AuthoringAndStakingRatio>::get() * dsm_staking_payout_per_era;
+            let market_staking_payout = dsm_staking_payout_per_era - market_authoring_payout;
             assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
             assert_eq!(Staking::eras_total_stakes(0), 2001);
             <Module<Test>>::reward_by_ids(vec![(21, 1)]);
@@ -442,19 +444,20 @@ fn era_reward_with_dsm_staking_pot_should_work() {
             // rewards may round to 0.000001
             assert_eq!(
                 Balances::total_balance(&10) / 10000000,
-                (init_balance_10 + total_staking_payout_0 * 1000 / 2001 + dsm_staking_payout_per_era * 1000 / 2001) / 10000000
+                (init_balance_10 + total_staking_payout_0 * 1000 / 2001 + market_staking_payout * 1000 / 2001) / 10000000
             );
             let stakes_21 = Balances::total_balance(&21);
             let stakes_31 = Balances::total_balance(&31);
             // candidates should have rewards
             assert_eq!(
                 stakes_21 / 10000000,
-                (init_balance_21 + total_authoring_payout + total_staking_payout_0 * 1000 / 2001 + dsm_staking_payout_per_era * 1000 / 2001) / 10000000
+                (init_balance_21 + total_authoring_payout + market_authoring_payout + total_staking_payout_0 * 1000 / 2001 + market_staking_payout * 1000 / 2001) / 10000000
             );
 
             start_session(4, true);
 
-            <Module<Test>>::reward_by_ids(vec![(21, 101)]); // meaningless points
+            <Module<Test>>::reward_by_ids(vec![(21, 1)]);
+            <Module<Test>>::reward_by_ids(vec![(31, 1)]);
             // new era is triggered here.
             start_session(5, true);
             start_session(6, true);
@@ -465,15 +468,15 @@ fn era_reward_with_dsm_staking_pot_should_work() {
             assert_eq!(
                 Balances::total_balance(&10) / 100000000,
                 (init_balance_10 + total_staking_payout_0 * 1000 / 2001
-                    + (dsm_staking_payout_per_era * 1000 / 2001) + (dsm_staking_payout_per_era * 2 * 1000 / 2001)) / 100000000
+                    + (market_staking_payout * 1000 / 2001) + (market_staking_payout * 2 * 1000 / 2001)) / 100000000
             );
             assert_eq!(
                 Balances::total_balance(&21) / 10000000,
-                (stakes_21 + (dsm_staking_payout_per_era * 2 * 1000 / 2001)) / 10000000
+                (stakes_21 + market_authoring_payout + (market_staking_payout * 2 * 1000 / 2001)) / 10000000
             );
             assert_eq!(
                 Balances::total_balance(&31) / 10000000,
-                (stakes_31 + (dsm_staking_payout_per_era * 2 / 2001)) / 10000000
+                (stakes_31 + market_authoring_payout + (market_staking_payout * 2 / 2001)) / 10000000
             );
         });
 }

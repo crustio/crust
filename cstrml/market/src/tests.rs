@@ -3106,3 +3106,49 @@ fn reward_liquidator_should_work() {
         assert_eq!(Balances::free_balance(&charlie), 28080);
     });
 }
+
+#[test]
+fn reward_merchant_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let merchant = MERCHANT;
+        let alice = ALICE;
+        let storage_pot = Market::storage_pot();
+        let _ = Balances::make_free_balance_be(&storage_pot, 121);
+
+        <self::MerchantLedgers<Test>>::insert(&merchant, MerchantLedger {
+            pledge: 180,
+            reward: 120
+        });
+
+        assert_ok!(Market::reward_merchant(Origin::signed(merchant.clone())));
+        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+            pledge: 180,
+            reward: 0
+        });
+        assert_eq!(Balances::free_balance(&merchant), 120);
+        assert_noop!(
+            Market::reward_merchant(
+                Origin::signed(merchant)
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 10,
+                message: Some("NotEnoughReward")
+            }
+        );
+
+        assert_noop!(
+            Market::reward_merchant(
+                Origin::signed(alice)
+            ),
+            DispatchError::Module {
+                index: 0,
+                error: 3,
+                message: Some("NotRegister")
+            }
+        );
+    });
+}

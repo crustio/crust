@@ -63,6 +63,7 @@ pub trait WeightInfo {
     fn cut_pledge() -> Weight;
     fn place_storage_order() -> Weight;
     fn claim_reward() -> Weight;
+    fn reward_merchant() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -382,7 +383,9 @@ decl_error! {
         /// File does not exist
         FileNotExist,
         /// File is not in the reward period
-        NotInRewardPeriod
+        NotInRewardPeriod,
+        /// Reward is not enough
+        NotEnoughReward
     }
 }
 
@@ -581,7 +584,35 @@ decl_module! {
             Ok(())
         }
 
-        // TODO: add claim_reward
+        /// Reward the merchant
+        #[weight = T::WeightInfo::reward_merchant()]
+        pub fn reward_merchant(
+            origin
+        ) -> DispatchResult {
+            let merchant = ensure_signed(origin)?;
+
+            // TODO: Remove this check later
+            ensure!(Self::allow_list().contains(&merchant), Error::<T>::NotPermitted);
+
+            // 1. Ensure merchant registered before
+            ensure!(<MerchantLedgers<T>>::contains_key(&merchant), Error::<T>::NotRegister);
+
+            // 2. Fetch ledger information
+            let mut merchant_ledger = Self::merchant_ledgers(&merchant);
+
+            // 3. Ensure reward is larger than some value
+            ensure!(merchant_ledger.reward > Zero::zero(), Error::<T>::NotEnoughReward);
+
+            // 4. Transfer the money
+            T::Currency::transfer(&Self::storage_pot(), &merchant, merchant_ledger.reward, KeepAlive).expect("Something wrong during transferring");
+
+            // 5. Set the reward to zero and push it back
+            merchant_ledger.reward = Zero::zero();
+            <MerchantLedgers<T>>::insert(&merchant, merchant_ledger);
+
+            Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
+            Ok(())
+        }
 
         /// Add it into allow list
         #[weight = 1000]
@@ -1111,5 +1142,6 @@ decl_event!(
         CutPledgeSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
+        RewardMerchantSuccess(AccountId),
     }
 );

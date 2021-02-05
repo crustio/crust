@@ -285,9 +285,6 @@ pub trait Config: system::Config {
     /// File Base Price.
     type FileInitPrice: Get<BalanceOf<Self>>;
 
-    /// Max limit for the length of sorders in each payment claim.
-    type ClaimLimit: Get<u32>;
-
     /// Storage reference ratio. files_size / total_capacity
     type StorageReferenceRatio: Get<(u128, u128)>;
 
@@ -411,9 +408,6 @@ decl_module! {
 
         /// File Init Price.
         const FileInitPrice: BalanceOf<T> = T::FileInitPrice::get();
-
-        /// Max limit for the length of sorders in each payment claim.
-        const ClaimLimit: u32 = T::ClaimLimit::get();
 
         /// Storage reference ratio. files_size / total_capacity
         const StorageReferenceRatio: (u128, u128) = T::StorageReferenceRatio::get();

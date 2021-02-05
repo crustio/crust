@@ -441,6 +441,9 @@ pub trait Config: frame_system::Config {
     /// Market Staking Pot Duration. Count of EraIndex
     type MarketStakingPotDuration: Get<u32>;
 
+    /// Authoring and Staking ratio for market staking pot
+    type AuthoringAndStakingRatio: Get<Perbill>;
+
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
 }
@@ -539,7 +542,7 @@ decl_storage! {
             map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
 
         /// Market staking payout of validator at era.
-        pub ErasMarketStakingPayout get(fn eras_market_staking_payout):
+        pub ErasMarketPayout get(fn eras_market_payout):
             map hasher(twox_64_concat) EraIndex => Option<BalanceOf<T>>;
 
         /// Authoring payout of validator at era.
@@ -783,6 +786,9 @@ decl_module! {
 
         /// Storage power ratio for crust network phase 1
         const SPowerRatio: u128 = T::SPowerRatio::get();
+
+        /// Authoring and Staking ratio for market staking pot
+        const AuthoringAndStakingRatio: Perbill = T::AuthoringAndStakingRatio::get();
 
         type Error = Error<T>;
 
@@ -1682,11 +1688,8 @@ impl<T: Config> Module<T> {
 
         // Note: if era has no reward to be claimed, era may be future. better not to update
         // `ledger.claimed_rewards` in this case.
-        let era_staking_payout = <ErasStakingPayout<T>>::get(&era)
+        let total_era_staking_payout = <ErasStakingPayout<T>>::get(&era)
             .ok_or_else(|| Error::<T>::InvalidEraToReward)?;
-        let era_market_staking_payout = <ErasMarketStakingPayout<T>>::get(&era)
-            .unwrap_or(Zero::zero());
-        let total_era_staking_payout = era_staking_payout.saturating_add(era_market_staking_payout);
 
         let controller = Self::bonded(&validator_stash).ok_or(Error::<T>::NotStash)?;
         let mut ledger = <Ledger<T>>::get(&controller).ok_or_else(|| Error::<T>::NotController)?;
@@ -1907,7 +1910,13 @@ impl<T: Config> Module<T> {
                     total_authoring_payout = Zero::zero();
                     total_staking_payout = Zero::zero();
                 }
-                // 2. Block authoring payout
+
+                // 2. Market's staking payout
+                let (market_authoring_payout, market_staking_payout) = Self::calculate_market_payout(active_era_index);
+                total_authoring_payout = total_authoring_payout.saturating_add(market_authoring_payout);
+                total_staking_payout = total_staking_payout.saturating_add(market_staking_payout);
+
+                // 3. Block authoring payout
                 for (v, p) in points.individual.iter() {
                     if *p != 0u32 {
                         let authoring_reward =
@@ -1915,12 +1924,9 @@ impl<T: Config> Module<T> {
                         <ErasAuthoringPayout<T>>::insert(&active_era_index, v, authoring_reward);
                     }
                 }
-    
-                // 3. Staking payout
-                <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
 
-                // 4. Market's staking payout
-                Self::distribute_market_staking_payout(active_era_index);
+                // 4. Staking payout
+                <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
     
                 // 5. Deposit era reward event
                 Self::deposit_event(RawEvent::EraReward(active_era_index, total_authoring_payout, total_staking_payout));
@@ -1939,7 +1945,7 @@ impl<T: Config> Module<T> {
         <ErasStakersClipped<T>>::remove_prefix(era_index);
         <ErasValidatorPrefs<T>>::remove_prefix(era_index);
         <ErasStakingPayout<T>>::remove(era_index);
-        <ErasMarketStakingPayout<T>>::remove(era_index);
+        <ErasMarketPayout<T>>::remove(era_index);
         <ErasTotalStakes<T>>::remove(era_index);
         <ErasAuthoringPayout<T>>::remove_prefix(era_index);
         <ErasRewardPoints<T>>::remove(era_index);
@@ -2007,17 +2013,22 @@ impl<T: Config> Module<T> {
         reward_this_era.try_into().ok().unwrap()
     }
 
-    fn distribute_market_staking_payout(active_era: EraIndex) {
+    fn calculate_market_payout(active_era: EraIndex) -> (BalanceOf<T>, BalanceOf<T>) {
         let total_dsm_staking_payout = T::MarketStakingPot::withdraw_staking_pot();
         let duration = T::MarketStakingPotDuration::get();
         let dsm_staking_payout_per_era = Perbill::from_rational_approximation(1, duration) * total_dsm_staking_payout;
         // Reward starts from this era.
         for i in 0..duration {
-            <ErasMarketStakingPayout<T>>::mutate(active_era + i, |payout| match *payout {
+            <ErasMarketPayout<T>>::mutate(active_era + i, |payout| match *payout {
                 Some(amount) => *payout = Some(amount.saturating_add(dsm_staking_payout_per_era.clone())),
                 None => *payout = Some(dsm_staking_payout_per_era.clone())
             });
         }
+        let total_market_payout = Self::eras_market_payout(active_era).unwrap();
+        // TODO: merge this logic with GPoS's reward mechanism
+        let market_authoring_payout = T::AuthoringAndStakingRatio::get() * total_market_payout;
+        let market_staking_payout = total_market_payout.saturating_sub(market_authoring_payout);
+        (market_authoring_payout, market_staking_payout)
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.

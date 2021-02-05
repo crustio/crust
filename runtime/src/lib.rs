@@ -729,7 +729,6 @@ parameter_types! {
     pub const InitialReplica: u32 = 4;
     pub const FileBaseFee: Balance = MILLICENTS * 2;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and InitialReplica
-    pub const ClaimLimit: u32 = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
@@ -750,7 +749,6 @@ impl market::Config for Runtime {
     type InitialReplica = InitialReplica;
     type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
-    type ClaimLimit = ClaimLimit;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;

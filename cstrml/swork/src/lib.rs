@@ -264,6 +264,9 @@ decl_module! {
         /// Punishment duration if someone offline
         const PunishmentSlots: u32 = T::PunishmentSlots::get();
 
+        /// Max number of members in one group
+        const MaxGroupSize: u32 = T::MaxGroupSize::get();
+
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;

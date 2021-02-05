@@ -144,7 +144,6 @@ parameter_types! {
     pub const InitialReplica: u32 = 4;
     pub const FileBaseFee: Balance = 1000;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
-    pub const ClaimLimit: u32 = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
@@ -164,7 +163,6 @@ impl market::Config for Test {
     type InitialReplica = InitialReplica;
     type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
-    type ClaimLimit = ClaimLimit;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;

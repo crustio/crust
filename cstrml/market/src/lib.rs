@@ -285,9 +285,6 @@ pub trait Config: system::Config {
     /// File Base Price.
     type FileInitPrice: Get<BalanceOf<Self>>;
 
-    /// Max limit for the length of sorders in each payment claim.
-    type ClaimLimit: Get<u32>;
-
     /// Storage reference ratio. files_size / total_capacity
     type StorageReferenceRatio: Get<(u128, u128)>;
 
@@ -398,7 +395,37 @@ decl_module! {
         fn deposit_event() = default;
 
         /// The market's module id, used for deriving its sovereign account ID.
-		const ModuleId: ModuleId = T::ModuleId::get();
+        const ModuleId: ModuleId = T::ModuleId::get();
+
+        /// File duration.
+        const FileDuration: BlockNumber = T::FileDuration::get();
+
+        /// File base replica.
+        const InitialReplica: u32 = T::InitialReplica::get();
+
+        /// File Base Fee.
+        const FileBaseFee: BalanceOf<T> = T::FileBaseFee::get();
+
+        /// File Init Price.
+        const FileInitPrice: BalanceOf<T> = T::FileInitPrice::get();
+
+        /// Storage reference ratio. files_size / total_capacity
+        const StorageReferenceRatio: (u128, u128) = T::StorageReferenceRatio::get();
+
+        /// Storage increase ratio.
+        const StorageIncreaseRatio: Perbill = T::StorageIncreaseRatio::get();
+
+        /// Storage decrease ratio.
+        const StorageDecreaseRatio: Perbill = T::StorageDecreaseRatio::get();
+
+        /// Storage / Staking ratio.
+        const StakingRatio: Perbill = T::StakingRatio::get();
+
+        /// Tax / Storage plus Staking ratio.
+        const TaxRatio: Perbill = T::TaxRatio::get();
+
+        /// Max size of used trash.
+        const UsedTrashMaxSize: u128 = T::UsedTrashMaxSize::get();
 
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to pledge first, complexity depends on `Pledges`(P).

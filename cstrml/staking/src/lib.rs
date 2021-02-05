@@ -1900,7 +1900,7 @@ impl<T: Config> Module<T> {
                 }
 
                 // 2. Market's staking payout
-                let (market_authoring_payout, market_staking_payout) = Self::distribute_market_staking_payout(active_era_index);
+                let (market_authoring_payout, market_staking_payout) = Self::calculate_market_payout(active_era_index);
                 total_authoring_payout = total_authoring_payout.saturating_add(market_authoring_payout);
                 total_staking_payout = total_staking_payout.saturating_add(market_staking_payout);
 
@@ -2001,7 +2001,7 @@ impl<T: Config> Module<T> {
         reward_this_era.try_into().ok().unwrap()
     }
 
-    fn distribute_market_staking_payout(active_era: EraIndex) -> (BalanceOf<T>, BalanceOf<T>) {
+    fn calculate_market_payout(active_era: EraIndex) -> (BalanceOf<T>, BalanceOf<T>) {
         let total_dsm_staking_payout = T::MarketStakingPot::withdraw_staking_pot();
         let duration = T::MarketStakingPotDuration::get();
         let dsm_staking_payout_per_era = Perbill::from_rational_approximation(1, duration) * total_dsm_staking_payout;

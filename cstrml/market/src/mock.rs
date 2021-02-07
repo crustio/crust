@@ -159,13 +159,13 @@ parameter_types! {
     pub const InitialReplica: u32 = 4;
     pub const FileBaseFee: Balance = 1000;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
-    pub const ClaimLimit: u32 = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
     pub const TaxRatio: Perbill = Perbill::from_percent(10);
     pub const UsedTrashMaxSize: u128 = 2;
+    pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
 }
 
 impl Config for Test {
@@ -178,13 +178,13 @@ impl Config for Test {
     type InitialReplica = InitialReplica;
     type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
-    type ClaimLimit = ClaimLimit;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
+    type MaximumFileSize = MaximumFileSize;
     type WeightInfo = weight::WeightInfo<Test>;
 }
 

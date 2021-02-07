@@ -248,6 +248,7 @@ fn testnet_genesis(
             slash_reward_fraction: Perbill::from_percent(10),
             ..Default::default()
         }),
+        market: Some(Default::default()),
         pallet_babe: Some(Default::default()),
         pallet_grandpa: Some(Default::default()),
         pallet_im_online: Some(Default::default()),
@@ -365,6 +366,7 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             slash_reward_fraction: Perbill::from_percent(10),
             ..Default::default()
         }),
+        market: Some(Default::default()),
         pallet_babe: Some(Default::default()),
         pallet_grandpa: Some(Default::default()),
         pallet_im_online: Some(Default::default()),
@@ -486,6 +488,7 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             slash_reward_fraction: Perbill::from_percent(10),
             ..Default::default()
         }),
+        market: Some(Default::default()),
         pallet_babe: Some(Default::default()),
         pallet_grandpa: Some(Default::default()),
         pallet_im_online: Some(Default::default()),

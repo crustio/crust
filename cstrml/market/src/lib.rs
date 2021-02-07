@@ -62,7 +62,8 @@ pub trait WeightInfo {
     fn pledge_extra() -> Weight;
     fn cut_pledge() -> Weight;
     fn place_storage_order() -> Weight;
-    fn calculate_reward() -> Weight;
+    fn claim_reward() -> Weight;
+    fn reward_merchant() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -205,7 +206,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             let mut is_to_decreased = false;
             file_info.replicas.retain(|replica| {
                 if replica.who == *who && replica.is_reported {
-                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `calculate_payout`
+                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_claim_reward`
                     is_to_decreased = true;
                 }
                 replica.who != *who
@@ -284,9 +285,6 @@ pub trait Config: system::Config {
     /// File Base Price.
     type FileInitPrice: Get<BalanceOf<Self>>;
 
-    /// Max limit for the length of sorders in each payment claim.
-    type ClaimLimit: Get<u32>;
-
     /// Storage reference ratio. files_size / total_capacity
     type StorageReferenceRatio: Get<(u128, u128)>;
 
@@ -304,6 +302,9 @@ pub trait Config: system::Config {
 
     /// UsedTrashMaxSize.
     type UsedTrashMaxSize: Get<u128>;
+
+    /// Maximum file size
+    type MaximumFileSize: Get<u64>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -378,7 +379,15 @@ decl_error! {
         FileSizeNotCorrect,
         /// You are not permitted to this function
         /// You are not in the whitelist
-        NotPermitted
+        NotPermitted,
+        /// File does not exist
+        FileNotExist,
+        /// File is not in the reward period
+        NotInRewardPeriod,
+        /// Reward is not enough
+        NotEnoughReward,
+        /// File is too large
+        FileTooLarge
     }
 }
 
@@ -391,7 +400,40 @@ decl_module! {
         fn deposit_event() = default;
 
         /// The market's module id, used for deriving its sovereign account ID.
-		const ModuleId: ModuleId = T::ModuleId::get();
+        const ModuleId: ModuleId = T::ModuleId::get();
+
+        /// File duration.
+        const FileDuration: BlockNumber = T::FileDuration::get();
+
+        /// File base replica.
+        const InitialReplica: u32 = T::InitialReplica::get();
+
+        /// File Base Fee.
+        const FileBaseFee: BalanceOf<T> = T::FileBaseFee::get();
+
+        /// File Init Price.
+        const FileInitPrice: BalanceOf<T> = T::FileInitPrice::get();
+
+        /// Storage reference ratio. files_size / total_capacity
+        const StorageReferenceRatio: (u128, u128) = T::StorageReferenceRatio::get();
+
+        /// Storage increase ratio.
+        const StorageIncreaseRatio: Perbill = T::StorageIncreaseRatio::get();
+
+        /// Storage decrease ratio.
+        const StorageDecreaseRatio: Perbill = T::StorageDecreaseRatio::get();
+
+        /// Storage / Staking ratio.
+        const StakingRatio: Perbill = T::StakingRatio::get();
+
+        /// Tax / Storage plus Staking ratio.
+        const TaxRatio: Perbill = T::TaxRatio::get();
+
+        /// Max size of used trash.
+        const UsedTrashMaxSize: u128 = T::UsedTrashMaxSize::get();
+
+        /// Max size of a file
+        const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to pledge first, complexity depends on `Pledges`(P).
@@ -494,7 +536,7 @@ decl_module! {
             <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
             // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
 
             // 6. Emit success
             Self::deposit_event(RawEvent::CutPledgeSuccess(who, value));
@@ -526,23 +568,25 @@ decl_module! {
                     Err(Error::<T>::FileSizeNotCorrect)?
                 }
             }
+            // 2. charged_file_size should be smaller than 128G
+            ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
             let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
-            // 2. Check client can afford the sorder
+            // 3. Check client can afford the sorder
             ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
-            // 3. Split into storage and staking account.
+            // 4. Split into storage and staking account.
             let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
 
             let curr_bn = Self::get_current_block_number();
 
-            // 4. calculate payouts. Try to close file and decrease first party storage
-            Self::calculate_payout(&cid, curr_bn);
+            // 5. do claim reward. Try to close file and decrease first party storage
+            Self::do_claim_reward(&cid, curr_bn);
 
-            // 5. three scenarios: new file, extend time(refresh time) or extend replica
+            // 6. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
-            // 6. Update storage price.
+            // 7. Update storage price.
             #[cfg(not(test))]
             Self::update_file_price();
 
@@ -552,24 +596,60 @@ decl_module! {
         }
 
         /// Calculate the payout
-        #[weight = T::WeightInfo::calculate_reward()]
-        pub fn calculate_reward(
+        #[weight = T::WeightInfo::claim_reward()]
+        pub fn claim_reward(
             origin,
             cid: MerkleRoot,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
+            let claimer = ensure_signed(origin)?;
 
             // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
+            ensure!(Self::allow_list().contains(&claimer), Error::<T>::NotPermitted);
+
+            // 1. Ensure file exist
+            ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
 
             let curr_bn = Self::get_current_block_number();
-            Self::calculate_payout(&cid, curr_bn);
+
+            // 2. Calculate reward should be after expired_on
+            ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::NotInRewardPeriod);
+
+            Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
+            Self::do_claim_reward(&cid, curr_bn);
             Self::try_to_close_file(&cid, curr_bn);
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
         }
 
-        // TODO: add claim_reward
+        /// Reward the merchant
+        #[weight = T::WeightInfo::reward_merchant()]
+        pub fn reward_merchant(
+            origin
+        ) -> DispatchResult {
+            let merchant = ensure_signed(origin)?;
+
+            // TODO: Remove this check later
+            ensure!(Self::allow_list().contains(&merchant), Error::<T>::NotPermitted);
+
+            // 1. Ensure merchant registered before
+            ensure!(<MerchantLedgers<T>>::contains_key(&merchant), Error::<T>::NotRegister);
+
+            // 2. Fetch ledger information
+            let mut merchant_ledger = Self::merchant_ledgers(&merchant);
+
+            // 3. Ensure reward is larger than some value
+            ensure!(merchant_ledger.reward > Zero::zero(), Error::<T>::NotEnoughReward);
+
+            // 4. Transfer the money
+            T::Currency::transfer(&Self::storage_pot(), &merchant, merchant_ledger.reward, KeepAlive).expect("Something wrong during transferring");
+
+            // 5. Set the reward to zero and push it back
+            merchant_ledger.reward = Zero::zero();
+            <MerchantLedgers<T>>::insert(&merchant, merchant_ledger);
+
+            Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
+            Ok(())
+        }
 
         /// Add it into allow list
         #[weight = 1000]
@@ -613,13 +693,13 @@ impl<T: Config> Module<T> {
         T::ModuleId::get().into_sub_account("rese")
     }
 
-    /// Calculate payout from file's replica
+    /// Calculate reward from file's replica
     /// This function will calculate the file's reward, update replicas
     /// and (maybe) insert file's status(files_size and delete file)
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
-    fn calculate_payout(cid: &MerkleRoot, curr_bn: BlockNumber)
+    pub fn do_claim_reward(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
         if Self::files(cid).is_none() { return; }
@@ -712,7 +792,7 @@ impl<T: Config> Module<T> {
                 Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
-                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                 }
                 Self::move_into_trash(cid, used_info, file_info.file_size);
             };
@@ -773,6 +853,89 @@ impl<T: Config> Module<T> {
         UsedTrashSizeII::mutate(|value| {*value = 0;});
     }
 
+    fn maybe_delete_file_from_used_trash_i(cid: &MerkleRoot) {
+        // 1. Delete trashI's anchor
+        UsedTrashI::mutate_exists(cid, |maybe_used| {
+            match *maybe_used {
+                Some(ref mut used_info) => {
+                    for anchor in used_info.groups.keys() {
+                        UsedTrashMappingI::mutate(anchor, |value| {
+                            *value -= used_info.used_size;
+                        });
+                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                    }
+                    UsedTrashSizeI::mutate(|value| {*value -= 1;});
+                },
+                None => {}
+            }
+            *maybe_used = None;
+        });
+    }
+
+    fn maybe_delete_file_from_used_trash_ii(cid: &MerkleRoot) {
+        // 1. Delete trashII's anchor
+        UsedTrashII::mutate_exists(cid, |maybe_used| {
+            match *maybe_used {
+                Some(ref mut used_info) => {
+                    for anchor in used_info.groups.keys() {
+                        UsedTrashMappingII::mutate(anchor, |value| {
+                            *value -= used_info.used_size;
+                        });
+                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                    }
+                    UsedTrashSizeII::mutate(|value| {*value -= 1;});
+                },
+                None => {}
+            }
+            *maybe_used = None;
+        });
+    }
+
+    fn maybe_delete_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+        let mut used_size = 0;
+        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.groups.remove(anchor).is_some() {
+                    used_size = used_info.used_size;
+                    UsedTrashMappingI::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
+        used_size
+    }
+
+    fn maybe_delete_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+        let mut used_size = 0;
+        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
+            Some(ref mut used_info) => {
+                if used_info.groups.remove(anchor).is_some() {
+                    used_size = used_info.used_size;
+                    UsedTrashMappingII::mutate(anchor, |value| {
+                        *value -= used_info.used_size;
+                    });
+                }
+            },
+            None => {}
+        });
+        used_size
+    }
+
+    fn maybe_reward_claimer(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
+        if let Some((mut file_info, used_info)) = Self::files(cid) {
+            // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
+            // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator
+            // 3. curr_bn > expired_on + T::FileDuration::get() * 2 => all amount would be rewarded to the liquidator
+            let reward_liquidator_amount = Perbill::from_rational_approximation(curr_bn.saturating_sub(file_info.expired_on).saturating_sub(T::FileDuration::get()), T::FileDuration::get()) * file_info.amount;
+            if !reward_liquidator_amount.is_zero() {
+                file_info.amount = file_info.amount.saturating_sub(reward_liquidator_amount);
+                T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive).expect("Something wrong during transferring");
+                <Files<T>>::insert(cid, (file_info, used_info));
+            }
+        }
+    }
 
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_replica_count
@@ -801,6 +964,7 @@ impl<T: Config> Module<T> {
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         } else {
+            Self::check_file_in_trash(cid);
             // New file
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
                 file_size,
@@ -818,6 +982,13 @@ impl<T: Config> Module<T> {
             };
             <Files<T>>::insert(cid, (file_info, used_info));
         }
+    }
+
+    fn check_file_in_trash(cid: &MerkleRoot) {
+        // I. Delete trashI's anchor
+        Self::maybe_delete_file_from_used_trash_i(cid);
+        // 2. Delete trashII's anchor
+        Self::maybe_delete_file_from_used_trash_ii(cid);
     }
 
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
@@ -920,33 +1091,12 @@ impl<T: Config> Module<T> {
             },
             None => {}
         });
-        
 
         // 2. Delete trashI's anchor
-        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
-            Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
-                    used_size = used_info.used_size;
-                    UsedTrashMappingI::mutate(anchor, |value| {
-                        *value -= used_info.used_size;
-                    });
-                }
-            },
-            None => {}
-        });
+        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_i(cid, anchor));
 
         // 3. Delete trashII's anchor
-        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
-            Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
-                    used_size = used_info.used_size;
-                    UsedTrashMappingII::mutate(anchor, |value| {
-                        *value -= used_info.used_size;
-                    });
-                }
-            },
-            None => {}
-        });
+        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_ii(cid, anchor));
 
         used_size
     }
@@ -959,7 +1109,7 @@ impl<T: Config> Module<T> {
                     <Files<T>>::insert(cid, (file_info, used_info));
                 } else {
                     if !Self::maybe_reward_merchant(who, &file_info.amount){
-                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, AllowDeath).expect("Something wrong during transferring");
+                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
                 }
@@ -1029,5 +1179,6 @@ decl_event!(
         CutPledgeSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
+        RewardMerchantSuccess(AccountId),
     }
 );

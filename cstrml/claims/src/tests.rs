@@ -8,23 +8,31 @@ use frame_support::{assert_noop, assert_ok, dispatch::DispatchError};
 #[test]
 fn happy_pass_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner
+        // 0. Set miner and superior
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
+        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
 
-        // 1. Mint a claim
+        // 1. Set claim limit = 100
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+        assert_eq!(CrustClaims::claim_limit(), 100);
+
+        // 2. Mint a claim
         let tx_hash = get_legal_tx_hash();
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
+
+        // 3. Storage should ok
         assert_eq!(CrustClaims::claims(&tx_hash), Some((eth_addr.clone(), 100))); // new tx
         assert_eq!(CrustClaims::claimed(&tx_hash), false); // tx has not be claimed
+        assert_eq!(CrustClaims::claim_limit(), 0);
 
-        // 2. Claim it with correct msg sig
+        // 4. Claim it with correct msg sig
         // Pay RUSTs to the TEST account:0100000000000000
         let sig = get_legal_eth_sig();
         assert_eq!(Balances::free_balance(1), 0);
         assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()));
 
-        // 3. Claim success
+        // 5. Claim success
         assert_eq!(Balances::free_balance(1), 100);
         assert_eq!(CrustClaims::claimed(&tx_hash), true); // tx has already be claimed
     });
@@ -66,23 +74,27 @@ fn tx_should_exist() {
 #[test]
 fn illegal_sig_claim_should_failed() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner
+        // 0. Set miner and superior
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
+        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
 
-        // 1. Mint a claim
+        // 1. Set limitation
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+
+        // 2. Mint a claim
         let tx_hash = get_legal_tx_hash();
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
 
-        // 2. Claim it with illegal sig
-        // 2.1 Another eth account wanna this money, go fuck himself
+        // 3. Claim it with illegal sig
+        // 3.1 Another eth account wanna this money, go fuck himself
         let sig1 = get_another_account_eth_sig();
         assert_noop!(
             CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig1.clone()),
             Error::<Test>::SignatureNotMatch
         );
 
-        // 2.2 Sig with wrong message should failed
+        // 3.2 Sig with wrong message should failed
         let sig2 = get_wrong_msg_eth_sig();
         assert_noop!(
             CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig2.clone()),
@@ -94,15 +106,19 @@ fn illegal_sig_claim_should_failed() {
 #[test]
 fn double_mint_should_failed() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner
+        // 0. Set miner and superior
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
+        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
 
-        // 1. Mint a claim
+        // 1. Set limit
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+
+        // 2. Mint a claim
         let tx_hash = get_legal_tx_hash();
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
 
-        // 2. Mint the same eth again
+        // 3. Mint the same eth again
         assert_noop!(
             CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100),
             Error::<Test>::AlreadyBeMint
@@ -113,26 +129,64 @@ fn double_mint_should_failed() {
 #[test]
 fn double_claim_should_failed() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner
+        // 0. Set miner and superior
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
+        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
 
-        // 1. Mint a claim
+        // 1. Set limitation
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+
+        // 2. Mint a claim
         let tx_hash = get_legal_tx_hash();
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
 
-        // 2. Claim it
+        // 3. Claim it
         // Pay RUSTs to the TEST account:0100000000000000
         let sig = get_legal_eth_sig();
         assert_eq!(Balances::free_balance(1), 0);
         assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()));
         assert_eq!(Balances::free_balance(1), 100);
 
-        // 3. Claim again, in ur dream 🙂
+        // 4. Claim again, in ur dream 🙂
         assert_noop!(
             CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()),
             Error::<Test>::AlreadyBeClaimed
         );
         assert_eq!(Balances::free_balance(1), 100);
+    });
+}
+
+#[test]
+fn claim_limit_should_work() {
+    new_test_ext().execute_with(|| {
+        // 0. Set miner and superior
+        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
+        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+
+        // 1. Mint a claim should failed without limitation
+        let tx_hash = get_legal_tx_hash();
+        let eth_addr = get_legal_eth_addr();
+        assert_noop!(
+            CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10),
+            Error::<Test>::ExceedClaimLimit
+        );
+
+        // 2. Set limitation
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 10));
+        assert_eq!(CrustClaims::claim_limit(), 10);
+
+        // 3. Claim amount with limitation should be ok
+        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10));
+        assert_eq!(CrustClaims::claim_limit(), 0);
+    });
+}
+
+#[test]
+fn bond_eth_should_work() {
+    new_test_ext().execute_with(|| {
+        let eth_addr = get_legal_eth_addr();
+        assert_ok!(CrustClaims::bond_eth(Origin::signed(1), eth_addr.clone()));
+        assert_eq!(CrustClaims::bonded_eth(1), Some(eth_addr));
     });
 }

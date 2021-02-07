@@ -311,8 +311,8 @@ impl pallet_grandpa::Config for Runtime {
 
 parameter_types! {
 	// Minimum 100 bytes/CRU deposited (1 CENT/byte)
-	pub const BasicDeposit: Balance = 10 * DOLLARS;       // 258 bytes on-chain
-	pub const FieldDeposit: Balance = 250 * CENTS;        // 66 bytes on-chain
+	pub const BasicDeposit: Balance = 5 * DOLLARS;       // 258 bytes on-chain
+	pub const FieldDeposit: Balance = 1 * DOLLARS;        // 66 bytes on-chain
 	pub const SubAccountDeposit: Balance = 2 * DOLLARS;   // 53 bytes on-chain
 	pub const MaxSubAccounts: u32 = 100;
 	pub const MaxAdditionalFields: u32 = 100;
@@ -399,6 +399,8 @@ parameter_types! {
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
     // 60 eras means 15 days if era = 6 hours
     pub const MarketStakingPotDuration: u32 = 60;
+    // Authoring and Staking reward ratio
+    pub const AuthoringAndStakingRatio: Perbill = Perbill::from_percent(20);
 }
 
 impl staking::Config for Runtime {
@@ -409,7 +411,7 @@ impl staking::Config for Runtime {
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
     type Event = Event;
-    type Slash = ();
+    type Slash = Treasury;
     type Reward = ();
     type Randomness = RandomnessCollectiveFlip;
     type SessionsPerEra = SessionsPerEra;
@@ -423,6 +425,7 @@ impl staking::Config for Runtime {
     type SPowerRatio = SPowerRatio;
     type MarketStakingPot = Market;
     type MarketStakingPotDuration = MarketStakingPotDuration;
+    type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
     type WeightInfo = staking::weight::WeightInfo;
 }
 
@@ -446,7 +449,7 @@ parameter_types! {
 	pub const CandidacyBond: Balance = 10 * DOLLARS;
 	pub const VotingBond: Balance = 1 * DOLLARS;
 	pub const TermDuration: BlockNumber = 7 * DAYS;
-	pub const DesiredMembers: u32 = 13;
+	pub const DesiredMembers: u32 = 7;
 	pub const DesiredRunnersUp: u32 = 7;
 	pub const ElectionsPhragmenModuleId: LockIdentifier = *b"phrelect";
 }
@@ -495,7 +498,7 @@ parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const ProposalBondMinimum: Balance = 20 * DOLLARS;
 	pub const SpendPeriod: BlockNumber = 6 * DAYS;
-	pub const Burn: Permill = Permill::from_perthousand(2);
+	pub const Burn: Permill = Permill::from_perthousand(0);
 	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
 
 	pub const TipCountdown: BlockNumber = 1 * DAYS;
@@ -729,13 +732,13 @@ parameter_types! {
     pub const InitialReplica: u32 = 2;
     pub const FileBaseFee: Balance = CENTS / 20;  // roughly equal to 1RMB / month
     pub const FileInitPrice: Balance = CENTS / 10; // Need align with FileDuration and InitialReplica
-    pub const ClaimLimit: u32 = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2); // 25/100 = 25%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 2);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 2);
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
     pub const TaxRatio: Perbill = Perbill::from_percent(10);
     pub const UsedTrashMaxSize: u128 = 500_000;
+    pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
 }
 
 impl market::Config for Runtime {
@@ -749,7 +752,6 @@ impl market::Config for Runtime {
     type InitialReplica = InitialReplica;
     type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
-    type ClaimLimit = ClaimLimit;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
@@ -757,6 +759,7 @@ impl market::Config for Runtime {
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
     type WeightInfo = market::weight::WeightInfo<Runtime>;
+    type MaximumFileSize = MaximumFileSize;
 }
 
 construct_runtime! {
@@ -808,7 +811,7 @@ construct_runtime! {
 
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config},
-        Market: market::{Module, Call, Storage, Event<T>},
+        Market: market::{Module, Call, Storage, Event<T>, Config},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},

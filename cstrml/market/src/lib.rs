@@ -303,6 +303,9 @@ pub trait Config: system::Config {
     /// UsedTrashMaxSize.
     type UsedTrashMaxSize: Get<u128>;
 
+    /// Maximum file size
+    type MaximumFileSize: Get<u64>;
+
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
 }
@@ -382,7 +385,9 @@ decl_error! {
         /// File is not in the reward period
         NotInRewardPeriod,
         /// Reward is not enough
-        NotEnoughReward
+        NotEnoughReward,
+        /// File is too large
+        FileTooLarge
     }
 }
 
@@ -426,6 +431,9 @@ decl_module! {
 
         /// Max size of used trash.
         const UsedTrashMaxSize: u128 = T::UsedTrashMaxSize::get();
+
+        /// Max size of a file
+        const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to pledge first, complexity depends on `Pledges`(P).
@@ -560,23 +568,25 @@ decl_module! {
                     Err(Error::<T>::FileSizeNotCorrect)?
                 }
             }
+            // 2. charged_file_size should be smaller than 128G
+            ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
             let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
-            // 2. Check client can afford the sorder
+            // 3. Check client can afford the sorder
             ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
-            // 3. Split into storage and staking account.
+            // 4. Split into storage and staking account.
             let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
 
             let curr_bn = Self::get_current_block_number();
 
-            // 4. do claim reward. Try to close file and decrease first party storage
+            // 5. do claim reward. Try to close file and decrease first party storage
             Self::do_claim_reward(&cid, curr_bn);
 
-            // 5. three scenarios: new file, extend time(refresh time) or extend replica
+            // 6. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
-            // 6. Update storage price.
+            // 7. Update storage price.
             #[cfg(not(test))]
             Self::update_file_price();
 

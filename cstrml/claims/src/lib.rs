@@ -177,7 +177,7 @@ decl_storage! {
         Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
         Superior get(fn superior): Option<T::AccountId>;
         Miner get(fn miner): Option<T::AccountId>;
-		BondedEth get(fn bonded_eth): map hasher(blake2_128_concat) T::AccountId => Option<EthereumAddress>;
+        BondedEth get(fn bonded_eth): map hasher(blake2_128_concat) T::AccountId => Option<EthereumAddress>;
     }
 }
 

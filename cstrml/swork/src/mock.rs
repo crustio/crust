@@ -150,6 +150,7 @@ parameter_types! {
     pub const StakingRatio: Perbill = Perbill::from_percent(80);
     pub const TaxRatio: Perbill = Perbill::from_percent(10);
     pub const UsedTrashMaxSize: u128 = 2;
+    pub const FileSizeLimit: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
 }
 
 impl market::Config for Test {
@@ -169,6 +170,7 @@ impl market::Config for Test {
     type StakingRatio = StakingRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
+    type FileSizeLimit = FileSizeLimit;
     type WeightInfo = market::weight::WeightInfo<Test>;
 }
 

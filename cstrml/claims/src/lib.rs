@@ -140,7 +140,7 @@ decl_event!(
         /// Someone claimed some CRUs. [who, ethereum_address, amount]
         Claimed(AccountId, EthereumAddress, Balance),
         /// Ethereum address was bonded to account. [who, ethereum_address]
-		BondEthSuccess(AccountId, EthereumAddress),
+        BondEthSuccess(AccountId, EthereumAddress),
     }
 );
 
@@ -292,7 +292,7 @@ decl_module! {
             Self::process_claim(tx, signer, dest)
         }
 
-        /// Register a Ethereum Address for an given account
+		/// Register a Ethereum Address for an given account
 		///
 		/// # <weight>
 		/// - `O(1)`

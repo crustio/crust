@@ -139,6 +139,8 @@ decl_event!(
         MintSuccess(EthereumTxHash, EthereumAddress, Balance),
         /// Someone claimed some CRUs. [who, ethereum_address, amount]
         Claimed(AccountId, EthereumAddress, Balance),
+        /// Ethereum address was bonded to account. [who, ethereum_address]
+        BondEthSuccess(AccountId, EthereumAddress),
     }
 );
 
@@ -175,6 +177,7 @@ decl_storage! {
         Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
         Superior get(fn superior): Option<T::AccountId>;
         Miner get(fn miner): Option<T::AccountId>;
+        BondedEth get(fn bonded_eth): map hasher(blake2_128_concat) T::AccountId => Option<EthereumAddress>;
     }
 }
 
@@ -288,6 +291,22 @@ decl_module! {
             // 3. Make sure signer is match with claimer
             Self::process_claim(tx, signer, dest)
         }
+
+		/// Register a Ethereum Address for an given account
+		///
+		/// # <weight>
+		/// - `O(1)`
+		/// - 1 storage mutations (codec `O(1)`).
+		/// - 1 event.
+		/// # </weight>
+		#[weight = 1_000_000]
+		fn bond_eth(origin, address: EthereumAddress) {
+			let who = ensure_signed(origin)?;
+
+			<BondedEth<T>>::insert(&who, &address);
+
+			Self::deposit_event(RawEvent::BondEthSuccess(who, address));
+		}
     }
 }
 

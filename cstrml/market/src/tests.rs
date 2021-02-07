@@ -219,7 +219,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
         DispatchError::Module {
             index: 0,
             error: 11,
-            message: Some("TooLarge")
+            message: Some("FileTooLarge")
         });
     });
 }

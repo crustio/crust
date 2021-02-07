@@ -304,7 +304,7 @@ pub trait Config: system::Config {
     type UsedTrashMaxSize: Get<u128>;
 
     /// Maximum file size
-    type FileSizeLimit: Get<u64>;
+    type MaximumFileSize: Get<u64>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -387,7 +387,7 @@ decl_error! {
         /// Reward is not enough
         NotEnoughReward,
         /// File is too large
-        TooLarge
+        FileTooLarge
     }
 }
 
@@ -433,7 +433,7 @@ decl_module! {
         const UsedTrashMaxSize: u128 = T::UsedTrashMaxSize::get();
 
         /// Max size of a file
-        const FileSizeLimit: u64 = T::FileSizeLimit::get();
+        const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to pledge first, complexity depends on `Pledges`(P).
@@ -569,7 +569,7 @@ decl_module! {
                 }
             }
             // 2. charged_file_size should be smaller than 128G
-            ensure!(charged_file_size < T::FileSizeLimit::get(), Error::<T>::TooLarge);
+            ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
             let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
             // 3. Check client can afford the sorder

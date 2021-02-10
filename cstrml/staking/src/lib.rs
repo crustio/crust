@@ -732,6 +732,8 @@ decl_error! {
         AlreadyBonded,
         /// Controller is already paired.
         AlreadyPaired,
+        /// All stakes are guaranteed, cut guarantee first
+        AllGuaranteed,
         /// Duplicate index.
         DuplicateIndex,
         /// Slash record index out of bounds.
@@ -945,13 +947,22 @@ decl_module! {
         fn unbond(origin, #[compact] value: BalanceOf<T>) {
             let controller = ensure_signed(origin)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+
+            // 0. Judge if exceed MAX_UNLOCKING_CHUNKS
             ensure!(
                 ledger.unlocking.len() < MAX_UNLOCKING_CHUNKS,
                 Error::<T>::NoMoreChunks,
             );
 
-            let mut value = value.min(ledger.active);
+            // 1. Ensure guarantee's stakes is free
+            let mut value = value;
+            if let Some(guarantee) = Self::guarantors(&ledger.stash) {
+                ensure!(guarantee.total < ledger.active, Error::<T>::AllGuaranteed);
+                value = value.min(ledger.active - guarantee.total);
+            }
 
+            // 2. Ensure value < ledger.active
+            value = value.min(ledger.active);
             if !value.is_zero() {
                 ledger.active -= value;
 

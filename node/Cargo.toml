@@ -50,11 +50,11 @@ frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", bran
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1" }
 
 # Cumulus dependencies
-cumulus-consensus = { git = "https://github.com/paritytech/cumulus", default-features = false, branch = "rococo-v1" }
-cumulus-collator = { git = "https://github.com/paritytech/cumulus", default-features = false, branch = "rococo-v1" }
-cumulus-network = { git = "https://github.com/paritytech/cumulus", default-features = false, branch = "rococo-v1" }
-cumulus-primitives = { git = "https://github.com/paritytech/cumulus", default-features = false, branch = "rococo-v1" }
-cumulus-service = { git = "https://github.com/paritytech/cumulus", default-features = false, branch = "rococo-v1" }
+cumulus-consensus = { git = "https://github.com/MyronFanQiu/cumulus", default-features = false, branch = "rococo-v1" }
+cumulus-collator = { git = "https://github.com/MyronFanQiu/cumulus", default-features = false, branch = "rococo-v1" }
+cumulus-network = { git = "https://github.com/MyronFanQiu/cumulus", default-features = false, branch = "rococo-v1" }
+cumulus-primitives = { git = "https://github.com/MyronFanQiu/cumulus", default-features = false, branch = "rococo-v1" }
+cumulus-service = { git = "https://github.com/MyronFanQiu/cumulus", default-features = false, branch = "rococo-v1" }
 
 # Polkadot dependencies
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "rococo-v1" }

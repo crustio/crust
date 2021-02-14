@@ -65,7 +65,7 @@ polkadot-parachain = { git = "https://github.com/paritytech/polkadot", branch = 
 
 sp-timestamp = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1" }
 sc-chain-spec = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1" }
-sp-trie = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate", features = ["memory-tracker"], branch = "rococo-v1" }
+sp-trie = { default-features = false, git = "https://github.com/paritytech/substrate", features = ["memory-tracker"], branch = "rococo-v1" }
 sc-rpc = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1" }
 node-inspect = { optional = true, git = "https://github.com/paritytech/substrate", branch = "rococo-v1" }
 

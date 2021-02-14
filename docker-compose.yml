@@ -1,0 +1,26 @@
+version: "3.3"
+services:
+  rococo-validator-1:
+    image: "cloverio/rococo-relaynode:latest"
+    restart: always
+    environment:
+      ARGS: "--chain /opt/mychain/rococo-custom.json --base-path /opt/mychain/v1 --port 30336 --ws-port 9947 --rpc-port 9936 --name Crust-Validator-1 --rpc-cors=all --validator --alice"
+      #    network_mode: host
+    ports:
+      - "9936:9936"
+      - "9947:9947"
+      - "30336:30336"
+    volumes:
+      - /root/rococo:/opt/mychain
+  rococo-validator-2:
+    image: "cloverio/rococo-relaynode:latest"
+    restart: always
+    environment:
+      ARGS: "--chain /opt/mychain/rococo-custom.json --base-path /opt/mychain/v2 --port 30334 --ws-port 9945 --rpc-port 9934 --name Crust-Validator-2 --rpc-cors=all --validator --bob"
+      #    network_mode: host
+    ports:
+      - "9934:9934"
+      - "9945:9945"
+      - "30334:30334"
+    volumes:
+      - /root/rococo:/opt/mychain

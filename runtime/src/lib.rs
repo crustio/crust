@@ -839,7 +839,7 @@ construct_runtime! {
 
 		ParachainSystem: cumulus_parachain_system::{Module, Call, Storage, Inherent, Event},
 		ParachainInfo: parachain_info::{Module, Storage, Config},
-		XcmHandler: xcm_handler::{Module, Event<T>, Origin},
+		XcmHandler: xcm_handler::{Module, Call, Event<T>, Origin},
     }
 }
 

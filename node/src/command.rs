@@ -4,7 +4,6 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::chain_spec;
-use codec::Encode;
 use crate::cli::{Cli, Subcommand, RelayChainCli};
 use crate::service as crust_service;
 use crate::executor::Executor;
@@ -12,13 +11,15 @@ use crust_service::new_partial;
 use sc_service::PartialComponents;
 use sc_cli::{Result, SubstrateCli, RuntimeVersion, ChainSpec};
 use crust_runtime::{Block, RuntimeApi};
-use cumulus_primitives::{genesis::generate_genesis_block, ParaId};
+use cumulus_primitives_core::ParaId;
+use cumulus_client_service::genesis::generate_genesis_block;
 use polkadot_parachain::primitives::AccountIdConversion;
 use sc_cli::{
     CliConfiguration, DefaultConfigurationValues, ImportParams,
     SharedParams, KeystoreParams, NetworkParams
 };
 use sc_service::config::{BasePath, PrometheusConfig};
+use sp_core::Encode;
 use sp_core::hexdisplay::HexDisplay;
 use std::{io::Write, net::SocketAddr};
 use log::info;

@@ -200,6 +200,8 @@ impl frame_system::Config for Runtime {
 parameter_types! {
     pub const EpochDuration: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
     pub const ExpectedBlockTime: u64 = MILLISECS_PER_BLOCK;
+    pub const ReportLongevity: u64 =
+		BondingDuration::get() as u64 * SessionsPerEra::get() as u64 * EpochDuration::get();
 }
 
 impl pallet_babe::Config for Runtime {
@@ -221,7 +223,7 @@ impl pallet_babe::Config for Runtime {
 
     type KeyOwnerProofSystem = Historical;
 
-    type HandleEquivocation = pallet_babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
+    type HandleEquivocation = pallet_babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences, ReportLongevity>;
 
     type WeightInfo = ();
 }
@@ -260,6 +262,7 @@ impl pallet_im_online::Config for Runtime {
     type AuthorityId = ImOnlineId;
     type Event = Event;
     type SessionDuration = SessionDuration;
+    type ValidatorSet = Historical;
     type ReportUnresponsiveness = Offences;
     type UnsignedPriority = ImOnlineUnsignedPriority;
     type WeightInfo = ();
@@ -294,7 +297,7 @@ impl pallet_grandpa::Config for Runtime {
 
     type KeyOwnerProofSystem = Historical;
 
-    type HandleEquivocation = pallet_grandpa::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
+    type HandleEquivocation = pallet_grandpa::EquivocationHandler<Self::KeyOwnerIdentification, Offences, ReportLongevity>;
 
     type WeightInfo = ();
 }
@@ -720,7 +723,7 @@ impl market::Config for Runtime {
 
 impl parachain_info::Config for Runtime {}
 
-impl cumulus_parachain_system::Config for Runtime {
+impl cumulus_pallet_parachain_system::Config for Runtime {
     type Event = Event;
     type OnValidationData = ();
     type SelfParaId = parachain_info::Module<Runtime>;
@@ -731,7 +734,7 @@ impl cumulus_parachain_system::Config for Runtime {
 parameter_types! {
 	pub const RococoLocation: MultiLocation = MultiLocation::X1(Junction::Parent);
 	pub const RococoNetwork: NetworkId = NetworkId::Polkadot;
-	pub RelayChainOrigin: Origin = xcm_handler::Origin::Relay.into();
+	pub RelayChainOrigin: Origin = cumulus_pallet_xcm_handler::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Junction::Parachain {
 		id: ParachainInfo::parachain_id().into()
 	}.into();
@@ -757,7 +760,7 @@ type LocalAssetTransactor = CurrencyAdapter<
 type LocalOriginConverter = (
     SovereignSignedViaLocation<LocationConverter, Origin>,
     RelayChainAsNative<RelayChainOrigin, Origin>,
-    SiblingParachainAsNative<xcm_handler::Origin, Origin>,
+    SiblingParachainAsNative<cumulus_pallet_xcm_handler::Origin, Origin>,
     SignedAccountId32AsNative<RococoNetwork, Origin>,
 );
 
@@ -773,7 +776,7 @@ impl Config for XcmConfig {
     type LocationInverter = LocationInverter<Ancestry>;
 }
 
-impl xcm_handler::Config for Runtime {
+impl cumulus_pallet_xcm_handler::Config for Runtime {
     type Event = Event;
     type XcmExecutor = XcmExecutor<XcmConfig>;
     type UpwardMessageSender = ParachainSystem;
@@ -837,9 +840,9 @@ construct_runtime! {
         // Token candy
         Candy: candy::{Module, Call, Storage, Event<T>},
 
-		ParachainSystem: cumulus_parachain_system::{Module, Call, Storage, Inherent, Event},
+		ParachainSystem: cumulus_pallet_parachain_system::{Module, Call, Storage, Inherent, Event},
 		ParachainInfo: parachain_info::{Module, Storage, Config},
-		XcmHandler: xcm_handler::{Module, Call, Event<T>, Origin},
+		XcmHandler: cumulus_pallet_xcm_handler::{Module, Call, Event<T>, Origin},
     }
 }
 
@@ -953,7 +956,7 @@ impl_runtime_apis! {
             }
         }
 
-        fn current_epoch_start() -> babe_primitives::SlotNumber {
+        fn current_epoch_start() -> babe_primitives::Slot {
             Babe::current_epoch_start()
         }
 
@@ -967,7 +970,7 @@ impl_runtime_apis! {
 
 
         fn generate_key_ownership_proof(
-            _slot_number: babe_primitives::SlotNumber,
+            _slot_number: babe_primitives::Slot,
             authority_id: babe_primitives::AuthorityId,
         ) -> Option<babe_primitives::OpaqueKeyOwnershipProof> {
             use codec::Encode;
@@ -1088,4 +1091,4 @@ impl_runtime_apis! {
     }
 }
 
-cumulus_runtime::register_validate_block!(Block, Executive);
+cumulus_pallet_parachain_system::register_validate_block!(Block, Executive);

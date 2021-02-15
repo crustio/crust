@@ -14,7 +14,7 @@ use sp_consensus_babe::AuthorityId as BabeId;
 use primitives::{constants::currency::CRUS, *};
 use sc_service::ChainType;
 use sp_runtime::{traits::{Verify, IdentifyAccount}, Perbill};
-use cumulus_primitives::ParaId;
+use cumulus_primitives_core::ParaId;
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_PROTOCOL_ID: &str = "cru";

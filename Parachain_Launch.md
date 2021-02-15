@@ -38,22 +38,27 @@ git checkout parachain/rococo-v1
 
 Compile source code with command ```cargo build --release```
 
-## Step1: export parachain genesis and wasm data
+## Step1: build rocky spec
+
+```shell script
+./target/release/crust build-spec --chain rocky-staging --raw --disable-default-bootnode > rococo-rocky-spec.json
+```
+
+## Step2: export parachain genesis and wasm data
 
  - export genesis data
 
 ```sh
-./target/release/crust export-genesis-state --parachain-id 2000 > para-2000-genesis
-./target/release/crust export-genesis-state --parachain-id 5000 > para-5000-genesis
+./target/release/crust export-genesis-state --parachain-id 7777 --chain ./rococo-rocky-spec.json > para-7777-genesis
 ```
 
  - export wasm data
 
 ```sh
-./target/release/crust export-genesis-wasm > parachain-wasm
+./target/release/crust export-genesis-wasm --chain ./rococo-rocky-spec.json > parachain-wasm
 ```
 
-## Step2: run relay chain
+## Step3: run relay chain
 
 - run Alice
 
@@ -76,14 +81,14 @@ Got Alice chain identity:
 ./target/release/polkadot --validator --chain rococo-custom.json --tmp --rpc-cors all --ws-port 9966 --port 30335 --charlie --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
 ```
 
-## Step3 Run crust parachain collator
+## Step4 Run crust parachain collator
 
 Add ```RUST_LOG=debug RUST_BACKTRACE=1``` if you want see more details
 
  - run the first parachain collator
 
  ```sh
-./target/release/crust  --tmp --parachain-id 2000 --port 40341 --ws-port 9951 --rpc-cors all --validator --execution wasm --wasm-execution compiled -- --execution wasm --chain ../polkadot/rococo-custom.json --wasm-execution compiled
+./target/release/crust  --tmp --chain ./rococo-rocky-spec.json --parachain-id 7777 --port 40341 --ws-port 9951 --rpc-cors all --validator --execution wasm --wasm-execution compiled -- --execution wasm --chain ../polkadot/rococo-custom.json --wasm-execution compiled
 ```
 
  - run the second parachain collator for the same parachain
@@ -92,5 +97,5 @@ Add ```RUST_LOG=debug RUST_BACKTRACE=1``` if you want see more details
 ./target/release/crust  --tmp --parachain-id 2000 --port 40342 --ws-port 9952 --rpc-cors all --validator --execution wasm --wasm-execution compiled -- --execution wasm --chain ../polkadot/rococo-custom.json --wasm-execution compiled
 ```
 
-## Step4 register your parachain into rococo local test
+## Step5 register your parachain into rococo local test
 submit the `paraSudoConfig:sudoParaScheduleInit` extrinsic to register para chain to the relay chain 

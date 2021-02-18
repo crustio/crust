@@ -59,8 +59,8 @@ macro_rules! log {
 
 pub trait WeightInfo {
     fn register() -> Weight;
-    fn pledge_extra() -> Weight;
-    fn cut_pledge() -> Weight;
+    fn add_collateral() -> Weight;
+    fn cut_collateral() -> Weight;
     fn place_storage_order() -> Weight;
     fn claim_reward() -> Weight;
     fn reward_merchant() -> Weight;
@@ -118,8 +118,8 @@ pub struct UsedInfo {
 pub struct MerchantLedger<Balance> {
     // The current reward amount.
     pub reward: Balance,
-    // The total pledge amount
-    pub pledge: Balance
+    // The total collateral amount
+    pub collateral: Balance
 }
 
 type BalanceOf<T> =
@@ -352,7 +352,7 @@ decl_storage! {
     add_extra_genesis {
 		build(|_config| {
 			// Create Market accounts
-			<Module<T>>::init_pot(<Module<T>>::pledge_pot);
+			<Module<T>>::init_pot(<Module<T>>::collateral_pot);
 			<Module<T>>::init_pot(<Module<T>>::storage_pot);
 			<Module<T>>::init_pot(<Module<T>>::staking_pot);
 			<Module<T>>::init_pot(<Module<T>>::reserved_pot);
@@ -365,8 +365,8 @@ decl_error! {
     pub enum Error for Module<T: Config> {
         /// Don't have enough currency
         InsufficientCurrency,
-        /// Don't have enough pledge
-        InsufficientPledge,
+        /// Don't have enough collateral
+        InsufficientCollateral,
         /// Can not bond with value less than minimum balance.
         InsufficientValue,
         /// Not Register before
@@ -436,110 +436,110 @@ decl_module! {
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
         /// Register to be a merchant, you should provide your storage layer's address info
-        /// this will require you to pledge first, complexity depends on `Pledges`(P).
+        /// this will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Read: Pledge
-        /// - Write: Pledge
+        /// - Read: Collateral
+        /// - Write: Collateral
         /// # </weight>
         #[weight = T::WeightInfo::register()]
         pub fn register(
             origin,
-            #[compact] pledge: BalanceOf<T>
+            #[compact] collateral: BalanceOf<T>
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Reject a pledge which is considered to be _dust_.
-            ensure!(pledge >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+            // 1. Reject a collateral which is considered to be _dust_.
+            ensure!(collateral >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Ensure merchant has enough currency.
-            ensure!(pledge <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(collateral <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if merchant has not register before.
             ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
 
-            // 4. Transfer from origin to pledge account.
-            T::Currency::transfer(&who, &Self::pledge_pot(), pledge.clone(), AllowDeath).expect("Something wrong during transferring");
+            // 4. Transfer from origin to collateral account.
+            T::Currency::transfer(&who, &Self::collateral_pot(), collateral.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 5. Prepare new ledger
             let ledger = MerchantLedger {
                 reward: Zero::zero(),
-                pledge: pledge.clone()
+                collateral: collateral.clone()
             };
 
-            // 6. Upsert pledge.
+            // 6. Upsert collateral.
             <MerchantLedgers<T>>::insert(&who, ledger);
 
             // 7. Emit success
-            Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), pledge));
+            Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), collateral));
 
             Ok(())
         }
 
-        /// Pledge extra amount of currency to accept market order.
+        /// Collateral extra amount of currency to accept market order.
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Read: Pledge
-        /// - Write: Pledge
+        /// - Read: Collateral
+        /// - Write: Collateral
         /// # </weight>
-        #[weight = T::WeightInfo::pledge_extra()]
-        pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+        #[weight = T::WeightInfo::add_collateral()]
+        pub fn add_collateral(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Reject a pledge which is considered to be _dust_.
+            // 1. Reject a collateral which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Check if merchant has pledged before
+            // 2. Check if merchant has collateral or not
             ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             // 3. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 4. Upgrade pledge.
-            <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.pledge += value.clone();});
+            // 4. Upgrade collateral.
+            <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
 
-            // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&who, &Self::pledge_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
+            // 5. Transfer from origin to collateral account.
+            T::Currency::transfer(&who, &Self::collateral_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeExtraSuccess(who.clone(), value));
+            Self::deposit_event(RawEvent::AddCollateralSuccess(who.clone(), value));
 
             Ok(())
         }
 
-        /// Decrease pledge amount of currency for market order.
+        /// Decrease collateral amount of currency for market order.
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Read: Pledge
-        /// - Write: Pledge
+        /// - Read: Collateral
+        /// - Write: Collateral
         /// # </weight>
-        #[weight = T::WeightInfo::cut_pledge()]
-        pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+        #[weight = T::WeightInfo::cut_collateral()]
+        pub fn cut_collateral(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Reject a pledge which is considered to be _dust_.
+            // 1. Reject a collateral which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Check if merchant has pledged before
+            // 2. Check if merchant has collateral or not
             ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             let mut ledger = Self::merchant_ledgers(&who);
 
             // 3. Ensure value is smaller than unused.
-            ensure!(value <= ledger.pledge - ledger.reward, Error::<T>::InsufficientPledge);
+            ensure!(value <= ledger.collateral - ledger.reward, Error::<T>::InsufficientCollateral);
 
-            // 4. Upgrade pledge.
-            ledger.pledge -= value.clone();
+            // 4. Upgrade collateral.
+            ledger.collateral -= value.clone();
             <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
-            // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
+            // 5. Transfer from origin to collateral account.
+            T::Currency::transfer(&Self::collateral_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::CutPledgeSuccess(who, value));
+            Self::deposit_event(RawEvent::CutCollateralSuccess(who, value));
 
             Ok(())
         }
@@ -682,10 +682,10 @@ decl_module! {
 }
 
 impl<T: Config> Module<T> {
-    /// The pot of a pledge account
-    pub fn pledge_pot() -> T::AccountId {
-        // "modl" ++ "crmarket" ++ "pled" is 16 bytes
-        T::ModuleId::get().into_sub_account("pled")
+    /// The pot of a collateral account
+    pub fn collateral_pot() -> T::AccountId {
+        // "modl" ++ "crmarket" ++ "coll" is 16 bytes
+        T::ModuleId::get().into_sub_account("coll")
     }
 
     /// The pot of a storage account
@@ -1020,9 +1020,9 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn has_enough_pledge(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
+    fn has_enough_collateral(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
         let ledger = Self::merchant_ledgers(who);
-        (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.pledge
+        (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.collateral
     }
 
     pub fn update_file_price() {
@@ -1131,7 +1131,7 @@ impl<T: Config> Module<T> {
     }
 
     fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>) -> bool {
-        if Self::has_enough_pledge(&who, amount) {
+        if Self::has_enough_collateral(&who, amount) {
             <MerchantLedgers<T>>::mutate(&who, |ledger| {
                 ledger.reward += amount.clone();
             });
@@ -1188,8 +1188,8 @@ decl_event!(
     {
         FileSuccess(AccountId, FileInfo<AccountId, Balance>),
         RegisterSuccess(AccountId, Balance),
-        PledgeExtraSuccess(AccountId, Balance),
-        CutPledgeSuccess(AccountId, Balance),
+        AddCollateralSuccess(AccountId, Balance),
+        CutCollateralSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
         PotList(AccountId, AccountId, AccountId, AccountId),

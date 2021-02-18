@@ -59,29 +59,29 @@ benchmarks! {
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
     verify {
         assert_eq!(Market::<T>::merchant_ledgers(&user), MerchantLedger {
-            pledge: T::Currency::minimum_balance() * 10u32.into(),
+            collateral: T::Currency::minimum_balance() * 10u32.into(),
             reward: 0u32.into()
         });
     }
 
-    pledge_extra {
+    add_collateral {
         let user = create_funded_user::<T>("user", 100);
         Market::<T>::register(RawOrigin::Signed(user.clone()).into(), T::Currency::minimum_balance() * 10u32.into()).expect("Something wrong during registering");
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
     verify {
         assert_eq!(Market::<T>::merchant_ledgers(&user), MerchantLedger {
-            pledge: T::Currency::minimum_balance() * 20u32.into(),
+            collateral: T::Currency::minimum_balance() * 20u32.into(),
             reward: 0u32.into()
         });
     }
 
-    cut_pledge {
+    cut_collateral {
         let user = create_funded_user::<T>("user", 100);
         Market::<T>::register(RawOrigin::Signed(user.clone()).into(), T::Currency::minimum_balance() * 100u32.into()).expect("Something wrong during registering");
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
     verify {
         assert_eq!(Market::<T>::merchant_ledgers(&user), MerchantLedger {
-            pledge: T::Currency::minimum_balance() * 90u32.into(),
+            collateral: T::Currency::minimum_balance() * 90u32.into(),
             reward: 0u32.into()
         });
     }
@@ -131,16 +131,16 @@ mod tests {
     }
 
     #[test]
-    fn pledge_extra() {
+    fn add_collateral() {
         new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_pledge_extra::<Test>());
+            assert_ok!(test_benchmark_add_collateral::<Test>());
         });
     }
 
     #[test]
-    fn cut_pledge() {
+    fn cut_collateral() {
         new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_cut_pledge::<Test>());
+            assert_ok!(test_benchmark_cut_collateral::<Test>());
         });
     }
 

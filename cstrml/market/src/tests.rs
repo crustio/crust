@@ -11,33 +11,33 @@ use frame_support::{
 use hex;
 use crate::MerchantLedger;
 
-/// Register & Pledge test cases
+/// Register & Collateral test cases
 #[test]
 fn register_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
         let merchant = MERCHANT;
-        let pledge_pot = Market::pledge_pot();
+        let collateral_pot = Market::collateral_pot();
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 180,
+            collateral: 180,
             reward: 0
         });
-        assert_eq!(Balances::free_balance(&pledge_pot), 180);
-        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 20));
+        assert_eq!(Balances::free_balance(&collateral_pot), 180);
+        assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 20));
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 160,
+            collateral: 160,
             reward: 0
         });
-        assert_eq!(Balances::free_balance(&pledge_pot), 160);
-        assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 10));
+        assert_eq!(Balances::free_balance(&collateral_pot), 160);
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 10));
         assert_eq!(Market::merchant_ledgers(merchant), MerchantLedger {
-            pledge: 170,
+            collateral: 170,
             reward: 0
         });
-        assert_eq!(Balances::free_balance(&pledge_pot), 170);
+        assert_eq!(Balances::free_balance(&collateral_pot), 170);
     });
 }
 
@@ -86,7 +86,7 @@ fn register_should_fail_due_to_double_register() {
 }
 
 #[test]
-fn pledge_extra_should_fail_due_to_merchant_not_register() {
+fn collateral_extra_should_fail_due_to_merchant_not_register() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -94,7 +94,7 @@ fn pledge_extra_should_fail_due_to_merchant_not_register() {
         let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_noop!(
-            Market::pledge_extra(
+            Market::add_collateral(
                 Origin::signed(merchant),
                 200
             ),
@@ -108,7 +108,7 @@ fn pledge_extra_should_fail_due_to_merchant_not_register() {
 }
 
 #[test]
-fn cut_pledge_should_fail_due_to_reward() {
+fn cut_collateral_should_fail_due_to_reward() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -117,28 +117,28 @@ fn cut_pledge_should_fail_due_to_reward() {
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 180,
+            collateral: 180,
             reward: 0
         });
 
         <self::MerchantLedgers<Test>>::insert(&merchant, MerchantLedger {
-            pledge: 180,
+            collateral: 180,
             reward: 120
         });
-        assert_ok!(Market::cut_pledge(Origin::signed(merchant.clone()), 20));
+        assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 20));
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 160,
+            collateral: 160,
             reward: 120
         });
         assert_noop!(
-            Market::cut_pledge(
+            Market::cut_collateral(
                 Origin::signed(merchant),
                 50
             ),
             DispatchError::Module {
                 index: 0,
                 error: 1,
-                message: Some("InsufficientPledge")
+                message: Some("InsufficientCollateral")
             }
         );
     });
@@ -552,14 +552,14 @@ fn do_claim_reward_should_work() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 7089
         })
     });
 }
 
 #[test]
-fn do_claim_reward_should_fail_due_to_insufficient_pledge() {
+fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -666,15 +666,15 @@ fn do_claim_reward_should_fail_due_to_insufficient_pledge() {
             })
         );
 
-        // pledge is 7020 * 10 < 70000 reward
+        // collateral is 7020 * 10 < 70000 reward
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 70_000,
+            collateral: 70_000,
             reward: 0
         });
 
         run_to_block(903);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 600, true);
-        assert_ok!(Market::pledge_extra(Origin::signed(merchant.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6_000_000));
         Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
@@ -699,7 +699,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_pledge() {
         );
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_070_000,
+            collateral: 6_070_000,
             reward: 10028
         });
     });
@@ -801,7 +801,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
         });
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 23399
         })
     });
@@ -926,7 +926,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 4679
         });
 
@@ -964,11 +964,11 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 5848
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1169
         });
 
@@ -1012,11 +1012,11 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 6627
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1948
         });
 
@@ -1060,15 +1060,15 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 6627
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1948
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1646
         });
 
@@ -1113,15 +1113,15 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 9921
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 5242
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 4940
         });
         assert_eq!(Market::files_size(), (file_size * 3) as u128);
@@ -1135,15 +1135,15 @@ fn do_claim_reward_should_work_in_complex_timeline() {
         });
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 11019
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 6340
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 6038
         });
         assert_eq!(Market::files_size(), 0);
@@ -1167,7 +1167,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
-        // pledge is 60 < 121 reward
+        // collateral is 60 < 121 reward
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
         assert_ok!(Market::place_storage_order(
@@ -1415,23 +1415,23 @@ fn do_claim_reward_should_work_for_more_replicas() {
         );
 
         assert_eq!(Market::merchant_ledgers(&ferdie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 1169
         });
         assert_eq!(Market::merchant_ledgers(&eve), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 0
         });
     });
@@ -2046,7 +2046,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         add_who_into_replica(&cid2, reported_file_size_cid2, merchant.clone(), legal_pk.clone(), None);
         assert_eq!(Market::files(&cid2).is_none(), true);
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6000,
+            collateral: 6000,
             reward: 360
         });
     })
@@ -2279,7 +2279,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 4679
         });
 
@@ -2350,11 +2350,11 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         );
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 14038
         });
         assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 9359
         });
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
@@ -2482,7 +2482,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
             })
         );
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 6_000_000,
+            collateral: 6_000_000,
             reward: 4679
         });
 
@@ -3150,13 +3150,13 @@ fn reward_merchant_should_work() {
         let _ = Balances::make_free_balance_be(&storage_pot, 121);
 
         <self::MerchantLedgers<Test>>::insert(&merchant, MerchantLedger {
-            pledge: 180,
+            collateral: 180,
             reward: 120
         });
 
         assert_ok!(Market::reward_merchant(Origin::signed(merchant.clone())));
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            pledge: 180,
+            collateral: 180,
             reward: 0
         });
         assert_eq!(Balances::free_balance(&merchant), 120);

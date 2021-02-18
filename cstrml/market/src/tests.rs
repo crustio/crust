@@ -972,7 +972,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             reward: 1169
         });
 
-        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+        assert_eq!(Market::files_size(), file_size as u128);
 
         add_who_into_replica(&cid, file_size, dave.clone(), hex::decode("11").unwrap(), None);
         run_to_block(703);
@@ -1020,7 +1020,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             reward: 1948
         });
 
-        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+        assert_eq!(Market::files_size(), file_size as u128);
 
         run_to_block(903);
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 600, true);
@@ -1124,7 +1124,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             collateral: 6_000_000,
             reward: 4940
         });
-        assert_eq!(Market::files_size(), (file_size * 3) as u128);
+        assert_eq!(Market::files_size(), (file_size * 2) as u128);
 
         run_to_block(1803);
         assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid.clone()));
@@ -2357,7 +2357,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             collateral: 6_000_000,
             reward: 9359
         });
-        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+        assert_eq!(Market::files_size(), 0 as u128);
         assert_eq!(Balances::free_balance(&reserved_pot), 26000);
     });
 }
@@ -2851,7 +2851,7 @@ fn files_size_should_not_be_decreased_twice() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), false)].into_iter())
             })
         );
-        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+        assert_eq!(Market::files_size(), file_size as u128);
         Market::delete_replicas(&dave, &cid, &hex::decode("11").unwrap()); // delete 11. 11 won't be deleted twice.
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
@@ -2882,7 +2882,7 @@ fn files_size_should_not_be_decreased_twice() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
-        assert_eq!(Market::files_size(), (file_size * 2) as u128);
+        assert_eq!(Market::files_size(), file_size as u128);
     });
 }
 

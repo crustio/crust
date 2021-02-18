@@ -171,10 +171,11 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             Self::insert_replica(&mut file_info, new_replica);
             file_info.reported_replica_count += 1;
 
-            // 3. Update used_info
+            // 3. Update used_info and files size
             if is_counted {
                 used_info.reported_group_count += 1;
                 Self::update_groups_used_info(file_info.file_size, &mut used_info);
+                Self::update_files_size(file_info.file_size, 0, 1);
                 used_info.groups.insert(anchor.clone(), true);
                 used_size = used_info.used_size; // need to add the used_size after the update
             };
@@ -186,12 +187,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
 
-            // 5. Update files size
-            if file_info.reported_replica_count <= file_info.expected_replica_count {
-                Self::update_files_size(file_info.file_size, 0, 1);
-            }
-
-            // 6. Update files
+            // 5. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
         return used_size
@@ -213,9 +209,6 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             });
             if is_to_decreased {
                 file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
-                if file_info.reported_replica_count < file_info.expected_replica_count {
-                    Self::update_files_size(file_info.file_size, 1, 0);
-                }
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         }
@@ -709,15 +702,13 @@ impl<T: Config> Module<T> {
         
         // 3. File already expired
         if file_info.expired_on <= file_info.claimed_at { return; }
-        
-        // TODO: Restrict the frequency of calculate payout(limit the duration of 2 claiming)
 
-        // 4. Update used_info
+        // 4. Update used_info and files_size
+        let prev_first_class_count = used_info.reported_group_count;
         used_info.reported_group_count = Self::count_reported_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
         Self::update_groups_used_info(file_info.file_size, &mut used_info);
+        Self::update_files_size(file_info.file_size, prev_first_class_count, used_info.reported_group_count);
 
-        // Get the previous first class storage count
-        let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
         let claim_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
         
@@ -766,9 +757,6 @@ impl<T: Config> Module<T> {
             file_info.reported_replica_count = new_replicas.len() as u32;
             new_replicas.append(&mut invalid_replicas);
             file_info.replicas = new_replicas;
-
-            // 5.4 Update first class storage size
-            Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
         }
 
         // 6. File status might become ready to be closed if claim_block == expired_on
@@ -789,7 +777,7 @@ impl<T: Config> Module<T> {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn && file_info.expired_on >= file_info.claimed_at {
-                Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
+                Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
                     T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
@@ -940,7 +928,6 @@ impl<T: Config> Module<T> {
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_replica_count
         if let Some((mut file_info, used_info)) = Self::files(cid) {
-            let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
             // expired_on < claimed_at => file is not live yet. This situation only happen for new file.
             // expired_on == claimed_at => file is ready to be closed(wait to be put into trash or refreshed).
             // expired_on > claimed_at => file is ongoing.
@@ -960,7 +947,6 @@ impl<T: Config> Module<T> {
             if extend_replica {
                 // TODO: use 2 instead of 4
                 file_info.expected_replica_count += T::InitialReplica::get();
-                Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         } else {
@@ -1086,6 +1072,7 @@ impl<T: Config> Module<T> {
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
                         Self::update_groups_used_info(file_info.file_size, used_info);
+                        Self::update_files_size(file_info.file_size, 1, 0);
                     }
                 }
             },

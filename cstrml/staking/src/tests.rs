@@ -1012,7 +1012,7 @@ fn guarantors_also_get_slashed() {
                 Staking::guarantee(Origin::signed(2), (20, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -1021,7 +1021,7 @@ fn guarantors_also_get_slashed() {
                 Staking::guarantee(Origin::signed(2), (10, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -1627,6 +1627,93 @@ fn bond_extra_works() {
 }
 
 #[test]
+fn unbond_should_works() {
+    ExtBuilder::default().build().execute_with(|| {
+        // 1. If I am validator
+        start_era(1, false);
+        // Check that account 10 is a validator
+        assert!(<Validators<Test>>::contains_key(11));
+        // Check how much is at stake
+        assert_eq!(
+            Staking::ledger(&10),
+            Some(StakingLedger {
+                stash: 11,
+                total: 1000,
+                active: 1000,
+                unlocking: vec![],
+                claimed_rewards: vec![]
+            })
+        );
+        // Unbond should work
+        assert_ok!(Staking::unbond(Origin::signed(10), 900));
+        assert_eq!(
+            Staking::ledger(&10),
+            Some(StakingLedger {
+                stash: 11,
+                total: 1000,
+                active: 100,
+                unlocking: vec![UnlockChunk {
+                    value: 900,
+                    era: 1 + 3
+                }],
+                claimed_rewards: vec![]
+            })
+        );
+
+        // After a era, stakers should updated
+        start_era(2, false);
+        assert_eq!(
+            Staking::eras_stakers(2, &11),
+            Exposure {
+                total: 350,
+                own: 100,
+                others: vec![IndividualExposure { who: 101, value: 250 }]
+            }
+        );
+
+        // 2. If I am guarantor
+        // Check that account 100 is a guarantor
+        assert!(<Guarantors<Test>>::contains_key(101));
+        // Check how much is at stake
+        assert_eq!(
+            Staking::ledger(&100),
+            Some(StakingLedger {
+                stash: 101,
+                total: 500,
+                active: 500,
+                unlocking: vec![],
+                claimed_rewards: vec![]
+            })
+        );
+        assert_eq!(Staking::guarantors(&101).unwrap().total, 500);
+        // Unbond should failed(guarantee >= active)
+        assert_noop!(
+            Staking::unbond(Origin::signed(100), 100),
+            Error::<Test>::AllGuaranteed
+        );
+
+        // Cut guarantee
+        assert_ok!(Staking::cut_guarantee(Origin::signed(100), (11, 100)));
+
+        // Unbond should success(guarantee < active)
+        assert_ok!(Staking::unbond(Origin::signed(100), 200));
+        assert_eq!(
+            Staking::ledger(&100),
+            Some(StakingLedger {
+                stash: 101,
+                total: 500,
+                active: 400,
+                unlocking: vec![UnlockChunk {
+                    value: 100, // Should only 100 unbonded
+                    era: 2 + 3
+                }],
+                claimed_rewards: vec![]
+            })
+        );
+    });
+}
+
+#[test]
 fn bond_extra_and_withdraw_unbonded_works() {
     // * Should test
     // * Given an account being bonded [and chosen as a validator](not mandatory)
@@ -1775,6 +1862,15 @@ fn bond_extra_and_withdraw_unbonded_works() {
                     }],
                     claimed_rewards: vec![]
                 })
+            );
+            // Exposure is now should updated.
+            assert_eq!(
+                Staking::eras_stakers(3, &11),
+                Exposure {
+                    total: 100,
+                    own: 100,
+                    others: vec![]
+                }
             );
 
             // trigger next era.
@@ -2095,7 +2191,7 @@ fn switching_roles() {
                 Staking::guarantee(Origin::signed(4), (1, 250)), // 1 is not validator
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -2175,7 +2271,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (1, 50)), // 1 is not validator
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -2183,7 +2279,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (2, 50)), // 2 self is not validator neither
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -2191,7 +2287,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (15, 50)), // 15 doesn't exist
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -3858,7 +3954,7 @@ fn multi_guarantees_should_work() {
                 Staking::guarantee(Origin::signed(4), (11, 10)),
                 DispatchError::Module {
                     index: 0,
-                    error: 9,
+                    error: 10,
                     message: Some("ExceedGuaranteeLimit"),
                 }
             );
@@ -3879,7 +3975,7 @@ fn multi_guarantees_should_work() {
                 Staking::guarantee(Origin::signed(4), (116, 10)),
                 DispatchError::Module {
                     index: 0,
-                    error: 9,
+                    error: 10,
                     message: Some("ExceedGuaranteeLimit"),
                 }
             );
@@ -3983,7 +4079,7 @@ fn cut_guarantee_should_work() {
                 Staking::cut_guarantee(Origin::signed(2), (88, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -4037,7 +4133,7 @@ fn cut_guarantee_should_work() {
                 Staking::cut_guarantee(Origin::signed(2), (7, 1000)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -4321,7 +4417,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 11, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 12,
+                    error: 13,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -4329,7 +4425,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 21, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 12,
+                    error: 13,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -4337,7 +4433,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 31, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 12,
+                    error: 13,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -4482,7 +4578,7 @@ fn recharge_staking_pot_should_work() {
                 Staking::recharge_staking_pot(Origin::signed(founder), 200_000_000_000_000),
                 DispatchError::Module {
                     index: 0,
-                    error: 13,
+                    error: 14,
                     message: Some("InsufficientCurrency"),
                 }
             );

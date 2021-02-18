@@ -1693,8 +1693,9 @@ impl<T: Config> Module<T> {
 
         // 2. Pay authoring reward
         let mut validator_imbalance = <PositiveImbalanceOf<T>>::zero();
-        if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
-            validator_imbalance.maybe_subsume(Self::make_payout(&validator_stash, value));
+        let mut total_reward: BalanceOf<T> = Zero::zero();
+        if let Some(authoring_reward) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
+            total_reward = total_reward.saturating_add(authoring_reward);
         }
 
         let to_num =
@@ -1703,24 +1704,25 @@ impl<T: Config> Module<T> {
         // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
         let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * total_era_staking_payout;
+        total_reward = total_reward.saturating_add(staking_reward);
         let total = exposure.total.max(One::one());
-        // 4. Calculate total rewards for staking
-        let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * staking_reward;
+        // 4. Calculate guarantee rewards for staking
+        let guarantee_staking_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * total_reward;
         let mut guarantee_rewards = Zero::zero();
         // 5. Pay staking reward to guarantors
         for i in &exposure.others {
             let reward_ratio = Perbill::from_rational_approximation(i.value, total);
             // Reward guarantors
-            guarantee_rewards += reward_ratio * total_rewards;
+            guarantee_rewards += reward_ratio * guarantee_staking_rewards;
             if let Some(imbalance) = Self::make_payout(
                 &i.who,
-                reward_ratio * total_rewards
+                reward_ratio * guarantee_staking_rewards
             ) {
                 Self::deposit_event(RawEvent::Reward(i.who.clone(), imbalance.peek()));
             };
         }
         // 6. Pay staking reward to validator
-        validator_imbalance.maybe_subsume(Self::make_payout(&ledger.stash, staking_reward - guarantee_rewards));
+        validator_imbalance.maybe_subsume(Self::make_payout(&ledger.stash, total_reward - guarantee_rewards));
         Self::deposit_event(RawEvent::Reward(ledger.stash, validator_imbalance.peek()));
         Ok(())
     }

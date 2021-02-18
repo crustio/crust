@@ -1707,16 +1707,16 @@ impl<T: Config> Module<T> {
         total_reward = total_reward.saturating_add(staking_reward);
         let total = exposure.total.max(One::one());
         // 4. Calculate guarantee rewards for staking
-        let guarantee_staking_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * total_reward;
+        let estimated_guarantee_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * total_reward;
         let mut guarantee_rewards = Zero::zero();
         // 5. Pay staking reward to guarantors
         for i in &exposure.others {
             let reward_ratio = Perbill::from_rational_approximation(i.value, total);
             // Reward guarantors
-            guarantee_rewards += reward_ratio * guarantee_staking_rewards;
+            guarantee_rewards += reward_ratio * estimated_guarantee_rewards;
             if let Some(imbalance) = Self::make_payout(
                 &i.who,
-                reward_ratio * guarantee_staking_rewards
+                reward_ratio * estimated_guarantee_rewards
             ) {
                 Self::deposit_event(RawEvent::Reward(i.who.clone(), imbalance.peek()));
             };

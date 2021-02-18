@@ -310,12 +310,12 @@ fn rewards_should_work() {
             // 11 validator has 2/3 of the total rewards and half half for it and its guarantor
             assert_eq_error_rate!(
                 Balances::total_balance(&2) / 1000000,
-                (init_balance_2 + staking_reward * 500 / 2001) / 1000000,
+                (init_balance_2 + authoring_reward / 3 + staking_reward * 500 / 2001) / 1000000,
                 1
             );
             assert_eq_error_rate!(
                 Balances::total_balance(&10) / 1000000,
-                (init_balance_10 + authoring_reward * 2 /3 + staking_reward * 500 / 2001) / 1000000,
+                (init_balance_10 + authoring_reward / 3 + staking_reward * 500 / 2001) / 1000000,
                 1
             );
 
@@ -1541,12 +1541,12 @@ fn validator_payment_prefs_work() {
         // Round to 0.000001
         assert_eq!(
             Balances::total_balance(&11) / 1000000,
-            (stash_initial_balance + total_authoring_payout_0 + shared_cut / 2 + shared_cut) / 1000000
+            (stash_initial_balance + total_authoring_payout_0 * 3 / 4 + shared_cut / 2 + shared_cut) / 1000000
         );
         // Controller account will not get any reward.
         assert_eq!(Balances::total_balance(&10), 1);
         // Rest of the reward will be shared and paid to the guarantor in stake.
-        assert_eq!(Balances::total_balance(&2) / 1000000, (500 + shared_cut / 2) / 1000000);
+        assert_eq!(Balances::total_balance(&2) / 1000000, (500 + shared_cut / 2 + total_authoring_payout_0 / 4) / 1000000);
 
         check_exposure_all();
         check_guarantor_all();

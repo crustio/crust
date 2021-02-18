@@ -1012,7 +1012,7 @@ fn guarantors_also_get_slashed() {
                 Staking::guarantee(Origin::signed(2), (20, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -1021,7 +1021,7 @@ fn guarantors_also_get_slashed() {
                 Staking::guarantee(Origin::signed(2), (10, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -2191,7 +2191,7 @@ fn switching_roles() {
                 Staking::guarantee(Origin::signed(4), (1, 250)), // 1 is not validator
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -2271,7 +2271,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (1, 50)), // 1 is not validator
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -2279,7 +2279,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (2, 50)), // 2 self is not validator neither
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -2287,7 +2287,7 @@ fn wrong_vote_is_null() {
                 Staking::guarantee(Origin::signed(2), (15, 50)), // 15 doesn't exist
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -3954,7 +3954,7 @@ fn multi_guarantees_should_work() {
                 Staking::guarantee(Origin::signed(4), (11, 10)),
                 DispatchError::Module {
                     index: 0,
-                    error: 9,
+                    error: 10,
                     message: Some("ExceedGuaranteeLimit"),
                 }
             );
@@ -3975,7 +3975,7 @@ fn multi_guarantees_should_work() {
                 Staking::guarantee(Origin::signed(4), (116, 10)),
                 DispatchError::Module {
                     index: 0,
-                    error: 9,
+                    error: 10,
                     message: Some("ExceedGuaranteeLimit"),
                 }
             );
@@ -4079,7 +4079,7 @@ fn cut_guarantee_should_work() {
                 Staking::cut_guarantee(Origin::signed(2), (88, 250)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -4133,7 +4133,7 @@ fn cut_guarantee_should_work() {
                 Staking::cut_guarantee(Origin::signed(2), (7, 1000)),
                 DispatchError::Module {
                     index: 0,
-                    error: 6,
+                    error: 7,
                     message: Some("InvalidTarget"),
                 }
             );
@@ -4417,7 +4417,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 11, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 12,
+                    error: 13,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -4425,7 +4425,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 21, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 12,
+                    error: 13,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -4433,7 +4433,7 @@ fn double_claim_rewards_should_fail() {
                 Staking::reward_stakers(Origin::signed(10), 31, 0),
                 DispatchError::Module {
                     index: 0,
-                    error: 12,
+                    error: 13,
                     message: Some("AlreadyClaimed"),
                 }
             );
@@ -4578,7 +4578,7 @@ fn recharge_staking_pot_should_work() {
                 Staking::recharge_staking_pot(Origin::signed(founder), 200_000_000_000_000),
                 DispatchError::Module {
                     index: 0,
-                    error: 13,
+                    error: 14,
                     message: Some("InsufficientCurrency"),
                 }
             );

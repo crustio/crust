@@ -133,12 +133,12 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Accept id(who, anchor), reported_file_size, cid, valid_at and maybe_member
     /// Returns the real used size of this file
     /// used size is decided by market
-    fn upsert_replicas(who: &<T as system::Config>::AccountId,
-                       cid: &MerkleRoot,
-                       reported_file_size: u64,
-                       anchor: &SworkerAnchor,
-                       valid_at: BlockNumber,
-                       maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
+    fn upsert_replica(who: &<T as system::Config>::AccountId,
+                      cid: &MerkleRoot,
+                      reported_file_size: u64,
+                      anchor: &SworkerAnchor,
+                      valid_at: BlockNumber,
+                      maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
     ) -> u64 {
         // Judge if file_info.file_size == reported_file_size or not
         Self::maybe_upsert_file_size(who, cid, reported_file_size);
@@ -171,13 +171,9 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             Self::insert_replica(&mut file_info, new_replica);
             file_info.reported_replica_count += 1;
 
-            // 3. Update used_info and files size
+            // 3. Update used_info
             if is_counted {
-                used_info.reported_group_count += 1;
-                Self::update_groups_used_info(file_info.file_size, &mut used_info);
-                Self::update_files_size(file_info.file_size, 0, 1);
-                used_info.groups.insert(anchor.clone(), true);
-                used_size = used_info.used_size; // need to add the used_size after the update
+                used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the used_size after the update
             };
 
             // 4. The first join the replicas and file become live(expired_on > claimed_at)
@@ -196,7 +192,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
     /// Returns the real used size of this file
-    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn delete_replica(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         // 1. Delete replica from file_info
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             let mut is_to_decreased = false;
@@ -214,7 +210,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         }
 
         // 2. Delete anchor from file_info/file_trash and return whether it is counted
-        Self::delete_used_anchor(cid, anchor)
+        Self::delete_used_group(cid, anchor)
     }
 
     // withdraw market staking pot for distributing staking reward
@@ -704,10 +700,10 @@ impl<T: Config> Module<T> {
         if file_info.expired_on <= file_info.claimed_at { return; }
 
         // 4. Update used_info and files_size
-        let prev_first_class_count = used_info.reported_group_count;
+        let prev_reported_group_count = used_info.reported_group_count;
         used_info.reported_group_count = Self::count_reported_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
         Self::update_groups_used_info(file_info.file_size, &mut used_info);
-        Self::update_files_size(file_info.file_size, prev_first_class_count, used_info.reported_group_count);
+        Self::update_files_size(file_info.file_size, prev_reported_group_count, used_info.reported_group_count);
 
         let claim_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
@@ -1057,7 +1053,15 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
+        used_info.reported_group_count += 1;
+        Self::update_groups_used_info(file_size, used_info);
+        Self::update_files_size(file_size, 0, 1);
+        used_info.groups.insert(anchor.clone(), true);
+        used_info.used_size
+    }
+
+    fn delete_used_group(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut used_size: u64 = 0;
         
         // 1. Delete files anchor

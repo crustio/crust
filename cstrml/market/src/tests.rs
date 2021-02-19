@@ -2516,8 +2516,8 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
-        Market::delete_replicas(&merchant, &cid, &legal_pk);
-        Market::delete_replicas(&charlie, &cid, &legal_pk);
+        Market::delete_replica(&merchant, &cid, &legal_pk);
+        Market::delete_replica(&charlie, &cid, &legal_pk);
 
         run_to_block(903);
         Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
@@ -2642,7 +2642,7 @@ fn dynamic_used_size_should_work() {
            }
         );
         for _ in 0..140 {
-            Market::delete_replicas(&merchant, &cid, &legal_pk);
+            Market::delete_replica(&merchant, &cid, &legal_pk);
         }
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            UsedInfo {
@@ -2711,7 +2711,7 @@ fn delete_used_size_should_work() {
                groups: expected_groups.clone()
            }
         );
-        Market::delete_replicas(&merchant, &cid, &hex::decode("10").unwrap());
+        Market::delete_replica(&merchant, &cid, &hex::decode("10").unwrap());
         expected_groups.remove(&hex::decode("10").unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            UsedInfo {
@@ -2726,7 +2726,7 @@ fn delete_used_size_should_work() {
             <swork::ReportedInSlot>::insert(key.clone(), 300, true);
             expected_groups.insert(key.clone(), true);
         }
-        Market::delete_replicas(&merchant, &cid, &hex::decode("21").unwrap()); // delete 21. 21 won't be deleted twice.
+        Market::delete_replica(&merchant, &cid, &hex::decode("21").unwrap()); // delete 21. 21 won't be deleted twice.
         expected_groups.remove(&hex::decode("21").unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            UsedInfo {
@@ -2852,7 +2852,7 @@ fn files_size_should_not_be_decreased_twice() {
             })
         );
         assert_eq!(Market::files_size(), file_size as u128);
-        Market::delete_replicas(&dave, &cid, &hex::decode("11").unwrap()); // delete 11. 11 won't be deleted twice.
+        Market::delete_replica(&dave, &cid, &hex::decode("11").unwrap()); // delete 11. 11 won't be deleted twice.
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,

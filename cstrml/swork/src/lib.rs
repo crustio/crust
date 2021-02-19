@@ -833,13 +833,13 @@ impl<T: Config> Module<T> {
                         members= Some(Self::groups(owner));
                     }
                 };
-                Some((cid.clone(), T::MarketInterface::upsert_replicas(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members), *valid_at))
+                Some((cid.clone(), T::MarketInterface::upsert_replica(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members), *valid_at))
             }).collect()
         } else {
             let curr_bn = Self::get_current_block_number();
             changed_files.iter().filter_map(|(cid, _, _)| {
                 // 2. If mapping to storage orders
-                Some((cid.clone(), T::MarketInterface::delete_replicas(reporter, cid, anchor), curr_bn as u64))
+                Some((cid.clone(), T::MarketInterface::delete_replica(reporter, cid, anchor), curr_bn as u64))
             }).collect()
         }
     }

@@ -740,8 +740,9 @@ impl<T: Config> Module<T> {
                         continue;
                     }
                     
-                    // if that guy is poor, just pass him ☠️ 
-                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount, Some(replica.anchor.clone()), Some(used_info.groups.clone())) {
+                    // if that guy is poor, just pass him ☠️
+                    // Only the first member in the groups can accept the storage reward.
+                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount, used_info.groups.contains_key(&replica.anchor)) {
                         rewarded_amount += one_payout_amount.clone();
                         rewarded_count +=1;
                     }
@@ -1099,7 +1100,7 @@ impl<T: Config> Module<T> {
                     file_info.file_size = reported_file_size;
                     <Files<T>>::insert(cid, (file_info, used_info));
                 } else {
-                    if !Self::maybe_reward_merchant(who, &file_info.amount, None, None){
+                    if !Self::maybe_reward_merchant(who, &file_info.amount, true) {
                         T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
@@ -1108,11 +1109,9 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>, anchor_option: Option<SworkerAnchor>, groups_option: Option<BTreeMap<SworkerAnchor, bool>>) -> bool {
-        if let (Some(anchor), Some(groups)) = (anchor_option, groups_option) {
-            if !groups.contains_key(&anchor) {
-                return false;
-            }
+    fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>, is_legal_payout_target: bool) -> bool {
+        if !is_legal_payout_target {
+            return false;
         }
         if Self::has_enough_collateral(&who, amount) {
             <MerchantLedgers<T>>::mutate(&who, |ledger| {

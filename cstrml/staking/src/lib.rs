@@ -732,6 +732,8 @@ decl_error! {
         AlreadyBonded,
         /// Controller is already paired.
         AlreadyPaired,
+        /// All stakes are guaranteed, cut guarantee first
+        AllGuaranteed,
         /// Duplicate index.
         DuplicateIndex,
         /// Slash record index out of bounds.
@@ -945,13 +947,22 @@ decl_module! {
         fn unbond(origin, #[compact] value: BalanceOf<T>) {
             let controller = ensure_signed(origin)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+
+            // 0. Judge if exceed MAX_UNLOCKING_CHUNKS
             ensure!(
                 ledger.unlocking.len() < MAX_UNLOCKING_CHUNKS,
                 Error::<T>::NoMoreChunks,
             );
 
-            let mut value = value.min(ledger.active);
+            // 1. Ensure guarantee's stakes is free
+            let mut value = value;
+            if let Some(guarantee) = Self::guarantors(&ledger.stash) {
+                ensure!(guarantee.total < ledger.active, Error::<T>::AllGuaranteed);
+                value = value.min(ledger.active - guarantee.total);
+            }
 
+            // 2. Ensure value < ledger.active
+            value = value.min(ledger.active);
             if !value.is_zero() {
                 ledger.active -= value;
 
@@ -1693,8 +1704,9 @@ impl<T: Config> Module<T> {
 
         // 2. Pay authoring reward
         let mut validator_imbalance = <PositiveImbalanceOf<T>>::zero();
-        if let Some(value) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
-            validator_imbalance.maybe_subsume(Self::make_payout(&validator_stash, value));
+        let mut total_reward: BalanceOf<T> = Zero::zero();
+        if let Some(authoring_reward) = <ErasAuthoringPayout<T>>::get(&era, &validator_stash) {
+            total_reward = total_reward.saturating_add(authoring_reward);
         }
 
         let to_num =
@@ -1703,24 +1715,25 @@ impl<T: Config> Module<T> {
         // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
         let staking_reward = Perbill::from_rational_approximation(to_num(exposure.total), to_num(era_total_stakes)) * total_era_staking_payout;
+        total_reward = total_reward.saturating_add(staking_reward);
         let total = exposure.total.max(One::one());
-        // 4. Calculate total rewards for staking
-        let total_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * staking_reward;
+        // 4. Calculate guarantee rewards for staking
+        let estimated_guarantee_rewards = <ErasValidatorPrefs<T>>::get(&era, &ledger.stash).fee * total_reward;
         let mut guarantee_rewards = Zero::zero();
         // 5. Pay staking reward to guarantors
         for i in &exposure.others {
             let reward_ratio = Perbill::from_rational_approximation(i.value, total);
             // Reward guarantors
-            guarantee_rewards += reward_ratio * total_rewards;
+            guarantee_rewards += reward_ratio * estimated_guarantee_rewards;
             if let Some(imbalance) = Self::make_payout(
                 &i.who,
-                reward_ratio * total_rewards
+                reward_ratio * estimated_guarantee_rewards
             ) {
                 Self::deposit_event(RawEvent::Reward(i.who.clone(), imbalance.peek()));
             };
         }
         // 6. Pay staking reward to validator
-        validator_imbalance.maybe_subsume(Self::make_payout(&ledger.stash, staking_reward - guarantee_rewards));
+        validator_imbalance.maybe_subsume(Self::make_payout(&ledger.stash, total_reward - guarantee_rewards));
         Self::deposit_event(RawEvent::Reward(ledger.stash, validator_imbalance.peek()));
         Ok(())
     }

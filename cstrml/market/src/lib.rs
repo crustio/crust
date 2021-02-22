@@ -59,8 +59,8 @@ macro_rules! log {
 
 pub trait WeightInfo {
     fn register() -> Weight;
-    fn pledge_extra() -> Weight;
-    fn cut_pledge() -> Weight;
+    fn add_collateral() -> Weight;
+    fn cut_collateral() -> Weight;
     fn place_storage_order() -> Weight;
     fn claim_reward() -> Weight;
     fn reward_merchant() -> Weight;
@@ -118,8 +118,8 @@ pub struct UsedInfo {
 pub struct MerchantLedger<Balance> {
     // The current reward amount.
     pub reward: Balance,
-    // The total pledge amount
-    pub pledge: Balance
+    // The total collateral amount
+    pub collateral: Balance
 }
 
 type BalanceOf<T> =
@@ -133,12 +133,12 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Accept id(who, anchor), reported_file_size, cid, valid_at and maybe_member
     /// Returns the real used size of this file
     /// used size is decided by market
-    fn upsert_replicas(who: &<T as system::Config>::AccountId,
-                       cid: &MerkleRoot,
-                       reported_file_size: u64,
-                       anchor: &SworkerAnchor,
-                       valid_at: BlockNumber,
-                       maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
+    fn upsert_replica(who: &<T as system::Config>::AccountId,
+                      cid: &MerkleRoot,
+                      reported_file_size: u64,
+                      anchor: &SworkerAnchor,
+                      valid_at: BlockNumber,
+                      maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
     ) -> u64 {
         // Judge if file_info.file_size == reported_file_size or not
         Self::maybe_upsert_file_size(who, cid, reported_file_size);
@@ -173,10 +173,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
             // 3. Update used_info
             if is_counted {
-                used_info.reported_group_count += 1;
-                Self::update_groups_used_info(file_info.file_size, &mut used_info);
-                used_info.groups.insert(anchor.clone(), true);
-                used_size = used_info.used_size; // need to add the used_size after the update
+                used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the used_size after the update
             };
 
             // 4. The first join the replicas and file become live(expired_on > claimed_at)
@@ -186,12 +183,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
 
-            // 5. Update files size
-            if file_info.reported_replica_count <= file_info.expected_replica_count {
-                Self::update_files_size(file_info.file_size, 0, 1);
-            }
-
-            // 6. Update files
+            // 5. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
         return used_size
@@ -200,7 +192,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
     /// Returns the real used size of this file
-    fn delete_replicas(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn delete_replica(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         // 1. Delete replica from file_info
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             let mut is_to_decreased = false;
@@ -213,15 +205,12 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             });
             if is_to_decreased {
                 file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
-                if file_info.reported_replica_count < file_info.expected_replica_count {
-                    Self::update_files_size(file_info.file_size, 1, 0);
-                }
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         }
 
         // 2. Delete anchor from file_info/file_trash and return whether it is counted
-        Self::delete_used_anchor(cid, anchor)
+        Self::delete_used_group(cid, anchor)
     }
 
     // withdraw market staking pot for distributing staking reward
@@ -352,7 +341,7 @@ decl_storage! {
     add_extra_genesis {
 		build(|_config| {
 			// Create Market accounts
-			<Module<T>>::init_pot(<Module<T>>::pledge_pot);
+			<Module<T>>::init_pot(<Module<T>>::collateral_pot);
 			<Module<T>>::init_pot(<Module<T>>::storage_pot);
 			<Module<T>>::init_pot(<Module<T>>::staking_pot);
 			<Module<T>>::init_pot(<Module<T>>::reserved_pot);
@@ -365,8 +354,8 @@ decl_error! {
     pub enum Error for Module<T: Config> {
         /// Don't have enough currency
         InsufficientCurrency,
-        /// Don't have enough pledge
-        InsufficientPledge,
+        /// Don't have enough collateral
+        InsufficientCollateral,
         /// Can not bond with value less than minimum balance.
         InsufficientValue,
         /// Not Register before
@@ -436,110 +425,110 @@ decl_module! {
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
         /// Register to be a merchant, you should provide your storage layer's address info
-        /// this will require you to pledge first, complexity depends on `Pledges`(P).
+        /// this will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Read: Pledge
-        /// - Write: Pledge
+        /// - Read: Collateral
+        /// - Write: Collateral
         /// # </weight>
         #[weight = T::WeightInfo::register()]
         pub fn register(
             origin,
-            #[compact] pledge: BalanceOf<T>
+            #[compact] collateral: BalanceOf<T>
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Reject a pledge which is considered to be _dust_.
-            ensure!(pledge >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+            // 1. Reject a collateral which is considered to be _dust_.
+            ensure!(collateral >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Ensure merchant has enough currency.
-            ensure!(pledge <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(collateral <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if merchant has not register before.
             ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
 
-            // 4. Transfer from origin to pledge account.
-            T::Currency::transfer(&who, &Self::pledge_pot(), pledge.clone(), AllowDeath).expect("Something wrong during transferring");
+            // 4. Transfer from origin to collateral account.
+            T::Currency::transfer(&who, &Self::collateral_pot(), collateral.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 5. Prepare new ledger
             let ledger = MerchantLedger {
                 reward: Zero::zero(),
-                pledge: pledge.clone()
+                collateral: collateral.clone()
             };
 
-            // 6. Upsert pledge.
+            // 6. Upsert collateral.
             <MerchantLedgers<T>>::insert(&who, ledger);
 
             // 7. Emit success
-            Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), pledge));
+            Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), collateral));
 
             Ok(())
         }
 
-        /// Pledge extra amount of currency to accept market order.
+        /// Collateral extra amount of currency to accept market order.
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Read: Pledge
-        /// - Write: Pledge
+        /// - Read: Collateral
+        /// - Write: Collateral
         /// # </weight>
-        #[weight = T::WeightInfo::pledge_extra()]
-        pub fn pledge_extra(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+        #[weight = T::WeightInfo::add_collateral()]
+        pub fn add_collateral(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Reject a pledge which is considered to be _dust_.
+            // 1. Reject a collateral which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Check if merchant has pledged before
+            // 2. Check if merchant has collateral or not
             ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             // 3. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 4. Upgrade pledge.
-            <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.pledge += value.clone();});
+            // 4. Upgrade collateral.
+            <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
 
-            // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&who, &Self::pledge_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
+            // 5. Transfer from origin to collateral account.
+            T::Currency::transfer(&who, &Self::collateral_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::PledgeExtraSuccess(who.clone(), value));
+            Self::deposit_event(RawEvent::AddCollateralSuccess(who.clone(), value));
 
             Ok(())
         }
 
-        /// Decrease pledge amount of currency for market order.
+        /// Decrease collateral amount of currency for market order.
         ///
         /// # <weight>
         /// Complexity: O(logP)
-        /// - Read: Pledge
-        /// - Write: Pledge
+        /// - Read: Collateral
+        /// - Write: Collateral
         /// # </weight>
-        #[weight = T::WeightInfo::cut_pledge()]
-        pub fn cut_pledge(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+        #[weight = T::WeightInfo::cut_collateral()]
+        pub fn cut_collateral(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Reject a pledge which is considered to be _dust_.
+            // 1. Reject a collateral which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Check if merchant has pledged before
+            // 2. Check if merchant has collateral or not
             ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             let mut ledger = Self::merchant_ledgers(&who);
 
             // 3. Ensure value is smaller than unused.
-            ensure!(value <= ledger.pledge - ledger.reward, Error::<T>::InsufficientPledge);
+            ensure!(value <= ledger.collateral - ledger.reward, Error::<T>::InsufficientCollateral);
 
-            // 4. Upgrade pledge.
-            ledger.pledge -= value.clone();
+            // 4. Upgrade collateral.
+            ledger.collateral -= value.clone();
             <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
-            // 5. Transfer from origin to pledge account.
-            T::Currency::transfer(&Self::pledge_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
+            // 5. Transfer from origin to collateral account.
+            T::Currency::transfer(&Self::collateral_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::CutPledgeSuccess(who, value));
+            Self::deposit_event(RawEvent::CutCollateralSuccess(who, value));
 
             Ok(())
         }
@@ -669,10 +658,10 @@ decl_module! {
 }
 
 impl<T: Config> Module<T> {
-    /// The pot of a pledge account
-    pub fn pledge_pot() -> T::AccountId {
-        // "modl" ++ "crmarket" ++ "pled" is 16 bytes
-        T::ModuleId::get().into_sub_account("pled")
+    /// The pot of a collateral account
+    pub fn collateral_pot() -> T::AccountId {
+        // "modl" ++ "crmarket" ++ "coll" is 16 bytes
+        T::ModuleId::get().into_sub_account("coll")
     }
 
     /// The pot of a storage account
@@ -709,15 +698,13 @@ impl<T: Config> Module<T> {
         
         // 3. File already expired
         if file_info.expired_on <= file_info.claimed_at { return; }
-        
-        // TODO: Restrict the frequency of calculate payout(limit the duration of 2 claiming)
 
-        // 4. Update used_info
+        // 4. Update used_info and files_size
+        let prev_reported_group_count = used_info.reported_group_count;
         used_info.reported_group_count = Self::count_reported_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
         Self::update_groups_used_info(file_info.file_size, &mut used_info);
+        Self::update_files_size(file_info.file_size, prev_reported_group_count, used_info.reported_group_count);
 
-        // Get the previous first class storage count
-        let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
         let claim_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
         
@@ -753,8 +740,9 @@ impl<T: Config> Module<T> {
                         continue;
                     }
                     
-                    // if that guy is poor, just pass him ☠️ 
-                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount) {
+                    // if that guy is poor, just pass him ☠️
+                    // Only the first member in the groups can accept the storage reward.
+                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount, used_info.groups.contains_key(&replica.anchor)) {
                         rewarded_amount += one_payout_amount.clone();
                         rewarded_count +=1;
                     }
@@ -766,9 +754,6 @@ impl<T: Config> Module<T> {
             file_info.reported_replica_count = new_replicas.len() as u32;
             new_replicas.append(&mut invalid_replicas);
             file_info.replicas = new_replicas;
-
-            // 5.4 Update first class storage size
-            Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
         }
 
         // 6. File status might become ready to be closed if claim_block == expired_on
@@ -789,7 +774,7 @@ impl<T: Config> Module<T> {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn && file_info.expired_on >= file_info.claimed_at {
-                Self::update_files_size(file_info.file_size, file_info.reported_replica_count.min(file_info.expected_replica_count), 0);
+                Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
                     T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
@@ -940,7 +925,6 @@ impl<T: Config> Module<T> {
     fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on or expected_replica_count
         if let Some((mut file_info, used_info)) = Self::files(cid) {
-            let prev_first_class_count = file_info.reported_replica_count.min(file_info.expected_replica_count);
             // expired_on < claimed_at => file is not live yet. This situation only happen for new file.
             // expired_on == claimed_at => file is ready to be closed(wait to be put into trash or refreshed).
             // expired_on > claimed_at => file is ongoing.
@@ -960,7 +944,6 @@ impl<T: Config> Module<T> {
             if extend_replica {
                 // TODO: use 2 instead of 4
                 file_info.expected_replica_count += T::InitialReplica::get();
-                Self::update_files_size(file_info.file_size, prev_first_class_count, file_info.reported_replica_count.min(file_info.expected_replica_count));
             }
             <Files<T>>::insert(cid, (file_info, used_info));
         } else {
@@ -1007,9 +990,9 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn has_enough_pledge(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
+    fn has_enough_collateral(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
         let ledger = Self::merchant_ledgers(who);
-        (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.pledge
+        (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.collateral
     }
 
     pub fn update_file_price() {
@@ -1071,7 +1054,15 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn delete_used_anchor(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
+        used_info.reported_group_count += 1;
+        Self::update_groups_used_info(file_size, used_info);
+        Self::update_files_size(file_size, 0, 1);
+        used_info.groups.insert(anchor.clone(), true);
+        used_info.used_size
+    }
+
+    fn delete_used_group(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut used_size: u64 = 0;
         
         // 1. Delete files anchor
@@ -1086,6 +1077,7 @@ impl<T: Config> Module<T> {
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
                         Self::update_groups_used_info(file_info.file_size, used_info);
+                        Self::update_files_size(file_info.file_size, 1, 0);
                     }
                 }
             },
@@ -1108,7 +1100,7 @@ impl<T: Config> Module<T> {
                     file_info.file_size = reported_file_size;
                     <Files<T>>::insert(cid, (file_info, used_info));
                 } else {
-                    if !Self::maybe_reward_merchant(who, &file_info.amount){
+                    if !Self::maybe_reward_merchant(who, &file_info.amount, true) {
                         T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
@@ -1117,8 +1109,11 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>) -> bool {
-        if Self::has_enough_pledge(&who, amount) {
+    fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>, is_legal_payout_target: bool) -> bool {
+        if !is_legal_payout_target {
+            return false;
+        }
+        if Self::has_enough_collateral(&who, amount) {
             <MerchantLedgers<T>>::mutate(&who, |ledger| {
                 ledger.reward += amount.clone();
             });
@@ -1175,8 +1170,8 @@ decl_event!(
     {
         FileSuccess(AccountId, FileInfo<AccountId, Balance>),
         RegisterSuccess(AccountId, Balance),
-        PledgeExtraSuccess(AccountId, Balance),
-        CutPledgeSuccess(AccountId, Balance),
+        AddCollateralSuccess(AccountId, Balance),
+        CutCollateralSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
         RewardMerchantSuccess(AccountId),

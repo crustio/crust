@@ -671,11 +671,11 @@ decl_module! {
             origin
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
-            let pledge_pot = Self::pledge_pot();
+            let collateral_pot = Self::collateral_pot();
             let storage_pot = Self::storage_pot();
             let staking_pot = Self::staking_pot();
             let reserved_pot = Self::reserved_pot();
-            Self::deposit_event(RawEvent::PotList(pledge_pot, storage_pot, staking_pot, reserved_pot));
+            Self::deposit_event(RawEvent::PotList(collateral_pot, storage_pot, staking_pot, reserved_pot));
             Ok(())
         }
     }

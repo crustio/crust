@@ -1162,6 +1162,37 @@ impl<T: Config> Module<T> {
     }
 }
 
+pub mod migrations {
+    use super::*;
+
+    #[derive(Encode, Decode)]
+    pub struct OldMerchantLedger<Balance> {
+        // The current reward amount.
+        pub reward: Balance,
+        // The total pledge amount
+        pub pledge: Balance
+    }
+
+    pub fn migration() -> frame_support::weights::Weight {
+        recalculate_files_size();
+        migrate_to_collateral();
+        T::BlockWeights::get().max_block
+    }
+    fn recalculate_files_size() {
+        FilesSize::put(0);
+        for (file_info, used_info) in <Files<T>>::iter() {
+            Self::update_files_size(file_info.file_size, 0, used_info.reported_group_count);
+
+        }
+    }
+    fn migrate_to_collateral<T: Config>() -> frame_support::weights::Weight {
+        MerchantLedgers::<T>::translate::<OldMerchantLedger<BalanceOf<T>>, _>(|_, ledger| Some( MerchantLedger {
+            reward: ledger.reward,
+            collateral: ledger.pledge
+        }));
+    }
+}
+
 decl_event!(
     pub enum Event<T>
     where

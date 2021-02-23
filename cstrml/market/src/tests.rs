@@ -56,7 +56,7 @@ fn register_should_fail_due_to_insufficient_currency() {
                 200
             ),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 0,
                 message: Some("InsufficientCurrency")
             }
@@ -78,7 +78,7 @@ fn register_should_fail_due_to_double_register() {
                 70
             ),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 4,
                 message: Some("AlreadyRegistered")
             }
@@ -100,7 +100,7 @@ fn collateral_extra_should_fail_due_to_merchant_not_register() {
                 200
             ),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 3,
                 message: Some("NotRegister")
             }
@@ -137,7 +137,7 @@ fn cut_collateral_should_fail_due_to_reward() {
                 50
             ),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 1,
                 message: Some("InsufficientCollateral")
             }
@@ -218,7 +218,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
             file_size, 0
         ),
         DispatchError::Module {
-            index: 0,
+            index: 3,
             error: 11,
             message: Some("FileTooLarge")
         });
@@ -2342,7 +2342,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         assert_noop!(Market::place_storage_order(
             Origin::signed(source.clone()), cid1.clone(), 80, 0),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 6,
                 message: Some("FileSizeNotCorrect")
             }
@@ -3261,7 +3261,7 @@ fn reward_liquidator_should_work() {
         assert_noop!(
             Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 9,
                 message: Some("NotInRewardPeriod")
         });
@@ -3291,7 +3291,7 @@ fn reward_liquidator_should_work() {
         assert_noop!(
             Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 9,
                 message: Some("NotInRewardPeriod")
         });
@@ -3355,7 +3355,7 @@ fn reward_merchant_should_work() {
                 Origin::signed(merchant)
             ),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 10,
                 message: Some("NotEnoughReward")
             }
@@ -3366,7 +3366,7 @@ fn reward_merchant_should_work() {
                 Origin::signed(alice)
             ),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 3,
                 message: Some("NotRegister")
             }
@@ -3406,7 +3406,7 @@ fn set_global_switch_should_work() {
             file_size, 0
         ),
         DispatchError::Module {
-            index: 0,
+            index: 3,
             error: 12,
             message: Some("PlaceOrderNotAvailable")
         });
@@ -3443,7 +3443,7 @@ fn renew_file_should_work() {
         assert_noop!(
             Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
             DispatchError::Module {
-                index: 0,
+                index: 3,
                 error: 8,
                 message: Some("FileNotExist")
         });

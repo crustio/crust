@@ -17,10 +17,10 @@ use frame_support::{
     weights::Weight
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
-use frame_system::{self as system, ensure_signed, ensure_root};
+use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
     Perbill, ModuleId,
-    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}
+    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
 };
 
 #[cfg(feature = "std")]

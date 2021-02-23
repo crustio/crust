@@ -3101,37 +3101,6 @@ fn files_size_should_not_be_decreased_twice() {
 }
 
 #[test]
-fn allow_list_should_work() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = ZIKUN;
-        let _ = Balances::make_free_balance_be(&source, 20_000_000);
-        let cid =
-            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
-        let file_size = 134289408; // should less than merchant
-
-        assert_noop!(
-            Market::place_storage_order(
-                Origin::signed(source.clone()), cid.clone(),
-                file_size, 0, false
-            ),
-            DispatchError::Module {
-                index: 0,
-                error: 7,
-                message: Some("NotPermitted")
-            }
-        );
-        assert_ok!(Market::add_member_into_allow_list(Origin::root(), source.clone()));
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
-            file_size, 0, false
-        ));
-    });
-}
-
-#[test]
 fn clear_same_file_in_trash_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first

@@ -17,10 +17,10 @@ use frame_support::{
     weights::Weight
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
-use frame_system::{self as system, ensure_signed, ensure_root};
+use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
     Perbill, ModuleId,
-    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}
+    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
 };
 
 #[cfg(feature = "std")]
@@ -302,9 +302,6 @@ pub trait Config: system::Config {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Config> as Market {
-        /// Allow List
-        pub AllowList get(fn allow_list): BTreeSet<T::AccountId>;
-
         /// Merchant Ledger
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
@@ -555,9 +552,6 @@ decl_module! {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
-
             // 1. Calculate amount.
             let mut charged_file_size = reported_file_size;
             if let Some((file_info, _)) = Self::files(&cid) {
@@ -590,7 +584,7 @@ decl_module! {
             #[cfg(not(test))]
             Self::update_file_price();
 
-            Self::deposit_event(RawEvent::FileSuccess(who, Self::files(cid).unwrap().0));
+            Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
             Ok(())
         }
@@ -602,9 +596,6 @@ decl_module! {
             cid: MerkleRoot,
         ) -> DispatchResult {
             let claimer = ensure_signed(origin)?;
-
-            // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&claimer), Error::<T>::NotPermitted);
 
             // 1. Ensure file exist
             ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
@@ -628,9 +619,6 @@ decl_module! {
         ) -> DispatchResult {
             let merchant = ensure_signed(origin)?;
 
-            // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&merchant), Error::<T>::NotPermitted);
-
             // 1. Ensure merchant registered before
             ensure!(<MerchantLedgers<T>>::contains_key(&merchant), Error::<T>::NotRegister);
 
@@ -648,21 +636,6 @@ decl_module! {
             <MerchantLedgers<T>>::insert(&merchant, merchant_ledger);
 
             Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
-            Ok(())
-        }
-
-        /// Add it into allow list
-        #[weight = 1000]
-        pub fn add_member_into_allow_list(
-            origin,
-            target: <T::Lookup as StaticLookup>::Source
-        ) -> DispatchResult {
-            let _ = ensure_root(origin)?;
-            let member = T::Lookup::lookup(target)?;
-
-            <AllowList<T>>::mutate(|members| {
-                members.insert(member);
-            });
             Ok(())
         }
     }
@@ -1107,14 +1080,20 @@ impl<T: Config> Module<T> {
     fn maybe_upsert_file_size(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             if file_info.replicas.len().is_zero() {
-                if file_info.file_size >= reported_file_size {
+                // ordered_file_size == reported_file_size, return it
+                if file_info.file_size == reported_file_size {
+                    return
+                // ordered_file_size > reported_file_size, correct it
+                } else if file_info.file_size > reported_file_size {
                     file_info.file_size = reported_file_size;
                     <Files<T>>::insert(cid, (file_info, used_info));
+                // ordered_file_size < reported_file_size, close it with notification
                 } else {
                     if !Self::maybe_reward_merchant(who, &file_info.amount, true) {
                         T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
+                    Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
                 }
             }
         }
@@ -1198,12 +1177,13 @@ decl_event!(
         AccountId = <T as system::Config>::AccountId,
         Balance = BalanceOf<T>
     {
-        FileSuccess(AccountId, FileInfo<AccountId, Balance>),
+        FileSuccess(AccountId, MerkleRoot),
         RegisterSuccess(AccountId, Balance),
         AddCollateralSuccess(AccountId, Balance),
         CutCollateralSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
+        IllegalFileClosed(MerkleRoot),
         RewardMerchantSuccess(AccountId),
     }
 );

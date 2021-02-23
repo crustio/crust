@@ -52,8 +52,6 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
 }
 
 benchmarks! {
-    _{}
-
     register {
         let user = create_funded_user::<T>("user", 100);
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())

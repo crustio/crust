@@ -2,29 +2,15 @@
 // This file is part of Crust.
 
 use super::*;
+use crate as claims;
 
 use sp_core::H256;
-use frame_support::{impl_outer_dispatch, impl_outer_origin, parameter_types};
+use frame_support::parameter_types;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header,
 };
 use hex_literal::hex;
 
-impl_outer_origin! {
-    pub enum Origin for Test {}
-}
-
-impl_outer_dispatch! {
-    pub enum Call for Test where origin: Origin {
-        claims::CrustClaims,
-    }
-}
-
-// For testing the module, we construct most of a mock runtime. This means
-// first constructing a configuration type (`Test`) which `impl`s each of the
-// configuration traits of modules we want to use.
-#[derive(Clone, Eq, PartialEq)]
-pub struct Test;
 parameter_types! {
     pub const BlockHashCount: u32 = 250;
 }
@@ -45,11 +31,12 @@ impl frame_system::Config for Test {
     type BlockHashCount = BlockHashCount;
     type DbWeight = ();
     type Version = ();
-    type PalletInfo = ();
+    type PalletInfo = PalletInfo;
     type AccountData = balances::AccountData<u64>;
     type OnNewAccount = ();
-    type OnKilledAccount = Balances;
+    type OnKilledAccount = ();
     type SystemWeightInfo = ();
+    type SS58Prefix = ();
 }
 
 parameter_types! {
@@ -74,9 +61,20 @@ impl Config for Test {
     type Currency = Balances;
     type Prefix = Prefix;
 }
-pub type System = frame_system::Module<Test>;
-pub type Balances = balances::Module<Test>;
-pub type CrustClaims = Module<Test>;
+type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
+
+frame_support::construct_runtime!(
+	pub enum Test where
+		Block = Block,
+		NodeBlock = Block,
+		UncheckedExtrinsic = UncheckedExtrinsic
+	{
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+        CrustClaims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+	}
+);
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.

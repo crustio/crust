@@ -164,8 +164,6 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
 }
 
 benchmarks! {
-    _{}
-
     set_code {
         let code: Vec<u8> = vec![120,27,83,125,61,206,243,157,236,123,139,206,111,223,205,3,45,141,132,102,64,233,181,89,139,74,159,98,113,136,169,8];
     }: {

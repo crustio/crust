@@ -61,6 +61,7 @@ pub fn new_partial(config: &Configuration) -> Result<
 
     let transaction_pool = sc_transaction_pool::BasicPool::new_full(
     config.transaction_pool.clone(),
+    config.role.is_authority().into(),
     config.prometheus_registry(),
     task_manager.spawn_handle(),
     client.clone(),
@@ -97,7 +98,7 @@ pub fn new_partial(config: &Configuration) -> Result<
     let shared_authority_set = grandpa_link.shared_authority_set().clone();
     let shared_voter_state = sc_finality_grandpa::SharedVoterState::empty();
     let finality_proof_provider =
-        GrandpaFinalityProofProvider::new_for_service(backend.clone(), client.clone());
+        GrandpaFinalityProofProvider::new_for_service(backend.clone(), Some(shared_authority_set.clone()));
 
     let import_setup = (babe_block_import.clone(), grandpa_link, babe_link.clone());
     let rpc_setup = shared_voter_state.clone();
@@ -151,16 +152,6 @@ pub fn new_partial(config: &Configuration) -> Result<
 /// Builds a new service for a full client.
 pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
 {
-
-    let role = config.role.clone();
-    let is_authority = role.is_authority();
-    let force_authoring = config.force_authoring;
-    let disable_grandpa = config.disable_grandpa;
-    let name = config.network.node_name.clone();
-    let backoff_authoring_blocks =
-        Some(sc_consensus_slots::BackoffAuthoringOnFinalizedHeadLagging::default());
-
-
     let sc_service::PartialComponents {
         client,
         backend,
@@ -173,11 +164,17 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
         other: (rpc_extensions_builder, import_setup, rpc_setup)
     } = new_partial(&config)?;
 
+    let role = config.role.clone();
+    let force_authoring = config.force_authoring;
+    let disable_grandpa = config.disable_grandpa;
+    let name = config.network.node_name.clone();
+    let backoff_authoring_blocks =
+        Some(sc_consensus_slots::BackoffAuthoringOnFinalizedHeadLagging::default());
     let prometheus_registry = config.prometheus_registry().cloned();
 
     let shared_voter_state = rpc_setup;
 
-    config.network.notifications_protocols.push(sc_finality_grandpa::GRANDPA_PROTOCOL_NAME.into());
+    config.network.extra_sets.push(sc_finality_grandpa::grandpa_peers_set_config());
 
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
         sc_service::build_network(sc_service::BuildNetworkParams {
@@ -196,9 +193,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
         );
     }
 
-    let telemetry_connection_sinks = sc_service::TelemetryConnectionSinks::default();
-
-    let _ = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
+    let (_rpc_handlers, telemetry_connection_notifier) = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
         config,
         backend: backend.clone(),
         client: client.clone(),
@@ -209,14 +204,13 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
         task_manager: &mut task_manager,
         on_demand: None,
         remote_blockchain: None,
-        telemetry_connection_sinks: telemetry_connection_sinks.clone(),
         network_status_sinks,
         system_rpc_tx,
     })?;
 
     let (babe_block_import, grandpa_link, babe_link) = import_setup;
 
-    if is_authority {
+    if role.is_authority() {
         let proposer =
             sc_basic_authorship::ProposerFactory::new(
                 task_manager.spawn_handle(),
@@ -249,36 +243,31 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
         task_manager.spawn_essential_handle().spawn_blocking("babe", babe);
 
         // Authority discovery: this module runs to promise authorities' connection
-        let _ = if role.is_authority() {
-            use sc_network::Event;
-            use futures::StreamExt;
+        use sc_network::Event;
+        use futures::StreamExt;
 
-            let authority_discovery_role = if role.is_authority() {
-                authority_discovery::Role::PublishAndDiscover(
-                    keystore_container.keystore(),
-                )
-            } else {
-                // don't publish our addresses when we're only a collator
-                authority_discovery::Role::Discover
-            };
-            let dht_event_stream = network.event_stream("authority-discovery")
-                .filter_map(|e| async move { match e {
-                    Event::Dht(e) => Some(e),
-                    _ => None,
-                }});
-            let (worker, service) = authority_discovery::new_worker_and_service(
-                client.clone(),
-                network.clone(),
-                Box::pin(dht_event_stream),
-                authority_discovery_role,
-                prometheus_registry.clone(),
-            );
-
-            task_manager.spawn_handle().spawn("authority-discovery-worker", worker.run());
-            Some(service)
+        let authority_discovery_role = if role.is_authority() {
+            authority_discovery::Role::PublishAndDiscover(
+                keystore_container.keystore(),
+            )
         } else {
-            None
+            // don't publish our addresses when we're only a collator
+            authority_discovery::Role::Discover
         };
+        let dht_event_stream = network.event_stream("authority-discovery")
+            .filter_map(|e| async move { match e {
+                Event::Dht(e) => Some(e),
+                _ => None,
+            }});
+        let (worker, _service) = authority_discovery::new_worker_and_service(
+            client.clone(),
+            network.clone(),
+            Box::pin(dht_event_stream),
+            authority_discovery_role,
+            prometheus_registry.clone(),
+        );
+
+        task_manager.spawn_handle().spawn("authority-discovery-worker", worker.run());
     }
 
     // if the node isn't actively participating in consensus then it doesn't
@@ -314,7 +303,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
             config: grandpa_config,
             link: grandpa_link,
             network: network.clone(),
-            telemetry_on_connect: Some(telemetry_connection_sinks.on_connect_stream()),
+            telemetry_on_connect: telemetry_connection_notifier.map(|x| x.on_connect_stream()),
             voting_rule: sc_finality_grandpa::VotingRulesBuilder::default().build(),
             prometheus_registry,
             shared_voter_state
@@ -334,9 +323,11 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
 }
 
 /// Builds a new service for a light client.
-pub fn new_light(config: Configuration) -> Result<TaskManager, ServiceError> {
+pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError> {
     let (client, backend, keystore, mut task_manager, on_demand) =
         sc_service::new_light_parts::<Block, RuntimeApi, CrustExecutor>(&config)?;
+
+    config.network.extra_sets.push(sc_finality_grandpa::grandpa_peers_set_config());
 
     let select_chain = LongestChain::new(backend.clone());
 
@@ -406,7 +397,6 @@ pub fn new_light(config: Configuration) -> Result<TaskManager, ServiceError> {
         remote_blockchain: Some(backend.remote_blockchain()),
         rpc_extensions_builder: Box::new(sc_service::NoopRpcExtensionBuilder(rpc_extensions)),
         task_manager: &mut task_manager,
-        telemetry_connection_sinks: sc_service::TelemetryConnectionSinks::default(),
         config,
         keystore: keystore.sync_keystore(),
         backend,

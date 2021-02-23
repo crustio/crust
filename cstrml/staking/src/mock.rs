@@ -4,8 +4,9 @@
 //! Test utilities
 
 use crate::*;
+use crate as staking;
 use frame_support::{
-    assert_ok, impl_outer_origin, parameter_types,
+    assert_ok, parameter_types,
     StorageValue, IterableStorageMap,
     traits::{Currency, Get, FindAuthor, OnInitialize, OnFinalize, TestRandomness},
     weights::constants::RocksDbWeight,
@@ -78,6 +79,10 @@ impl pallet_session::SessionHandler<AccountId> for TestSessionHandler {
     }
 }
 
+impl sp_runtime::BoundToRuntimeAppPublic for TestSessionHandler {
+    type Public = UintAuthorityId;
+}
+
 pub fn is_disabled(controller: AccountId) -> bool {
     let stash = Staking::ledger(&controller).unwrap().stash;
     SESSION.with(|d| d.borrow().1.contains(&stash))
@@ -97,10 +102,6 @@ impl Get<EraIndex> for SlashDeferDuration {
     }
 }
 
-impl_outer_origin! {
-    pub enum Origin for Test where system = frame_system {}
-}
-
 /// Author of block is always 11
 pub struct Author11;
 impl FindAuthor<u128> for Author11 {
@@ -113,8 +114,6 @@ impl FindAuthor<u128> for Author11 {
 }
 
 // Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Test;
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
 }
@@ -122,7 +121,7 @@ parameter_types! {
 impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
-    type Call = ();
+    type Call = Call;
     type Index = u64;
     type BlockNumber = BlockNumber;
     type Hash = H256;
@@ -134,13 +133,14 @@ impl frame_system::Config for Test {
     type BlockHashCount = BlockHashCount;
     type DbWeight = RocksDbWeight;
     type Version = ();
-    type PalletInfo = ();
+    type PalletInfo = PalletInfo;
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
     type BlockWeights = ();
     type BlockLength = ();
+    type SS58Prefix = ();
 }
 parameter_types! {
     pub const TransferFee: Balance = 0;
@@ -161,6 +161,11 @@ parameter_types! {
     pub const UncleGenerations: u64 = 0;
     pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(25);
 }
+sp_runtime::impl_opaque_keys! {
+	pub struct SessionKeys {
+		pub other: TestSessionHandler,
+	}
+}
 impl pallet_session::Config for Test {
     type Event = ();
     type ValidatorId = AccountId;
@@ -169,7 +174,7 @@ impl pallet_session::Config for Test {
     type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
     type SessionManager = pallet_session::historical::NoteHistoricalRoot<Test, Staking>;
     type SessionHandler = TestSessionHandler;
-    type Keys = UintAuthorityId;
+    type Keys = SessionKeys;
     type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
     type WeightInfo = ();
 }
@@ -243,8 +248,8 @@ parameter_types! {
 
 impl Config for Test {
     type ModuleId = StakingModuleId;
-    type Currency = balances::Module<Self>;
-    type UnixTime = pallet_timestamp::Module<Self>;
+    type Currency = Balances;
+    type UnixTime = Timestamp;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
     type Event = ();
@@ -263,6 +268,24 @@ impl Config for Test {
     type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
     type WeightInfo = weight::WeightInfo;
 }
+
+type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
+
+frame_support::construct_runtime!(
+	pub enum Test where
+		Block = Block,
+		NodeBlock = Block,
+		UncheckedExtrinsic = UncheckedExtrinsic
+	{
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Staking: staking::{Module, Call, Config<T>, Storage, Event<T>},
+		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
+	}
+);
 
 pub struct ExtBuilder {
     existential_deposit: u64,
@@ -392,6 +415,14 @@ impl ExtBuilder {
                 (31, balance_factor * 2000),
                 (40, balance_factor),
                 (41, balance_factor * 2000),
+                (50, balance_factor),
+                (51, balance_factor * 1000),
+                (60, balance_factor),
+                (61, balance_factor * 2000),
+                (70, balance_factor),
+                (71, balance_factor * 2000),
+                (80, balance_factor),
+                (81, balance_factor * 2000),
                 (100, 2000 * balance_factor),
                 (101, 2000 * balance_factor),
                 // This allow us to have a total_payout different from 0.
@@ -417,7 +448,7 @@ impl ExtBuilder {
             vec![]
         };
 
-        let _ = GenesisConfig::<Test> {
+        let _ = staking::GenesisConfig::<Test> {
             stakers: vec![
                 // (stash, controller, staked_amount, status)
                 (
@@ -460,7 +491,7 @@ impl ExtBuilder {
             keys: validators.iter().map(|x| (
                 *x,
                 *x,
-                UintAuthorityId((*x).try_into().unwrap())
+                SessionKeys { other: UintAuthorityId(*x as u64) }
             )).collect(),
         }
         .assimilate_storage(&mut storage);
@@ -475,13 +506,6 @@ impl ExtBuilder {
         ext
     }
 }
-
-pub type System = frame_system::Module<Test>;
-pub type Balances = balances::Module<Test>;
-pub type Session = pallet_session::Module<Test>;
-pub type Timestamp = pallet_timestamp::Module<Test>;
-pub type Staking = Module<Test>;
-pub type Swork = swork::Module<Test>;
 
 pub fn check_exposure_all() {
     // a check per validator to ensure the exposure struct is always sane.

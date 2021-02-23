@@ -1,12 +1,12 @@
-# Crust &middot; [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcrustio%2Fcrust%2Fbadge&style=flat)](https://github.com/crustio/crust/actions?query=workflow%3A%22Crust+CI%22) [![Substrate version](https://img.shields.io/badge/Substrate-2.0.0-blue?logo=Parity%20Substrate)](https://substrate.dev/) [![GitHub license](https://img.shields.io/github/license/crustio/crust)](LICENSE)
+# Crust &middot; [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcrustio%2Fcrust%2Fbadge&style=flat)](https://github.com/crustio/crust/actions?query=workflow%3A%22Crust+CI%22) [![Substrate version](https://img.shields.io/badge/Substrate-3.0.0-blue?logo=Parity%20Substrate)](https://substrate.dev/) [![GitHub license](https://img.shields.io/github/license/crustio/crust?logo=gnu)](LICENSE)
 
 <a href='https://web3.foundation/'><img width='160' alt='Funded by web3 foundation' src='docs/img/web3f_grants_badge.png'></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='https://builders.parity.io/'><img width='180' src='docs/img/sbp_grants_badge.png'></a>
 
-Implementation of a [Crust protocol](https://crust.network) node with [substrate](https://github.com/paritytech/substrate).
+Implementation of a [Crust Protocol](https://crust.network) node with [substrate](https://github.com/paritytech/substrate).
 
 ## Join to play
 
-Go to our [Crust Node](https://github.com/crustio/crust-node), follow the README.
+Please go to [crust wiki](https://wiki.crust.network/docs/en/nodeOverview), refer the node overview.
 
 ## Building
 
@@ -41,20 +41,18 @@ Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust
 ### 1. Connect to maxwell
 
 ```shell
-./target/release/crust --chain=maxwell
+./target/release/crust --chain maxwell
 ```
 
-Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Maxwell-1.0-User-Guide).
+Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/release/0.11.1/node/res/maxwell.json).
 
 ### 2. Connect to rocky
 
 > Archived chain for only **internal test** now.
 
 ```shell
-./target/release/crust --chain=rocky
+./target/release/crust --chain rocky
 ```
-
-Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Join-Crust-Rocky).
 
 ### 3. Run as dev
 
@@ -78,7 +76,7 @@ If you want to see the multi-node consensus algorithm in action locally, then yo
 
 You'll need two terminal windows open.
 
-We'll start Alice's substrate node first on default TCP port 30333 with her chain database stored locally at `/tmp/alice`. The bootnode ID of her node is `12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp`, which is generated from the `--node-key` value that we specify below:
+We'll start Alice's substrate node first on default TCP port `30333` with her chain database stored locally at `/tmp/alice`. The bootnode ID of her node is `12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp`, which is generated from the `--node-key` value that we specify below:
 
 ```bash
 ./target/release/crust \
@@ -88,7 +86,7 @@ We'll start Alice's substrate node first on default TCP port 30333 with her chai
   --node-key 0000000000000000000000000000000000000000000000000000000000000001
 ```
 
-In the second terminal, we'll start Bob's substrate node on a different TCP port of 30334, and with his chain database stored locally at `/tmp/bob`. We'll specify a value for the `--bootnodes` option that will connect his node to Alice's bootnode ID on TCP port 30333:
+In the second terminal, we'll start Bob's substrate node on a different TCP port of `30334`, and with his chain database stored locally at `/tmp/bob`. We'll specify a value for the `--bootnodes` option that will connect his node to Alice's bootnode ID on TCP port 30333:
 
 ```bash
 ./target/release/crust \
@@ -103,7 +101,7 @@ Additional CLI usage options are available and may be shown by running `cargo ru
 
 ## Contribution
 
-Please follow the contributions guidelines as outlined in [docs/CONTRIBUTION.md](https://github.com/crustio/crust/blob/master/docs/CONTRIBUTION.md). In all communications and contributions, this project follows the [Contributor Covenant Code of Conduct](https://github.com/paritytech/substrate/blob/master/docs/CODE_OF_CONDUCT.adoc).
+Please follow the contributions guidelines as outlined in [docs/CONTRIBUTION.md](https://github.com/crustio/crust/blob/master/docs/CONTRIBUTION.md). In all communications and contributions, this project follows the [Contributor Covenant Code of Conduct](https://github.com/paritytech/substrate/blob/master/docs/CODE_OF_CONDUCT.md).
 
 ## License
 

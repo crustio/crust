@@ -116,7 +116,7 @@ pub fn run() -> sc_cli::Result<()> {
                 match config.role {
                     Role::Light => new_light(config),
                     _ => new_full(config),
-                }
+                }.map_err(sc_cli::Error::Service)
             })
         }
     }

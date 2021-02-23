@@ -579,7 +579,7 @@ decl_module! {
             #[cfg(not(test))]
             Self::update_file_price();
 
-            Self::deposit_event(RawEvent::FileSuccess(who, Self::files(cid).unwrap().0));
+            Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
             Ok(())
         }
@@ -1096,14 +1096,20 @@ impl<T: Config> Module<T> {
     fn maybe_upsert_file_size(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             if file_info.replicas.len().is_zero() {
-                if file_info.file_size >= reported_file_size {
+                // ordered_file_size == reported_file_size, return it
+                if file_info.file_size == reported_file_size {
+                    return
+                // ordered_file_size > reported_file_size, correct it
+                } else if file_info.file_size > reported_file_size {
                     file_info.file_size = reported_file_size;
                     <Files<T>>::insert(cid, (file_info, used_info));
+                // ordered_file_size < reported_file_size, close it with notification
                 } else {
                     if !Self::maybe_reward_merchant(who, &file_info.amount, true) {
                         T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
+                    Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
                 }
             }
         }
@@ -1168,12 +1174,13 @@ decl_event!(
         AccountId = <T as system::Config>::AccountId,
         Balance = BalanceOf<T>
     {
-        FileSuccess(AccountId, FileInfo<AccountId, Balance>),
+        FileSuccess(AccountId, MerkleRoot),
         RegisterSuccess(AccountId, Balance),
         AddCollateralSuccess(AccountId, Balance),
         CutCollateralSuccess(AccountId, Balance),
         PaysOrderSuccess(AccountId),
         CalculateSuccess(MerkleRoot),
+        IllegalFileClosed(MerkleRoot),
         RewardMerchantSuccess(AccountId),
     }
 );

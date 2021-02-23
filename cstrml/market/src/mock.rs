@@ -204,18 +204,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     let mut ext: sp_io::TestExternalities = t.into();
     ext.execute_with(|| {
-        add_allow_list();
         init_swork_setup();
     });
 
     ext
-}
-
-pub fn add_allow_list() {
-    let allow_list = [ALICE, BOB, CHARLIE, EVE, MERCHANT, DAVE, FERDIE];
-    for member in allow_list.iter() {
-        Market::add_member_into_allow_list(Origin::root(), member.clone()).expect("Give permission failed");
-    }
 }
 
 pub fn init_swork_setup() {

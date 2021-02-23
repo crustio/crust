@@ -17,10 +17,10 @@ use frame_support::{
     weights::Weight
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
-use frame_system::{self as system, ensure_signed, ensure_root};
+use frame_system::{self as system, ensure_signed};
 use sp_runtime::{
     Perbill, ModuleId,
-    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}
+    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
 };
 
 #[cfg(feature = "std")]
@@ -302,9 +302,6 @@ pub trait Config: system::Config {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Config> as Market {
-        /// Allow List
-        pub AllowList get(fn allow_list): BTreeSet<T::AccountId>;
-
         /// Merchant Ledger
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
@@ -555,9 +552,6 @@ decl_module! {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&who), Error::<T>::NotPermitted);
-
             // 1. Calculate amount.
             let mut charged_file_size = reported_file_size;
             if let Some((file_info, _)) = Self::files(&cid) {
@@ -603,9 +597,6 @@ decl_module! {
         ) -> DispatchResult {
             let claimer = ensure_signed(origin)?;
 
-            // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&claimer), Error::<T>::NotPermitted);
-
             // 1. Ensure file exist
             ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
 
@@ -628,9 +619,6 @@ decl_module! {
         ) -> DispatchResult {
             let merchant = ensure_signed(origin)?;
 
-            // TODO: Remove this check later
-            ensure!(Self::allow_list().contains(&merchant), Error::<T>::NotPermitted);
-
             // 1. Ensure merchant registered before
             ensure!(<MerchantLedgers<T>>::contains_key(&merchant), Error::<T>::NotRegister);
 
@@ -648,21 +636,6 @@ decl_module! {
             <MerchantLedgers<T>>::insert(&merchant, merchant_ledger);
 
             Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
-            Ok(())
-        }
-
-        /// Add it into allow list
-        #[weight = 1000]
-        pub fn add_member_into_allow_list(
-            origin,
-            target: <T::Lookup as StaticLookup>::Source
-        ) -> DispatchResult {
-            let _ = ensure_root(origin)?;
-            let member = T::Lookup::lookup(target)?;
-
-            <AllowList<T>>::mutate(|members| {
-                members.insert(member);
-            });
             Ok(())
         }
 

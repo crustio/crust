@@ -2035,7 +2035,6 @@ fn join_group_should_work_for_used_in_work_report() {
 
             run_to_block(1500);
             let alice_wr_info = group_work_report_alice_1500();
-            Market::add_member_into_allow_list(Origin::root(), eve.clone()).expect("Give permission failed");
             assert_ok!(Market::claim_reward(Origin::signed(eve.clone()), file_c.clone()));
             assert_ok!(Market::claim_reward(Origin::signed(eve.clone()), file_d.clone()));
             assert_ok!(Market::claim_reward(Origin::signed(eve.clone()), file_e.clone()));

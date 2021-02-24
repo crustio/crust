@@ -133,16 +133,11 @@ decl_module! {
 mod tests {
     use super::*;
 
-    use frame_support::{impl_outer_origin, assert_ok, assert_noop, parameter_types};
+    use frame_support::{assert_ok, assert_noop, parameter_types};
     use sp_core::H256;
     use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header};
+    use crate as candy;
 
-    impl_outer_origin! {
-		pub enum Origin for Test where system = frame_system {}
-	}
-
-    #[derive(Clone, Eq, PartialEq)]
-    pub struct Test;
     parameter_types! {
 		pub const BlockHashCount: u64 = 250;
 	}
@@ -151,7 +146,7 @@ mod tests {
         type BlockWeights = ();
         type BlockLength = ();
         type Origin = Origin;
-        type Call = ();
+        type Call = Call;
         type Index = u64;
         type BlockNumber = u64;
         type Hash = H256;
@@ -163,17 +158,30 @@ mod tests {
         type BlockHashCount = BlockHashCount;
         type DbWeight = ();
         type Version = ();
-        type PalletInfo = ();
+        type PalletInfo = PalletInfo;
         type AccountData = ();
         type OnNewAccount = ();
         type OnKilledAccount = ();
         type SystemWeightInfo = ();
+        type SS58Prefix = ();
     }
     impl Config for Test {
         type Event = ();
         type Balance = u64;
     }
-    type Candy = Module<Test>;
+    type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+    type Block = frame_system::mocking::MockBlock<Test>;
+
+    frame_support::construct_runtime!(
+	pub enum Test where
+		Block = Block,
+		NodeBlock = Block,
+		UncheckedExtrinsic = UncheckedExtrinsic
+	{
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		Candy: candy::{Module, Call, Storage, Event<T>},
+	}
+);
 
     fn new_test_ext() -> sp_io::TestExternalities {
         frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()

@@ -2,9 +2,10 @@
 // This file is part of Crust.
 
 use super::*;
+use crate as market;
 
 use frame_support::{
-    impl_outer_origin, parameter_types, assert_ok,
+    parameter_types, assert_ok,
     weights::constants::RocksDbWeight,
     traits::{OnFinalize, OnInitialize, Get}
 };
@@ -31,16 +32,6 @@ pub const MERCHANT: AccountId32 = AccountId32::new([5u8; 32]);
 pub const DAVE: AccountId32 = AccountId32::new([6u8; 32]);
 pub const FERDIE: AccountId32 = AccountId32::new([7u8; 32]);
 pub const ZIKUN: AccountId32 = AccountId32::new([8u8; 32]);
-
-impl_outer_origin! {
-    pub enum Origin for Test where system = system {}
-}
-
-// For testing the module, we construct most of a mock runtime. This means
-// first constructing a configuration type (`Test`) which `impl`s each of the
-// configuration traits of modules we want to use.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Test;
 
 thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(1);
@@ -108,7 +99,7 @@ impl system::Config for Test {
     type BlockWeights = ();
     type BlockLength = ();
     type Origin = Origin;
-    type Call = ();
+    type Call = Call;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
@@ -120,11 +111,12 @@ impl system::Config for Test {
     type BlockHashCount = BlockHashCount;
     type DbWeight = RocksDbWeight;
     type Version = ();
-    type PalletInfo = ();
+    type PalletInfo = PalletInfo;
     type AccountData = AccountData<Balance>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
+    type SS58Prefix = ();
 }
 
 impl balances::Config for Test {
@@ -188,10 +180,21 @@ impl Config for Test {
     type WeightInfo = weight::WeightInfo<Test>;
 }
 
-pub type Market = Module<Test>;
-pub type System = system::Module<Test>;
-pub type Swork = swork::Module<Test>;
-pub type Balances = balances::Module<Test>;
+type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
+
+frame_support::construct_runtime!(
+	pub enum Test where
+		Block = Block,
+		NodeBlock = Block,
+		UncheckedExtrinsic = UncheckedExtrinsic
+	{
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config},
+		Market: market::{Module, Call, Storage, Event<T>, Config},
+	}
+);
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = system::GenesisConfig::default()

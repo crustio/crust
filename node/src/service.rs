@@ -164,6 +164,14 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
         other: (rpc_extensions_builder, import_setup, rpc_setup)
     } = new_partial(&config)?;
 
+    let role = config.role.clone();
+    let force_authoring = config.force_authoring;
+    let disable_grandpa = config.disable_grandpa;
+    let name = config.network.node_name.clone();
+    let backoff_authoring_blocks =
+        Some(sc_consensus_slots::BackoffAuthoringOnFinalizedHeadLagging::default());
+    let prometheus_registry = config.prometheus_registry().cloned();
+
     let shared_voter_state = rpc_setup;
 
     config.network.extra_sets.push(sc_finality_grandpa::grandpa_peers_set_config());
@@ -184,14 +192,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
             &config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
         );
     }
-
-    let role = config.role.clone();
-    let force_authoring = config.force_authoring;
-    let disable_grandpa = config.disable_grandpa;
-    let name = config.network.node_name.clone();
-    let backoff_authoring_blocks =
-        Some(sc_consensus_slots::BackoffAuthoringOnFinalizedHeadLagging::default());
-    let prometheus_registry = config.prometheus_registry().cloned();
 
     let (_rpc_handlers, telemetry_connection_notifier) = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
         config,

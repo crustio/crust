@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021 Crust Network Technologies Ltd.	// This file is part of Substrate.
+// Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
 //! Test setup for potential reentracy and lost updates of nested mutations.
@@ -122,7 +122,6 @@ impl Default for ExtBuilder {
 	}
 }
 impl ExtBuilder {
-
 	pub fn existential_deposit(mut self, existential_deposit: u64) -> Self {
 		self.existential_deposit = existential_deposit;
 		self

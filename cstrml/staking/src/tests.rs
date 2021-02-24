@@ -2,7 +2,6 @@
 // This file is part of Crust.
 
 //! Tests for the module.
-
 use super::*;
 use crate::mock::*;
 use frame_support::{
@@ -28,7 +27,7 @@ fn force_unstake_works() {
         assert_noop!(
             Balances::transfer(Origin::signed(11), 1, 10),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 1,
                 message: Some("LiquidityRestrictions"),
             }
@@ -641,7 +640,7 @@ fn staking_should_work() {
             assert_noop!(
                 Balances::reserve(&3, 501),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 1,
                     message: Some("LiquidityRestrictions"),
                 }
@@ -1011,7 +1010,7 @@ fn guarantors_also_get_slashed() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(2), (20, 250)),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -1020,7 +1019,7 @@ fn guarantors_also_get_slashed() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(2), (10, 250)),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -1251,7 +1250,7 @@ fn cannot_transfer_staked_balance() {
             assert_noop!(
                 Balances::transfer(Origin::signed(11), 20, 1),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 1,
                     message: Some("LiquidityRestrictions"),
                 }
@@ -1284,7 +1283,7 @@ fn cannot_transfer_staked_balance_2() {
             assert_noop!(
                 Balances::transfer(Origin::signed(21), 20, 1001),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 1,
                     message: Some("LiquidityRestrictions"),
                 }
@@ -1307,7 +1306,7 @@ fn cannot_reserve_staked_balance() {
         assert_noop!(
             Balances::reserve(&11, 1),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 1,
                 message: Some("LiquidityRestrictions"),
             }
@@ -2052,7 +2051,7 @@ fn on_free_balance_zero_stash_removes_validator() {
             // Reduce free_balance of stash to 0
             let _ = Balances::slash(&11, u64::max_value());
             // Check total balance of stash
-            assert_eq!(Balances::total_balance(&11), 0);
+            assert_eq!(Balances::total_balance(&11), 10);
 
             // Reap the stash
             assert_ok!(Staking::reap_stash(Origin::none(), 11));
@@ -2114,7 +2113,7 @@ fn on_free_balance_zero_stash_removes_guarantor() {
             // Reduce free_balance of stash to 0
             let _ = Balances::slash(&11, u64::max_value());
             // Check total balance of stash
-            assert_eq!(Balances::total_balance(&11), 0);
+            assert_eq!(Balances::total_balance(&11), 10);
 
             // Reap the stash
             assert_ok!(Staking::reap_stash(Origin::none(), 11));
@@ -2190,7 +2189,7 @@ fn switching_roles() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(4), (1, 250)), // 1 is not validator
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -2270,7 +2269,7 @@ fn wrong_vote_is_null() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(2), (1, 50)), // 1 is not validator
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -2278,7 +2277,7 @@ fn wrong_vote_is_null() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(2), (2, 50)), // 2 self is not validator neither
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -2286,7 +2285,7 @@ fn wrong_vote_is_null() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(2), (15, 50)), // 15 doesn't exist
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -3117,8 +3116,8 @@ fn garbage_collection_after_slashing() {
             // validator and guarantor slash in era are garbage-collected by era change,
             // so we don't test those here.
 
-            assert_eq!(Balances::free_balance(&11), 0);
-            assert_eq!(Balances::total_balance(&11), 0);
+            assert_eq!(Balances::free_balance(&11), 2);
+            assert_eq!(Balances::total_balance(&11), 2);
 
             assert_ok!(Staking::reap_stash(Origin::none(), 11));
             assert!(<Staking as crate::Store>::SlashingSpans::get(&11).is_none());
@@ -3953,7 +3952,7 @@ fn multi_guarantees_should_work() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(4), (11, 10)),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 10,
                     message: Some("ExceedGuaranteeLimit"),
                 }
@@ -3974,7 +3973,7 @@ fn multi_guarantees_should_work() {
             assert_noop!(
                 Staking::guarantee(Origin::signed(4), (116, 10)),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 10,
                     message: Some("ExceedGuaranteeLimit"),
                 }
@@ -4078,7 +4077,7 @@ fn cut_guarantee_should_work() {
             assert_noop!(
                 Staking::cut_guarantee(Origin::signed(2), (88, 250)),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -4132,7 +4131,7 @@ fn cut_guarantee_should_work() {
             assert_noop!(
                 Staking::cut_guarantee(Origin::signed(2), (7, 1000)),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 7,
                     message: Some("InvalidTarget"),
                 }
@@ -4416,7 +4415,7 @@ fn double_claim_rewards_should_fail() {
             assert_noop!(
                 Staking::reward_stakers(Origin::signed(10), 11, 0),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 13,
                     message: Some("AlreadyClaimed"),
                 }
@@ -4424,7 +4423,7 @@ fn double_claim_rewards_should_fail() {
             assert_noop!(
                 Staking::reward_stakers(Origin::signed(10), 21, 0),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 13,
                     message: Some("AlreadyClaimed"),
                 }
@@ -4432,7 +4431,7 @@ fn double_claim_rewards_should_fail() {
             assert_noop!(
                 Staking::reward_stakers(Origin::signed(10), 31, 0),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 13,
                     message: Some("AlreadyClaimed"),
                 }
@@ -4577,7 +4576,7 @@ fn recharge_staking_pot_should_work() {
             assert_noop!(
                 Staking::recharge_staking_pot(Origin::signed(founder), 200_000_000_000_000),
                 DispatchError::Module {
-                    index: 0,
+                    index: 3,
                     error: 14,
                     message: Some("InsufficientCurrency"),
                 }

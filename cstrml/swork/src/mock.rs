@@ -2,9 +2,10 @@
 // This file is part of Crust.
 
 use crate::*;
+use crate as swork;
 
 pub use frame_support::{
-    impl_outer_origin, parameter_types,
+    parameter_types,
     weights::{Weight, constants::RocksDbWeight},
     traits::{OnInitialize, OnFinalize, Get, TestRandomness}
 };
@@ -21,10 +22,6 @@ pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIte
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;
-
-impl_outer_origin! {
-    pub enum Origin for Test where system = system {}
-}
 
 thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
@@ -91,12 +88,6 @@ pub struct ReportWorksInfo {
     pub sig: SworkerSignature
 }
 
-// For testing the module, we construct most of a mock runtime. This means
-// first constructing a configuration type (`Test`) which `impl`s each of the
-// configuration traits of modules we want to use.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Test;
-
 parameter_types! {
 	pub const BlockHashCount: u32 = 250;
 	pub BlockWeights: frame_system::limits::BlockWeights =
@@ -108,7 +99,7 @@ impl system::Config for Test {
     type BlockWeights = BlockWeights;
     type BlockLength = ();
     type Origin = Origin;
-    type Call = ();
+    type Call = Call;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
@@ -120,11 +111,12 @@ impl system::Config for Test {
     type BlockHashCount = BlockHashCount;
     type DbWeight = RocksDbWeight;
     type Version = ();
-    type PalletInfo = ();
+    type PalletInfo = PalletInfo;
     type AccountData = AccountData<u64>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
+    type SS58Prefix = ();
 }
 
 impl balances::Config for Test {
@@ -200,10 +192,21 @@ impl Config for Test {
     type WeightInfo = weight::WeightInfo<Test>;
 }
 
-pub type Swork = Module<Test>;
-pub type System = system::Module<Test>;
-pub type Market = market::Module<Test>;
-pub type Balances = balances::Module<Test>;
+type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
+
+frame_support::construct_runtime!(
+	pub enum Test where
+		Block = Block,
+		NodeBlock = Block,
+		UncheckedExtrinsic = UncheckedExtrinsic
+	{
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config},
+		Market: market::{Module, Call, Storage, Event<T>, Config},
+	}
+);
 
 pub struct ExtBuilder {
     code: SworkerCode
@@ -228,7 +231,7 @@ impl ExtBuilder {
             .build_storage::<Test>()
             .unwrap();
 
-        GenesisConfig {
+        swork::GenesisConfig {
             code: self.code,
         }.assimilate_storage(&mut t).unwrap();
 

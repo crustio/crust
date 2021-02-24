@@ -210,7 +210,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
 
     let (babe_block_import, grandpa_link, babe_link) = import_setup;
 
-    if let sc_service::config::Role::Authority { .. } = &role {
+    if role.is_authority() {
         let proposer =
             sc_basic_authorship::ProposerFactory::new(
                 task_manager.spawn_handle(),
@@ -241,10 +241,8 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
         // the BABE authoring task is considered essential, i.e. if it
         // fails we take down the service with it.
         task_manager.spawn_essential_handle().spawn_blocking("babe", babe);
-    }
 
-    // Authority discovery: this module runs to promise authorities' connection
-    if role.is_authority() {
+        // Authority discovery: this module runs to promise authorities' connection
         use sc_network::Event;
         use futures::StreamExt;
 
@@ -282,7 +280,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
 
     let grandpa_config = sc_finality_grandpa::Config {
         // FIXME: [Substrate]substrate/issues#1578 make this available through chain spec
-        gossip_duration: Duration::from_millis(333),
+        gossip_duration: Duration::from_millis(1000),
         justification_period: 512,
         name: Some(name),
         observer_enabled: false,

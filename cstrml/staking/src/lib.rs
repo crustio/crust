@@ -1407,7 +1407,7 @@ decl_module! {
             .saturating_add(76 * WEIGHT_PER_MICROS)]
         fn reap_stash(_origin, stash: T::AccountId) {
             let at_minimum = T::Currency::total_balance(&stash) == T::Currency::minimum_balance();
-			ensure!(at_minimum, Error::<T>::FundedTarget);
+            ensure!(at_minimum, Error::<T>::FundedTarget);
             Self::kill_stash(&stash)?;
             T::Currency::remove_lock(STAKING_ID, &stash);
         }

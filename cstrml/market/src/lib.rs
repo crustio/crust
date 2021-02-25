@@ -333,8 +333,8 @@ decl_storage! {
         pub UsedTrashMappingII get(fn used_trash_mapping_ii):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
-        /// Global switch to enable place storage order
-        pub GlobalSwitch get(fn global_switch): bool = true;
+        /// Market switch to enable place storage order
+        pub MarketSwitch get(fn market_switch): bool = false;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -375,8 +375,8 @@ decl_error! {
         NotEnoughReward,
         /// File is too large
         FileTooLarge,
-        /// Service is not available right now, maybe due to A/B Upgrade
-        ServiceNotAvailable
+        /// Place order is not available right now
+        PlaceOrderNotAvailable
     }
 }
 
@@ -543,7 +543,7 @@ decl_module! {
             extend_replica: bool
         ) -> DispatchResult {
             // 1. Service should be available right now.
-            ensure!(Self::global_switch(), Error::<T>::ServiceNotAvailable);
+            ensure!(Self::market_switch(), Error::<T>::PlaceOrderNotAvailable);
             let who = ensure_signed(origin)?;
 
             // 2. Calculate amount.
@@ -635,15 +635,15 @@ decl_module! {
 
         /// Set the global switch
         #[weight = T::WeightInfo::reward_merchant()]
-        pub fn set_global_switch(
+        pub fn set_market_switch(
             origin,
             is_enabled: bool
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
 
-            GlobalSwitch::put(is_enabled);
+            MarketSwitch::put(is_enabled);
 
-            Self::deposit_event(RawEvent::SetGlobalSwitchSuccess(is_enabled));
+            Self::deposit_event(RawEvent::SetMarketSwitchSuccess(is_enabled));
             Ok(())
         }
     }
@@ -1174,6 +1174,6 @@ decl_event!(
         CalculateSuccess(MerkleRoot),
         IllegalFileClosed(MerkleRoot),
         RewardMerchantSuccess(AccountId),
-        SetGlobalSwitchSuccess(bool),
+        SetMarketSwitchSuccess(bool),
     }
 );

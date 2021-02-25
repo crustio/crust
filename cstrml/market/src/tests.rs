@@ -3390,7 +3390,7 @@ fn set_global_switch_should_work() {
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, false
         ));
-        assert_ok!(Market::set_global_switch(
+        assert_ok!(Market::set_market_switch(
             Origin::root(),
             false
         ));
@@ -3401,7 +3401,7 @@ fn set_global_switch_should_work() {
         DispatchError::Module {
             index: 0,
             error: 12,
-            message: Some("ServiceNotAvailable")
+            message: Some("PlaceOrderNotAvailable")
         });
     });
 }

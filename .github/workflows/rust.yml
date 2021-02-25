@@ -35,7 +35,7 @@ jobs:
       - run: sudo apt update && sudo apt install cmake pkg-config libssl-dev git gcc build-essential clang
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2020-08-10-x86_64-unknown-linux-gnu
+          toolchain: nightly-2021-01-19-x86_64-unknown-linux-gnu
           target: wasm32-unknown-unknown
           override: true
       - name: Cargo build

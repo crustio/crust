@@ -1,7 +1,6 @@
 // Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
-#![feature(vec_remove_item)]
 #![recursion_limit = "128"]
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -1407,7 +1406,8 @@ decl_module! {
         #[weight = T::DbWeight::get().reads_writes(4, 7)
             .saturating_add(76 * WEIGHT_PER_MICROS)]
         fn reap_stash(_origin, stash: T::AccountId) {
-            ensure!(T::Currency::total_balance(&stash).is_zero(), Error::<T>::FundedTarget);
+            let at_minimum = T::Currency::total_balance(&stash) == T::Currency::minimum_balance();
+            ensure!(at_minimum, Error::<T>::FundedTarget);
             Self::kill_stash(&stash)?;
             T::Currency::remove_lock(STAKING_ID, &stash);
         }

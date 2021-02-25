@@ -63,7 +63,7 @@ fn register_should_failed_with_unmatched_reporter() {
                 register_info.sig
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 0,
                 message: Some("IllegalApplier"),
             }
@@ -93,7 +93,7 @@ fn register_should_failed_with_illegal_cert() {
                 register_info.sig
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 1,
                 message: Some("IllegalIdentity"),
             }
@@ -125,7 +125,7 @@ fn register_should_failed_with_illegal_isv_body() {
                 register_info.sig
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 1,
                 message: Some("IllegalIdentity"),
             }
@@ -156,7 +156,7 @@ fn register_should_failed_with_illegal_id_sig() {
                 register_info.sig
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 1,
                 message: Some("IllegalIdentity"),
             }
@@ -187,7 +187,7 @@ fn register_should_failed_with_illegal_ias_sig() {
                 register_info.sig
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 1,
                 message: Some("IllegalIdentity"),
             }
@@ -216,7 +216,7 @@ fn register_should_failed_with_wrong_code() {
                     register_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 1,
                     message: Some("IllegalIdentity"),
                 }
@@ -439,7 +439,7 @@ fn report_works_should_failed_with_not_registered() {
                     legal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 2,
                     message: Some("IllegalReporter"),
                 }
@@ -479,7 +479,7 @@ fn report_works_should_failed_with_illegal_code() {
                     legal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 3,
                     message: Some("OutdatedReporter"),
                 }
@@ -517,7 +517,7 @@ fn report_works_should_failed_with_wrong_timing() {
                     illegal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 4,
                     message: Some("InvalidReportTime"),
                 }
@@ -556,7 +556,7 @@ fn report_works_should_failed_with_illegal_sig() {
                     illegal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 5,
                     message: Some("IllegalWorkReportSig"),
                 }
@@ -605,7 +605,7 @@ fn report_works_should_failed_with_illegal_file_transition() {
                     illegal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 7,
                     message: Some("IllegalFilesTransition"),
                 }
@@ -750,7 +750,7 @@ fn incremental_report_should_failed_with_root_change() {
                     illegal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 7,
                     message: Some("IllegalFilesTransition"),
                 }
@@ -798,7 +798,7 @@ fn incremental_report_should_failed_with_wrong_file_size_change() {
                     illegal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 7,
                     message: Some("IllegalFilesTransition"),
                 }
@@ -1124,7 +1124,7 @@ fn ab_upgrade_expire_should_work() {
                     wr_info_600.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 3,
                     message: Some("OutdatedReporter"),
                 }
@@ -1195,7 +1195,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
                     b_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 6,
                     message: Some("ABUpgradeFailed"),
                 }
@@ -1264,7 +1264,7 @@ fn create_group_should_fail_due_to_invalid_situations() {
                 Origin::signed(alice.clone())
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 14,
                 message: Some("GroupAlreadyExist"),
             });
@@ -1275,7 +1275,7 @@ fn create_group_should_fail_due_to_invalid_situations() {
                 Origin::signed(alice.clone())
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 15,
                 message: Some("GroupOwnerForbidden"),
             });
@@ -1307,7 +1307,7 @@ fn register_should_fail_due_to_reporter_is_group_owner() {
                     register_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 15,
                     message: Some("GroupOwnerForbidden"),
                 }
@@ -1349,7 +1349,7 @@ fn report_works_should_fail_due_to_reporter_is_group_owner() {
                     legal_wr_info.sig
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 15,
                     message: Some("GroupOwnerForbidden"),
                 });
@@ -1377,7 +1377,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 alice.clone()
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 10,
                 message: Some("IdentityNotExist"),
             });
@@ -1403,7 +1403,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 alice.clone()
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 12,
                 message: Some("NotOwner"),
             });
@@ -1419,7 +1419,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 alice.clone()
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 13,
                 message: Some("IllegalUsed"),
             });
@@ -1455,7 +1455,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 alice.clone()
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 17,
                 message: Some("ExceedGroupLimit"),
             });
@@ -1472,7 +1472,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 alice.clone()
             ),
             DispatchError::Module {
-                index: 0,
+                index: 2,
                 error: 11,
                 message: Some("AlreadyJoint"),
             });
@@ -2235,7 +2235,7 @@ fn quit_group_should_work_for_stake_limit() {
                     Origin::signed(alice.clone())
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 10,
                     message: Some("IdentityNotExist"),
                 }
@@ -2251,7 +2251,7 @@ fn quit_group_should_work_for_stake_limit() {
                     Origin::signed(alice.clone())
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 16,
                     message: Some("NotJoint"),
                 }
@@ -2320,7 +2320,7 @@ fn kick_out_should_work_for_stake_limit() {
                     alice.clone()
                 ),
                 DispatchError::Module {
-                    index: 0,
+                    index: 2,
                     error: 12,
                     message: Some("NotOwner"),
                 }

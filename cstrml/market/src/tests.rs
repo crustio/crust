@@ -3366,3 +3366,42 @@ fn reward_merchant_should_work() {
         );
     });
 }
+
+#[test]
+fn set_global_switch_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+
+        let cid =
+            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let file_size = 100; // should less than
+        let staking_pot = Market::staking_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, false
+        ));
+        assert_ok!(Market::set_market_switch(
+            Origin::root(),
+            false
+        ));
+        assert_noop!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, false
+        ),
+        DispatchError::Module {
+            index: 0,
+            error: 12,
+            message: Some("PlaceOrderNotAvailable")
+        });
+    });
+}

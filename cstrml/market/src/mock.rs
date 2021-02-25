@@ -4,7 +4,7 @@
 use super::*;
 
 use frame_support::{
-    impl_outer_origin, parameter_types,
+    impl_outer_origin, parameter_types, assert_ok,
     weights::constants::RocksDbWeight,
     traits::{OnFinalize, OnInitialize, Get}
 };
@@ -205,6 +205,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut ext: sp_io::TestExternalities = t.into();
     ext.execute_with(|| {
         init_swork_setup();
+        assert_ok!(Market::set_market_switch(Origin::root(), true));
     });
 
     ext

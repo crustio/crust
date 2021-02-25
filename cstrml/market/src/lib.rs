@@ -17,7 +17,7 @@ use frame_support::{
     weights::Weight
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
-use frame_system::{self as system, ensure_signed};
+use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_runtime::{
     Perbill, ModuleId,
     traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
@@ -333,7 +333,8 @@ decl_storage! {
         pub UsedTrashMappingII get(fn used_trash_mapping_ii):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
-
+        /// Market switch to enable place storage order
+        pub MarketSwitch get(fn market_switch): bool = false;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -373,7 +374,9 @@ decl_error! {
         /// Reward is not enough
         NotEnoughReward,
         /// File is too large
-        FileTooLarge
+        FileTooLarge,
+        /// Place order is not available right now
+        PlaceOrderNotAvailable
     }
 }
 
@@ -550,9 +553,11 @@ decl_module! {
             #[compact] tips: BalanceOf<T>,
             extend_replica: bool
         ) -> DispatchResult {
+            // 1. Service should be available right now.
+            ensure!(Self::market_switch(), Error::<T>::PlaceOrderNotAvailable);
             let who = ensure_signed(origin)?;
 
-            // 1. Calculate amount.
+            // 2. Calculate amount.
             let mut charged_file_size = reported_file_size;
             if let Some((file_info, _)) = Self::files(&cid) {
                 if file_info.file_size <= reported_file_size {
@@ -562,25 +567,25 @@ decl_module! {
                     Err(Error::<T>::FileSizeNotCorrect)?
                 }
             }
-            // 2. charged_file_size should be smaller than 128G
+            // 3. charged_file_size should be smaller than 128G
             ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
             let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
-            // 3. Check client can afford the sorder
+            // 4. Check client can afford the sorder
             ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
-            // 4. Split into storage and staking account.
+            // 5. Split into storage and staking account.
             let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
 
             let curr_bn = Self::get_current_block_number();
 
-            // 5. do claim reward. Try to close file and decrease first party storage
+            // 6. do claim reward. Try to close file and decrease first party storage
             Self::do_claim_reward(&cid, curr_bn);
 
-            // 6. three scenarios: new file, extend time(refresh time) or extend replica
+            // 7. three scenarios: new file, extend time(refresh time) or extend replica
             Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
 
-            // 7. Update storage price.
+            // 8. Update storage price.
             #[cfg(not(test))]
             Self::update_file_price();
 
@@ -649,6 +654,20 @@ decl_module! {
             let staking_pot = Self::staking_pot();
             let reserved_pot = Self::reserved_pot();
             Self::deposit_event(RawEvent::PotList(collateral_pot, storage_pot, staking_pot, reserved_pot));
+            Ok(())
+        }
+
+        /// Set the global switch
+        #[weight = T::WeightInfo::reward_merchant()]
+        pub fn set_market_switch(
+            origin,
+            is_enabled: bool
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+
+            MarketSwitch::put(is_enabled);
+
+            Self::deposit_event(RawEvent::SetMarketSwitchSuccess(is_enabled));
             Ok(())
         }
     }
@@ -1199,5 +1218,6 @@ decl_event!(
         PotList(AccountId, AccountId, AccountId, AccountId),
         IllegalFileClosed(MerkleRoot),
         RewardMerchantSuccess(AccountId),
+        SetMarketSwitchSuccess(bool),
     }
 );

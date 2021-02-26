@@ -212,6 +212,9 @@ decl_storage! {
         /// The free workload, used for calculating stake limit in the end of era
         /// default is 0
         pub Free get(fn free): u128 = 0;
+
+        /// Enable punishment, the default behavior will have punishment.
+        pub EnablePunishment get(fn enable_punishment): bool = true;
     }
 }
 
@@ -667,6 +670,20 @@ decl_module! {
             Ok(())
         }
 
+        /// Set the punishment flag
+        #[weight = 1000]
+        pub fn set_punishment(
+            origin,
+            is_enabled: bool
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+
+            EnablePunishment::put(is_enabled);
+
+            Self::deposit_event(RawEvent::SetPunishmentSuccess(is_enabled));
+            Ok(())
+        }
+
         // TODO: chill anchor, identity and pk
 
     }
@@ -868,6 +885,11 @@ impl<T: Config> Module<T> {
     }
 
     fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {
+        // If punishment is disable
+        // check whether it's reported in the last report slot
+        if !Self::enable_punishment() {
+            return Self::reported_in_slot(&id.anchor, current_rs);
+        }
         if current_rs < id.punishment_deadline {
             // punish it anyway and don't refresh the deadline.
             return false;
@@ -1036,5 +1058,6 @@ decl_event!(
         CreateGroupSuccess(AccountId),
         KickOutSuccess(AccountId),
         CancelPunishmentSuccess(AccountId),
+        SetPunishmentSuccess(bool),
     }
 );

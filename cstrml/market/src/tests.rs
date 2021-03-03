@@ -3259,6 +3259,14 @@ fn reward_liquidator_should_work() {
             file_size, 0, false
         ));
 
+        assert_noop!(
+            Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()),
+            DispatchError::Module {
+                index: 3,
+                error: 9,
+                message: Some("NotInRewardPeriod")
+        });
+
         run_to_block(303);
 
         let legal_wr_info = legal_work_report_with_added_files();

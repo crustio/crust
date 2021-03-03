@@ -1,6 +1,7 @@
 // Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
+#![feature(vec_remove_item)]
 #![recursion_limit = "128"]
 #![cfg_attr(not(feature = "std"), no_std)]
 

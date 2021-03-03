@@ -77,6 +77,8 @@ pub struct FileInfo<AccountId, Balance> {
     pub claimed_at: BlockNumber,
     // The file value
     pub amount: Balance,
+    // The pre paid pool
+    pub prepaid: Balance,
     // The count of valid replica each report slot
     pub reported_replica_count: u32,
     // The replica list
@@ -284,6 +286,9 @@ pub trait Config: system::Config {
     /// Storage/Staking ratio.
     type StakingRatio: Get<Perbill>;
 
+    /// Renew reward ratio
+    type RenewRewardRatio: Get<Perbill>;
+
     /// Tax / Storage plus Staking ratio.
     type TaxRatio: Get<Perbill>;
 
@@ -412,6 +417,9 @@ decl_module! {
 
         /// Storage / Staking ratio.
         const StakingRatio: Perbill = T::StakingRatio::get();
+
+        /// Renew reward ratio.
+        const RenewRewardRatio: Perbill = T::RenewRewardRatio::get();
 
         /// Tax / Storage plus Staking ratio.
         const TaxRatio: Perbill = T::TaxRatio::get();
@@ -580,6 +588,28 @@ decl_module! {
             Ok(())
         }
 
+        /// Place a storage order
+        #[weight = T::WeightInfo::place_storage_order()]
+        pub fn add_prepaid(
+            origin,
+            cid: MerkleRoot,
+            #[compact] amount: BalanceOf<T>
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
+
+            if let Some((mut file_info, used_info)) = Self::Files(cid) {
+                T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath).expect("Something wrong during transferring");
+                file_info.prepaid += amount;
+                <Files<T>>::insert(cid, (file_info, used_info));
+            }
+
+            Self::deposit_event(RawEvent::FileSuccess(who, cid));
+
+            Ok(())
+        }
+
         /// Calculate the payout
         #[weight = T::WeightInfo::claim_reward()]
         pub fn claim_reward(
@@ -601,7 +631,9 @@ decl_module! {
 
             Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
             Self::do_claim_reward(&cid, curr_bn);
-            Self::try_to_close_file(&cid, curr_bn);
+            if !Self::try_to_renew_file(&cid, curr_bn, &claimer) {
+               Self::try_to_close_file(&cid, curr_bn);
+            }
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
         }
@@ -770,6 +802,10 @@ impl<T: Config> Module<T> {
                 if file_info.amount != Zero::zero() {
                     // This should rarely happen.
                     T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
+                }
+                if file_info.prepaid != Zero::zero() {
+                    // This should rarely happen.
+                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.prepaid, KeepAlive).expect("Something wrong during transferring");
                 }
                 Self::move_into_trash(cid, used_info, file_info.file_size);
             };
@@ -942,6 +978,7 @@ impl<T: Config> Module<T> {
                 expired_on: 0,
                 claimed_at: curr_bn.clone(),
                 amount: amount.clone(),
+                prepaid: Zero::zero(),
                 reported_replica_count: 0u32,
                 replicas: vec![]
             };
@@ -952,6 +989,37 @@ impl<T: Config> Module<T> {
             };
             <Files<T>>::insert(cid, (file_info, used_info));
         }
+    }
+
+    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> bool {
+        if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+            let amount = T::FileBaseFee::get() + Self::get_file_amount(file_info.file_size);
+            let renew_reward = T::RenewRewardRatio::get() * amount.clone();
+            // 4. Check client can afford the sorder
+            if file_info.prepaid >= amount + renew_reward {
+                file_info.prepaid = file_info.prepaid - amount.clone() - renew_reward.clone();
+                T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive).expect("Something wrong during transferring");
+                // 5. Split into storage and staking account.
+                let amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), amount.clone());
+                file_info.amount += amount;
+                if file_info.replicas.len() == 0 {
+                    // turn this file into pending status since replicas.len() is zero
+                    // we keep the original amount and expected_replica_count
+                    file_info.expired_on = 0;
+                } else {
+                    file_info.expired_on = curr_bn + T::FileDuration::get();
+                }
+                file_info.claimed_at = *curr_bn;
+                <Files<T>>::insert(cid, (file_info, used_info));
+
+                #[cfg(not(test))]
+                Self::update_file_price();
+
+                return true;
+            }
+            return false;
+        }
+        return false;
     }
 
     fn check_file_in_trash(cid: &MerkleRoot) {
@@ -1162,6 +1230,7 @@ decl_event!(
         Balance = BalanceOf<T>
     {
         FileSuccess(AccountId, MerkleRoot),
+        AddPrepaidSuccess(AccountId, MerkleRoot, Balance),
         RegisterSuccess(AccountId, Balance),
         AddCollateralSuccess(AccountId, Balance),
         CutCollateralSuccess(AccountId, Balance),

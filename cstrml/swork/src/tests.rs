@@ -2671,3 +2671,22 @@ fn cancel_punishment_should_work() {
             assert_eq!(*map.get(&ferdie).unwrap(), 4294967410u128);
         });
 }
+
+#[test]
+fn remove_reported_in_slot_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+            <self::ReportedInSlotV2>::insert(legal_pk.clone(), 0, true);
+            <self::ReportedInSlotV2>::insert(legal_pk.clone(), 300, true);
+            run_to_block(1800);
+            Swork::on_initialize(System::block_number());
+            assert_eq!(<self::ReportedInSlotV2>::contains_key(legal_pk.clone()), 0, false);
+            assert_eq!(<self::ReportedInSlotV2>::contains_key(legal_pk.clone()), 300, true);
+            run_to_block(2100);
+            Swork::on_initialize(System::block_number());
+            assert_eq!(<self::ReportedInSlotV2>::contains_key(legal_pk.clone()), 300, false);
+        });
+}

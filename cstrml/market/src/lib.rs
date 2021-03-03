@@ -713,7 +713,7 @@ impl<T: Config> Module<T> {
             // 5.2. Loop replicas
             for replica in file_info.replicas.iter() {
                 // a. didn't report in prev slot, push back to the end of replica
-                if !T::SworkerInterface::is_wr_reported(&replica.anchor, claim_block) {
+                if !T::SworkerInterface::is_wr_reported(&replica.anchor, curr_bn) {
                     let mut invalid_replica = replica.clone();
                     // update the valid_at to the curr_bn
                     invalid_replica.valid_at = curr_bn;

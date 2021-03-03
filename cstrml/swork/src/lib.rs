@@ -201,6 +201,7 @@ decl_storage! {
         /// We leave it keep all era's report info
         /// cause B-tree won't build index on key2(ReportSlot)
         /// value represent if reported in this slot
+        /// TODO: reverse the keys when we launch mainnet
         pub ReportedInSlot get(fn reported_in_slot):
             double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => bool = false;
 
@@ -708,6 +709,7 @@ impl<T: Config> Module<T> {
         );
         // 2. Loop all identities and get the workload map
         let mut workload_map= BTreeMap::new();
+        // TODO: add check when we launch mainnet
         let to_removed_slot = current_rs.saturating_sub(Self::history_slot_depth());
         for (reporter, mut id) in <Identities<T>>::iter() {
             let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);

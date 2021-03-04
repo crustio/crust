@@ -167,6 +167,9 @@ pub trait Config: system::Config {
 
 decl_storage! {
     trait Store for Module<T: Config> as Swork {
+
+        HistorySlotDepth get(fn history_slot_depth): ReportSlot = 6 * REPORT_SLOT;
+
         /// The sWorker enclave code, this should be managed by sudo/democracy
         pub Code get(fn code) config(): SworkerCode;
 
@@ -198,6 +201,7 @@ decl_storage! {
         /// We leave it keep all era's report info
         /// cause B-tree won't build index on key2(ReportSlot)
         /// value represent if reported in this slot
+        /// TODO: reverse the keys when we launch mainnet
         pub ReportedInSlot get(fn reported_in_slot):
             double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => bool = false;
 
@@ -705,6 +709,8 @@ impl<T: Config> Module<T> {
         );
         // 2. Loop all identities and get the workload map
         let mut workload_map= BTreeMap::new();
+        // TODO: add check when we launch mainnet
+        let to_removed_slot = current_rs.saturating_sub(Self::history_slot_depth());
         for (reporter, mut id) in <Identities<T>>::iter() {
             let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);
             total_used = total_used.saturating_add(used);
@@ -717,7 +723,7 @@ impl<T: Config> Module<T> {
             // TODO: we may need to deal with free and used seperately in the future
             let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(used).saturating_add(free);
             workload_map.insert(owner, workload);
-
+            ReportedInSlot::remove(&id.anchor, to_removed_slot);
         }
 
         Used::put(total_used);

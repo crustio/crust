@@ -596,7 +596,10 @@ decl_module! {
 
             let curr_bn = Self::get_current_block_number();
 
-            // 2. Calculate reward should be after expired_on
+            // 2. file should be live right now
+            ensure!(Self::files(&cid).unwrap().0.expired_on != 0, Error::<T>::NotInRewardPeriod);
+
+            // 3. Calculate reward should be after expired_on
             ensure!(curr_bn >= Self::files(&cid).unwrap().0.expired_on, Error::<T>::NotInRewardPeriod);
 
             Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
@@ -713,7 +716,7 @@ impl<T: Config> Module<T> {
             // 5.2. Loop replicas
             for replica in file_info.replicas.iter() {
                 // a. didn't report in prev slot, push back to the end of replica
-                if !T::SworkerInterface::is_wr_reported(&replica.anchor, claim_block) {
+                if !T::SworkerInterface::is_wr_reported(&replica.anchor, curr_bn) {
                     let mut invalid_replica = replica.clone();
                     // update the valid_at to the curr_bn
                     invalid_replica.valid_at = curr_bn;

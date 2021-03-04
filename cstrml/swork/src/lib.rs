@@ -9,6 +9,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::{DispatchResult, DispatchResultWithPostInfo},
     storage::IterableStorageMap,
+    storage::migration::remove_storage_prefix,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
         Weight, DispatchClass, Pays
@@ -277,6 +278,11 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
+
+        fn on_runtime_upgrade() -> frame_support::weights::Weight {
+            migrations::clear_useless_reported_in_slot::<T>();
+            T::BlockWeights::get().max_block
+        }
 
 
         /// Called when a block is initialized. Will call update_identities to update stake limit
@@ -1046,6 +1052,29 @@ impl<T: Config> Module<T> {
     fn convert_bn_to_rs(curr_bn: u32) -> u64 {
         let report_index = curr_bn as u64 / REPORT_SLOT;
         report_index * REPORT_SLOT
+    }
+}
+
+
+pub mod migrations {
+    use super::*;
+
+    pub fn clear_useless_reported_in_slot<T: Config>() {
+        let reported_rs = <crate::Module<T>>::get_current_reported_slot();
+        let current_rs = <crate::Module<T>>::current_report_slot();
+        let mut reported_history= BTreeSet::new();
+        for (_, id) in <Identities<T>>::iter() {
+            if <crate::Module<T>>::reported_in_slot(&id.anchor, current_rs) {
+                reported_history.insert((id.anchor.clone(), current_rs));
+            }
+            if <crate::Module<T>>::reported_in_slot(&id.anchor, reported_rs) {
+                reported_history.insert((id.anchor.clone(), reported_rs));
+            }
+        }
+        remove_storage_prefix(ReportedInSlot::module_prefix(), ReportedInSlot::storage_prefix(), &[]);
+        for (anchor, report_slot) in reported_history.iter() {
+            ReportedInSlot::insert(anchor, report_slot, true);
+        }
     }
 }
 

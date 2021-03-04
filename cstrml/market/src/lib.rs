@@ -424,17 +424,6 @@ decl_module! {
         /// Max size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
-
-        fn on_runtime_upgrade() -> frame_support::weights::Weight {
-            FilesSize::put(0);
-            for (_, (file_info, used_info)) in <Files<T>>::iter() {
-                Self::update_files_size(file_info.file_size, 0, used_info.reported_group_count);
-
-            }
-			migrations::migrate_to_collateral::<T>();
-			T::BlockWeights::get().max_block
-		}
-
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
@@ -1184,25 +1173,6 @@ impl<T: Config> Module<T> {
         };
 
         used_ratio * file_size
-    }
-}
-
-pub mod migrations {
-    use super::*;
-
-    #[derive(Encode, Decode)]
-    pub struct OldMerchantLedger<Balance> {
-        // The current reward amount.
-        pub reward: Balance,
-        // The total pledge amount
-        pub pledge: Balance
-    }
-
-    pub fn migrate_to_collateral<T: Config>() {
-        MerchantLedgers::<T>::translate::<OldMerchantLedger<BalanceOf<T>>, _>(|_, ledger| Some( MerchantLedger {
-            reward: ledger.reward,
-            collateral: ledger.pledge
-        }));
     }
 }
 

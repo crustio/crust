@@ -169,7 +169,7 @@ pub trait Config: system::Config {
 decl_storage! {
     trait Store for Module<T: Config> as Swork {
 
-        HistorySlotDepth get(fn history_slot_depth): ReportSlot = 6 * REPORT_SLOT;
+        HistorySlotDepth get(fn history_slot_depth): ReportSlot = 3 * REPORT_SLOT;
 
         /// The sWorker enclave code, this should be managed by sudo/democracy
         pub Code get(fn code) config(): SworkerCode;

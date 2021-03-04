@@ -280,9 +280,9 @@ decl_module! {
         fn deposit_event() = default;
 
         fn on_runtime_upgrade() -> frame_support::weights::Weight {
-			migrations::clear_useless_reported_in_slot::<T>();
-			T::BlockWeights::get().max_block
-		}
+            migrations::clear_useless_reported_in_slot::<T>();
+            T::BlockWeights::get().max_block
+        }
 
 
         /// Called when a block is initialized. Will call update_identities to update stake limit

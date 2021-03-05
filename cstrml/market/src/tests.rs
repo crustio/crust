@@ -2200,6 +2200,8 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let file_size = 100; // should less than merchant
         let reported_file_size_cid1 = 90;
         let reported_file_size_cid2 = 1000;
+        let storage_pot = Market::storage_pot();
+        let _ = Balances::make_free_balance_be(&storage_pot, 1);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
@@ -2227,6 +2229,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 })
             );
         }
+        assert_eq!(Balances::free_balance(&storage_pot), 721);
 
         run_to_block(303);
         let legal_wr_info = legal_work_report_with_added_files();
@@ -2255,6 +2258,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
+        assert_eq!(Balances::free_balance(&storage_pot), 721);
         // reported_file_size_cid2 = 1000 > 100 => close this file
         add_who_into_replica(&cid2, reported_file_size_cid2, merchant.clone(), legal_pk.clone(), None, None);
         assert_eq!(Market::files(&cid2).is_none(), true);
@@ -2262,6 +2266,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
             collateral: 6000,
             reward: 360
         });
+        assert_eq!(Balances::free_balance(&storage_pot), 721);
     })
 }
 

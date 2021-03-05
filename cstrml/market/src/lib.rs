@@ -603,6 +603,8 @@ decl_module! {
                 T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath).expect("Something wrong during transferring");
                 file_info.prepaid += amount;
                 <Files<T>>::insert(&cid, (file_info, used_info));
+            } else {
+                Err(Error::<T>::FileNotExist)?
             }
 
             Self::deposit_event(RawEvent::AddPrepaidSuccess(who, cid, amount));

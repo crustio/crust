@@ -3350,6 +3350,7 @@ fn reward_merchant_should_work() {
             reward: 0
         });
         assert_eq!(Balances::free_balance(&merchant), 120);
+        assert_eq!(Balances::free_balance(&storage_pot), 1);
         assert_noop!(
             Market::reward_merchant(
                 Origin::signed(merchant)
@@ -3561,6 +3562,80 @@ fn renew_file_should_work() {
         assert_eq!(Balances::free_balance(&charlie), 59800); // 42120 + 11180 + 6500
         assert_eq!(Market::used_trash_i(&cid).is_some(), true);
         assert_eq!(Market::files(&cid).is_none(), true);
+        assert_eq!(Balances::free_balance(&reserved_pot), 189400); // 39000 + 23400 + 127000
+    });
+}
+
+#[test]
+fn storage_pot_should_be_balanced() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // should less than merchant
+        let source = ALICE;
+        let merchant = BOB;
+        let charlie = CHARLIE;
+
+        let storage_pot = Market::storage_pot();
+        let reserved_pot = Market::reserved_pot();
+        let _ = Balances::make_free_balance_be(&storage_pot, 1);
+        assert_eq!(Balances::free_balance(&storage_pot), 1);
+        assert_eq!(Balances::free_balance(&reserved_pot), 0);
+
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let merchants = vec![merchant.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+        }
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        assert_eq!(Balances::free_balance(&storage_pot), 23401);
+        assert_eq!(Balances::free_balance(&reserved_pot), 13000);
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+        ));
+
+        assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
+        assert_eq!(Balances::free_balance(&storage_pot), 423401);
+
+        run_to_block(2503);
+        // 20% would be rewarded to liquidator charlie
+        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_eq!(Balances::free_balance(&storage_pot), 305621);
+
+        run_to_block(8000); // expired_on 6000 => all reward to liquidator charlie
+        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_eq!(Balances::free_balance(&storage_pot), 150401);
+
+        run_to_block(9000);
+        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_eq!(Balances::free_balance(&storage_pot), 1);
         assert_eq!(Balances::free_balance(&reserved_pot), 189400); // 39000 + 23400 + 127000
     });
 }

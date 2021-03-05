@@ -169,7 +169,7 @@ fn place_storage_order_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -178,7 +178,6 @@ fn place_storage_order_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -215,7 +214,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
 
         assert_noop!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ),
         DispatchError::Module {
             index: 3,
@@ -252,7 +251,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         // 1. New storage order
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -261,7 +260,6 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -279,7 +277,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         // 2. Add amount for sOrder not begin should work
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -288,7 +286,6 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -328,7 +325,6 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1400,
                 claimed_at: 400,
                 amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -354,7 +350,6 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1400,
                 claimed_at: 500,
                 amount: 42121,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -374,7 +369,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         run_to_block(600);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -383,7 +378,6 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1600,
                 claimed_at: 600,
                 amount: 60842,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -403,7 +397,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         run_to_block(800);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 200, true
+            file_size, 200
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -412,7 +406,6 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1800,
                 claimed_at: 800,
                 amount: 72111,
-                expected_replica_count: 8,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -460,7 +453,7 @@ fn do_claim_reward_should_work() {
         // 1. New storage order
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -469,7 +462,6 @@ fn do_claim_reward_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -511,7 +503,6 @@ fn do_claim_reward_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -537,7 +528,6 @@ fn do_claim_reward_should_work() {
                 expired_on: 1303,
                 claimed_at: 606,
                 amount: 16311,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -578,7 +568,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -587,7 +577,6 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -626,7 +615,6 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -651,7 +639,6 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 1303,
                 claimed_at: 603,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -683,7 +670,6 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 1303,
                 claimed_at: 903,
                 amount: 13372, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -725,7 +711,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -734,7 +720,6 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -773,7 +758,6 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -835,7 +819,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -844,7 +828,6 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -885,7 +868,6 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -910,7 +892,6 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -941,7 +922,6 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 603,
                 amount: 16383,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -983,7 +963,6 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 703,
                 amount: 14825,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -1031,7 +1010,6 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 903,
                 amount: 13179,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![
                     Replica {
@@ -1084,7 +1062,6 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 1203,
                 amount: 3297,
-                expected_replica_count: 4,
                 reported_replica_count: 3,
                 replicas: vec![
                     Replica {
@@ -1172,7 +1149,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -1181,7 +1158,6 @@ fn do_claim_reward_should_fail_due_to_not_live() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1205,7 +1181,6 @@ fn do_claim_reward_should_fail_due_to_not_live() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1225,7 +1200,6 @@ fn do_claim_reward_should_fail_due_to_not_live() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1263,7 +1237,7 @@ fn do_claim_reward_should_work_for_more_replicas() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -1272,7 +1246,6 @@ fn do_claim_reward_should_work_for_more_replicas() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1322,7 +1295,6 @@ fn do_claim_reward_should_work_for_more_replicas() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1372,7 +1344,6 @@ fn do_claim_reward_should_work_for_more_replicas() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18724,
-                expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1462,7 +1433,7 @@ fn do_claim_reward_should_only_pay_the_groups() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -1471,7 +1442,6 @@ fn do_claim_reward_should_only_pay_the_groups() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1531,7 +1501,6 @@ fn do_claim_reward_should_only_pay_the_groups() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1584,7 +1553,6 @@ fn do_claim_reward_should_only_pay_the_groups() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18724,
-                expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1676,7 +1644,7 @@ fn insert_replica_should_work_for_complex_scenario() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -1685,7 +1653,6 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1709,7 +1676,6 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![
                 Replica {
@@ -1734,7 +1700,6 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -1765,7 +1730,6 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 3,
                 replicas: vec![
                     Replica {
@@ -1819,7 +1783,6 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 4,
                 replicas: vec![
                     Replica {
@@ -1860,7 +1823,6 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1908,7 +1870,6 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 6,
                 replicas: vec![
                     Replica {
@@ -1990,7 +1951,7 @@ fn clear_trash_should_work() {
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(
                 Origin::signed(source.clone()), cid.clone(),
-                file_size, 0, false
+                file_size, 0
             ));
             assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
@@ -1998,7 +1959,6 @@ fn clear_trash_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2025,7 +1985,6 @@ fn clear_trash_should_work() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                    expected_replica_count: 4,
                     reported_replica_count: 1,
                     replicas: vec![Replica {
                         who: merchant.clone(),
@@ -2154,7 +2113,7 @@ fn withdraw_staking_pot_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -2163,7 +2122,6 @@ fn withdraw_staking_pot_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2208,7 +2166,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(
                 Origin::signed(source.clone()), cid.clone(),
-                file_size, 0, false
+                file_size, 0
             ));
             assert_eq!(Market::files(&cid).unwrap_or_default(), (
                 FileInfo {
@@ -2216,7 +2174,6 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                     expired_on: 0,
                     claimed_at: 50,
                     amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                    expected_replica_count: 4,
                     reported_replica_count: 0,
                     replicas: vec![]
                 },
@@ -2240,7 +2197,6 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2287,7 +2243,7 @@ fn double_place_storage_order_file_size_check_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid1.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
         assert_eq!(Market::files(&cid1).unwrap_or_default(), (
             FileInfo {
@@ -2295,7 +2251,6 @@ fn double_place_storage_order_file_size_check_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2317,7 +2272,6 @@ fn double_place_storage_order_file_size_check_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2335,7 +2289,7 @@ fn double_place_storage_order_file_size_check_should_work() {
 
         // 80 < 100 => throw an error
         assert_noop!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid1.clone(), 80, 0, false),
+            Origin::signed(source.clone()), cid1.clone(), 80, 0),
             DispatchError::Module {
                 index: 3,
                 error: 6,
@@ -2346,7 +2300,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         // 12000000 > 100. Only need amount for 100
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid1.clone(),
-            12000000, 0, false
+            12000000, 0
         ));
 
         assert_eq!(Market::files(&cid1).unwrap_or_default(), (
@@ -2355,7 +2309,6 @@ fn double_place_storage_order_file_size_check_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2401,7 +2354,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -2410,7 +2363,6 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2451,7 +2403,6 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2476,7 +2427,6 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2504,7 +2454,6 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -2531,7 +2480,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 1500, true);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
@@ -2539,7 +2488,6 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 2803,
                 claimed_at: 1803,
                 amount: 23403,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -2604,7 +2552,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -2613,7 +2561,6 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2654,7 +2601,6 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2679,7 +2625,6 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
-                expected_replica_count: 4,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2707,7 +2652,6 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -2741,7 +2685,6 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 903,
                 amount: 18721,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2756,7 +2699,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
@@ -2764,7 +2707,6 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 0,
                 claimed_at: 1803,
                 amount: 42121,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2799,7 +2741,7 @@ fn dynamic_used_size_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -2808,7 +2750,6 @@ fn dynamic_used_size_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2888,7 +2829,7 @@ fn delete_used_size_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -2897,7 +2838,6 @@ fn delete_used_size_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2979,7 +2919,7 @@ fn files_size_should_not_be_decreased_twice() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -2988,7 +2928,6 @@ fn files_size_should_not_be_decreased_twice() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -3036,7 +2975,6 @@ fn files_size_should_not_be_decreased_twice() {
                 expired_on: 1303,
                 claimed_at: 703,
                 amount: 17162,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -3072,7 +3010,6 @@ fn files_size_should_not_be_decreased_twice() {
                 expired_on: 1303,
                 claimed_at: 703,
                 amount: 17162,
-                expected_replica_count: 4,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -3126,7 +3063,7 @@ fn clear_same_file_in_trash_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -3135,7 +3072,6 @@ fn clear_same_file_in_trash_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -3193,7 +3129,7 @@ fn clear_same_file_in_trash_should_work() {
         // place a same storage order
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -3202,7 +3138,6 @@ fn clear_same_file_in_trash_should_work() {
                 expired_on: 0,
                 claimed_at: 1803,
                 amount: 23400,
-                expected_replica_count: 4,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -3256,7 +3191,7 @@ fn reward_liquidator_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         assert_noop!(
@@ -3306,7 +3241,7 @@ fn reward_liquidator_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
@@ -3317,7 +3252,7 @@ fn reward_liquidator_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
 
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
@@ -3395,7 +3330,7 @@ fn set_global_switch_should_work() {
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ));
         assert_ok!(Market::set_market_switch(
             Origin::root(),
@@ -3403,7 +3338,7 @@ fn set_global_switch_should_work() {
         ));
         assert_noop!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0, false
+            file_size, 0
         ),
         DispatchError::Module {
             index: 3,

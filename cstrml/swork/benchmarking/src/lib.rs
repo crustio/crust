@@ -153,7 +153,6 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
             expired_on: 1000,
             claimed_at: 400,
             amount: <T as market::Config>::Currency::minimum_balance() * 1000000000u32.into(),
-            expected_replica_count: 4,
             reported_replica_count: 0,
             replicas
         };

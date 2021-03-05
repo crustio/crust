@@ -742,9 +742,9 @@ parameter_types! {
     /// Unit is pico
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 15 * DAYS;
-    pub const InitialReplica: u32 = 4;
+    pub const FileReplica: u32 = 4;
     pub const FileBaseFee: Balance = MILLICENTS * 2;
-    pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and InitialReplica
+    pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
@@ -763,7 +763,7 @@ impl market::Config for Runtime {
     type Event = Event;
     /// File duration.
     type FileDuration = FileDuration;
-    type InitialReplica = InitialReplica;
+    type FileReplica = FileReplica;
     type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;

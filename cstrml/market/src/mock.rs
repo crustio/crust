@@ -148,7 +148,7 @@ parameter_types! {
     /// Unit is pico
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 1000;
-    pub const InitialReplica: u32 = 4;
+    pub const FileReplica: u32 = 4;
     pub const FileBaseFee: Balance = 1000;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
@@ -167,7 +167,7 @@ impl Config for Test {
     type SworkerInterface = Swork;
     type Event = ();
     type FileDuration = FileDuration;
-    type InitialReplica = InitialReplica;
+    type FileReplica = FileReplica;
     type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;

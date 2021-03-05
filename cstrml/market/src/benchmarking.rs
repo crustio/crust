@@ -21,7 +21,7 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     user
 }
 
-fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, claimed_at: BlockNumber, amount: u32, expected_replica_count: u32)
+fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, claimed_at: BlockNumber, amount: u32)
     -> (FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)
 {
     let used_info = UsedInfo {
@@ -44,7 +44,6 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
         expired_on,
         claimed_at,
         amount: T::Currency::minimum_balance() * amount.into(),
-        expected_replica_count,
         reported_replica_count: 0,
         replicas
     };
@@ -89,9 +88,9 @@ benchmarks! {
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];
-        <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000, 4));
+        <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000));
         system::Module::<T>::set_block_number(600u32.into());
-    }: _(RawOrigin::Signed(user.clone()), cid.clone(), file_size, T::Currency::minimum_balance() * 10u32.into(), true)
+    }: _(RawOrigin::Signed(user.clone()), cid.clone(), file_size, T::Currency::minimum_balance() * 10u32.into())
     verify {
         assert_eq!(Market::<T>::files(&cid).unwrap_or_default().0.claimed_at, 600);
     }
@@ -101,7 +100,7 @@ benchmarks! {
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];
-        <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000, 4));
+        <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000));
         system::Module::<T>::set_block_number(2600u32.into());
         <T as crate::Config>::Currency::make_free_balance_be(&crate::Module::<T>::storage_pot(), 2000u32.into());
     }: _(RawOrigin::Signed(user.clone()), cid.clone())

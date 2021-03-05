@@ -7,7 +7,7 @@ use frame_system::{self as system, RawOrigin};
 use frame_benchmarking::{benchmarks, account};
 use frame_support::traits::Currency;
 use frame_support::storage::StorageMap;
-use sp_runtime::traits::StaticLookup;
+use sp_runtime::traits::{StaticLookup, Zero};
 use codec::Decode;
 use market::{UsedInfo, FileInfo, Replica};
 use primitives::*;
@@ -153,6 +153,7 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
             expired_on: 1000,
             claimed_at: 400,
             amount: <T as market::Config>::Currency::minimum_balance() * 1000000000u32.into(),
+            prepaid: Zero::zero(),
             reported_replica_count: 0,
             replicas
         };

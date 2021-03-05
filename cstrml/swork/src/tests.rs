@@ -292,6 +292,7 @@ fn report_works_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: reporter.clone(),
@@ -305,6 +306,7 @@ fn report_works_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 1000,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: reporter,
@@ -1553,6 +1555,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![Replica {
                         who: alice.clone(),
@@ -1573,6 +1576,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![Replica {
                         who: alice.clone(),
@@ -1593,6 +1597,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![Replica {
                         who: alice.clone(),
@@ -1636,6 +1641,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 2,
                     replicas: vec![
                         Replica {
@@ -1664,6 +1670,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 2,
                     replicas: vec![
                         Replica {
@@ -1693,6 +1700,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![
                         Replica {
@@ -1738,6 +1746,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 3,
                     replicas: vec![
                         Replica {
@@ -1772,6 +1781,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 2,
                     replicas: vec![
                         Replica {
@@ -1801,6 +1811,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![
                         Replica {
@@ -1851,6 +1862,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![
                         Replica {
@@ -1873,6 +1885,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 2,
                     replicas: vec![
                         Replica {
@@ -1902,6 +1915,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 2,
                     replicas: vec![
                         Replica {
@@ -1953,6 +1967,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![
                         Replica {
@@ -1975,6 +1990,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![
                         Replica {
@@ -1998,6 +2014,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 1000,
+                    prepaid: 0,
                     reported_replica_count: 0,
                     replicas: vec![]
                 },

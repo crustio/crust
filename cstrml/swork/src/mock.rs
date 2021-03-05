@@ -143,6 +143,7 @@ parameter_types! {
     pub const TaxRatio: Perbill = Perbill::from_percent(10);
     pub const UsedTrashMaxSize: u128 = 2;
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
+    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl market::Config for Test {
@@ -160,6 +161,7 @@ impl market::Config for Test {
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
+    type RenewRewardRatio = RenewRewardRatio;
     type TaxRatio = TaxRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
     type MaximumFileSize = MaximumFileSize;
@@ -652,7 +654,7 @@ pub fn add_not_live_files() {
             reported_group_count: 0,
             groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };
-        insert_file(file, 1000, 0, 1000, 0, vec![], *file_size, used_info);
+        insert_file(file, 1000, 0, 1000, 0, 0, vec![], *file_size, used_info);
     }
 
     let storage_pot = Market::storage_pot();
@@ -681,16 +683,17 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(anchor.clone(), true)].into_iter())
         };
-        insert_file(file, 200, 12000, 1000, 0, vec![replica_info.clone()], *file_size, used_info);
+        insert_file(file, 200, 12000, 1000, 0, 0, vec![replica_info.clone()], *file_size, used_info);
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, claimed_at: u32, expired_on: u32, amount: Balance, reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+fn insert_file(f_id: &MerkleRoot, claimed_at: u32, expired_on: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
     let file_info = FileInfo {
         file_size,
         expired_on,
         claimed_at,
         amount,
+        prepaid,
         reported_replica_count,
         replicas
     };

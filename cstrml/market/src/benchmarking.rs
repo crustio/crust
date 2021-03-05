@@ -44,6 +44,7 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
         expired_on,
         claimed_at,
         amount: T::Currency::minimum_balance() * amount.into(),
+        prepaid: Zero::zero(),
         reported_replica_count: 0,
         replicas
     };

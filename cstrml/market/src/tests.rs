@@ -178,6 +178,7 @@ fn place_storage_order_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -260,6 +261,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -286,6 +288,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -325,6 +328,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1400,
                 claimed_at: 400,
                 amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -350,6 +354,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1400,
                 claimed_at: 500,
                 amount: 42121,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -378,6 +383,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1600,
                 claimed_at: 600,
                 amount: 60842,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -406,6 +412,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 expired_on: 1800,
                 claimed_at: 800,
                 amount: 72111,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -462,6 +469,7 @@ fn do_claim_reward_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -503,6 +511,7 @@ fn do_claim_reward_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -528,6 +537,7 @@ fn do_claim_reward_should_work() {
                 expired_on: 1303,
                 claimed_at: 606,
                 amount: 16311,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -577,6 +587,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -615,6 +626,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -639,6 +651,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 1303,
                 claimed_at: 603,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -670,6 +683,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
                 expired_on: 1303,
                 claimed_at: 903,
                 amount: 13372, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -720,6 +734,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -758,6 +773,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -828,6 +844,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -868,6 +885,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -892,6 +910,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -922,6 +941,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 603,
                 amount: 16383,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -963,6 +983,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 703,
                 amount: 14825,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -1010,6 +1031,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 903,
                 amount: 13179,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![
                     Replica {
@@ -1062,6 +1084,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
                 expired_on: 1303,
                 claimed_at: 1203,
                 amount: 3297,
+                prepaid: 0,
                 reported_replica_count: 3,
                 replicas: vec![
                     Replica {
@@ -1158,6 +1181,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1181,6 +1205,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1200,6 +1225,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1246,6 +1272,7 @@ fn do_claim_reward_should_work_for_more_replicas() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1295,6 +1322,7 @@ fn do_claim_reward_should_work_for_more_replicas() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1344,6 +1372,7 @@ fn do_claim_reward_should_work_for_more_replicas() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18724,
+                prepaid: 0,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1442,6 +1471,7 @@ fn do_claim_reward_should_only_pay_the_groups() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1501,6 +1531,7 @@ fn do_claim_reward_should_only_pay_the_groups() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1553,6 +1584,7 @@ fn do_claim_reward_should_only_pay_the_groups() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18724,
+                prepaid: 0,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1653,6 +1685,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1676,6 +1709,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![
                 Replica {
@@ -1700,6 +1734,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -1730,6 +1765,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 3,
                 replicas: vec![
                     Replica {
@@ -1783,6 +1819,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 4,
                 replicas: vec![
                     Replica {
@@ -1823,6 +1860,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 5,
                 replicas: vec![
                     Replica {
@@ -1870,6 +1908,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 6,
                 replicas: vec![
                     Replica {
@@ -1959,6 +1998,7 @@ fn clear_trash_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -1985,6 +2025,7 @@ fn clear_trash_should_work() {
                     expired_on: 1303,
                     claimed_at: 303,
                     amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                    prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![Replica {
                         who: merchant.clone(),
@@ -2122,6 +2163,7 @@ fn withdraw_staking_pot_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2174,6 +2216,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                     expired_on: 0,
                     claimed_at: 50,
                     amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                    prepaid: 0,
                     reported_replica_count: 0,
                     replicas: vec![]
                 },
@@ -2197,6 +2240,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2251,6 +2295,7 @@ fn double_place_storage_order_file_size_check_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2272,6 +2317,7 @@ fn double_place_storage_order_file_size_check_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2309,6 +2355,7 @@ fn double_place_storage_order_file_size_check_should_work() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2363,6 +2410,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2403,6 +2451,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2427,6 +2476,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2454,6 +2504,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -2488,6 +2539,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 expired_on: 2803,
                 claimed_at: 1803,
                 amount: 23403,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -2561,6 +2613,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2601,6 +2654,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 303,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2625,6 +2679,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
+                prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
                     who: merchant.clone(),
@@ -2652,6 +2707,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 503,
                 amount: 18721,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -2685,6 +2741,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 1303,
                 claimed_at: 903,
                 amount: 18721,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2707,6 +2764,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 expired_on: 0,
                 claimed_at: 1803,
                 amount: 42121,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2750,6 +2808,7 @@ fn dynamic_used_size_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2838,6 +2897,7 @@ fn delete_used_size_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2928,6 +2988,7 @@ fn files_size_should_not_be_decreased_twice() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -2975,6 +3036,7 @@ fn files_size_should_not_be_decreased_twice() {
                 expired_on: 1303,
                 claimed_at: 703,
                 amount: 17162,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -3010,6 +3072,7 @@ fn files_size_should_not_be_decreased_twice() {
                 expired_on: 1303,
                 claimed_at: 703,
                 amount: 17162,
+                prepaid: 0,
                 reported_replica_count: 2,
                 replicas: vec![
                     Replica {
@@ -3072,6 +3135,7 @@ fn clear_same_file_in_trash_should_work() {
                 expired_on: 0,
                 claimed_at: 50,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },
@@ -3138,6 +3202,7 @@ fn clear_same_file_in_trash_should_work() {
                 expired_on: 0,
                 claimed_at: 1803,
                 amount: 23400,
+                prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
             },

@@ -141,7 +141,7 @@ parameter_types! {
     /// Unit is pico
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 1000;
-    pub const InitialReplica: u32 = 4;
+    pub const FileReplica: u32 = 4;
     pub const FileBaseFee: Balance = 1000;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
@@ -161,7 +161,7 @@ impl market::Config for Test {
     type Event = ();
     /// File duration.
     type FileDuration = FileDuration;
-    type InitialReplica = InitialReplica;
+    type FileReplica = FileReplica;
     type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
@@ -650,7 +650,7 @@ pub fn add_not_live_files() {
             reported_group_count: 0,
             groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };
-        insert_file(file, 1000, 0, 1000, 4, 0, vec![], *file_size, used_info);
+        insert_file(file, 1000, 0, 1000, 0, vec![], *file_size, used_info);
     }
 
     let storage_pot = Market::storage_pot();
@@ -675,17 +675,16 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(anchor.clone(), true)].into_iter())
         };
-        insert_file(file, 200, 12000, 1000, 4, 0, vec![replica_info.clone()], *file_size, used_info);
+        insert_file(file, 200, 12000, 1000, 0, vec![replica_info.clone()], *file_size, used_info);
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, claimed_at: u32, expired_on: u32, amount: Balance, expected_replica_count: u32, reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+fn insert_file(f_id: &MerkleRoot, claimed_at: u32, expired_on: u32, amount: Balance, reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
     let file_info = FileInfo {
         file_size,
         expired_on,
         claimed_at,
         amount,
-        expected_replica_count,
         reported_replica_count,
         replicas
     };

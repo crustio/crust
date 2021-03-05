@@ -77,8 +77,6 @@ pub struct FileInfo<AccountId, Balance> {
     pub claimed_at: BlockNumber,
     // The file value
     pub amount: Balance,
-    // The count of replica that user wants
-    pub expected_replica_count: u32,
     // The count of valid replica each report slot
     pub reported_replica_count: u32,
     // The replica list
@@ -266,7 +264,7 @@ pub trait Config: system::Config {
     type FileDuration: Get<BlockNumber>;
 
     /// File base replica. Use 4 for now
-    type InitialReplica: Get<u32>;
+    type FileReplica: Get<u32>;
 
     /// File Base Fee. Use 0.001 CRU for now
     type FileBaseFee: Get<BalanceOf<Self>>;
@@ -395,7 +393,7 @@ decl_module! {
         const FileDuration: BlockNumber = T::FileDuration::get();
 
         /// File base replica.
-        const InitialReplica: u32 = T::InitialReplica::get();
+        const FileReplica: u32 = T::FileReplica::get();
 
         /// File Base Fee.
         const FileBaseFee: BalanceOf<T> = T::FileBaseFee::get();
@@ -539,8 +537,7 @@ decl_module! {
             origin,
             cid: MerkleRoot,
             reported_file_size: u64,
-            #[compact] tips: BalanceOf<T>,
-            extend_replica: bool
+            #[compact] tips: BalanceOf<T>
         ) -> DispatchResult {
             // 1. Service should be available right now.
             ensure!(Self::market_switch(), Error::<T>::PlaceOrderNotAvailable);
@@ -571,8 +568,8 @@ decl_module! {
             // 6. do claim reward. Try to close file and decrease first party storage
             Self::do_claim_reward(&cid, curr_bn);
 
-            // 7. three scenarios: new file, extend time(refresh time) or extend replica
-            Self::upsert_new_file_info(&cid, extend_replica, &amount, &curr_bn, charged_file_size);
+            // 7. three scenarios: new file, extend time(refresh time)
+            Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
             // 8. Update storage price.
             #[cfg(not(test))]
@@ -714,7 +711,7 @@ impl<T: Config> Module<T> {
         Self::update_files_size(file_info.file_size, prev_reported_group_count, used_info.reported_group_count);
 
         let claim_block = curr_bn.min(file_info.expired_on);
-        let target_reward_count = file_info.replicas.len().min(file_info.expected_replica_count as usize) as u32;
+        let target_reward_count = file_info.replicas.len().min(T::FileReplica::get() as usize) as u32;
         
         // 5. Calculate payouts, check replicas and update the file_info
         if target_reward_count > 0 {
@@ -930,8 +927,8 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn upsert_new_file_info(cid: &MerkleRoot, extend_replica: bool, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
-        // Extend expired_on or expected_replica_count
+    fn upsert_new_file_info(cid: &MerkleRoot, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
+        // Extend expired_on
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             // expired_on < claimed_at => file is not live yet. This situation only happen for new file.
             // expired_on == claimed_at => file is ready to be closed(wait to be put into trash or refreshed).
@@ -941,7 +938,7 @@ impl<T: Config> Module<T> {
             } else if file_info.expired_on == file_info.claimed_at {
                 if file_info.replicas.len() == 0 {
                     // turn this file into pending status since replicas.len() is zero
-                    // we keep the original amount and expected_replica_count
+                    // we keep the original amount
                     file_info.expired_on = 0;
                 } else {
                     file_info.expired_on = curr_bn + T::FileDuration::get();
@@ -949,10 +946,6 @@ impl<T: Config> Module<T> {
                 file_info.claimed_at = *curr_bn;
             }
             file_info.amount += amount.clone();
-            if extend_replica {
-                // TODO: use 2 instead of 4
-                file_info.expected_replica_count += T::InitialReplica::get();
-            }
             <Files<T>>::insert(cid, (file_info, used_info));
         } else {
             Self::check_file_in_trash(cid);
@@ -962,7 +955,6 @@ impl<T: Config> Module<T> {
                 expired_on: 0,
                 claimed_at: curr_bn.clone(),
                 amount: amount.clone(),
-                expected_replica_count: T::InitialReplica::get(),
                 reported_replica_count: 0u32,
                 replicas: vec![]
             };

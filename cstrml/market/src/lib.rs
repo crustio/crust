@@ -992,7 +992,7 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> bool {
+    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             // 1. Calculate total amount
             let file_amount = T::FileBaseFee::get() + Self::get_file_amount(file_info.file_size);
@@ -1020,12 +1020,8 @@ impl<T: Config> Module<T> {
                 Self::update_file_price();
 
                 Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
-
-                return true;
             }
-            return false;
         }
-        return false;
     }
 
     fn check_file_in_trash(cid: &MerkleRoot) {

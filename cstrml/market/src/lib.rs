@@ -1170,8 +1170,9 @@ impl<T: Config> Module<T> {
                     <Files<T>>::insert(cid, (file_info, used_info));
                 // ordered_file_size < reported_file_size, close it with notification
                 } else {
-                    if !Self::maybe_reward_merchant(who, &file_info.amount, true) {
-                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
+                    let total_amount = file_info.amount + file_info.prepaid;
+                    if !Self::maybe_reward_merchant(who, &total_amount, true) {
+                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive).expect("Something wrong during transferring");
                     }
                     <Files<T>>::remove(cid);
                     Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));

@@ -636,9 +636,11 @@ decl_module! {
             Self::do_claim_reward(&cid, curr_bn);
 
             // 5. Try to renew file if prepaid is not zero
-            if !Self::try_to_renew_file(&cid, curr_bn, &claimer) {
-               Self::try_to_close_file(&cid, curr_bn);
-            }
+            Self::try_to_renew_file(&cid, curr_bn, &claimer);
+
+            // 6. Try to close file
+            Self::try_to_close_file(&cid, curr_bn);
+
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
         }
@@ -804,14 +806,8 @@ impl<T: Config> Module<T> {
             // If it's already expired.
             if file_info.expired_on <= curr_bn && file_info.expired_on >= file_info.claimed_at {
                 Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
-                if file_info.amount != Zero::zero() {
-                    // This should rarely happen.
-                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.amount, KeepAlive).expect("Something wrong during transferring");
-                }
-                if file_info.prepaid != Zero::zero() {
-                    // This should rarely happen.
-                    T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), file_info.prepaid, KeepAlive).expect("Something wrong during transferring");
-                }
+                let total_amount = file_info.amount.saturating_add(file_info.prepaid);
+                T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive).expect("Something wrong during transferring");
                 Self::move_into_trash(cid, used_info, file_info.file_size);
             };
         }
@@ -1108,9 +1104,9 @@ impl<T: Config> Module<T> {
         let staking_amount = T::StakingRatio::get() * staking_and_storage_amount;
         let storage_amount = staking_and_storage_amount - staking_amount;
 
-        T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, AllowDeath).expect("Something wrong during transferring");
-        T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, AllowDeath).expect("Something wrong during transferring");
-        T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), AllowDeath).expect("Something wrong during transferring");
+        T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, KeepAlive).expect("Something wrong during transferring");
+        T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, KeepAlive).expect("Something wrong during transferring");
+        T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), KeepAlive).expect("Something wrong during transferring");
         storage_amount
     }
 

@@ -9,7 +9,6 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::{DispatchResult, DispatchResultWithPostInfo},
     storage::IterableStorageMap,
-    storage::migration::remove_storage_prefix,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
         Weight, DispatchClass, Pays

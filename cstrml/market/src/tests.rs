@@ -176,7 +176,7 @@ fn place_storage_order_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -259,7 +259,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -286,7 +286,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -326,7 +326,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             FileInfo {
                 file_size,
                 expired_on: 1400,
-                claimed_at: 400,
+                calculated_at: 400,
                 amount: 46800, // ( 1000 + 1000 * 129 + 0 ) * 0.18 * 2
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -344,15 +344,15 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             })
         );
 
-        // Calculate mannual claim reward should work
+        // Calculate reward should work
         run_to_block(500);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1400,
-                claimed_at: 500,
+                calculated_at: 500,
                 amount: 42121,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -381,7 +381,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             FileInfo {
                 file_size,
                 expired_on: 1600,
-                claimed_at: 600,
+                calculated_at: 600,
                 amount: 60842,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -410,7 +410,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             FileInfo {
                 file_size,
                 expired_on: 1800,
-                claimed_at: 800,
+                calculated_at: 800,
                 amount: 72111,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -435,9 +435,9 @@ fn place_storage_order_should_work_for_extend_scenarios() {
 #[test]
 // Payout should be triggered by:
 // 1. Delete file(covered by swork module)
-// 2. Claim reward
+// 2. Calculate reward
 // 3. Place started storage order(covered by `place_storage_order_should_work_for_extend_scenarios`)
-fn do_claim_reward_should_work() {
+fn do_calculate_reward_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -467,7 +467,7 @@ fn do_claim_reward_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -509,7 +509,7 @@ fn do_claim_reward_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -530,12 +530,12 @@ fn do_claim_reward_should_work() {
         // 3. Go along with some time, and get reward
         run_to_block(606);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 606,
+                calculated_at: 606,
                 amount: 16311,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -560,7 +560,7 @@ fn do_claim_reward_should_work() {
 }
 
 #[test]
-fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
+fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -585,7 +585,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -624,7 +624,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -644,12 +644,12 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
 
         run_to_block(603);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 603,
+                calculated_at: 603,
                 amount: 23400, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -676,12 +676,12 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
         run_to_block(903);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 600, true);
         assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6_000_000));
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 903,
+                calculated_at: 903,
                 amount: 13372, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -707,7 +707,7 @@ fn do_claim_reward_should_fail_due_to_insufficient_collateral() {
 }
 
 #[test]
-fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
+fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -732,7 +732,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -771,7 +771,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -791,7 +791,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
 
         run_to_block(1506);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 1200, true);
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::files(&cid), None);
 
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
@@ -808,7 +808,7 @@ fn do_claim_reward_should_move_file_to_trash_due_to_expired() {
 }
 
 #[test]
-fn do_claim_reward_should_work_in_complex_timeline() {
+fn do_calculate_reward_should_work_in_complex_timeline() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -842,7 +842,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -883,7 +883,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -903,12 +903,12 @@ fn do_claim_reward_should_work_in_complex_timeline() {
 
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 503,
+                calculated_at: 503,
                 amount: 18721,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -934,12 +934,12 @@ fn do_claim_reward_should_work_in_complex_timeline() {
 
         run_to_block(603);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 603,
+                calculated_at: 603,
                 amount: 16383,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -976,12 +976,12 @@ fn do_claim_reward_should_work_in_complex_timeline() {
 
         add_who_into_replica(&cid, file_size, dave.clone(), hex::decode("11").unwrap(), None, None);
         run_to_block(703);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 703,
+                calculated_at: 703,
                 amount: 14825,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -1024,12 +1024,12 @@ fn do_claim_reward_should_work_in_complex_timeline() {
 
         run_to_block(903);
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 600, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 903,
+                calculated_at: 903,
                 amount: 13179,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -1077,12 +1077,12 @@ fn do_claim_reward_should_work_in_complex_timeline() {
         run_to_block(1203);
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 900, true);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 1203,
+                calculated_at: 1203,
                 amount: 3297,
                 prepaid: 0,
                 reported_replica_count: 3,
@@ -1127,7 +1127,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
         assert_eq!(Market::files_size(), (file_size * 2) as u128);
 
         run_to_block(1803);
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
@@ -1152,7 +1152,7 @@ fn do_claim_reward_should_work_in_complex_timeline() {
 }
 
 #[test]
-fn do_claim_reward_should_fail_due_to_not_live() {
+fn do_calculate_reward_should_fail_due_to_not_live() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -1179,7 +1179,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1203,7 +1203,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1217,13 +1217,13 @@ fn do_claim_reward_should_fail_due_to_not_live() {
         );
 
         run_to_block(1506);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1239,7 +1239,7 @@ fn do_claim_reward_should_fail_due_to_not_live() {
 }
 
 #[test]
-fn do_claim_reward_should_work_for_more_replicas() {
+fn do_calculate_reward_should_work_for_more_replicas() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -1270,7 +1270,7 @@ fn do_claim_reward_should_work_for_more_replicas() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1320,7 +1320,7 @@ fn do_claim_reward_should_work_for_more_replicas() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 5,
@@ -1365,12 +1365,12 @@ fn do_claim_reward_should_work_for_more_replicas() {
         );
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 503,
+                calculated_at: 503,
                 amount: 18724,
                 prepaid: 0,
                 reported_replica_count: 5,
@@ -1438,7 +1438,7 @@ fn do_claim_reward_should_work_for_more_replicas() {
 }
 
 #[test]
-fn do_claim_reward_should_only_pay_the_groups() {
+fn do_calculate_reward_should_only_pay_the_groups() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -1469,7 +1469,7 @@ fn do_claim_reward_should_only_pay_the_groups() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1529,7 +1529,7 @@ fn do_claim_reward_should_only_pay_the_groups() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 5,
@@ -1577,12 +1577,12 @@ fn do_claim_reward_should_only_pay_the_groups() {
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 0, true);
         <swork::ReportedInSlot>::insert(hex::decode("22").unwrap(), 0, true);
         <swork::ReportedInSlot>::insert(hex::decode("33").unwrap(), 0, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 503,
+                calculated_at: 503,
                 amount: 18724,
                 prepaid: 0,
                 reported_replica_count: 5,
@@ -1683,7 +1683,7 @@ fn insert_replica_should_work_for_complex_scenario() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1707,7 +1707,7 @@ fn insert_replica_should_work_for_complex_scenario() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -1732,7 +1732,7 @@ fn insert_replica_should_work_for_complex_scenario() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -1763,7 +1763,7 @@ fn insert_replica_should_work_for_complex_scenario() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 3,
@@ -1817,7 +1817,7 @@ fn insert_replica_should_work_for_complex_scenario() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 4,
@@ -1858,7 +1858,7 @@ fn insert_replica_should_work_for_complex_scenario() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 5,
@@ -1906,7 +1906,7 @@ fn insert_replica_should_work_for_complex_scenario() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 6,
@@ -1996,7 +1996,7 @@ fn clear_trash_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2023,7 +2023,7 @@ fn clear_trash_should_work() {
                 FileInfo {
                     file_size,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -2045,28 +2045,28 @@ fn clear_trash_should_work() {
         run_to_block(1500);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 1200, true);
         // close files one by one
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid1.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
         assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid2.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
         assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid3.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
         assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid4.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
         assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
@@ -2075,14 +2075,14 @@ fn clear_trash_should_work() {
         assert_eq!(Market::used_trash_i(&cid1), None);
         assert_eq!(Market::used_trash_i(&cid2), None);
 
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid5.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
         assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid6.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
         assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), UsedInfo {
             used_size: file_size * 2,
             reported_group_count: 1,
@@ -2161,7 +2161,7 @@ fn withdraw_staking_pot_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2216,7 +2216,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 FileInfo {
                     file_size,
                     expired_on: 0,
-                    claimed_at: 50,
+                    calculated_at: 50,
                     amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                     prepaid: 0,
                     reported_replica_count: 0,
@@ -2241,7 +2241,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
             FileInfo {
                 file_size: reported_file_size_cid1,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -2298,7 +2298,7 @@ fn double_place_storage_order_file_size_check_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2320,7 +2320,7 @@ fn double_place_storage_order_file_size_check_should_work() {
             FileInfo {
                 file_size: reported_file_size_cid1,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -2358,7 +2358,7 @@ fn double_place_storage_order_file_size_check_should_work() {
             FileInfo {
                 file_size: reported_file_size_cid1,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 720, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2413,7 +2413,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2454,7 +2454,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -2474,12 +2474,12 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
 
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 503,
+                calculated_at: 503,
                 amount: 18721,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -2507,7 +2507,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 503,
+                calculated_at: 503,
                 amount: 18721,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -2542,7 +2542,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             FileInfo {
                 file_size,
                 expired_on: 2303,
-                claimed_at: 1303,
+                calculated_at: 1303,
                 amount: 23403,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -2616,7 +2616,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2657,7 +2657,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -2677,12 +2677,12 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
 
         run_to_block(503);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 503,
+                calculated_at: 503,
                 amount: 18721,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -2710,7 +2710,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 503,
+                calculated_at: 503,
                 amount: 18721,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -2738,13 +2738,13 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
         Market::delete_replica(&charlie, &cid, &legal_pk);
 
         run_to_block(903);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
-        // claimed_at should be updated
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+        // calculated_at should be updated
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 903,
+                calculated_at: 903,
                 amount: 18721,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2767,7 +2767,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 1803,
+                calculated_at: 1803,
                 amount: 42121,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2811,7 +2811,7 @@ fn dynamic_used_size_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2900,7 +2900,7 @@ fn delete_used_size_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -2991,7 +2991,7 @@ fn files_size_should_not_be_decreased_twice() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -3034,12 +3034,12 @@ fn files_size_should_not_be_decreased_twice() {
         assert_eq!(Market::files_size(), (file_size * 3) as u128);
         run_to_block(703);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        Market::do_claim_reward(&cid, System::block_number().try_into().unwrap());
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 703,
+                calculated_at: 703,
                 amount: 17162,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -3075,7 +3075,7 @@ fn files_size_should_not_be_decreased_twice() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 703,
+                calculated_at: 703,
                 amount: 17162,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -3138,7 +3138,7 @@ fn clear_same_file_in_trash_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 50,
+                calculated_at: 50,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -3180,7 +3180,7 @@ fn clear_same_file_in_trash_should_work() {
         run_to_block(1803);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 1500, true);
         <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 1500, true);
-        assert_ok!(Market::claim_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
 
         // Prepare a file in the trash
         assert_eq!(Market::files(&cid).is_none(), true);
@@ -3205,7 +3205,7 @@ fn clear_same_file_in_trash_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 0,
-                claimed_at: 1803,
+                calculated_at: 1803,
                 amount: 23400,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -3252,7 +3252,7 @@ fn reward_liquidator_should_work() {
         }
 
         assert_noop!(
-            Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()),
+            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 0,
                 error: 8,
@@ -3265,7 +3265,7 @@ fn reward_liquidator_should_work() {
         ));
 
         assert_noop!(
-            Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()),
+            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 3,
                 error: 9,
@@ -3295,7 +3295,7 @@ fn reward_liquidator_should_work() {
         ));
 
         assert_noop!(
-            Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()),
+            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 0,
                 error: 9,
@@ -3304,7 +3304,7 @@ fn reward_liquidator_should_work() {
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 4680);
         assert_eq!(Market::files(&cid).is_none(), true);
         assert_eq!(Market::used_trash_i(&cid).is_some(), true);
@@ -3317,7 +3317,7 @@ fn reward_liquidator_should_work() {
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
 
         run_to_block(4000); // 3503 - 4503 => no reward to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 4680);
 
         assert_ok!(Market::place_storage_order(
@@ -3328,7 +3328,7 @@ fn reward_liquidator_should_work() {
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
 
         run_to_block(8000); // expired_on 6000 => all reward to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 28080);
     });
 }
@@ -3487,7 +3487,7 @@ fn renew_file_should_work() {
             FileInfo {
                 file_size,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 23400,
                 prepaid: 400_000,
                 reported_replica_count: 1,
@@ -3507,13 +3507,13 @@ fn renew_file_should_work() {
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 2303,
-                claimed_at: 1303,
+                calculated_at: 1303,
                 amount: 42120, // 23400 * 0.8 + 23400
                 prepaid: 263_500,
                 reported_replica_count: 0,
@@ -3537,13 +3537,13 @@ fn renew_file_should_work() {
         assert_eq!(Balances::free_balance(&reserved_pot), 26000);
 
         run_to_block(8000); // expired_on 2303 => all reward to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 59800); // 42120 + 11180 + 6500
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 3303,
-                claimed_at: 2303,
+                calculated_at: 2303,
                 amount: 23400,
                 prepaid: 127000,
                 reported_replica_count: 0,
@@ -3563,7 +3563,7 @@ fn renew_file_should_work() {
         assert_eq!(Balances::free_balance(&reserved_pot), 39000);
         assert_eq!(Market::used_trash_i(&cid).is_none(), true);
         run_to_block(9000); // expired_on 3303 => all reward to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 83200); // 42120 + 11180 + 6500 + 23400
         assert_eq!(Market::used_trash_i(&cid).is_some(), true);
         assert_eq!(Market::files(&cid).is_none(), true);
@@ -3631,15 +3631,15 @@ fn storage_pot_should_be_balanced() {
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 305621);
 
         run_to_block(8000); // expired_on 6000 => all reward to liquidator charlie
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 150401);
 
         run_to_block(9000);
-        assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 1);
         assert_eq!(Balances::free_balance(&reserved_pot), 166000); // 39000 + 127000
     });

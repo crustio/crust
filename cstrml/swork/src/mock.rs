@@ -684,11 +684,11 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, claimed_at: u32, expired_on: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
     let file_info = FileInfo {
         file_size,
         expired_on,
-        claimed_at,
+        calculated_at,
         amount,
         prepaid,
         reported_replica_count,

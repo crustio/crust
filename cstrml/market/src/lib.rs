@@ -1262,7 +1262,7 @@ pub mod migrations {
                 FileInfo {
                     file_size: file_info.file_size,
                     expired_on: file_info.expired_on,
-                    claimed_at: file_info.claimed_at,
+                    calculated_at: file_info.claimed_at,
                     amount: file_info.amount,
                     prepaid: Zero::zero(),
                     reported_replica_count: file_info.reported_replica_count,

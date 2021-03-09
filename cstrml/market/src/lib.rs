@@ -62,7 +62,7 @@ pub trait WeightInfo {
     fn add_collateral() -> Weight;
     fn cut_collateral() -> Weight;
     fn place_storage_order() -> Weight;
-    fn claim_reward() -> Weight;
+    fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
 }
 
@@ -198,7 +198,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             let mut is_to_decreased = false;
             file_info.replicas.retain(|replica| {
                 if replica.who == *who && replica.is_reported {
-                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_claim_reward`
+                    // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_calculate_reward`
                     is_to_decreased = true;
                 }
                 replica.who != *who
@@ -574,7 +574,7 @@ decl_module! {
             let curr_bn = Self::get_current_block_number();
 
             // 6. do claim reward. Try to close file and decrease first party storage
-            Self::do_claim_reward(&cid, curr_bn);
+            Self::do_calculate_reward(&cid, curr_bn);
 
             // 7. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
@@ -613,8 +613,8 @@ decl_module! {
         }
 
         /// Calculate the payout
-        #[weight = T::WeightInfo::claim_reward()]
-        pub fn claim_reward(
+        #[weight = T::WeightInfo::calculate_reward()]
+        pub fn calculate_reward(
             origin,
             cid: MerkleRoot,
         ) -> DispatchResult {
@@ -633,7 +633,7 @@ decl_module! {
             Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
 
             // 4. Refresh the status of the file and calculate the reward for merchants
-            Self::do_claim_reward(&cid, curr_bn);
+            Self::do_calculate_reward(&cid, curr_bn);
 
             // 5. Try to renew file if prepaid is not zero
             Self::try_to_renew_file(&cid, curr_bn, &claimer);
@@ -719,7 +719,7 @@ impl<T: Config> Module<T> {
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
-    pub fn do_claim_reward(cid: &MerkleRoot, curr_bn: BlockNumber)
+    pub fn do_calculate_reward(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
         if Self::files(cid).is_none() { return; }

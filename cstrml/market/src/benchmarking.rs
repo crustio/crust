@@ -96,7 +96,7 @@ benchmarks! {
         assert_eq!(Market::<T>::files(&cid).unwrap_or_default().0.claimed_at, 600);
     }
 
-    claim_reward {
+    calculate_reward {
         let user = create_funded_user::<T>("user", 100);
         let cid = vec![0];
         let file_size: u64 = 10;
@@ -146,9 +146,9 @@ mod tests {
     }
 
     #[test]
-    fn claim_reward() {
+    fn calculate_reward() {
         new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_claim_reward::<Test>());
+            assert_ok!(test_benchmark_calculate_reward::<Test>());
         });
     }
 

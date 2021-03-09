@@ -290,7 +290,7 @@ fn report_works_should_work() {
             assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default().0, FileInfo {
                 file_size: 134289408,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 1000,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -304,7 +304,7 @@ fn report_works_should_work() {
             assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default().0, FileInfo {
                 file_size: 268578816,
                 expired_on: 1303,
-                claimed_at: 303,
+                calculated_at: 303,
                 amount: 1000,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -1553,7 +1553,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 13,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -1574,7 +1574,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 7,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -1595,7 +1595,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -1639,7 +1639,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 7,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 2,
@@ -1668,7 +1668,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 2,
@@ -1698,7 +1698,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 55,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -1744,7 +1744,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 3,
@@ -1779,7 +1779,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 55,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 2,
@@ -1809,7 +1809,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 22,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -1860,7 +1860,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 7,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -1883,7 +1883,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 2,
@@ -1913,7 +1913,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 55,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 2,
@@ -1965,7 +1965,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 37,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -1988,7 +1988,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 55,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
@@ -2012,7 +2012,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 FileInfo {
                     file_size: 22,
                     expired_on: 1303,
-                    claimed_at: 303,
+                    calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 0,

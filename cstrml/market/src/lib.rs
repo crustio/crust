@@ -73,8 +73,8 @@ pub struct FileInfo<AccountId, Balance> {
     pub file_size: u64,
     // The block number when the file goes invalide
     pub expired_on: BlockNumber,
-    // The last block number when the file's amount is claimed
-    pub claimed_at: BlockNumber,
+    // The last block number when the file's amount is calculated
+    pub calculated_at: BlockNumber,
     // The file value
     pub amount: Balance,
     // The pre paid pool
@@ -176,10 +176,10 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                 used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the used_size after the update
             };
 
-            // 4. The first join the replicas and file become live(expired_on > claimed_at)
+            // 4. The first join the replicas and file become live(expired_on > calculated_at)
             let curr_bn = Self::get_current_block_number();
             if file_info.replicas.len() == 1 {
-                file_info.claimed_at = curr_bn;
+                file_info.calculated_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
 
@@ -573,7 +573,7 @@ decl_module! {
 
             let curr_bn = Self::get_current_block_number();
 
-            // 6. do claim reward. Try to close file and decrease first party storage
+            // 6. do calculate reward. Try to close file and decrease first party storage
             Self::do_calculate_reward(&cid, curr_bn);
 
             // 7. three scenarios: new file, extend time(refresh time)
@@ -618,7 +618,7 @@ decl_module! {
             origin,
             cid: MerkleRoot,
         ) -> DispatchResult {
-            let claimer = ensure_signed(origin)?;
+            let liquidator = ensure_signed(origin)?;
 
             // 1. Ensure file exist
             ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
@@ -629,14 +629,14 @@ decl_module! {
             // 2. File should be live right now and calculate reward should be after expired_on
             ensure!(file_info.expired_on != 0 && curr_bn >= file_info.expired_on, Error::<T>::NotInRewardPeriod);
 
-            // 3. Maybe reward claimer when he try to close outdated file
-            Self::maybe_reward_claimer(&cid, curr_bn, &claimer);
+            // 3. Maybe reward liquidator when he try to close outdated file
+            Self::maybe_reward_liquidator(&cid, curr_bn, &liquidator);
 
             // 4. Refresh the status of the file and calculate the reward for merchants
             Self::do_calculate_reward(&cid, curr_bn);
 
             // 5. Try to renew file if prepaid is not zero
-            Self::try_to_renew_file(&cid, curr_bn, &claimer);
+            Self::try_to_renew_file(&cid, curr_bn, &liquidator);
 
             // 6. Try to close file
             Self::try_to_close_file(&cid, curr_bn);
@@ -728,7 +728,7 @@ impl<T: Config> Module<T> {
         let (mut file_info, mut used_info) = Self::files(cid).unwrap_or_default();
         
         // 3. File already expired
-        if file_info.expired_on <= file_info.claimed_at { return; }
+        if file_info.expired_on <= file_info.calculated_at { return; }
 
         // 4. Update used_info and files_size
         let prev_reported_group_count = used_info.reported_group_count;
@@ -736,14 +736,14 @@ impl<T: Config> Module<T> {
         Self::update_groups_used_info(file_info.file_size, &mut used_info);
         Self::update_files_size(file_info.file_size, prev_reported_group_count, used_info.reported_group_count);
 
-        let claim_block = curr_bn.min(file_info.expired_on);
+        let calculated_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(T::FileReplica::get() as usize) as u32;
         
         // 5. Calculate payouts, check replicas and update the file_info
         if target_reward_count > 0 {
             // 5.1 Get 1 payout amount and sub 1 to make sure that we won't get overflow
-            let one_payout_amount = (Perbill::from_rational_approximation(claim_block - file_info.claimed_at,
-                                                                          (file_info.expired_on - file_info.claimed_at) * target_reward_count) * file_info.amount).saturating_sub(1u32.into());
+            let one_payout_amount = (Perbill::from_rational_approximation(calculated_block - file_info.calculated_at,
+                                                                          (file_info.expired_on - file_info.calculated_at) * target_reward_count) * file_info.amount).saturating_sub(1u32.into());
             let mut rewarded_amount = Zero::zero();
             let mut rewarded_count = 0u32;
             let mut new_replicas: Vec<Replica<T::AccountId>> = Vec::with_capacity(file_info.replicas.len());
@@ -787,8 +787,8 @@ impl<T: Config> Module<T> {
             file_info.replicas = new_replicas;
         }
 
-        // 6. File status might become ready to be closed if claim_block == expired_on
-        file_info.claimed_at = claim_block;
+        // 6. File status might become ready to be closed if calculated_block == expired_on
+        file_info.calculated_at = calculated_block;
         // 7. Update files
         <Files<T>>::insert(cid, (file_info, used_info));
     }
@@ -804,7 +804,7 @@ impl<T: Config> Module<T> {
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
-            if file_info.expired_on <= curr_bn && file_info.expired_on == file_info.claimed_at {
+            if file_info.expired_on <= curr_bn && file_info.expired_on == file_info.calculated_at {
                 Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
                 let total_amount = file_info.amount.saturating_add(file_info.prepaid);
                 T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive).expect("Something wrong during transferring");
@@ -937,7 +937,7 @@ impl<T: Config> Module<T> {
         used_size
     }
 
-    fn maybe_reward_claimer(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
+    fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
             // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator
@@ -954,17 +954,17 @@ impl<T: Config> Module<T> {
     fn upsert_new_file_info(cid: &MerkleRoot, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on
         if let Some((mut file_info, used_info)) = Self::files(cid) {
-            // expired_on < claimed_at => file is not live yet. This situation only happen for new file.
-            // expired_on == claimed_at => file is ready to be closed(wait to be put into trash or refreshed).
-            // expired_on > claimed_at => file is ongoing.
-            if file_info.expired_on > file_info.claimed_at { //if it's already live.
+            // expired_on < calculated_at => file is not live yet. This situation only happen for new file.
+            // expired_on == calculated_at => file is ready to be closed(wait to be put into trash or refreshed).
+            // expired_on > calculated_at => file is ongoing.
+            if file_info.expired_on > file_info.calculated_at { //if it's already live.
                 file_info.expired_on = curr_bn + T::FileDuration::get();
-            } else if file_info.expired_on == file_info.claimed_at {
+            } else if file_info.expired_on == file_info.calculated_at {
                 if file_info.replicas.len() == 0 {
                     // turn this file into pending status since replicas.len() is zero
                     // we keep the original amount
                     file_info.expired_on = 0;
-                    file_info.claimed_at = *curr_bn;
+                    file_info.calculated_at = *curr_bn;
                 } else {
                     file_info.expired_on = file_info.expired_on + T::FileDuration::get();
                 }
@@ -977,7 +977,7 @@ impl<T: Config> Module<T> {
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
                 file_size,
                 expired_on: 0,
-                claimed_at: curr_bn.clone(),
+                calculated_at: curr_bn.clone(),
                 amount: amount.clone(),
                 prepaid: Zero::zero(),
                 reported_replica_count: 0u32,
@@ -1010,7 +1010,7 @@ impl<T: Config> Module<T> {
                     // turn this file into pending status since replicas.len() is zero
                     // we keep the original amount and expected_replica_count
                     file_info.expired_on = 0;
-                    file_info.claimed_at = curr_bn;
+                    file_info.calculated_at = curr_bn;
                 } else {
                     file_info.expired_on = file_info.expired_on + T::FileDuration::get();
                 }

@@ -21,7 +21,7 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     user
 }
 
-fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, claimed_at: BlockNumber, amount: u32)
+fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, calculated_at: BlockNumber, amount: u32)
     -> (FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)
 {
     let used_info = UsedInfo {
@@ -42,7 +42,7 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
     let file_info = FileInfo {
         file_size,
         expired_on,
-        claimed_at,
+        calculated_at,
         amount: T::Currency::minimum_balance() * amount.into(),
         prepaid: Zero::zero(),
         reported_replica_count: 0,
@@ -93,7 +93,7 @@ benchmarks! {
         system::Module::<T>::set_block_number(600u32.into());
     }: _(RawOrigin::Signed(user.clone()), cid.clone(), file_size, T::Currency::minimum_balance() * 10u32.into())
     verify {
-        assert_eq!(Market::<T>::files(&cid).unwrap_or_default().0.claimed_at, 600);
+        assert_eq!(Market::<T>::files(&cid).unwrap_or_default().0.calculated_at, 600);
     }
 
     calculate_reward {

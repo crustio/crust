@@ -817,7 +817,7 @@ impl<T: Config> Module<T> {
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
-            if file_info.expired_on <= curr_bn && file_info.expired_on >= file_info.claimed_at {
+            if file_info.expired_on <= curr_bn && file_info.expired_on == file_info.claimed_at {
                 Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
                 let total_amount = file_info.amount.saturating_add(file_info.prepaid);
                 T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive).expect("Something wrong during transferring");
@@ -977,10 +977,10 @@ impl<T: Config> Module<T> {
                     // turn this file into pending status since replicas.len() is zero
                     // we keep the original amount
                     file_info.expired_on = 0;
+                    file_info.claimed_at = *curr_bn;
                 } else {
-                    file_info.expired_on = curr_bn + T::FileDuration::get();
+                    file_info.expired_on = file_info.expired_on + T::FileDuration::get();
                 }
-                file_info.claimed_at = *curr_bn;
             }
             file_info.amount += amount.clone();
             <Files<T>>::insert(cid, (file_info, used_info));
@@ -1023,10 +1023,10 @@ impl<T: Config> Module<T> {
                     // turn this file into pending status since replicas.len() is zero
                     // we keep the original amount and expected_replica_count
                     file_info.expired_on = 0;
+                    file_info.claimed_at = curr_bn;
                 } else {
-                    file_info.expired_on = curr_bn + T::FileDuration::get();
+                    file_info.expired_on = file_info.expired_on + T::FileDuration::get();
                 }
-                file_info.claimed_at = curr_bn;
                 <Files<T>>::insert(cid, (file_info, used_info));
 
                 #[cfg(not(test))]

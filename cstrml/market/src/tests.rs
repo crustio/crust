@@ -2541,8 +2541,8 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 2803,
-                claimed_at: 1803,
+                expired_on: 2303,
+                claimed_at: 1303,
                 amount: 23403,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -3512,8 +3512,8 @@ fn renew_file_should_work() {
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 3503,
-                claimed_at: 2503,
+                expired_on: 2303,
+                claimed_at: 1303,
                 amount: 42120, // 23400 * 0.8 + 23400
                 prepaid: 263_500,
                 reported_replica_count: 0,
@@ -3536,14 +3536,14 @@ fn renew_file_should_work() {
         assert_eq!(Market::used_trash_i(&cid).is_none(), true);
         assert_eq!(Balances::free_balance(&reserved_pot), 26000);
 
-        run_to_block(8000); // expired_on 6000 => all reward to liquidator charlie
+        run_to_block(8000); // expired_on 2303 => all reward to liquidator charlie
         assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 59800); // 42120 + 11180 + 6500
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
-                expired_on: 9000,
-                claimed_at: 8000,
+                expired_on: 3303,
+                claimed_at: 2303,
                 amount: 23400,
                 prepaid: 127000,
                 reported_replica_count: 0,
@@ -3562,12 +3562,12 @@ fn renew_file_should_work() {
         );
         assert_eq!(Balances::free_balance(&reserved_pot), 39000);
         assert_eq!(Market::used_trash_i(&cid).is_none(), true);
-        run_to_block(9000);
+        run_to_block(9000); // expired_on 3303 => all reward to liquidator charlie
         assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
-        assert_eq!(Balances::free_balance(&charlie), 59800); // 42120 + 11180 + 6500
+        assert_eq!(Balances::free_balance(&charlie), 83200); // 42120 + 11180 + 6500 + 23400
         assert_eq!(Market::used_trash_i(&cid).is_some(), true);
         assert_eq!(Market::files(&cid).is_none(), true);
-        assert_eq!(Balances::free_balance(&reserved_pot), 189400); // 39000 + 23400 + 127000
+        assert_eq!(Balances::free_balance(&reserved_pot), 166000); // 39000 + 127000
     });
 }
 
@@ -3641,6 +3641,6 @@ fn storage_pot_should_be_balanced() {
         run_to_block(9000);
         assert_ok!(Market::claim_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 1);
-        assert_eq!(Balances::free_balance(&reserved_pot), 189400); // 39000 + 23400 + 127000
+        assert_eq!(Balances::free_balance(&reserved_pot), 166000); // 39000 + 127000
     });
 }

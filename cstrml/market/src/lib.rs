@@ -40,7 +40,7 @@ pub mod benchmarking;
 use primitives::{
     MerkleRoot, BlockNumber, SworkerAnchor,
     traits::{
-        TransferrableCurrency, MarketInterface,
+        UsableCurrency, MarketInterface,
         SworkerInterface
     }
 };
@@ -251,7 +251,7 @@ pub trait Config: system::Config {
     type ModuleId: Get<ModuleId>;
 
     /// The payment balance.
-    type Currency: ReservableCurrency<Self::AccountId> + TransferrableCurrency<Self::AccountId>;
+    type Currency: ReservableCurrency<Self::AccountId> + UsableCurrency<Self::AccountId>;
 
     /// Converter from Currency<u64> to Balance.
     type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
@@ -449,7 +449,7 @@ decl_module! {
             ensure!(collateral >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Ensure merchant has enough currency.
-            ensure!(collateral <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(collateral <= T::Currency::usable_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if merchant has not register before.
             ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
@@ -490,7 +490,7 @@ decl_module! {
             ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             // 3. Ensure merchant has enough currency.
-            ensure!(value <= T::Currency::transfer_balance(&who), Error::<T>::InsufficientCurrency);
+            ensure!(value <= T::Currency::usable_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 4. Upgrade collateral.
             <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
@@ -566,7 +566,7 @@ decl_module! {
             let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
 
             // 4. Check client can afford the sorder
-            ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
             // 5. Split into reserved, storage and staking account
             let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
@@ -597,7 +597,7 @@ decl_module! {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            ensure!(T::Currency::transfer_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
             if let Some((mut file_info, used_info)) = Self::files(&cid) {
                 T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath).expect("Something wrong during transferring");

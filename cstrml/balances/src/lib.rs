@@ -169,7 +169,7 @@ pub use weights::WeightInfo;
 pub use pallet::*;
 
 // Crust primitives
-use primitives::traits::TransferrableCurrency;
+use primitives::traits::UsableCurrency;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -1451,10 +1451,9 @@ impl<T: Config<I>, I: 'static> LockableCurrency<T::AccountId> for Pallet<T, I>
 	}
 }
 
-impl<T: Config<I>, I: 'static> TransferrableCurrency<T::AccountId> for Module<T, I>
+impl<T: Config<I>, I: 'static> UsableCurrency<T::AccountId> for Module<T, I>
 	where T::Balance: MaybeSerializeDeserialize + Debug {
-	fn transfer_balance(who: &T::AccountId) -> Self::Balance {
-		let sum_of_locks = Self::locks(who).iter().fold(Zero::zero(), |acc: Self::Balance, value| {acc + value.amount});
-		Self::account(who).free.saturating_sub(sum_of_locks)
+	fn usable_balance(who: &T::AccountId) -> Self::Balance {
+		Self::account(who).usable(Reasons::All)
 	}
 }

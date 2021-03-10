@@ -30,7 +30,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, AccountIdConversion
+        CheckedAdd, AccountIdConversion, CheckedSub
     },
 };
 use sp_staking::{
@@ -50,7 +50,7 @@ pub mod weight;
 use swork;
 use primitives::{
     constants::{currency::*, time::*},
-    traits::{TransferrableCurrency, MarketInterface}
+    traits::{UsableCurrency, MarketInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -378,7 +378,7 @@ pub trait Config: frame_system::Config {
     /// The staking's module id, used for staking pot
     type ModuleId: Get<ModuleId>;
     /// The staking balance.
-    type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+    type Currency: UsableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
     /// Time used for computing era duration.
     ///
@@ -637,7 +637,7 @@ decl_storage! {
             let mut gensis_total_stakes: BalanceOf<T> = Zero::zero();
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
-                    T::Currency::transfer_balance(&stash) >= balance,
+                    T::Currency::usable_balance(&stash) >= balance,
                     "Stash does not have enough balance to bond."
                 );
                 let _ = <Module<T>>::bond(
@@ -859,7 +859,7 @@ decl_module! {
             let history_depth = Self::history_depth();
             let last_reward_era = current_era.saturating_sub(history_depth);
 
-            let stash_balance = T::Currency::transfer_balance(&stash);
+            let stash_balance = T::Currency::free_balance(&stash);
             let value = value.min(stash_balance);
             Self::deposit_event(RawEvent::Bonded(stash.clone(), value));
             let item = StakingLedger {
@@ -900,10 +900,9 @@ decl_module! {
             let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-            let mut extra = T::Currency::transfer_balance(&stash);
-
-            if extra > Zero::zero() {
-                extra = extra.min(max_additional);
+            let stash_balance = T::Currency::free_balance(&stash);
+            if let Some(extra) = stash_balance.checked_sub(&ledger.total) {
+                let extra = extra.min(max_additional);
                 ledger.total += extra;
                 ledger.active += extra;
                 Self::deposit_event(RawEvent::Bonded(stash, extra));

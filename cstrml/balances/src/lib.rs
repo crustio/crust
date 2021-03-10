@@ -166,7 +166,7 @@ pub use self::imbalances::{PositiveImbalance, NegativeImbalance};
 pub use weights::WeightInfo;
 
 // Crust primitives
-use primitives::traits::TransferrableCurrency;
+use primitives::traits::UsableCurrency;
 
 pub trait Subtrait<I: Instance = DefaultInstance>: frame_system::Config {
 	/// The balance of an account.
@@ -1300,10 +1300,9 @@ impl<T: Config<I>, I: Instance> IsDeadAccount<T::AccountId> for Module<T, I> whe
 	}
 }
 
-impl<T: Config<I>, I: Instance> TransferrableCurrency<T::AccountId> for Module<T, I>
+impl<T: Config<I>, I: Instance> UsableCurrency<T::AccountId> for Module<T, I>
 	where T::Balance: MaybeSerializeDeserialize + Debug {
-	fn transfer_balance(who: &T::AccountId) -> Self::Balance {
-		let sum_of_locks = Self::locks(who).iter().fold(Zero::zero(), |acc: Self::Balance, value| {acc + value.amount});
-		Self::account(who).free.saturating_sub(sum_of_locks)
+	fn usable_balance(who: &T::AccountId) -> Self::Balance {
+		Self::account(who).usable(Reasons::All)
 	}
 }

@@ -4632,9 +4632,9 @@ fn update_stake_limit_according_to_mpow_should_work() {
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
             let mut workload_map = BTreeMap::new();
-            workload_map.insert(2, 3);
-            workload_map.insert(4, 2);
-            workload_map.insert(6, 5);
+            workload_map.insert(1, 3);
+            workload_map.insert(3, 2);
+            workload_map.insert(5, 5);
             Staking::report_works(workload_map, 10);
             assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 7500);
             assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 5000);

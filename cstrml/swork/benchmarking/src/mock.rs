@@ -147,7 +147,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-		Swork: swork::{Module, Call, Storage, Event<T>, Config},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
 		Market: market::{Module, Call, Storage, Event<T>, Config},
 	}
 );

@@ -4,7 +4,7 @@ version = "0.11.1"
 authors = ["crustio"]
 build = "build.rs"
 edition = "2018"
-license = "GPL-3.0"
+license = "Apache-2.0"
 homepage = "https://crust.network"
 repository = "https://github.com/crustio/crust/"
 

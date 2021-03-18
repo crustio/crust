@@ -105,4 +105,4 @@ Please follow the contributions guidelines as outlined in [docs/CONTRIBUTION.md]
 
 ## License
 
-[GPL V3.0](https://github.com/crustio/crust/blob/master/LICENSE)
+[Apache 2.0](https://github.com/crustio/crust/blob/master/LICENSE)

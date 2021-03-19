@@ -11,6 +11,7 @@ codec = { package = "parity-scale-codec", version = "2.0.0", default-features = 
 parachain-info = { path = "../pallets/parachain-info", default-features = false }
 crust-parachain-primitives = { path = "../primitives", default-features = false }
 xstorage = { path = "../pallets/xstorage", default-features = false }
+market = { version = "0.11.1", package = 'parachain-market', path = '../pallets/market', default-features = false }
 
 # Substrate dependencies
 sp-std = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "rococo-v1" }
@@ -41,7 +42,6 @@ cumulus-pallet-xcm-handler = { path = "../../cumulus/pallets/xcm-handler", defau
 
 # Polkadot dependencies
 polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "rococo-v1" }
-polkadot-runtime-parachains = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "rococo-v1" }
 xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "rococo-v1" }
 xcm-builder = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "rococo-v1" }
 xcm-executor = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "rococo-v1" }
@@ -81,5 +81,6 @@ std = [
 	"xcm/std",
 	"xcm-builder/std",
 	"xcm-executor/std",
-	"polkadot-runtime-parachains/std",
+	"xstorage/std",
+	"market/std",
 ]

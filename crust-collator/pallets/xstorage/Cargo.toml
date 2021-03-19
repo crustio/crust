@@ -24,7 +24,6 @@ xcm = { git = "https://github.com/paritytech/polkadot", branch = "rococo-v1", de
 xcm-executor = { git = "https://github.com/paritytech/polkadot", branch = "rococo-v1", default-features = false }
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "rococo-v1", default-features = false }
 parachain-info = { path = "../parachain-info", default-features = false }
-polkadot-runtime-parachains = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "rococo-v1" }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
@@ -44,5 +43,4 @@ std = [
 	"cumulus-primitives-core/std",
 	"xcm/std",
 	"polkadot-primitives/std",
-	"polkadot-runtime-parachains/std",
 ]

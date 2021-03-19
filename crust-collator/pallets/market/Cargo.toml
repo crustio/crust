@@ -1,0 +1,47 @@
+[package]
+name = "parachain-market"
+version = "0.11.1"
+authors = ["crustio"]
+edition = "2018"
+license = "Apache-2.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
+
+[dependencies]
+# third party dependencies
+serde = { version = "1.0.111", optional = true }
+codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false }
+serde_json = "1.0.51"
+
+# substrate frames
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+
+# substrate primitives
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+sp-std = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+
+# crust runtime modules
+primitives = { package = "crust-parachain-primitives", path = "../../primitives", default-features = false }
+xstorage = { package = "xstorage", path = "../xstorage", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "serde",
+    "codec/std",
+    "frame-support/std",
+    "sp-core/std",
+    "sp-io/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "frame-system/std",
+    "primitives/std",
+    "xstorage/std"
+]
+
+[dev-dependencies]
+hex = "0.4.2"
+frame-benchmarking = "3.0.0"

@@ -22,12 +22,15 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-use crust_parachain_primitives::*;
+use crust_parachain_primitives::{
+    constants::{currency::*},
+    *
+};
 use sp_api::impl_runtime_apis;
 use sp_core::OpaqueMetadata;
 use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys,
-	traits::{BlakeTwo256, Block as BlockT, IdentityLookup},
+	create_runtime_str, generic, impl_opaque_keys, ModuleId,
+	traits::{BlakeTwo256, Block as BlockT, IdentityLookup, Convert, SaturatedConversion},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult,
 };
@@ -67,7 +70,6 @@ use xcm_executor::{
 	traits::{IsConcrete, NativeAsset, ConvertOrigin},
 	Config, XcmExecutor,
 };
-use polkadot_runtime_parachains::origin as parachains_origin;
 
 pub type SessionHandlers = ();
 
@@ -273,7 +275,9 @@ pub struct AllowedList;
 impl AllowedList {
 	fn is_allowed(id: u32) -> bool {
 		match id {
-			6666 => true,
+			6666 => true, // Local testnet
+			666 => true, // Acala
+			30 => true, // Phala
 			_ => false
 		}
 	}
@@ -321,7 +325,71 @@ impl cumulus_pallet_xcm_handler::Config for Runtime {
 	type AccountIdConverter = LocationConverter;
 }
 
-impl parachains_origin::Config for Runtime {}
+/// Simple structure that exposes how u64 currency can be represented as... u64.
+pub struct CurrencyToVoteHandler;
+
+impl Convert<u64, u64> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u64 {
+        x
+    }
+}
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 {
+        x
+    }
+}
+impl Convert<u128, u64> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u64 {
+        x.saturated_into()
+    }
+}
+
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
+    }
+}
+
+
+parameter_types! {
+    /// Unit is pico
+    pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
+    pub const FileDuration: BlockNumber = 15 * DAYS;
+    pub const FileReplica: u32 = 4;
+    pub const FileBaseFee: Balance = MILLICENTS * 2;
+    pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
+    pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
+    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
+    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
+    pub const StakingRatio: Perbill = Perbill::from_percent(80);
+    pub const TaxRatio: Perbill = Perbill::from_percent(10);
+    pub const UsedTrashMaxSize: u128 = 1_000;
+    pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
+    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
+}
+
+impl market::Config for Runtime {
+    /// The market's module id, used for deriving its sovereign account ID.
+    type ModuleId = MarketModuleId;
+    type Currency = Balances;
+    type CurrencyToBalance = CurrencyToVoteHandler;
+    type SworkerInterface = Market;
+    type Event = Event;
+    /// File duration.
+    type FileDuration = FileDuration;
+    type FileReplica = FileReplica;
+    type FileBaseFee = FileBaseFee;
+    type FileInitPrice = FileInitPrice;
+    type StorageReferenceRatio = StorageReferenceRatio;
+    type StorageIncreaseRatio = StorageIncreaseRatio;
+    type StorageDecreaseRatio = StorageDecreaseRatio;
+    type StakingRatio = StakingRatio;
+    type TaxRatio = TaxRatio;
+	type RenewRewardRatio = RenewRewardRatio;
+    type UsedTrashMaxSize = UsedTrashMaxSize;
+    type WeightInfo = market::weight::WeightInfo<Runtime>;
+    type MaximumFileSize = MaximumFileSize;
+}
 
 pub struct Preparator;
 impl xstorage::PrepareStorageOrder for Preparator {
@@ -332,9 +400,8 @@ impl xstorage::PrepareStorageOrder for Preparator {
 
 impl xstorage::Config for Runtime {
 	type HrmpMessageSender = ParachainSystem;
-	type Origin = Origin;
 	type Preparator = Preparator;
-	type DoPlaceStorageOrder = ();
+	type DoPlaceStorageOrder = Market;
 }
 
 construct_runtime! {
@@ -352,7 +419,7 @@ construct_runtime! {
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		ParachainInfo: parachain_info::{Module, Storage, Config, Call},
 		XcmHandler: cumulus_pallet_xcm_handler::{Module, Call, Event<T>, Origin},
-		ParachainsOrigin: parachains_origin::{Module, Origin},
+		Market: market::{Module, Call, Storage, Event<T>, Config},
 		Xstorage: xstorage::{Module, Storage, Call},
 	}
 }

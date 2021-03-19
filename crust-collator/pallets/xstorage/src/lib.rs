@@ -7,18 +7,17 @@ use sp_std::prelude::*;
 
 use cumulus_primitives_core::{ParaId, HrmpMessageSender, OutboundHrmpMessage};
 use xcm::v0::{Xcm, OriginKind};
-use polkadot_runtime_parachains::origin::Origin as ParachainOrigin;
 
 pub trait PrepareStorageOrder {
 	fn prepare_storage_order(cid: Vec<u8>, size: u64) -> Vec<u8>;
 }
 
 pub trait DoPlaceStorageOrder {
-	fn prepare_storage_order(cid: Vec<u8>, size: u64);
+	fn do_place_storage_order(cid: Vec<u8>, size: u64);
 }
 
 impl DoPlaceStorageOrder for () {
-	fn prepare_storage_order(_: Vec<u8>, _: u64) {
+	fn do_place_storage_order(_: Vec<u8>, _: u64) {
 
 	}
 }
@@ -26,8 +25,6 @@ impl DoPlaceStorageOrder for () {
 pub trait Config: frame_system::Config {
 	/// Something to send an HRMP message.
 	type HrmpMessageSender: HrmpMessageSender;
-
-	type Origin: From<ParachainOrigin> + From<<Self as frame_system::Config>::Origin> + Into<Result<ParachainOrigin, <Self as Config>::Origin>>;
 
 	type Preparator: PrepareStorageOrder;
 
@@ -53,7 +50,8 @@ decl_module! {
 		#[weight = 1_000]
 		pub fn inner_place_storage_order(origin, cid: Vec<u8>, size: u64) -> DispatchResultWithPostInfo {
 			let _ = ensure_root(origin)?;
-			CrossChainFiles::insert(cid, size);
+			CrossChainFiles::insert(&cid, size);
+			T::DoPlaceStorageOrder::do_place_storage_order(cid, size);
 			Ok(().into())
 		}
 
@@ -67,6 +65,7 @@ decl_module! {
 
 			let set_call = <T as Config>::Preparator::prepare_storage_order(cid, size);
 
+			// TODO: Use RelayedFrom instead of Transact to include account id
 			let transact = Xcm::Transact {
 				origin_type: OriginKind::Superuser,
 				call: set_call
@@ -81,6 +80,7 @@ decl_module! {
 				data,
 			};
 
+			// TODO: Use Xtoken as well to pay this order
 			T::HrmpMessageSender::send_hrmp_message(outbound_message).map_err(|_| Error::<T>::FailedToSend)?;
 
 			Ok(().into())

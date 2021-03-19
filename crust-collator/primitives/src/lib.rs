@@ -23,6 +23,10 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, Verify},
 	MultiSignature,
 };
+use sp_std::vec::Vec;
+
+pub mod constants;
+pub mod traits;
 
 pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
 
@@ -57,3 +61,30 @@ pub type Hash = sp_core::H256;
 
 /// Digest item type.
 pub type DigestItem = generic::DigestItem<Hash>;
+
+/// An instant or duration in time.
+pub type Moment = u64;
+
+/// sworker public key, little-endian-format, 64 bytes vec
+pub type SworkerPubKey = Vec<u8>;
+
+/// sworker anchor, just use SworkerPubKey right now, 64 bytes vec
+pub type SworkerAnchor = SworkerPubKey;
+
+/// sworker signature, little-endian-format, 64 bytes vec
+pub type SworkerSignature = Vec<u8>;
+
+/// sworker enclave code
+pub type SworkerCode = Vec<u8>;
+
+/// Work report empty workload/storage merkle root
+pub type MerkleRoot = Vec<u8>;
+
+/// File Alias for a file
+pub type FileAlias = Vec<u8>;
+
+/// Report index, always be a multiple of era number
+pub type ReportSlot = u64;
+
+/// Market vendor's address info
+pub type AddressInfo = Vec<u8>;

@@ -3251,13 +3251,7 @@ fn reward_liquidator_should_work() {
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
-        assert_noop!(
-            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
-            DispatchError::Module {
-                index: 3,
-                error: 8,
-                message: Some("FileNotExist")
-        });
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),

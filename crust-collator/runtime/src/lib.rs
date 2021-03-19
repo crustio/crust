@@ -1,4 +1,4 @@
-// Copyright 2019 Parity Technologies (UK) Ltd.
+// Copyright 2019-2021 Parity Technologies (UK) Ltd.
 // This file is part of Cumulus.
 
 // Cumulus is free software: you can redistribute it and/or modify
@@ -35,18 +35,20 @@ use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
+use codec::Encode;
 
 // A few exports that help ease life for downstream crates.
+use sp_std::marker::PhantomData;
 pub use frame_support::{
 	construct_runtime, parameter_types,
-	traits::Randomness,
+	traits::{Randomness, OriginTrait},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 		DispatchClass, IdentityFee, Weight,
 	},
 	StorageValue,
 };
-use frame_system::limits::{BlockLength, BlockWeights};
+use frame_system::{EnsureRoot, limits::{BlockLength, BlockWeights}};
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 #[cfg(any(feature = "std", test))]
@@ -55,16 +57,17 @@ pub use sp_runtime::{Perbill, Permill};
 
 // XCM imports
 use polkadot_parachain::primitives::Sibling;
-use xcm::v0::{Junction, MultiLocation, NetworkId};
+use xcm::v0::{Junction, MultiLocation, NetworkId, OriginKind};
 use xcm_builder::{
 	AccountId32Aliases, CurrencyAdapter, LocationInverter, ParentIsDefault, RelayChainAsNative,
-	SiblingParachainAsNative, SiblingParachainConvertsVia, SignedAccountId32AsNative,
-	SovereignSignedViaLocation,
+	SiblingParachainConvertsVia, SignedAccountId32AsNative,
+	SovereignSignedViaLocation
 };
 use xcm_executor::{
-	traits::{IsConcrete, NativeAsset},
+	traits::{IsConcrete, NativeAsset, ConvertOrigin},
 	Config, XcmExecutor,
 };
+use polkadot_runtime_parachains::origin as parachains_origin;
 
 pub type SessionHandlers = ();
 
@@ -77,7 +80,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("crust-collator"),
 	impl_name: create_runtime_str!("crust-collator"),
 	authoring_version: 1,
-	spec_version: 3,
+	spec_version: 5,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -233,8 +236,8 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 	type Event = Event;
 	type OnValidationData = ();
 	type SelfParaId = parachain_info::Module<Runtime>;
-	type DownwardMessageHandlers = ();
-	type HrmpMessageHandlers = ();
+	type DownwardMessageHandlers = XcmHandler;
+	type HrmpMessageHandlers = XcmHandler;
 }
 
 impl parachain_info::Config for Runtime {}
@@ -265,10 +268,35 @@ type LocalAssetTransactor = CurrencyAdapter<
 	AccountId,
 >;
 
+pub struct AllowedList;
+
+impl AllowedList {
+	fn is_allowed(id: u32) -> bool {
+		match id {
+			6666 => true,
+			_ => false
+		}
+	}
+}
+
+pub struct IsAllowedToCrust<Origin>(PhantomData<Origin>);
+impl<
+	Origin: OriginTrait
+> ConvertOrigin<Origin> for IsAllowedToCrust<Origin> {
+	fn convert_origin(origin: MultiLocation, kind: OriginKind) -> Result<Origin, MultiLocation> {
+		match (kind, origin) {
+			(OriginKind::Superuser, MultiLocation::X2(Junction::Parent, Junction::Parachain { id }))
+			if AllowedList::is_allowed(id.into()) =>
+				Ok(Origin::root()),
+			(_, origin) => Err(origin),
+		}
+	}
+}
+
 type LocalOriginConverter = (
 	SovereignSignedViaLocation<LocationConverter, Origin>,
 	RelayChainAsNative<RelayChainOrigin, Origin>,
-	SiblingParachainAsNative<cumulus_pallet_xcm_handler::Origin, Origin>,
+	IsAllowedToCrust<Origin>,
 	SignedAccountId32AsNative<RococoNetwork, Origin>,
 );
 
@@ -289,6 +317,24 @@ impl cumulus_pallet_xcm_handler::Config for Runtime {
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type UpwardMessageSender = ParachainSystem;
 	type HrmpMessageSender = ParachainSystem;
+	type SendXcmOrigin = EnsureRoot<AccountId>;
+	type AccountIdConverter = LocationConverter;
+}
+
+impl parachains_origin::Config for Runtime {}
+
+pub struct Preparator;
+impl xstorage::PrepareStorageOrder for Preparator {
+	fn prepare_storage_order(cid: Vec<u8>, size: u64) -> Vec<u8> {
+		Call::Xstorage(xstorage::Call::inner_place_storage_order(cid, size)).encode()
+	}
+}
+
+impl xstorage::Config for Runtime {
+	type HrmpMessageSender = ParachainSystem;
+	type Origin = Origin;
+	type Preparator = Preparator;
+	type DoPlaceStorageOrder = ();
 }
 
 construct_runtime! {
@@ -304,8 +350,10 @@ construct_runtime! {
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Module, Call, Storage},
 		ParachainSystem: cumulus_pallet_parachain_system::{Module, Call, Storage, Inherent, Event},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
-		ParachainInfo: parachain_info::{Module, Storage, Config},
+		ParachainInfo: parachain_info::{Module, Storage, Config, Call},
 		XcmHandler: cumulus_pallet_xcm_handler::{Module, Call, Event<T>, Origin},
+		ParachainsOrigin: parachains_origin::{Module, Origin},
+		Xstorage: xstorage::{Module, Storage, Call},
 	}
 }
 
@@ -414,4 +462,4 @@ impl_runtime_apis! {
 	}
 }
 
-cumulus_pallet_parachain_system::register_validate_block!(Block, Executive);
+cumulus_pallet_parachain_system::register_validate_block!(Runtime, Executive);

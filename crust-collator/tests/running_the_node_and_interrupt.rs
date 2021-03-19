@@ -1,4 +1,4 @@
-// Copyright 2020 Parity Technologies (UK) Ltd.
+// Copyright 2020-2021 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -21,7 +21,7 @@ mod common;
 
 #[test]
 #[cfg(unix)]
-fn interrupt_polkadot_mdns_issue_test() {
+fn running_the_node_works_and_can_be_interrupted() {
 	use nix::{
 		sys::signal::{
 			kill,
@@ -31,13 +31,13 @@ fn interrupt_polkadot_mdns_issue_test() {
 	};
 
 	fn run_command_and_kill(signal: Signal) {
-		let _ = fs::remove_dir_all("interrupt_polkadot_mdns_issue_test");
+		let _ = fs::remove_dir_all("interrupt_test");
 		let mut cmd = Command::new(cargo_bin("rococo-collator"))
-			.args(&["-d", "interrupt_polkadot_mdns_issue_test", "--", "--dev"])
+			.args(&["-d", "interrupt_test", "--", "--dev"])
 			.spawn()
 			.unwrap();
 
-		thread::sleep(Duration::from_secs(20));
+		thread::sleep(Duration::from_secs(30));
 		assert!(
 			cmd.try_wait().unwrap().is_none(),
 			"the process should still be running"

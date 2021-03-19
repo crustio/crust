@@ -1,4 +1,4 @@
-// Copyright 2020 Parity Technologies (UK) Ltd.
+// Copyright 2020-2021 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -21,7 +21,7 @@ mod common;
 
 #[test]
 #[cfg(unix)]
-fn polkadot_argument_parsing() {
+fn interrupt_polkadot_mdns_issue_test() {
 	use nix::{
 		sys::signal::{
 			kill,
@@ -31,18 +31,9 @@ fn polkadot_argument_parsing() {
 	};
 
 	fn run_command_and_kill(signal: Signal) {
-		let _ = fs::remove_dir_all("polkadot_argument_parsing");
+		let _ = fs::remove_dir_all("interrupt_polkadot_mdns_issue_test");
 		let mut cmd = Command::new(cargo_bin("rococo-collator"))
-			.args(&[
-				"-d",
-				"polkadot_argument_parsing",
-				"--",
-				"--dev",
-				"--bootnodes",
-				"/ip4/127.0.0.1/tcp/30333/p2p/Qmbx43psh7LVkrYTRXisUpzCubbgYojkejzAgj5mteDnxy",
-				"--bootnodes",
-				"/ip4/127.0.0.1/tcp/50500/p2p/Qma6SpS7tzfCrhtgEVKR9Uhjmuv55ovC3kY6y6rPBxpWde",
-			])
+			.args(&["-d", "interrupt_polkadot_mdns_issue_test", "--", "--dev"])
 			.spawn()
 			.unwrap();
 

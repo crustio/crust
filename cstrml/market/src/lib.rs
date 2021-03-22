@@ -621,7 +621,9 @@ decl_module! {
             let liquidator = ensure_signed(origin)?;
 
             // 1. Ensure file exist
-            ensure!(Self::files(&cid).is_some(), Error::<T>::FileNotExist);
+            if !<Files<T>>::contains_key(&cid) {
+                return Ok(());
+            }
 
             let file_info = Self::files(&cid).unwrap().0;
             let curr_bn = Self::get_current_block_number();

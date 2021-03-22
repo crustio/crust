@@ -170,7 +170,7 @@ decl_storage! {
 
         HistorySlotDepth get(fn history_slot_depth): ReportSlot = 6 * REPORT_SLOT;
 
-        /// The sWorker enclave code, this should be managed by sudo/democracy
+        /// The sWorker enclave codes, this should be managed by sudo/democracy
         pub Codes get (fn codes): map hasher(twox_64_concat) SworkerCode => Option<T::BlockNumber>;
 
         /// The bond relationship between AccountId <-> Identity
@@ -263,7 +263,9 @@ decl_error! {
         /// Member is not in a group
         NotJoint,
         /// Exceed the limit of members number in one group
-        ExceedGroupLimit
+        ExceedGroupLimit,
+        /// Expired block cannot be decreased
+        InvalidExpiredBlock
     }
 }
 
@@ -300,7 +302,11 @@ decl_module! {
         /// # </weight>
         #[weight = (T::WeightInfo::set_code(), DispatchClass::Operational)]
         pub fn set_code(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
+            // TODO: enable democracy
             ensure_root(origin)?;
+            if let Some(old_expired_block) = Self::codes(&new_code) {
+                ensure!(expire_block < old_expired_block, Error::<T>::InvalidExpiredBlock);
+            }
             <Codes<T>>::insert(&new_code, &expire_block);
             Self::deposit_event(RawEvent::SetCodeSuccess(new_code, expire_block));
         }
@@ -340,21 +346,17 @@ decl_module! {
             ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupOwnerForbidden);
 
             // 3. Ensure unparsed_identity trusted chain is legal, including signature and sworker code
-            let (maybe_pk, maybe_code) = Self::check_and_get_pk_with_code(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
+            let (maybe_pk, maybe_code) = Self::maybe_get_pk_and_code(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
             ensure!(maybe_pk.is_some() && maybe_code.is_some(), Error::<T>::IllegalIdentity);
 
             // 4. Insert new pub key info
             let pk = maybe_pk.unwrap();
             let code = maybe_code.unwrap();
 
-            // 5. Code should be still valid
-            let curr_bn = Self::get_current_block_number();
-            ensure!(curr_bn < TryInto::<u32>::try_into(Self::codes(&code).unwrap()).ok().unwrap(), Error::<T>::IllegalIdentity);
-
-            // 6. Insert the pk and code
+            // 5. Insert the pk and code
             Self::insert_pk_info(pk.clone(), code);
 
-            // 7. Emit event
+            // 6. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())
@@ -923,14 +925,14 @@ impl<T: Config> Module<T> {
         true
     }
 
-    fn check_and_get_pk_with_code(
+    fn maybe_get_pk_and_code(
         ias_sig: &IASSig,
         ias_cert: &SworkerCert,
         account_id: &T::AccountId,
         isv_body: &ISVBody,
         sig: &SworkerSignature
     ) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
-        let enclave_codes = <Codes<T>>::iter().map(|(key, _)| key).collect();
+        let legal_codes = <Codes<T>>::iter().map(|(key, _)| key).collect();
         let applier = account_id.encode();
 
         utils::verify_identity(
@@ -939,7 +941,7 @@ impl<T: Config> Module<T> {
             &applier,
             isv_body,
             sig,
-            &enclave_codes,
+            &legal_codes,
         )
     }
 

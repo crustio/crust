@@ -94,6 +94,20 @@ fn register_pk_with_another_code_should_work() {
 
             let register_info = another_legal_register_info();
             assert_ok!(Swork::set_code(Origin::root(), legal_code.clone(), 10000));
+
+            assert_noop!(
+                Swork::set_code(
+                    Origin::root(),
+                    legal_code.clone(),
+                    20000
+                ),
+                DispatchError::Module {
+                    index: 2,
+                    error: 18,
+                    message: Some("InvalidExpiredBlock"),
+                }
+            );
+
             assert_ok!(Swork::register(
                 Origin::signed(applier.clone()),
                 register_info.ias_sig,
@@ -270,36 +284,6 @@ fn register_should_failed_with_wrong_code() {
         .code(hex::decode("0011").unwrap())
         .build()
         .execute_with(|| {
-            let applier: AccountId =
-                AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
-                    .expect("valid ss58 address");
-            let register_info = legal_register_info();
-
-            assert_noop!(
-                Swork::register(
-                    Origin::signed(applier.clone()),
-                    register_info.ias_sig,
-                    register_info.ias_cert,
-                    register_info.account_id,
-                    register_info.isv_body,
-                    register_info.sig
-                ),
-                DispatchError::Module {
-                    index: 2,
-                    error: 1,
-                    message: Some("IllegalIdentity"),
-                }
-            );
-        });
-}
-
-#[test]
-fn register_should_failed_with_outdated_code() {
-    ExtBuilder::default()
-        .expired_bn(200)
-        .build()
-        .execute_with(|| {
-            run_to_block(201);
             let applier: AccountId =
                 AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                     .expect("valid ss58 address");

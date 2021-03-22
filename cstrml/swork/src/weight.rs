@@ -31,7 +31,7 @@ use sp_std::marker::PhantomData;
 /// Weight functions for swork.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
-	fn upgrade() -> Weight {
+	fn set_code() -> Weight {
 		(43_000_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(4 as Weight))
 			.saturating_add(T::DbWeight::get().writes(4 as Weight))

@@ -813,7 +813,7 @@ construct_runtime! {
 		Identity: pallet_identity::{Module, Call, Storage, Event<T>},
 
         // Crust modules
-        Swork: swork::{Module, Call, Storage, Event<T>, Config},
+        Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
         Market: market::{Module, Call, Storage, Event<T>},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.

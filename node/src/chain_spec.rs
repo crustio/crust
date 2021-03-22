@@ -255,7 +255,7 @@ fn testnet_genesis(
             keys: vec![]
         }),
         swork: Some(SworkConfig {
-            code: vec![]
+            init_codes: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),
@@ -372,7 +372,7 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             keys: vec![]
         }),
         swork: Some(SworkConfig {
-            code: vec![]
+            init_codes: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),
@@ -493,7 +493,7 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             keys: vec![]
         }),
         swork: Some(SworkConfig {
-            code: vec![]
+            init_codes: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),

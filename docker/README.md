@@ -1,4 +1,11 @@
-# Dockerize crust
+# Dockerize Crust
+
+## Usage
+
+```shell
+docker pull crustio/crust
+docker run -v /tmp/mwl:/tmp/mwl --network host crustio/crust:latest ./crust --chain maxwell --base-path /tmp/mwl --rpc-external --ws-external --rpc-cors all
+```
 
 ## Scripts
 
@@ -6,7 +13,7 @@
 - `build_env.sh`: Build crust's dependencies, including `rust`, `nightly toolchain`, `wasm toolchain` and `llvm`.
 - `build_bin.sh`: Build crust native binary on linux.
 
-## Usage
+## Build
 
 Please run the scripts under the ***root*** of this repository. ***DO NOT*** run from `docker` folder!
 

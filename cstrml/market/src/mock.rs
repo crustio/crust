@@ -193,7 +193,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-		Swork: swork::{Module, Call, Storage, Event<T>, Config},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
 		Market: market::{Module, Call, Storage, Event<T>, Config},
 	}
 );
@@ -203,8 +203,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .build_storage::<Test>()
     .unwrap();
 
-    let _ = swork::GenesisConfig {
-        code: LegalCode::get(),
+    let _ = swork::GenesisConfig::<Test> {
+        init_codes: vec![(LegalCode::get(), 100000)],
     }.assimilate_storage(&mut t);
 
     let mut ext: sp_io::TestExternalities = t.into();

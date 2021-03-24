@@ -14,8 +14,6 @@ docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:latest ./crust 
 4. `--rpc-cors all`: Allow cors requests
 5. More can be found with `--help`
 
-And the 
-
 ## Scripts
 
 - `build.sh`: Build crust official docker image.

@@ -4,8 +4,17 @@
 
 ```shell
 docker pull crustio/crust
-docker run -v /tmp/mwl:/tmp/mwl --network host crustio/crust:latest ./crust --chain maxwell --base-path /tmp/mwl --rpc-external --ws-external --rpc-cors all
+docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:latest ./crust --base-path /tmp/chain [more_options]
 ```
+
+**[more_options]** can be:
+1. `--chain`: Can be `dev`, `test`, `rocky` and `maxwell`
+2. `--rpc-external`: Expose rpc port
+3. `--ws-external`: Expose ws port
+4. `--rpc-cors all`: Allow cors requests
+5. More can be found with `--help`
+
+And the 
 
 ## Scripts
 

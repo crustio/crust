@@ -896,13 +896,13 @@ impl<T: Config> Module<T> {
         if !Self::enable_punishment() {
             return Self::reported_in_slot(&id.anchor, current_rs);
         }
-        if current_rs < id.punishment_deadline {
-            // punish it anyway and don't refresh the deadline.
-            return false;
-        } else if !Self::reported_in_slot(&id.anchor, current_rs) {
-            // should have wr. punish it again and refresh the deadline.
+        if !Self::reported_in_slot(&id.anchor, current_rs) {
+            // should have wr, otherwise punish it again and refresh the deadline.
             id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
-            <Identities<T>>::insert(reporter, id);
+            <Identities<T>>::insert(reporter, id.clone());
+        }
+        if current_rs < id.punishment_deadline {
+            // punish it anyway
             return false;
         }
         return true;

@@ -890,7 +890,7 @@ impl<T: Config> Module<T> {
 
     fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {
         if !Self::reported_in_slot(&id.anchor, current_rs) {
-            // should have wr. punish it again and refresh the deadline.
+            // should have wr, otherwise punish it again and refresh the deadline.
             id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
             <Identities<T>>::insert(reporter, id.clone());
         }

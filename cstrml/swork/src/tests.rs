@@ -2558,21 +2558,25 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             // All workload is counted to alice. bob and eve is None.
             assert_eq!(*map.get(&ferdie).unwrap(), 0);
 
-            let mut alice_wr_info = group_work_report_alice_300();
-            alice_wr_info.block_number = 2700;
-            let a_pk = alice_wr_info.curr_pk.clone();
-            let legal_wr = WorkReport {
-                report_slot: alice_wr_info.block_number,
-                used: alice_wr_info.used * 2,
-                free: alice_wr_info.free,
-                reported_files_size: alice_wr_info.used,
-                reported_srd_root: alice_wr_info.srd_root.clone(),
-                reported_files_root: alice_wr_info.files_root.clone()
-            };
-            add_wr(&a_pk, &legal_wr);
+            // add wr fo the following report slots
+            let bns = vec![1800, 2100, 2400, 2700, 3000];
+            for bn in bns {
+                let mut alice_wr_info = group_work_report_alice_300();
+                alice_wr_info.block_number = bn;
+                let a_pk = alice_wr_info.curr_pk.clone();
+                let legal_wr = WorkReport {
+                    report_slot: alice_wr_info.block_number,
+                    used: alice_wr_info.used * 2,
+                    free: alice_wr_info.free,
+                    reported_files_size: alice_wr_info.used,
+                    reported_srd_root: alice_wr_info.srd_root.clone(),
+                    reported_files_root: alice_wr_info.files_root.clone()
+                };
+                add_wr(&a_pk, &legal_wr);
+            }
             run_to_block(3003);
-
             Swork::update_identities();
+
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
@@ -2581,20 +2585,14 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             // All workload is counted to alice. bob and eve is None.
             assert_eq!(*map.get(&ferdie).unwrap(), 0);
 
-            let mut alice_wr_info = group_work_report_alice_300();
-            alice_wr_info.block_number = 3000;
-            let a_pk = alice_wr_info.curr_pk.clone();
-            let legal_wr = WorkReport {
-                report_slot: alice_wr_info.block_number,
-                used: alice_wr_info.used * 2,
-                free: alice_wr_info.free,
-                reported_files_size: alice_wr_info.used,
-                reported_srd_root: alice_wr_info.srd_root.clone(),
-                reported_files_root: alice_wr_info.files_root.clone()
-            };
-            add_wr(&a_pk, &legal_wr);
             run_to_block(3303);
             Swork::update_identities();
+
+            assert_eq!(Swork::identities(&alice).unwrap_or_default(), Identity {
+                anchor: a_pk.clone(),
+                punishment_deadline: 2700,
+                group: Some(ferdie.clone())
+            });
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 57 * 2);

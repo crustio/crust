@@ -895,7 +895,7 @@ impl<T: Config> Module<T> {
             <Identities<T>>::insert(reporter, id.clone());
         }
         if current_rs < id.punishment_deadline {
-            // punish it anyway and don't refresh the deadline.
+            // punish it anyway
             return false;
         }
         return true;

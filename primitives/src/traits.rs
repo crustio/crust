@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
-use frame_support::traits::LockableCurrency;
-use crate::{SworkerAnchor, MerkleRoot, BlockNumber};
+use frame_support::traits::{LockableCurrency, WithdrawReasons};
+use crate::{SworkerAnchor, MerkleRoot, BlockNumber, EraIndex};
 use sp_std::collections::btree_set::BTreeSet;
+use sp_runtime::DispatchError;
 
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
@@ -32,4 +33,12 @@ pub trait MarketInterface<AccountId, Balance> {
 	fn delete_replica(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64;
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;
+}
+
+pub trait FeeReductionInterface<AccountId, Balance, NegativeImbalance> {
+	fn update_overall_reduction(next_era: EraIndex, total_fee_reduction: Balance) -> Balance;
+
+	fn try_to_free_fee(who: &AccountId, fee: Balance, reasons: WithdrawReasons) -> Result<NegativeImbalance, DispatchError>;
+
+	fn try_to_free_count(who: &AccountId) -> bool;
 }

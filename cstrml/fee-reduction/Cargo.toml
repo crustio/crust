@@ -1,0 +1,42 @@
+[package]
+name = "cstrml-fee-reduction"
+version = "0.12.0"
+authors = ["crustio"]
+edition = "2018"
+license = "Apache-2.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
+
+[dependencies]
+serde = { default-features = false, version = "1.0.116" }
+serde_derive = { optional = true, version = "1.0.102" }
+codec = { package = "parity-scale-codec", default-features = false, version = "2.0.0" }
+rustc-hex = { default-features = false, version = "2.0.1" }
+
+# substrate frame dependencies
+frame-support = { default-features = false, version = "3.0.0" }
+frame-system = { default-features = false, version = "3.0.0" }
+sp-runtime = { default-features = false, version = "3.0.0" }
+sp-core = { default-features = false, version = "3.0.0" }
+sp-std = { default-features = false, version = "3.0.0" }
+sp-io = { default-features = false, version = "3.0.0" }
+primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
+
+[dev-dependencies]
+balances = { path = "../balances", package = "cstrml-balances" }
+hex-literal = "0.3.1"
+
+[features]
+default = ["std"]
+std = [
+    "serde/std",
+    "serde_derive",
+    "rustc-hex/std",
+    "codec/std",
+    "sp-core/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "sp-io/std",
+    "frame-support/std",
+    "frame-system/std",
+]

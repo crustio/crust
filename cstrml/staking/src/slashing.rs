@@ -50,7 +50,7 @@
 //! Based on research at https://research.web3.foundation/en/latest/polkadot/slashing/npos/
 
 use super::{
-    EraIndex, Config, Module, Store, BalanceOf, Exposure, Perbill, SessionInterface,
+    Config, Module, Store, BalanceOf, Exposure, Perbill, SessionInterface,
     NegativeImbalanceOf, UnappliedSlash,
 };
 use sp_runtime::{traits::{Zero, Saturating}, RuntimeDebug};
@@ -60,6 +60,7 @@ use frame_support::{
 };
 use sp_std::vec::Vec;
 use codec::{Encode, Decode};
+use primitives::EraIndex;
 
 /// The proportion of the slashing reward to be paid out on the first slashing detection.
 /// This is f_1 in the paper.

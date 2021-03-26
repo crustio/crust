@@ -12,6 +12,9 @@ use sp_std::vec::Vec;
 pub mod constants;
 pub mod traits;
 
+/// Counter for the number of eras that have passed.
+pub type EraIndex = u32;
+
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
 

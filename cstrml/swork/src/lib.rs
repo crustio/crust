@@ -27,7 +27,7 @@ use primitives::{
     MerkleRoot, SworkerPubKey, SworkerSignature,
     ReportSlot, BlockNumber, IASSig,
     ISVBody, SworkerCert, SworkerCode, SworkerAnchor,
-    traits::{MarketInterface, SworkerInterface}
+    traits::{MarketInterface, SworkerInterface, FeeReductionInterface}
 };
 use sp_std::collections::btree_map::BTreeMap;
 
@@ -44,6 +44,7 @@ mod tests;
 
 pub type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
+pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 pub(crate) const LOG_TARGET: &'static str = "swork";
 
@@ -160,6 +161,9 @@ pub trait Config: system::Config {
 
     /// Max number of members in one group
     type MaxGroupSize: Get<u32>;
+
+    /// Fee reduction interface
+    type FeeReductionInterface: FeeReductionInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -536,7 +540,17 @@ decl_module! {
             // 11. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
-            Ok(Pays::No.into())
+            // 12. Try to free count limitation
+            let id = Self::identities(&reporter).unwrap_or_default();
+            let mut owner = reporter;
+            if let Some(group) = id.group {
+                owner = group;
+            }
+            if T::FeeReductionInterface::try_to_free_count(&owner) {
+               return Ok(Pays::No.into());
+            }
+
+            Ok(Pays::Yes.into())
         }
 
         #[weight = T::WeightInfo::create_group()]

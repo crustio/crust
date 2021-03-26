@@ -729,6 +729,6 @@ pub fn authoring_rewards_in_era(era_index: EraIndex) -> BalanceOf<Test> {
 
 pub fn staking_rewards_in_era(era_index: EraIndex) -> BalanceOf<Test> {
     let total_reward = Staking::total_rewards_in_era(era_index);
-    let authoring_reward = Perbill::from_percent(20) * total_reward;
+    let authoring_reward = authoring_rewards_in_era(era_index);
     total_reward.saturating_sub(authoring_reward)
 }

@@ -15,14 +15,14 @@ use sp_core::{crypto::key_types, H256};
 use sp_io;
 use sp_runtime::testing::{Header, UintAuthorityId};
 use sp_runtime::traits::{Convert, IdentityLookup, OpaqueKeys, SaturatedConversion};
-use sp_runtime::{KeyTypeId, Perbill};
+use sp_runtime::{KeyTypeId, Perbill, DispatchError};
 use sp_staking::{
     offence::{OffenceDetails, OnOffenceHandler},
     SessionIndex,
 };
 use std::{cell::RefCell, collections::HashSet, collections::btree_set::BTreeSet};
-use balances::AccountData;
-use primitives::{traits::MarketInterface, MerkleRoot, SworkerAnchor};
+use balances::{AccountData, NegativeImbalance};
+use primitives::{traits::{MarketInterface, FeeReductionInterface}, MerkleRoot, SworkerAnchor};
 
 /// The AccountId alias in this test module.
 pub type AccountId = u128;
@@ -49,6 +49,7 @@ thread_local! {
     static OWN_WORKLOAD: RefCell<u128> = RefCell::new(0);
     static TOTAL_WORKLOAD: RefCell<u128> = RefCell::new(0);
     static DSM_STAKING_PAYOUT: RefCell<Balance> = RefCell::new(0);
+    static MOCK_USED_FEE: RefCell<Balance> = RefCell::new(0);
 }
 
 pub struct TestSessionHandler;
@@ -221,6 +222,23 @@ impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
     }
 }
 
+pub struct TestFeeReductionInterface;
+
+impl<AID> FeeReductionInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestFeeReductionInterface {
+    fn update_overall_reduction_info(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
+        BalanceOf::<Test>::from(MOCK_USED_FEE.with(|v| *v.borrow()))
+    }
+
+    fn try_to_free_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+        Ok(NegativeImbalance::new(0))
+    }
+
+    fn try_to_free_count(_: &AID) -> bool {
+        return true;
+    }
+
+}
+
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
     pub const MaxGroupSize: u32 = 100;
@@ -233,6 +251,7 @@ impl swork::Config for Test {
     type Works = TestStaking;
     type MarketInterface = TestStaking;
     type MaxGroupSize = MaxGroupSize;
+    type FeeReductionInterface = TestFeeReductionInterface;
     type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 
@@ -266,6 +285,7 @@ impl Config for Test {
     type MarketStakingPot = TestStaking;
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
+    type FeeReductionInterface = TestFeeReductionInterface;
     type WeightInfo = weight::WeightInfo;
 }
 
@@ -301,6 +321,7 @@ pub struct ExtBuilder {
     total_workload: u128,
     staking_pot: Balance,
     dsm_staking_payout: Balance,
+    mock_used_fee: Balance,
     start_reward_era: u32
 }
 
@@ -320,6 +341,7 @@ impl Default for ExtBuilder {
             total_workload: 3000,
             staking_pot: 1_000_000_000_000_000_000,
             dsm_staking_payout: 0,
+            mock_used_fee: 0,
             start_reward_era: 0
         }
     }
@@ -378,6 +400,10 @@ impl ExtBuilder {
         self.dsm_staking_payout = amount;
         self
     }
+    pub fn mock_used_fee(mut self, amount: Balance) -> Self {
+        self.mock_used_fee = amount;
+        self
+    }
     pub fn start_reward_era(mut self, era_index: u32) -> Self {
         self.start_reward_era = era_index;
         self
@@ -388,6 +414,7 @@ impl ExtBuilder {
         OWN_WORKLOAD.with(|v| *v.borrow_mut() = self.own_workload);
         TOTAL_WORKLOAD.with(|v| *v.borrow_mut() = self.total_workload);
         DSM_STAKING_PAYOUT.with(|v| *v.borrow_mut() = self.dsm_staking_payout);
+        MOCK_USED_FEE.with(|v| *v.borrow_mut() = self.mock_used_fee);
     }
     pub fn build(self) -> sp_io::TestExternalities {
         self.set_associated_consts();

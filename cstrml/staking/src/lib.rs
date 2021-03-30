@@ -1933,7 +1933,7 @@ impl<T: Config> Module<T> {
                 let mut total_payout = market_total_payout.saturating_add(gpos_total_payout);
 
                 // 4. decrease the last fee reduction and update the next total fee reduction
-                let used_fee = T::FeeReductionInterface::update_overall_reduction(active_era_index + 1, total_payout);
+                let used_fee = T::FeeReductionInterface::update_overall_reduction_info(active_era_index + 1, total_payout);
                 total_payout = total_payout.saturating_sub(used_fee);
 
                 // 5. Split the payout for staking and authoring

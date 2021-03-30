@@ -12,14 +12,14 @@ use frame_support::{
 // use sp_core::H256;
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
-    testing::Header,
+    testing::Header, DispatchError,
     traits::{BlakeTwo256, IdentityLookup, SaturatedConversion},
     Perbill,
 };
 pub use std::{cell::RefCell, iter::FromIterator};
-use balances::AccountData;
-pub use primitives::*;
-use swork::{PKInfo, Identity};
+use balances::{AccountData, NegativeImbalance};
+pub use primitives::{traits::FeeReductionInterface, *};
+use swork::{PKInfo, Identity, NegativeImbalanceOf};
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;
@@ -129,6 +129,23 @@ impl balances::Config for Test {
     type MaxLocks = ();
 }
 
+pub struct TestFeeReductionInterface;
+
+impl<AID> FeeReductionInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestFeeReductionInterface {
+    fn update_overall_reduction_info(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
+        Zero::zero()
+    }
+
+    fn try_to_free_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+        Ok(NegativeImbalance::new(0))
+    }
+
+    fn try_to_free_count(_: &AID) -> bool {
+        return true;
+    }
+
+}
+
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
     pub const MaxGroupSize: u32 = 100;
@@ -141,6 +158,7 @@ impl swork::Config for Test {
     type Works = ();
     type MarketInterface = Market;
     type MaxGroupSize = MaxGroupSize;
+    type FeeReductionInterface = TestFeeReductionInterface;
     type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 

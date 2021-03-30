@@ -36,7 +36,7 @@ pub trait MarketInterface<AccountId, Balance> {
 }
 
 pub trait FeeReductionInterface<AccountId, Balance, NegativeImbalance> {
-	fn update_overall_reduction(next_era: EraIndex, total_fee_reduction: Balance) -> Balance;
+	fn update_overall_reduction_info(next_era: EraIndex, total_fee_reduction: Balance) -> Balance;
 
 	fn try_to_free_fee(who: &AccountId, fee: Balance, reasons: WithdrawReasons) -> Result<NegativeImbalance, DispatchError>;
 

@@ -7,7 +7,8 @@
 use sp_std::prelude::*;
 use frame_support::{
     decl_event, decl_storage, decl_module, decl_error,
-    traits::{Currency, ReservableCurrency, WithdrawReasons, ExistenceRequirement, Imbalance}
+    traits::{Currency, ReservableCurrency, Get,
+             WithdrawReasons, ExistenceRequirement, Imbalance}
 };
 use frame_system::ensure_signed;
 use codec::{Encode, Decode};
@@ -17,7 +18,7 @@ use sp_runtime::DispatchError;
 
 use sp_runtime::{
     DispatchResult, Perbill,
-    traits::Zero
+    traits::Zero, SaturatedConversion
 };
 
 use primitives::{EraIndex, traits::FeeReductionInterface};
@@ -36,6 +37,7 @@ pub trait Config: frame_system::Config {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
     type Currency: ReservableCurrency<Self::AccountId>;
+    type OneOperationCost: Get<BalanceOf<Self>>;
 }
 
 decl_event!(
@@ -76,7 +78,7 @@ pub struct ReductionDetail<Balance> {
 }
 
 impl<T: Config> FeeReductionInterface<<T as frame_system::Config>::AccountId, BalanceOf<T>, NegativeImbalanceOf<T>> for Module<T> {
-    fn update_overall_reduction(next_era: EraIndex, total_reward: BalanceOf<T>) -> BalanceOf<T> {
+    fn update_overall_reduction_info(next_era: EraIndex, total_reward: BalanceOf<T>) -> BalanceOf<T> {
         Self::update_overall_reduction(next_era, Perbill::from_percent(1) * total_reward)
     }
 
@@ -158,6 +160,8 @@ impl<T: Config> Module<T> {
         let overall_reduction = Self::overall_reduction();
         let mut own_reduction = Self::reduction_info(who);
         Self::try_refresh_reduction(&overall_reduction, &mut own_reduction);
+        // won't update reduction detail if it has no staking
+        // to save db writing time
         if own_reduction.used_count_reduction < Self::calculate_total_count_reduction(&own_reduction) {
             own_reduction.used_count_reduction += 1;
             <ReductionInfo<T>>::insert(&who, own_reduction);
@@ -177,7 +181,7 @@ impl<T: Config> Module<T> {
         let reduction_fee = fee - real_fee;
         let mut withdraw_fee = Zero::zero();
         let mut used_reduction = Zero::zero();
-        if own_reduction.used_fee_reduction + reduction_fee < own_total_fee_reduction && overall_reduction.used_fee_reduction + reduction_fee < overall_reduction.total_fee_reduction {
+        if own_reduction.used_fee_reduction + reduction_fee <= own_total_fee_reduction && overall_reduction.used_fee_reduction + reduction_fee <= overall_reduction.total_fee_reduction {
             withdraw_fee = real_fee;
             used_reduction = reduction_fee;
         } else {
@@ -185,12 +189,15 @@ impl<T: Config> Module<T> {
         }
         let result = match T::Currency::withdraw(who, withdraw_fee, reasons, ExistenceRequirement::KeepAlive) {
             Ok(mut imbalance) => {
+                // won't update reduction detail if it has no staking
+                // to save db writing time
                 if !used_reduction.is_zero() {
                     overall_reduction.used_fee_reduction += used_reduction;
                     own_reduction.used_fee_reduction += used_reduction;
                     <ReductionInfo<T>>::insert(&who, own_reduction);
                     <OverallReduction<T>>::put(overall_reduction);
-                    imbalance.subsume(T::Currency::issue(used_reduction.clone()));
+                    let new_issued = T::Currency::issue(used_reduction.clone());
+                    imbalance.subsume(new_issued);
                 }
                 Ok(imbalance)
             }
@@ -199,15 +206,15 @@ impl<T: Config> Module<T> {
         result
     }
 
-    fn calculate_total_fee_reduction(own_staking: BalanceOf<T>, total_staking: BalanceOf<T>, total_fee_reduction: BalanceOf<T>) -> BalanceOf<T> {
+    pub fn calculate_total_fee_reduction(own_staking: BalanceOf<T>, total_staking: BalanceOf<T>, total_fee_reduction: BalanceOf<T>) -> BalanceOf<T> {
         Perbill::from_rational_approximation(own_staking, total_staking) * total_fee_reduction
     }
 
-    fn calculate_total_count_reduction(own_reduction: &ReductionDetail<BalanceOf<T>>) -> u32 {
-        12
+    pub fn calculate_total_count_reduction(own_reduction: &ReductionDetail<BalanceOf<T>>) -> u32 {
+        (own_reduction.own_staking / T::OneOperationCost::get()).saturated_into()
     }
 
-    fn try_refresh_reduction(overall_reduction: &OverallReductionInfo<BalanceOf<T>>, own_reduction: &mut ReductionDetail<BalanceOf<T>>) {
+    pub fn try_refresh_reduction(overall_reduction: &OverallReductionInfo<BalanceOf<T>>, own_reduction: &mut ReductionDetail<BalanceOf<T>>) {
         if own_reduction.refreshed_at < overall_reduction.active_era {
             own_reduction.refreshed_at = overall_reduction.active_era;
             own_reduction.used_fee_reduction = Zero::zero();

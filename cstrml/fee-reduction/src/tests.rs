@@ -2,191 +2,333 @@
 // This file is part of Crust.
 
 use super::*;
-use crate::{mock::*, Error};
-use frame_support::{assert_noop, assert_ok, dispatch::DispatchError};
+use crate::{mock::*, OverallReductionInfo, ReductionDetail};
+use frame_support::assert_ok;
+use balances::NegativeImbalance;
 
 #[test]
-fn happy_pass_should_work() {
+fn update_overall_info_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-
-        // 1. Set claim limit = 100
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
-        assert_eq!(CrustClaims::claim_limit(), 100);
-
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
-
-        // 3. Storage should ok
-        assert_eq!(CrustClaims::claims(&tx_hash), Some((eth_addr.clone(), 100))); // new tx
-        assert_eq!(CrustClaims::claimed(&tx_hash), false); // tx has not be claimed
-        assert_eq!(CrustClaims::claim_limit(), 0);
-
-        // 4. Claim it with correct msg sig
-        // Pay RUSTs to the TEST account:0100000000000000
-        let sig = get_legal_eth_sig();
-        assert_eq!(Balances::free_balance(1), 0);
-        assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()));
-
-        // 5. Claim success
-        assert_eq!(Balances::free_balance(1), 100);
-        assert_eq!(CrustClaims::claimed(&tx_hash), true); // tx has already be claimed
+        FeeReduction::update_overall_reduction_info(10u32.into(), 100);
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 1,
+            total_staking: 0,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
     });
 }
 
 #[test]
-fn change_miner_should_work() {
+fn add_collateral_should_work() {
     new_test_ext().execute_with(|| {
-        assert_noop!(
-            CrustClaims::change_miner(Origin::signed(1), 1),
-            DispatchError::BadOrigin
-        );
-
-        // 0. Set miner
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1)); // 1 is miner
-
-        // 1. Mint a claim with 2, no way
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_noop!(
-            CrustClaims::mint_claim(Origin::signed(2), tx_hash.clone(), eth_addr.clone(), 100),
-            Error::<Test>::IllegalMiner
-        );
+        FeeReduction::update_overall_reduction_info(10u32.into(), 100);
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 1,
+            total_staking: 0,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
+        let _ = Balances::make_free_balance_be(&ALICE, 200_000);
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 100));
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 100,
+            used_fee_reduction: 0,
+            used_count_reduction: 0,
+            refreshed_at: 0
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 1,
+            total_staking: 100,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
     });
 }
 
 #[test]
-fn tx_should_exist() {
+fn cut_collateral_should_work() {
     new_test_ext().execute_with(|| {
-        let tx_hash = get_legal_tx_hash();
-        let sig = get_legal_eth_sig();
-        assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash, sig),
-            Error::<Test>::SignerHasNoClaim
-        );
+        FeeReduction::update_overall_reduction_info(10u32.into(), 100);
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 1,
+            total_staking: 0,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
+        let _ = Balances::make_free_balance_be(&ALICE, 200_000);
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 100));
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 100,
+            used_fee_reduction: 0,
+            used_count_reduction: 0,
+            refreshed_at: 0
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 1,
+            total_staking: 100,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
+        assert_ok!(FeeReduction::cut_collateral(Origin::signed(ALICE.clone()), 50));
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 50,
+            used_fee_reduction: 0,
+            used_count_reduction: 0,
+            refreshed_at: 0
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 1,
+            total_staking: 50,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
     });
 }
 
 #[test]
-fn illegal_sig_claim_should_failed() {
+fn try_to_free_count_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-
-        // 1. Set limitation
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
-
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
-
-        // 3. Claim it with illegal sig
-        // 3.1 Another eth account wanna this money, go fuck himself
-        let sig1 = get_another_account_eth_sig();
-        assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig1.clone()),
-            Error::<Test>::SignatureNotMatch
-        );
-
-        // 3.2 Sig with wrong message should failed
-        let sig2 = get_wrong_msg_eth_sig();
-        assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig2.clone()),
-            Error::<Test>::SignatureNotMatch
-        );
+        FeeReduction::update_overall_reduction_info(10u32.into(), 100);
+        assert_eq!(FeeReduction::try_to_free_count(&ALICE), false);
+        // won't update reduction detail since it has not staking
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 0,
+            used_fee_reduction: 0,
+            used_count_reduction: 0,
+            refreshed_at: 0
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 1,
+            total_staking: 0,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
+        let _ = Balances::make_free_balance_be(&ALICE, 200_000);
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 105));
+        assert_eq!(FeeReduction::try_to_free_count(&ALICE), true);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 0,
+            used_count_reduction: 1,
+            refreshed_at: 10
+        });
+        assert_eq!(FeeReduction::try_to_free_count(&ALICE), true);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 0,
+            used_count_reduction: 2,
+            refreshed_at: 10
+        });
+        assert_eq!(FeeReduction::try_to_free_count(&ALICE), false);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 0,
+            used_count_reduction: 2,
+            refreshed_at: 10
+        });
+        FeeReduction::update_overall_reduction_info(11u32.into(), 100);
+        assert_eq!(FeeReduction::try_to_free_count(&ALICE), true);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 0,
+            used_count_reduction: 1,
+            refreshed_at: 11
+        });
+        assert_eq!(FeeReduction::try_to_free_count(&ALICE), true);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 0,
+            used_count_reduction: 2,
+            refreshed_at: 11
+        });
+        assert_eq!(FeeReduction::try_to_free_count(&ALICE), false);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 0,
+            used_count_reduction: 2,
+            refreshed_at: 11
+        });
     });
 }
 
 #[test]
-fn double_mint_should_failed() {
+fn try_to_free_fee_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-
-        // 1. Set limit
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
-
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
-
-        // 3. Mint the same eth again
-        assert_noop!(
-            CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100),
-            Error::<Test>::AlreadyBeMint
-        );
+        let _ = Balances::make_free_balance_be(&ALICE, 200);
+        let target_fee = NegativeImbalance::new(20);
+        assert_eq!(Balances::total_issuance(), 200);
+        FeeReduction::update_overall_reduction_info(10u32.into(), 10_000);
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 0,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 20, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
+        // won't update reduction detail since it has not staking
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 0,
+            used_fee_reduction: 0,
+            used_count_reduction: 0,
+            refreshed_at: 0
+        });
+        assert_eq!(Balances::total_balance(&ALICE), 180);
+        assert_eq!(Balances::total_issuance(), 180);
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 105));
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 20, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 19,
+            used_count_reduction: 0,
+            refreshed_at: 10
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 105,
+            used_fee_reduction: 19,
+            active_era: 10
+        });
+        assert_eq!(Balances::total_issuance(), 179); // 180 - 20 + 19
+        assert_eq!(Balances::total_balance(&ALICE), 179);
     });
 }
 
 #[test]
-fn double_claim_should_failed() {
+fn update_overall_info_should_return_used_fee() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-
-        // 1. Set limitation
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
-
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
-
-        // 3. Claim it
-        // Pay RUSTs to the TEST account:0100000000000000
-        let sig = get_legal_eth_sig();
-        assert_eq!(Balances::free_balance(1), 0);
-        assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()));
-        assert_eq!(Balances::free_balance(1), 100);
-
-        // 4. Claim again, in ur dream 🙂
-        assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()),
-            Error::<Test>::AlreadyBeClaimed
-        );
-        assert_eq!(Balances::free_balance(1), 100);
+        FeeReduction::update_overall_reduction_info(10u32.into(), 10_000);
+        let _ = Balances::make_free_balance_be(&ALICE, 200);
+        let target_fee = NegativeImbalance::new(20);
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 105));
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 20, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 105,
+            used_fee_reduction: 19,
+            used_count_reduction: 0,
+            refreshed_at: 10
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 105,
+            used_fee_reduction: 19,
+            active_era: 10
+        });
+        assert_eq!(FeeReduction::update_overall_reduction_info(11u32.into(), 10_000), 19);
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 105,
+            used_fee_reduction: 0,
+            active_era: 11
+        });
     });
 }
 
 #[test]
-fn claim_limit_should_work() {
+fn free_fee_limit_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        let _ = Balances::make_free_balance_be(&ALICE, 200);
+        let _ = Balances::make_free_balance_be(&BOB, 200);
+        let target_fee = NegativeImbalance::new(40);
+        assert_eq!(Balances::total_issuance(), 400);
+        FeeReduction::update_overall_reduction_info(10u32.into(), 10_000);
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 0,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 100));
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(BOB.clone()), 100));
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 40, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 100,
+            used_fee_reduction: 38,
+            used_count_reduction: 0,
+            refreshed_at: 10
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 200,
+            used_fee_reduction: 38,
+            active_era: 10
+        });
+        assert_eq!(Balances::total_issuance(), 398); // 400 - 40 + 38
+        assert_eq!(Balances::total_balance(&ALICE), 198);
 
-        // 1. Mint a claim should failed without limitation
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_noop!(
-            CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10),
-            Error::<Test>::ExceedClaimLimit
-        );
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 40, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 100,
+            used_fee_reduction: 38,
+            used_count_reduction: 0,
+            refreshed_at: 10
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 200,
+            used_fee_reduction: 38,
+            active_era: 10
+        });
+        assert_eq!(Balances::total_issuance(), 358); // 398 - 40
+        assert_eq!(Balances::total_balance(&ALICE), 158);
+        assert_ok!(FeeReduction::cut_collateral(Origin::signed(BOB.clone()), 100));
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 100,
+            used_fee_reduction: 38,
+            active_era: 10
+        });
 
-        // 2. Set limitation
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 10));
-        assert_eq!(CrustClaims::claim_limit(), 10);
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 40, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
+        assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
+            own_staking: 100,
+            used_fee_reduction: 76,
+            used_count_reduction: 0,
+            refreshed_at: 10
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 100,
+            used_fee_reduction: 76,
+            active_era: 10
+        });
+        assert_eq!(Balances::total_issuance(), 356); // 358 - 2
+        assert_eq!(Balances::total_balance(&ALICE), 156);
 
-        // 3. Claim amount with limitation should be ok
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10));
-        assert_eq!(CrustClaims::claim_limit(), 0);
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(BOB.clone()), 100));
+        assert_eq!(FeeReduction::try_to_free_fee(&BOB, 40, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
+        assert_eq!(FeeReduction::reduction_info(&BOB), ReductionDetail {
+            own_staking: 100,
+            used_fee_reduction: 0,
+            used_count_reduction: 0,
+            refreshed_at: 0
+        });
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 200,
+            used_fee_reduction: 76,
+            active_era: 10
+        });
+        assert_eq!(Balances::total_issuance(), 316); // 358 - 40
+        assert_eq!(Balances::total_balance(&BOB), 160);
+
     });
 }
 
 #[test]
-fn bond_eth_should_work() {
+fn currency_is_insufficient() {
     new_test_ext().execute_with(|| {
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::bond_eth(Origin::signed(1), eth_addr.clone()));
-        assert_eq!(CrustClaims::bonded_eth(1), Some(eth_addr));
+        let _ = Balances::make_free_balance_be(&ALICE, 30);
+        assert_eq!(Balances::total_issuance(), 30);
+        FeeReduction::update_overall_reduction_info(10u32.into(), 10_000);
+        assert_eq!(FeeReduction::overall_reduction(), OverallReductionInfo {
+            total_fee_reduction: 100,
+            total_staking: 0,
+            used_fee_reduction: 0,
+            active_era: 10
+        });
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 40, WithdrawReasons::TRANSACTION_PAYMENT).is_err(), true);
+        assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 25));
+        assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 200, WithdrawReasons::TRANSACTION_PAYMENT).is_err(), true);
     });
 }

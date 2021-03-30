@@ -780,9 +780,14 @@ impl market::Config for Runtime {
     type MaximumFileSize = MaximumFileSize;
 }
 
+parameter_types! {
+    pub const OneOperationCost: Balance = 1 * DOLLARS;
+}
+
 impl fee_reduction::Config for Runtime {
     type Event = Event;
     type Currency = Balances;
+    type OneOperationCost = OneOperationCost;
 }
 
 construct_runtime! {

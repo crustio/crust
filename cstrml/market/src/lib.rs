@@ -18,10 +18,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed, ensure_root};
-use sp_runtime::{
-    Perbill, ModuleId,
-    traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
-};
+use sp_runtime::{Perbill, ModuleId, traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}, DispatchError};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -455,7 +452,7 @@ decl_module! {
             ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
 
             // 4. Transfer from origin to collateral account.
-            T::Currency::transfer(&who, &Self::collateral_pot(), collateral.clone(), AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&who, &Self::collateral_pot(), collateral.clone(), AllowDeath)?;
 
             // 5. Prepare new ledger
             let ledger = MerchantLedger {
@@ -496,7 +493,7 @@ decl_module! {
             <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
 
             // 5. Transfer from origin to collateral account.
-            T::Currency::transfer(&who, &Self::collateral_pot(), value.clone(), AllowDeath).expect("Something wrong during transferring");
+            T::Currency::transfer(&who, &Self::collateral_pot(), value.clone(), AllowDeath)?;
 
             // 6. Emit success
             Self::deposit_event(RawEvent::AddCollateralSuccess(who.clone(), value));
@@ -531,7 +528,7 @@ decl_module! {
             <MerchantLedgers<T>>::insert(&who, ledger.clone());
 
             // 5. Transfer from origin to collateral account.
-            T::Currency::transfer(&Self::collateral_pot(), &who, value.clone(), KeepAlive).expect("Something wrong during transferring");
+            T::Currency::transfer(&Self::collateral_pot(), &who, value.clone(), KeepAlive)?;
 
             // 6. Emit success
             Self::deposit_event(RawEvent::CutCollateralSuccess(who, value));
@@ -569,7 +566,7 @@ decl_module! {
             ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
             // 5. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone());
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone())?;
 
             let curr_bn = Self::get_current_block_number();
 
@@ -600,7 +597,7 @@ decl_module! {
             ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
             if let Some((mut file_info, used_info)) = Self::files(&cid) {
-                T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath).expect("Something wrong during transferring");
+                T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath)?;
                 file_info.prepaid += amount;
                 <Files<T>>::insert(&cid, (file_info, used_info));
             } else {
@@ -632,16 +629,16 @@ decl_module! {
             ensure!(file_info.expired_on != 0 && curr_bn >= file_info.expired_on, Error::<T>::NotInRewardPeriod);
 
             // 3. Maybe reward liquidator when he try to close outdated file
-            Self::maybe_reward_liquidator(&cid, curr_bn, &liquidator);
+            Self::maybe_reward_liquidator(&cid, curr_bn, &liquidator)?;
 
             // 4. Refresh the status of the file and calculate the reward for merchants
             Self::do_calculate_reward(&cid, curr_bn);
 
             // 5. Try to renew file if prepaid is not zero
-            Self::try_to_renew_file(&cid, curr_bn, &liquidator);
+            Self::try_to_renew_file(&cid, curr_bn, &liquidator)?;
 
             // 6. Try to close file
-            Self::try_to_close_file(&cid, curr_bn);
+            Self::try_to_close_file(&cid, curr_bn)?;
 
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
             Ok(())
@@ -664,7 +661,7 @@ decl_module! {
             ensure!(merchant_ledger.reward > Zero::zero(), Error::<T>::NotEnoughReward);
 
             // 4. Transfer the money
-            T::Currency::transfer(&Self::storage_pot(), &merchant, merchant_ledger.reward, KeepAlive).expect("Something wrong during transferring");
+            T::Currency::transfer(&Self::storage_pot(), &merchant, merchant_ledger.reward, KeepAlive)?;
 
             // 5. Set the reward to zero and push it back
             merchant_ledger.reward = Zero::zero();
@@ -803,16 +800,17 @@ impl<T: Config> Module<T> {
     }
 
     /// Close file, maybe move into trash
-    fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) {
+    fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) -> DispatchResult {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn && file_info.expired_on == file_info.calculated_at {
                 Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
                 let total_amount = file_info.amount.saturating_add(file_info.prepaid);
-                T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive).expect("Something wrong during transferring");
+                T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive)?;
                 Self::move_into_trash(cid, used_info, file_info.file_size);
             };
         }
+        Ok(())
     }
 
     /// Trashbag operations
@@ -939,7 +937,7 @@ impl<T: Config> Module<T> {
         used_size
     }
 
-    fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
+    fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some((mut file_info, used_info)) = Self::files(cid) {
             // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
             // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator
@@ -947,10 +945,11 @@ impl<T: Config> Module<T> {
             let reward_liquidator_amount = Perbill::from_rational_approximation(curr_bn.saturating_sub(file_info.expired_on).saturating_sub(T::FileDuration::get()), T::FileDuration::get()) * file_info.amount;
             if !reward_liquidator_amount.is_zero() {
                 file_info.amount = file_info.amount.saturating_sub(reward_liquidator_amount);
-                T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive).expect("Something wrong during transferring");
+                T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive)?;
                 <Files<T>>::insert(cid, (file_info, used_info));
             }
         }
+        Ok(())
     }
 
     fn upsert_new_file_info(cid: &MerkleRoot, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
@@ -994,7 +993,7 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) {
+    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             // 1. Calculate total amount
             let file_amount = T::FileBaseFee::get() + Self::get_file_amount(file_info.file_size);
@@ -1004,9 +1003,9 @@ impl<T: Config> Module<T> {
             if file_info.prepaid >= total_amount {
                 file_info.prepaid = file_info.prepaid.saturating_sub(total_amount.clone());
                 // 3. Reward liquidator.
-                T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive).expect("Something wrong during transferring");
+                T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
                 // 4. Split into reserved, storage and staking account
-                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone());
+                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone())?;
                 file_info.amount += file_amount;
                 if file_info.replicas.len() == 0 {
                     // turn this file into pending status since replicas.len() is zero
@@ -1024,6 +1023,7 @@ impl<T: Config> Module<T> {
                 Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
             }
         }
+        Ok(())
     }
 
     fn check_file_in_trash(cid: &MerkleRoot) {
@@ -1096,16 +1096,16 @@ impl<T: Config> Module<T> {
     // 10% into reserved pot
     // 72% into staking pot
     // 18% into storage pot
-    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> BalanceOf<T> {
+    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> Result<BalanceOf<T>, DispatchError> {
         let reserved_amount = T::TaxRatio::get() * value;
         let staking_and_storage_amount = value - reserved_amount;
         let staking_amount = T::StakingRatio::get() * staking_and_storage_amount;
         let storage_amount = staking_and_storage_amount - staking_amount;
 
-        T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, KeepAlive).expect("Something wrong during transferring");
-        T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, KeepAlive).expect("Something wrong during transferring");
-        T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), KeepAlive).expect("Something wrong during transferring");
-        storage_amount
+        T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, KeepAlive)?;
+        T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, KeepAlive)?;
+        T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), KeepAlive)?;
+        Ok(storage_amount)
     }
 
     fn get_current_block_number() -> BlockNumber {
@@ -1166,7 +1166,8 @@ impl<T: Config> Module<T> {
                 } else {
                     let total_amount = file_info.amount + file_info.prepaid;
                     if !Self::maybe_reward_merchant(who, &total_amount, true) {
-                        T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive).expect("Something wrong during transferring");
+                        // This should not have error => discard the result
+                        let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
                     }
                     <Files<T>>::remove(cid);
                     Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));

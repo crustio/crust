@@ -38,6 +38,10 @@ pub trait Config: frame_system::Config {
     type Currency: ReservableCurrency<Self::AccountId>;
     // The amount for one report work operation
     type OneOperationCost: Get<BalanceOf<Self>>;
+    // The ratio between total fee limitation and total reward
+    type TotalFeeRatio: Get<Perbill>;
+    // The ratio between own fee and reduction
+    type OwnFeeRatio: Get<Perbill>;
 }
 
 decl_event!(
@@ -87,7 +91,7 @@ pub struct ReductionDetail<Balance> {
 
 impl<T: Config> FeeReductionInterface<<T as frame_system::Config>::AccountId, BalanceOf<T>, NegativeImbalanceOf<T>> for Module<T> {
     fn update_overall_reduction_info(next_era: EraIndex, total_reward: BalanceOf<T>) -> BalanceOf<T> {
-        Self::update_overall_reduction(next_era, Perbill::from_percent(1) * total_reward)
+        Self::update_overall_reduction(next_era, T::TotalFeeRatio::get() * total_reward)
     }
 
     fn try_to_free_fee(who: &<T as frame_system::Config>::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
@@ -194,22 +198,19 @@ impl<T: Config> Module<T> {
                                                                           overall_reduction.total_fee_reduction);
         // Try to free fee reduction
         // Check the person has his own limit and the total limit is enough
-        let real_fee = Perbill::from_percent(5) * fee;
+        let real_fee = T::OwnFeeRatio::get() * fee;
         let reduction_fee = fee - real_fee;
-        let mut withdraw_fee = Zero::zero();
-        let mut used_reduction = Zero::zero();
-        if own_reduction.used_fee_reduction + reduction_fee <= own_total_fee_reduction && overall_reduction.used_fee_reduction + reduction_fee <= overall_reduction.total_fee_reduction {
+        let (withdraw_fee, used_reduction) = if own_reduction.used_fee_reduction + reduction_fee <= own_total_fee_reduction && overall_reduction.used_fee_reduction + reduction_fee <= overall_reduction.total_fee_reduction {
             // it's ok to free this fee
             // withdraw fee is 5%
             // reduction is 95%
-            withdraw_fee = real_fee;
-            used_reduction = reduction_fee;
+            (real_fee, reduction_fee)
         } else {
             // it's not ok to free this fee
             // withdraw fee is 100%
             // reduction is 0%
-            withdraw_fee = fee;
-        }
+            (fee, Zero::zero())
+        };
         // Try to withdraw the currency
         let result = match T::Currency::withdraw(who, withdraw_fee, reasons, ExistenceRequirement::KeepAlive) {
             Ok(mut imbalance) => {

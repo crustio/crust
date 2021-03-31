@@ -782,12 +782,16 @@ impl market::Config for Runtime {
 
 parameter_types! {
     pub const OneOperationCost: Balance = 1 * DOLLARS;
+    pub const TotalFeeRatio: Perbill = Perbill::from_percent(1);
+    pub const OwnFeeRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl fee_reduction::Config for Runtime {
     type Event = Event;
     type Currency = Balances;
     type OneOperationCost = OneOperationCost;
+    type TotalFeeRatio = TotalFeeRatio;
+    type OwnFeeRatio = OwnFeeRatio;
 }
 
 construct_runtime! {

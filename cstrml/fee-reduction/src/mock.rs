@@ -60,12 +60,16 @@ impl balances::Config for Test {
 
 parameter_types! {
     pub const OneOperationCost: Balance = 50;
+    pub const TotalFeeRatio: Perbill = Perbill::from_percent(1);
+    pub const OwnFeeRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl Config for Test {
     type Event = ();
     type Currency = Balances;
     type OneOperationCost = OneOperationCost;
+    type TotalFeeRatio = TotalFeeRatio;
+    type OwnFeeRatio = OwnFeeRatio;
 }
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;

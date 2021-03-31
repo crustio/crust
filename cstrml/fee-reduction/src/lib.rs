@@ -34,9 +34,9 @@ pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system:
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 pub trait Config: frame_system::Config {
-    /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
     type Currency: ReservableCurrency<Self::AccountId>;
+    // The amount for one report work operation
     type OneOperationCost: Get<BalanceOf<Self>>;
 }
 
@@ -54,7 +54,7 @@ decl_event!(
 
 decl_error! {
     pub enum Error for Module<T: Config> {
-        /// Superior not exist, should set it first
+        /// Don't have enough money
         InsuffientBalance,
     }
 }
@@ -62,18 +62,26 @@ decl_error! {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct OverallReductionInfo<Balance> {
+    // The limit of the fee reduction in one era
     pub total_fee_reduction: Balance,
+    // The total staking amount
     pub total_staking: Balance,
+    // The total used fee reduction
     pub used_fee_reduction: Balance,
+    // The current era index
     pub active_era: EraIndex
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct ReductionDetail<Balance> {
+    // It's own staking value
     pub own_staking: Balance,
+    // The used reduction to fee
     pub used_fee_reduction: Balance,
+    // The used reduction for report works
     pub used_count_reduction: u32,
+    // The latest refreshed era index
     pub refreshed_at: EraIndex
 }
 
@@ -93,11 +101,10 @@ impl<T: Config> FeeReductionInterface<<T as frame_system::Config>::AccountId, Ba
 
 
 decl_storage! {
-    // A macro for the Storage config, and its implementation, for this module.
-    // This allows for type-safe usage of the Substrate storage database, so you can
-    // keep things around between blocks.
     trait Store for Module<T: Config> as FeeReduction {
+        // Overall reduction information
         OverallReduction get(fn overall_reduction): OverallReductionInfo<BalanceOf<T>>;
+        // One reduction information
         ReductionInfo get(fn reduction_info): map hasher(blake2_128_concat) T::AccountId => ReductionDetail<BalanceOf<T>>;
     }
 }
@@ -147,12 +154,18 @@ decl_module! {
 
 impl<T: Config> Module<T> {
     pub fn update_overall_reduction(next_era: EraIndex, total_fee_reduction: BalanceOf<T>) -> BalanceOf<T> {
+        // Fetch overall reduction information
         let mut overall_reduction = Self::overall_reduction();
+        // Store the used fee reduction in the last era
         let used_fee_reduction = overall_reduction.used_fee_reduction;
+        // Update it to the current era
         overall_reduction.active_era = next_era;
+        // Set the limit for the current era
         overall_reduction.total_fee_reduction = total_fee_reduction;
+        // Reset used fee reduction to zero
         overall_reduction.used_fee_reduction = Zero::zero();
         <OverallReduction<T>>::put(overall_reduction);
+        // Return the used fee in the last era
         used_fee_reduction
     }
 
@@ -173,29 +186,42 @@ impl<T: Config> Module<T> {
     pub fn try_free_fee_reduction(who: &T::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
         let mut overall_reduction = Self::overall_reduction();
         let mut own_reduction = Self::reduction_info(who);
+        // Refresh the reduction
         Self::try_refresh_reduction(&overall_reduction, &mut own_reduction);
+        // Calculate the own reduction limit
         let own_total_fee_reduction = Self::calculate_total_fee_reduction(own_reduction.own_staking,
                                                                           overall_reduction.total_staking,
                                                                           overall_reduction.total_fee_reduction);
+        // Try to free fee reduction
+        // Check the person has his own limit and the total limit is enough
         let real_fee = Perbill::from_percent(5) * fee;
         let reduction_fee = fee - real_fee;
         let mut withdraw_fee = Zero::zero();
         let mut used_reduction = Zero::zero();
         if own_reduction.used_fee_reduction + reduction_fee <= own_total_fee_reduction && overall_reduction.used_fee_reduction + reduction_fee <= overall_reduction.total_fee_reduction {
+            // it's ok to free this fee
+            // withdraw fee is 5%
+            // reduction is 95%
             withdraw_fee = real_fee;
             used_reduction = reduction_fee;
         } else {
+            // it's not ok to free this fee
+            // withdraw fee is 100%
+            // reduction is 0%
             withdraw_fee = fee;
         }
+        // Try to withdraw the currency
         let result = match T::Currency::withdraw(who, withdraw_fee, reasons, ExistenceRequirement::KeepAlive) {
             Ok(mut imbalance) => {
                 // won't update reduction detail if it has no staking
                 // to save db writing time
                 if !used_reduction.is_zero() {
+                    // update the reduction information
                     overall_reduction.used_fee_reduction += used_reduction;
                     own_reduction.used_fee_reduction += used_reduction;
                     <ReductionInfo<T>>::insert(&who, own_reduction);
                     <OverallReduction<T>>::put(overall_reduction);
+                    // issue the 95% fee
                     let new_issued = T::Currency::issue(used_reduction.clone());
                     imbalance.subsume(new_issued);
                 }

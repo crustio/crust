@@ -57,6 +57,7 @@ fn cut_collateral_should_work() {
             active_era: 10
         });
         let _ = Balances::make_free_balance_be(&ALICE, 200_000);
+
         assert_ok!(FeeReduction::add_collateral(Origin::signed(ALICE.clone()), 100));
         assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
             own_staking: 100,
@@ -70,6 +71,7 @@ fn cut_collateral_should_work() {
             used_fee_reduction: 0,
             active_era: 10
         });
+
         assert_ok!(FeeReduction::cut_collateral(Origin::signed(ALICE.clone()), 50));
         assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
             own_staking: 50,
@@ -120,6 +122,7 @@ fn try_to_free_count_should_work() {
             used_count_reduction: 2,
             refreshed_at: 10
         });
+        // Reach the limitation => cannot free this operation
         assert_eq!(FeeReduction::try_to_free_count(&ALICE), false);
         assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
             own_staking: 105,
@@ -127,6 +130,7 @@ fn try_to_free_count_should_work() {
             used_count_reduction: 2,
             refreshed_at: 10
         });
+        // New era => refresh the limitation
         FeeReduction::update_overall_reduction_info(11u32.into(), 100);
         assert_eq!(FeeReduction::try_to_free_count(&ALICE), true);
         assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
@@ -142,6 +146,7 @@ fn try_to_free_count_should_work() {
             used_count_reduction: 2,
             refreshed_at: 11
         });
+        // Reach the limitation => cannot free this operation
         assert_eq!(FeeReduction::try_to_free_count(&ALICE), false);
         assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
             own_staking: 105,
@@ -256,6 +261,7 @@ fn free_fee_limit_should_work() {
         assert_eq!(Balances::total_issuance(), 398); // 400 - 40 + 38
         assert_eq!(Balances::total_balance(&ALICE), 198);
 
+        // Reach his own limitation
         assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 40, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
         assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
             own_staking: 100,
@@ -279,6 +285,7 @@ fn free_fee_limit_should_work() {
             active_era: 10
         });
 
+        // Since Bob cut his collateral, Alice has more limitation, it's free again
         assert_eq!(FeeReduction::try_to_free_fee(&ALICE, 40, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
         assert_eq!(FeeReduction::reduction_info(&ALICE), ReductionDetail {
             own_staking: 100,
@@ -296,6 +303,7 @@ fn free_fee_limit_should_work() {
         assert_eq!(Balances::total_balance(&ALICE), 156);
 
         assert_ok!(FeeReduction::add_collateral(Origin::signed(BOB.clone()), 100));
+        // Bob has his own limitation, but total free fee reduction is not enough
         assert_eq!(FeeReduction::try_to_free_fee(&BOB, 40, WithdrawReasons::TRANSACTION_PAYMENT).unwrap(), target_fee);
         assert_eq!(FeeReduction::reduction_info(&BOB), ReductionDetail {
             own_staking: 100,

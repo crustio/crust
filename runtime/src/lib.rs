@@ -474,8 +474,8 @@ impl pallet_elections_phragmen::Config for Runtime {
 	type CandidacyBond = CandidacyBond;
     type VotingBondBase = VotingBondBase;
     type VotingBondFactor = VotingBondFactor;
-	type LoserCandidate = ();
-	type KickedMember = ();
+	type LoserCandidate = Treasury;
+	type KickedMember = Treasury;
 	type DesiredMembers = DesiredMembers;
 	type DesiredRunnersUp = DesiredRunnersUp;
 	type TermDuration = TermDuration;

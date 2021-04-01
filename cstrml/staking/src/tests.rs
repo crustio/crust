@@ -209,6 +209,50 @@ fn change_controller_works() {
 }
 
 #[test]
+fn validate_punishment_should_work() {
+    ExtBuilder::default().build().execute_with(|| {
+        for i in 1..10 {
+            let _ = Balances::make_free_balance_be(&i, 3000);
+        }
+
+        start_era(5, false);
+        // add a new candidate for being a validator. account 3 controlled by 4.
+        assert_ok!(Staking::bond(
+            Origin::signed(5),
+            4,
+            1000,
+            RewardDestination::Controller
+        ));
+
+        Staking::upsert_stake_limit(&5, 3000);
+        assert_eq!(<ErasValidatorPrefs<Test>>::contains_key(5, 5), false);
+        assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs { fee: Perbill::from_percent(50)}));
+        // Insert a useless eras validator prefs
+        assert_eq!(<ErasValidatorPrefs<Test>>::contains_key(5, 5), true);
+        assert_eq!(Staking::eras_validator_prefs(5, 5).fee, Perbill::from_percent(100));
+        assert_eq!(<ErasValidatorPrefs<Test>>::contains_key(6, 5), false);
+
+        start_era(6, false);
+        assert_eq!(Staking::eras_validator_prefs(6, 5).fee, Perbill::from_percent(50));
+
+        // Increase the prefs won't create punishment
+        assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs { fee: Perbill::from_percent(60)}));
+        assert_eq!(Staking::eras_validator_prefs(6, 5).fee, Perbill::from_percent(50));
+
+        // Decrease the prefs would have punishment
+        assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs { fee: Perbill::from_percent(30)}));
+        assert_eq!(Staking::eras_validator_prefs(6, 5).fee, Perbill::from_percent(100));
+
+        assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs { fee: Perbill::from_percent(20)}));
+        assert_eq!(Staking::eras_validator_prefs(6, 5).fee, Perbill::from_percent(100));
+
+        start_era(7, false);
+        // Next era would be ok again
+        assert_eq!(Staking::eras_validator_prefs(7, 5).fee, Perbill::from_percent(20));
+    })
+}
+
+#[test]
 fn rewards_should_work() {
     // should check that:
     // * rewards get recorded per session

@@ -153,7 +153,7 @@ where
 	let (mut telemetry, telemetry_worker_handle) = params.other;
 
 	let polkadot_full_node =
-		cumulus_client_service::build_polkadot_full_node(polkadot_config, collator_key.public(), telemetry_worker_handle)
+		cumulus_client_service::build_polkadot_full_node(polkadot_config, collator_key.clone(), telemetry_worker_handle)
 			.map_err(|e| match e {
 				polkadot_service::Error::Sub(x) => x,
 				s => format!("{}", s).into(),

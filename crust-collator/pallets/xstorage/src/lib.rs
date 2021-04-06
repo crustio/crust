@@ -1,11 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::Encode;
 use frame_support::{decl_error, decl_module, decl_storage, pallet_prelude::*};
 use frame_system::{ensure_signed, ensure_root};
 use sp_std::prelude::*;
 
-use cumulus_primitives_core::{ParaId, HrmpMessageSender, OutboundHrmpMessage};
+use cumulus_primitives_core::{ParaId, XcmpMessageSender, ServiceQuality};
 use xcm::v0::{Xcm, OriginKind};
 
 pub trait PrepareStorageOrder {
@@ -24,7 +23,7 @@ impl DoPlaceStorageOrder for () {
 
 pub trait Config: frame_system::Config {
 	/// Something to send an HRMP message.
-	type HrmpMessageSender: HrmpMessageSender;
+	type XcmpMessageSender: XcmpMessageSender;
 
 	type Preparator: PrepareStorageOrder;
 
@@ -74,14 +73,8 @@ decl_module! {
 			let message = xcm::VersionedXcm::V0(transact);
 			let recipient: ParaId = 7777.into();
 
-			let data = message.encode();
-			let outbound_message = OutboundHrmpMessage {
-				recipient,
-				data,
-			};
-
 			// TODO: Use Xtoken as well to pay this order
-			T::HrmpMessageSender::send_hrmp_message(outbound_message).map_err(|_| Error::<T>::FailedToSend)?;
+			T::XcmpMessageSender::send_xcm_message(recipient, message, ServiceQuality::Ordered).map_err(|_| Error::<T>::FailedToSend)?;
 
 			Ok(().into())
 		}

@@ -21,6 +21,5 @@ members = [
     'cstrml/swork/benchmarking',
     'crust-collator',
     'runtime',
-    'rpc',
-    'node',
+    'rpc'
 ]

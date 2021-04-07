@@ -392,17 +392,8 @@ impl market::Config for Runtime {
     type MaximumFileSize = MaximumFileSize;
 }
 
-pub struct Preparator;
-impl xstorage::PrepareStorageOrder for Preparator {
-	fn prepare_storage_order(cid: Vec<u8>, size: u64) -> Vec<u8> {
-		(10u8, 1u8, cid, size).encode()
-	}
-}
-
 impl xstorage::Config for Runtime {
 	type XcmpMessageSender = ParachainSystem;
-	type Preparator = Preparator;
-	type DoPlaceStorageOrder = Market;
 }
 
 construct_runtime! {
@@ -420,8 +411,8 @@ construct_runtime! {
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config, Call},
 		XcmHandler: cumulus_pallet_xcm_handler::{Pallet, Call, Event<T>, Origin},
-		Market: market::{Pallet, Call, Storage, Event<T>, Config},
-		Xstorage: xstorage::{Pallet, Storage, Call},
+		Market: market::{Pallet, Call, Storage, Event<T>, Config} = 9,
+		Xstorage: xstorage::{Pallet, Storage, Call} = 10,
 	}
 }
 

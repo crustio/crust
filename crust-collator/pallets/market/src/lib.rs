@@ -35,8 +35,6 @@ use primitives::{
     }
 };
 
-use xstorage::DoPlaceStorageOrder;
-
 pub trait WeightInfo {
     fn register() -> Weight;
     fn add_collateral() -> Weight;
@@ -215,17 +213,6 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     }
 }
 
-impl<T: Config> DoPlaceStorageOrder for Module<T> {
-    fn do_place_storage_order(cid: Vec<u8>, reported_file_size: u64) {
-        let mut charged_file_size = reported_file_size;
-        if let Some((file_info, _)) = Self::files(&cid) {
-            charged_file_size = file_info.file_size;
-        }
-        let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size);
-        let curr_bn = Self::get_current_block_number();
-        Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
-    }
-}
 
 /// Implement market's file inspector
 impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
@@ -434,6 +421,19 @@ decl_module! {
 
         /// Max size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
+
+        #[weight = 1_000]
+		pub fn inner_place_storage_order(origin, cid: Vec<u8>, reported_file_size: u64) -> DispatchResult {
+			let _ = ensure_root(origin)?;
+            let mut charged_file_size = reported_file_size;
+            if let Some((file_info, _)) = Self::files(&cid) {
+                charged_file_size = file_info.file_size;
+            }
+            let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size);
+            let curr_bn = Self::get_current_block_number();
+            Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
+			Ok(())
+		}
 
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to collateral first, complexity depends on `Collaterals`(P).

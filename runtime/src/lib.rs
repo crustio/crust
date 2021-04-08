@@ -387,8 +387,8 @@ impl pallet_session::historical::Config for Runtime {
 
 parameter_types! {
     pub const StakingModuleId: ModuleId = ModuleId(*b"cstaking");
-    // 36 sessions in an era (6 hours).
-    pub const SessionsPerEra: SessionIndex = 36;
+    // 3 sessions in an era (9 mins).
+    pub const SessionsPerEra: SessionIndex = 3;
     // 28 eras for unbonding (14 hours).
     pub const BondingDuration: staking::EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).

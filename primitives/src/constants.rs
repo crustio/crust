@@ -31,7 +31,7 @@ pub mod time {
     //	pub const MILLISECS_PER_BLOCK: Moment = 1000;
     pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
     // Alpha
-    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 10 * MINUTES;
+    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 3 * MINUTES;
     // Mainnet
     //	pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 4 * HOURS;
     // Testnet

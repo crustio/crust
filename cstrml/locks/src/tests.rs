@@ -4,189 +4,244 @@
 use super::*;
 use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok, dispatch::DispatchError};
+use crate::{CRU18, CRU24, CRU_LOCK_ID};
+
+pub const CRU24_WITH_DELAY:LockType = LockType {
+    delay: 6000 as BlockNumber, // use 6000 as the test
+    lock_period: 18
+};
 
 #[test]
-fn happy_pass_should_work() {
+fn create_new_lock_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-
-        // 1. Set claim limit = 100
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
-        assert_eq!(CrustClaims::claim_limit(), 100);
-
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
-
-        // 3. Storage should ok
-        assert_eq!(CrustClaims::claims(&tx_hash), Some((eth_addr.clone(), 100))); // new tx
-        assert_eq!(CrustClaims::claimed(&tx_hash), false); // tx has not be claimed
-        assert_eq!(CrustClaims::claim_limit(), 0);
-
-        // 4. Claim it with correct msg sig
-        // Pay RUSTs to the TEST account:0100000000000000
-        let sig = get_legal_eth_sig();
-        assert_eq!(Balances::free_balance(1), 0);
-        assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()));
-
-        // 5. Claim success
-        assert_eq!(Balances::free_balance(1), 100);
-        assert_eq!(CrustClaims::claimed(&tx_hash), true); // tx has already be claimed
+        let _ = Balances::make_free_balance_be(&1, 200);
+        CrustLocks::create_new_lock(&1, &200, CRU24);
+        assert_eq!(Balances::locks(&1)[0].amount, 200);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
     });
 }
 
 #[test]
-fn change_miner_should_work() {
+fn set_start_date_should_work() {
     new_test_ext().execute_with(|| {
+        run_to_block(300);
         assert_noop!(
-            CrustClaims::change_miner(Origin::signed(1), 1),
-            DispatchError::BadOrigin
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 1,
+                message: Some("NotStarted"),
+            }
+        );
+        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
+
+        let _ = Balances::make_free_balance_be(&1, 1800);
+
+        assert_noop!(
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 2,
+                message: Some("LockNotExist"),
+            }
         );
 
-        // 0. Set miner
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1)); // 1 is miner
+        CrustLocks::create_new_lock(&1, &1800, CRU18);
+        assert_eq!(Balances::locks(&1)[0].amount, 1800);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        // 1. Mint a claim with 2, no way
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
         assert_noop!(
-            CrustClaims::mint_claim(Origin::signed(2), tx_hash.clone(), eth_addr.clone(), 100),
-            Error::<Test>::IllegalMiner
-        );
-    });
-}
-
-#[test]
-fn tx_should_exist() {
-    new_test_ext().execute_with(|| {
-        let tx_hash = get_legal_tx_hash();
-        let sig = get_legal_eth_sig();
-        assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash, sig),
-            Error::<Test>::SignerHasNoClaim
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 3,
+                message: Some("TimeIsNotEnough"),
+            }
         );
     });
 }
 
 #[test]
-fn illegal_sig_claim_should_failed() {
+fn unlock_cru18_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        run_to_block(300);
+        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
 
-        // 1. Set limitation
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+        let _ = Balances::make_free_balance_be(&1, 1800);
 
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
+        CrustLocks::create_new_lock(&1, &1800, CRU18);
+        assert_eq!(Balances::locks(&1)[0].amount, 1800);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        // 3. Claim it with illegal sig
-        // 3.1 Another eth account wanna this money, go fuck himself
-        let sig1 = get_another_account_eth_sig();
+        run_to_block(1100);
         assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig1.clone()),
-            Error::<Test>::SignatureNotMatch
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 3,
+                message: Some("TimeIsNotEnough"),
+            }
+        );
+        run_to_block(2000);
+
+        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 1700);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        assert_noop!(
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 3,
+                message: Some("TimeIsNotEnough"),
+            }
         );
 
-        // 3.2 Sig with wrong message should failed
-        let sig2 = get_wrong_msg_eth_sig();
-        assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig2.clone()),
-            Error::<Test>::SignatureNotMatch
-        );
+        for i in 3..19 {
+            run_to_block(i*1000);
+            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+            assert_eq!(Balances::locks(&1)[0].amount, 1800 - (i - 1)*100);
+            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+        }
+
+        assert_eq!(Balances::locks(&1)[0].amount, 100);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        run_to_block(19000);
+        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1).len(), 0);
     });
 }
 
 #[test]
-fn double_mint_should_failed() {
+fn unlock_cru24_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        run_to_block(300);
+        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
 
-        // 1. Set limit
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+        let _ = Balances::make_free_balance_be(&1, 2400);
 
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
+        CrustLocks::create_new_lock(&1, &2400, CRU24);
+        assert_eq!(Balances::locks(&1)[0].amount, 2400);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        // 3. Mint the same eth again
+        run_to_block(1100);
         assert_noop!(
-            CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100),
-            Error::<Test>::AlreadyBeMint
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 3,
+                message: Some("TimeIsNotEnough"),
+            }
         );
+        run_to_block(2000);
+
+        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 2300);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        assert_noop!(
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 3,
+                message: Some("TimeIsNotEnough"),
+            }
+        );
+
+        for i in 3..25 {
+            run_to_block(i*1000);
+            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+            assert_eq!(Balances::locks(&1)[0].amount, 2400 - (i - 1)*100);
+            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+        }
+
+        assert_eq!(Balances::locks(&1)[0].amount, 100);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        run_to_block(25000);
+        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1).len(), 0);
     });
 }
 
 #[test]
-fn double_claim_should_failed() {
+fn unlock_cru24_with_delay_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        run_to_block(300);
+        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
 
-        // 1. Set limitation
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+        let _ = Balances::make_free_balance_be(&1, 1800);
 
-        // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
+        CrustLocks::create_new_lock(&1, &1800, CRU24_WITH_DELAY);
+        assert_eq!(Balances::locks(&1)[0].amount, 1800);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        // 3. Claim it
-        // Pay RUSTs to the TEST account:0100000000000000
-        let sig = get_legal_eth_sig();
-        assert_eq!(Balances::free_balance(1), 0);
-        assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()));
-        assert_eq!(Balances::free_balance(1), 100);
-
-        // 4. Claim again, in ur dream 🙂
+        run_to_block(7900);
         assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()),
-            Error::<Test>::AlreadyBeClaimed
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 3,
+                message: Some("TimeIsNotEnough"),
+            }
         );
-        assert_eq!(Balances::free_balance(1), 100);
+        run_to_block(8000);
+
+        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 1700);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        assert_noop!(
+            CrustLocks::unlock_one_period(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 3,
+                message: Some("TimeIsNotEnough"),
+            }
+        );
+
+        for i in 9..25 {
+            run_to_block(i*1000);
+            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+            assert_eq!(Balances::locks(&1)[0].amount, 1800 - (i - 7)*100);
+            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+        }
+
+        assert_eq!(Balances::locks(&1)[0].amount, 100);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        run_to_block(25000);
+        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1).len(), 0);
     });
 }
 
 #[test]
-fn claim_limit_should_work() {
+fn lock_should_be_removed_at_last() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
-        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
-        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        run_to_block(300);
+        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
 
-        // 1. Mint a claim should failed without limitation
-        let tx_hash = get_legal_tx_hash();
-        let eth_addr = get_legal_eth_addr();
-        assert_noop!(
-            CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10),
-            Error::<Test>::ExceedClaimLimit
-        );
+        let _ = Balances::make_free_balance_be(&1, 12364595);
 
-        // 2. Set limitation
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 10));
-        assert_eq!(CrustClaims::claim_limit(), 10);
+        CrustLocks::create_new_lock(&1, &12364596, CRU24);
+        assert_eq!(Balances::locks(&1)[0].amount, 12364596);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        // 3. Claim amount with limitation should be ok
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10));
-        assert_eq!(CrustClaims::claim_limit(), 0);
-    });
-}
+        for i in 2..25 {
+            run_to_block(i*1000);
+            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+        }
 
-#[test]
-fn bond_eth_should_work() {
-    new_test_ext().execute_with(|| {
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::bond_eth(Origin::signed(1), eth_addr.clone()));
-        assert_eq!(CrustClaims::bonded_eth(1), Some(eth_addr));
+        run_to_block(25000);
+        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1).len(), 0);
     });
 }

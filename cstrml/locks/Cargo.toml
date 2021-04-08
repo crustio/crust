@@ -20,6 +20,7 @@ sp-runtime = { default-features = false, version = "3.0.0" }
 sp-core = { default-features = false, version = "3.0.0" }
 sp-std = { default-features = false, version = "3.0.0" }
 sp-io = { default-features = false, version = "3.0.0" }
+primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
 
 [dev-dependencies]
 balances = { path = "../balances", package = "cstrml-balances" }

@@ -430,12 +430,6 @@ decl_module! {
         /// Max size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
-        fn on_runtime_upgrade() -> frame_support::weights::Weight {
-            migrations::migrate_to_file_v2::<T>();
-            T::BlockWeights::get().max_block
-        }
-
-
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
@@ -1242,48 +1236,6 @@ impl<T: Config> Module<T> {
         };
 
         used_ratio * file_size
-    }
-}
-
-pub mod migrations {
-    use super::*;
-
-    #[derive(Encode, Decode)]
-    pub struct OldFileInfo<AccountId, Balance> {
-        // The ordered file size, which declare by user
-        pub file_size: u64,
-        // The block number when the file goes invalide
-        pub expired_on: BlockNumber,
-        // The last block number when the file's amount is claimed
-        pub claimed_at: BlockNumber,
-        // The file value
-        pub amount: Balance,
-        // The count of replica that user wants
-        pub expected_replica_count: u32,
-        // The count of valid replica each report slot
-        pub reported_replica_count: u32,
-        // The replica list
-        // TODO: restrict the length of this replica
-        pub replicas: Vec<Replica<AccountId>>
-    }
-
-    pub fn migrate_to_file_v2<T: Config>() {
-        Files::<T>::translate::<(OldFileInfo<T::AccountId, BalanceOf<T>>, UsedInfo), _>(|_, file| {
-            let file_info = file.0;
-            let used_info = file.1;
-            Some((
-                FileInfo {
-                    file_size: file_info.file_size,
-                    expired_on: file_info.expired_on,
-                    calculated_at: file_info.claimed_at,
-                    amount: file_info.amount,
-                    prepaid: Zero::zero(),
-                    reported_replica_count: file_info.reported_replica_count,
-                    replicas: file_info.replicas
-                },
-                used_info
-            ))
-        });
     }
 }
 

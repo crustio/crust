@@ -102,7 +102,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 2,
+    spec_version: 3,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -711,7 +711,7 @@ impl pallet_sudo::Config for Runtime {
 }
 
 parameter_types! {
-    pub const PunishmentSlots: u32 = 24; // 24 report slot == 2 era == 12 hours
+    pub const PunishmentSlots: u32 = 2; // 24 report slot == 2 era == 12 hours
     pub const MaxGroupSize: u32 = 100;
 }
 
@@ -728,7 +728,7 @@ impl swork::Config for Runtime {
 parameter_types! {
     /// Unit is pico
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
-    pub const FileDuration: BlockNumber = 15 * DAYS;
+    pub const FileDuration: BlockNumber = 30 * MINUTES;
     pub const FileReplica: u32 = 4;
     pub const FileBaseFee: Balance = CENTS;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica

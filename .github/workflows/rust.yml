@@ -4,11 +4,13 @@ on:
   push:
     branches: 
       - master
-      - feature/*
+      - release/*
+      - maxwell
   pull_request:
     branches:
       - master
-      - feature/*
+      - release/*
+      - maxwell
 jobs:
   build_and_test:
     name: Build & Test

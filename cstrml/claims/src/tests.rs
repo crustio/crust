@@ -5,6 +5,7 @@ use super::*;
 use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok, dispatch::DispatchError};
 
+/// CRUPV claims test cases
 #[test]
 fn happy_pass_should_work() {
     new_test_ext().execute_with(|| {
@@ -188,5 +189,194 @@ fn bond_eth_should_work() {
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::bond_eth(Origin::signed(1), eth_addr.clone()));
         assert_eq!(CrustClaims::bonded_eth(1), Some(eth_addr));
+    });
+}
+
+/// Mainnet claims test cases
+#[test]
+fn mainnet_happy_pass_should_work() {
+    new_test_ext().execute_with(|| {
+        // 0. Set mainnet miner
+        assert_ok!(CrustClaims::set_mainnet_miner(Origin::root(), 1));
+
+        // 1. Mint a pre claim
+        let eth_addr = get_legal_eth_addr();
+        let cru18 = TokenType::CRU18;
+        assert_ok!(CrustClaims::mint_mainnet_claim(Origin::signed(1), eth_addr.clone(), cru18, 100));
+
+        // 3. Check state
+        assert_eq!(CrustClaims::mainnet_pre_claims(&eth_addr, cru18), Some(100)); // new locked cru mapping with address
+        assert_eq!(CrustClaims::mainnet_claimed(&eth_addr, cru18), false); // address with cru has not be claimed
+        assert_eq!(CrustClaims::mainnet_total_claimed(cru18), 0); // address with cru has not be claimed
+
+        // 4. Claim it with correct msg sig
+        // Pay RUSTs to the TEST account:0100000000000000
+        let sig = get_legal_eth_sig();
+        assert_eq!(Balances::free_balance(1), 0);
+        assert_ok!(CrustClaims::claim_mainnet(Origin::none(), 1, cru18, sig));
+
+        // 5. Claim should success
+        assert_eq!(CrustClaims::mainnet_claims(&eth_addr, cru18), Some((1, 100))); // new locked cru  has already be claimed
+        assert_eq!(CrustClaims::mainnet_claimed(&eth_addr, cru18), true); // address with cru has not be claimed
+        assert_eq!(CrustClaims::mainnet_total_claimed(cru18), 100); // address with cru has not be claimed
+
+        // 6. Another type of cru should not exist
+        assert_eq!(CrustClaims::mainnet_claims(&eth_addr, TokenType::CRU24), None);
+        assert_eq!(CrustClaims::mainnet_claims(&eth_addr, TokenType::CRU24D6), None);
+    });
+}
+
+#[test]
+fn change_mainnet_miner_should_work() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            CrustClaims::set_mainnet_miner(Origin::signed(1), 1),
+            DispatchError::BadOrigin
+        );
+
+        // 0. Set mainnet miner
+        assert_ok!(CrustClaims::set_mainnet_miner(Origin::root(), 1)); // 1 is miner
+
+        // 1. Mint a pre claim with 2, no way
+        let eth_addr = get_legal_eth_addr();
+        let cru18 = TokenType::CRU18;
+        assert_noop!(
+            CrustClaims::mint_mainnet_claim(Origin::signed(2), eth_addr.clone(), cru18, 100),
+            Error::<Test>::IllegalMiner
+        );
+    });
+}
+
+#[test]
+fn mainnet_claim_should_failed_with_illegal_sig() {
+    new_test_ext().execute_with(|| {
+        // 0. Set mainnet miner
+        assert_ok!(CrustClaims::set_mainnet_miner(Origin::root(), 1));
+
+        // 1. Mint a claim
+        let eth_addr = get_legal_eth_addr();
+        let cru18 = TokenType::CRU18;
+        assert_ok!(CrustClaims::mint_mainnet_claim(Origin::signed(1), eth_addr.clone(), cru18, 100));
+
+        // 2. Claim it with illegal sig
+        // 2.1 Another eth account wanna this money, go fuck himself
+        let sig1 = get_another_account_eth_sig();
+        assert_noop!(
+            CrustClaims::claim_mainnet(Origin::none(), 1, cru18, sig1.clone()),
+            Error::<Test>::SignerHasNoPreClaim
+        );
+
+        // 2.2 Sig with wrong message should failed
+        let sig2 = get_wrong_msg_eth_sig();
+        assert_noop!(
+            CrustClaims::claim_mainnet(Origin::none(), 1, cru18, sig2.clone()),
+            Error::<Test>::SignerHasNoPreClaim
+        );
+    });
+}
+
+#[test]
+fn double_mainnet_mint_should_failed() {
+    new_test_ext().execute_with(|| {
+        // 0. Set mainnet miner
+        assert_ok!(CrustClaims::set_mainnet_miner(Origin::root(), 1));
+
+        // 1. Mint a claim
+        let eth_addr = get_legal_eth_addr();
+        let cru18 = TokenType::CRU18;
+        assert_ok!(CrustClaims::mint_mainnet_claim(Origin::signed(1), eth_addr.clone(), cru18, 100));
+
+        // 2. Mint the same eth again
+        assert_noop!(
+            CrustClaims::mint_mainnet_claim(Origin::signed(1), eth_addr.clone(), cru18, 100),
+            Error::<Test>::AlreadyBeMint
+        );
+    });
+}
+
+#[test]
+fn double_mainnet_claim_should_failed() {
+    new_test_ext().execute_with(|| {
+        // 0. Set mainnet miner
+        assert_ok!(CrustClaims::set_mainnet_miner(Origin::root(), 1));
+
+        // 1. Mint a mainnet claim
+        let eth_addr = get_legal_eth_addr();
+        let cru18 = TokenType::CRU18;
+        assert_ok!(CrustClaims::mint_mainnet_claim(Origin::signed(1), eth_addr.clone(), cru18, 100));
+
+        // 2. Claim it
+        // Pay RUSTs to the TEST account:0100000000000000
+        let sig = get_legal_eth_sig();
+        assert_ok!(CrustClaims::claim_mainnet(Origin::none(), 1, cru18, sig.clone()));
+        assert_eq!(
+            CrustClaims::mainnet_claims(eth_addr.clone(), cru18),
+            Some((1, 100))
+        );
+
+        // 4. Claim again, in ur shit dream 🙂
+        assert_noop!(
+            CrustClaims::claim_mainnet(Origin::none(), 1, cru18, sig.clone()),
+            Error::<Test>::AlreadyBeClaimed
+        );
+        // Should not changed
+        assert_eq!(
+            CrustClaims::mainnet_claims(eth_addr.clone(), cru18),
+            Some((1, 100))
+        );
+    });
+}
+
+//// 5. Claim another type of locked cru should be fine
+//         assert_ok!(CrustClaims::claim_mainnet(Origin::none(), 1, cru24d6, sig.clone()));
+//         assert_eq!(
+//             CrustClaims::mainnet_claims(eth_addr.clone(), cru18),
+//             Some((1, 100))
+//         );
+//         assert_eq!(
+//             CrustClaims::mainnet_claims(eth_addr.clone(), cru24d6),
+//             Some((1, 30))
+//         );
+
+#[test]
+fn mainnet_account_double_bonds_should_failed() {
+    new_test_ext().execute_with(|| {
+        // 0. Set mainnet miner
+        assert_ok!(CrustClaims::set_mainnet_miner(Origin::root(), 1));
+
+        // 1. Mint a mainnet claim
+        let eth_addr = get_legal_eth_addr();
+        let cru18 = TokenType::CRU18;
+        let cru24d6 = TokenType::CRU24D6;
+        assert_ok!(CrustClaims::mint_mainnet_claim(Origin::signed(1), eth_addr.clone(), cru18, 100));
+        assert_ok!(CrustClaims::mint_mainnet_claim(Origin::signed(1), eth_addr.clone(), cru24d6, 30));
+
+        // 2. Claim it
+        // Pay RUSTs to the TEST account:0100000000000000
+        let sig = get_legal_eth_sig();
+        assert_ok!(CrustClaims::claim_mainnet(Origin::none(), 1, cru18, sig.clone()));
+        assert_eq!(
+            CrustClaims::mainnet_account_claimed_bonds(1),
+            Some(cru18)
+        );
+        assert_eq!(
+            CrustClaims::mainnet_claims(eth_addr.clone(), cru18),
+            Some((1, 100))
+        );
+
+        // 3. Try to claim cru24d6 with same account `1`
+        assert_noop!(
+            CrustClaims::claim_mainnet(Origin::none(), 1, cru24d6, sig.clone()),
+            Error::<Test>::MainnetAccountAlreadyBeBonded
+        );
+        // Should not changed
+        assert_eq!(
+            CrustClaims::mainnet_claims(eth_addr.clone(), cru18),
+            Some((1, 100))
+        );
+        assert_eq!(
+            CrustClaims::mainnet_claims(eth_addr.clone(), cru24d6),
+            None
+        );
     });
 }

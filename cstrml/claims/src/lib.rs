@@ -91,6 +91,23 @@ impl sp_std::fmt::Debug for EcdsaSignature {
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
 pub struct EthereumTxHash([u8; 32]);
 
+/// Locked CRU token type of mainnet.
+#[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug)]
+pub enum TokenType {
+    /// Locked CRU with 18 months.
+    CRU18 = 0,
+    /// Locked CRU with 24 months.
+    CRU24 = 1,
+    /// Locked CRU with 6+18 months.
+    CRU24D6 = 2,
+}
+
+impl Default for TokenType {
+    fn default() -> Self {
+        TokenType::CRU18
+    }
+}
+
 #[cfg(feature = "std")]
 impl Serialize for EthereumTxHash {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -141,6 +158,12 @@ decl_event!(
         Claimed(AccountId, EthereumAddress, Balance),
         /// Ethereum address was bonded to account. [who, ethereum_address]
         BondEthSuccess(AccountId, EthereumAddress),
+        /// Set new mainnet Miner
+        MainnetMinerChanged(AccountId),
+        /// Mint new mainnet pre claims
+        MainnetMintSuccess(EthereumAddress, TokenType, Balance),
+        /// Someone claimed mainnet locked CRUs, [who, ethereum_address, token_type, amount]
+        MainnetClaimed(AccountId, EthereumAddress, TokenType, Balance),
     }
 );
 
@@ -164,6 +187,10 @@ decl_error! {
         SignatureNotMatch,
         /// Exceed claim limitation
         ExceedClaimLimit,
+        /// Ethereum address and token type has no pre claims.
+        SignerHasNoPreClaim,
+        /// This account has already be bonded with other type of locked cru.
+        MainnetAccountAlreadyBeBonded
     }
 }
 
@@ -172,12 +199,44 @@ decl_storage! {
     // This allows for type-safe usage of the Substrate storage database, so you can
     // keep things around between blocks.
     trait Store for Module<T: Config> as Claims {
-        ClaimLimit get(fn claim_limit): BalanceOf<T> = Zero::zero();
-        Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
-        Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
+        /// Controlling the CRUPV claim limit, set by sudo.
         Superior get(fn superior): Option<T::AccountId>;
+
+        /// Maxwell miner set by sudo.
         Miner get(fn miner): Option<T::AccountId>;
+
+        /// Claim limit deciding how much CRUPV can be mint.
+        ClaimLimit get(fn claim_limit): BalanceOf<T> = Zero::zero();
+
+        /// Mapping with [EthereumTxHash: (EthereumAddress, TokenAmount)], mining by `Miner`.
+        Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
+
+        /// If `Claims(EthereumTxHash)` already been claimed, prevent double claim.
+        Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
         BondedEth get(fn bonded_eth): map hasher(blake2_128_concat) T::AccountId => Option<EthereumAddress>;
+
+        /// Mainnet miner set by sudo.
+        MainnetMiner get(fn mainnet_miner): Option<T::AccountId>;
+
+        /// ERC20 locked tokens including CRU18/CRU24/CRU24D6, to be claiming information.
+        MainnetPreClaims get(fn mainnet_pre_claims):
+        double_map hasher(identity) EthereumAddress, hasher(twox_64_concat) TokenType => Option<BalanceOf<T>>;
+
+        /// If `MainnetERC20Tokens(EthereumAddress, TokenType)` already been claimed, prevent double claim.
+        MainnetClaimed get(fn mainnet_claimed):
+        double_map hasher(identity) EthereumAddress, hasher(twox_64_concat) TokenType => bool;
+
+        /// Mainnet claims information with [EthereumAddress, MainnetPubKey].
+        MainnetClaims get(fn mainnet_claims):
+        double_map hasher(identity) EthereumAddress, hasher(twox_64_concat) TokenType
+        => Option<(T::AccountId, BalanceOf<T>)>;
+
+        /// Mainnet account bonded type of locked cru
+        MainnetAccountClaimedBonds get(fn mainnet_account_claimed_bonds):
+        map hasher(identity) T::AccountId => Option<TokenType>;
+
+        /// Claimed locked tokens, divided by `TokenType`.
+        MainnetTotalClaimed get(fn mainnet_total_claimed): map hasher(identity) TokenType => BalanceOf<T> = Zero::zero();
     }
 }
 
@@ -189,7 +248,6 @@ decl_module! {
         const Prefix: &[u8] = T::Prefix::get();
 
         fn deposit_event() = default;
-
 
         /// Change superior
         ///
@@ -307,6 +365,64 @@ decl_module! {
 
 			Self::deposit_event(RawEvent::BondEthSuccess(who, address));
 		}
+
+        /// Sets mainnet miner
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        ///
+        /// Parameters:
+        /// - `new_mainnet_miner`: The new mainnet miner's address, this is a cold pk needs to be offline
+        #[weight = 0]
+        fn set_mainnet_miner(origin, new_mainnet_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+            ensure_root(origin)?;
+
+            let new_mainnet_miner = T::Lookup::lookup(new_mainnet_miner)?;
+
+            MainnetMiner::<T>::put(new_mainnet_miner.clone());
+
+            Self::deposit_event(RawEvent::MainnetMinerChanged(new_mainnet_miner));
+            Ok(())
+        }
+
+        /// Mint the mainnet erc20 locked-CRU
+        #[weight = 0]
+        fn mint_mainnet_claim(origin, address: EthereumAddress, token_type: TokenType, amount: BalanceOf<T>) -> DispatchResult {
+            let signer = ensure_signed(origin)?;
+            let maybe_miner = Self::mainnet_miner();
+
+            // 1. Check if mainnet miner exist
+            ensure!(maybe_miner.is_some(), Error::<T>::MinerNotExist);
+
+            // 2. Check if this tx already be mint or be claimed
+            ensure!(!MainnetPreClaims::<T>::contains_key(&address, token_type), Error::<T>::AlreadyBeMint);
+
+            // 3. Check if signer is miner
+            ensure!(Some(&signer) == maybe_miner.as_ref(), Error::<T>::IllegalMiner);
+
+            // 4. Save to mainnet pre-claims and set claimed as `false`
+            MainnetPreClaims::<T>::insert(address.clone(), token_type, amount);
+            MainnetClaimed::insert(address.clone(), token_type, false);
+
+            Self::deposit_event(RawEvent::MainnetMintSuccess(address, token_type, amount));
+            Ok(())
+        }
+
+        /// Make real mainnet claims, should judge the ethereum signature
+        #[weight = 0]
+        fn claim_mainnet(origin, dest: T::AccountId, token_type: TokenType, sig: EcdsaSignature) -> DispatchResult {
+            let _ = ensure_none(origin)?;
+
+            // 1. Sign data
+            let data = dest.using_encoded(to_ascii_hex);
+            let signer = Self::eth_recover(&sig, &data, &[][..]).ok_or(Error::<T>::InvalidEthereumSignature)?;
+
+            // 2. Check the signer has pre-claim and not be claimed
+            ensure!(MainnetPreClaims::<T>::contains_key(&signer, token_type), Error::<T>::SignerHasNoPreClaim);
+            ensure!(!Self::mainnet_claimed(&signer, token_type), Error::<T>::AlreadyBeClaimed);
+
+            // 3. Make sure signer is match with pre-claimer
+            Self::process_mainnet_claim(signer, token_type, dest)
+        }
     }
 }
 
@@ -367,6 +483,34 @@ impl<T: Config> Module<T> {
             Err(Error::<T>::SignerHasNoClaim)?
         }
     }
+
+    fn process_mainnet_claim(signer: EthereumAddress, token_type: TokenType, dest: T::AccountId) -> DispatchResult {
+        if let Some(amount) = Self::mainnet_pre_claims(&signer, token_type) {
+            // 1. Check if this dest has already been bonded with another type of locked cru
+            ensure!(Self::mainnet_account_claimed_bonds(&dest).is_none() ||
+                Self::mainnet_account_claimed_bonds(&dest).unwrap() == token_type, Error::<T>::MainnetAccountAlreadyBeBonded);
+
+            // 2. Add this token to mainnet claims
+            MainnetClaims::<T>::insert(signer.clone(), token_type, (dest.clone(), amount.clone()));
+
+            // 3. Mark it be claimed
+            MainnetClaimed::insert(signer.clone(), token_type, true);
+
+            // 4. Update mainnet total claimed
+            MainnetTotalClaimed::<T>::mutate(token_type, |total_amount| *total_amount = total_amount.saturating_add(amount));
+
+            // 5. Insert the bonded locked token type with account
+            MainnetAccountClaimedBonds::<T>::insert(dest.clone(), token_type);
+
+            // Let's deposit an event to let the outside world know who claimed mainnet token
+            Self::deposit_event(RawEvent::MainnetClaimed(dest, signer, token_type, amount));
+
+            Ok(())
+        } else {
+            // No pre claims, this should already been checked in the upper context
+            Err(Error::<T>::SignerHasNoClaim)?
+        }
+    }
 }
 
 /// Custom validity errors used in Polkadot while validating transactions.
@@ -380,6 +524,8 @@ pub enum ValidityError {
     SignatureNotMatch = 2,
     /// This tx already be claimed.
     AlreadyBeClaimed = 3,
+    /// The signer has no pre claim.
+    SignerHasNoPreClaim = 4,
 }
 
 impl From<ValidityError> for u8 {
@@ -394,10 +540,14 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         const PRIORITY: u64 = 100;
 
-        let (maybe_signer, tx) = match call {
+        let (maybe_signer, maybe_tx, maybe_ty) = match call {
             Call::claim(account, tx, sig) => {
                 let data = account.using_encoded(to_ascii_hex);
-                (Self::eth_recover(&sig, &data, &[][..]), tx)
+                (Self::eth_recover(&sig, &data, &[][..]), Some(tx), None)
+            }
+            Call::claim_mainnet(account, ty, sig) => {
+                let data = account.using_encoded(to_ascii_hex);
+                (Self::eth_recover(&sig, &data, &[][..]), None, Some(ty))
             }
             _ => return Err(InvalidTransaction::Call.into()),
         };
@@ -405,22 +555,44 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
         let signer = maybe_signer
             .ok_or(InvalidTransaction::Custom(ValidityError::InvalidEthereumSignature.into()))?;
 
-        let e = InvalidTransaction::Custom(ValidityError::SignerHasNoClaim.into());
-        ensure!(<Claims<T>>::contains_key(&tx), e);
+        // CRUPV claims transaction
+        if let Some(tx) = maybe_tx {
+            let e = InvalidTransaction::Custom(ValidityError::SignerHasNoClaim.into());
+            ensure!(<Claims<T>>::contains_key(&tx), e);
 
-        let e = InvalidTransaction::Custom(ValidityError::SignatureNotMatch.into());
-        let (claimer, _) = Self::claims(&tx).unwrap();
-        ensure!(claimer == signer, e);
+            let e = InvalidTransaction::Custom(ValidityError::SignatureNotMatch.into());
+            let (claimer, _) = Self::claims(&tx).unwrap();
+            ensure!(claimer == signer, e);
 
-        let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
-        ensure!(!Self::claimed(&tx), e);
+            let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
+            ensure!(!Self::claimed(&tx), e);
 
-        Ok(ValidTransaction {
-            priority: PRIORITY,
-            requires: vec![],
-            provides: vec![("claims", signer).encode()],
-            longevity: TransactionLongevity::max_value(),
-            propagate: true,
-        })
+            return Ok(ValidTransaction {
+                priority: PRIORITY,
+                requires: vec![],
+                provides: vec![("claims", signer).encode()],
+                longevity: TransactionLongevity::max_value(),
+                propagate: true,
+            });
+        }
+
+        // Mainnet locked CRU claims transaction
+        if let Some(ty) = maybe_ty {
+            let e = InvalidTransaction::Custom(ValidityError::SignerHasNoPreClaim.into());
+            ensure!(<MainnetPreClaims<T>>::contains_key(&signer, ty), e);
+
+            let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
+            ensure!(!Self::mainnet_claimed(&signer, ty), e);
+
+            return Ok(ValidTransaction {
+                priority: PRIORITY,
+                requires: vec![],
+                provides: vec![("mainnet_claims", signer).encode()],
+                longevity: TransactionLongevity::max_value(),
+                propagate: true,
+            });
+        }
+
+        return Err(InvalidTransaction::Call.into());
     }
 }

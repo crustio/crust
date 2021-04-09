@@ -239,7 +239,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // 134289408 / 1_048_576 = 129
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
@@ -446,7 +446,7 @@ fn do_calculate_reward_should_work() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // 134289408 / 1_048_576 = 129
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
@@ -569,7 +569,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
@@ -716,7 +716,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
@@ -814,7 +814,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         run_to_block(50);
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let source = ALICE;
         let merchant = BOB;
@@ -1161,7 +1161,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
         let merchant = MERCHANT;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 100; // should less than merchant
 
         let _ = Balances::make_free_balance_be(&source, 20000);
@@ -1252,7 +1252,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
         let ferdie = FERDIE;
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408;
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
@@ -2385,7 +2385,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         run_to_block(50);
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let source = ALICE;
         let merchant = BOB;
@@ -2964,7 +2964,7 @@ fn files_size_should_not_be_decreased_twice() {
         run_to_block(50);
 
         let cid =
-            hex::decode("5bb706320afc633bfb843108e492192b17d2b6b9d9ee0b795ee95417fe08b660").unwrap();
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408; // should less than merchant
         let source = ALICE;
         let merchant = BOB;
@@ -3261,7 +3261,7 @@ fn reward_liquidator_should_work() {
         assert_noop!(
             Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
-                index: 3,
+                index: 0,
                 error: 9,
                 message: Some("NotInRewardPeriod")
         });
@@ -3443,7 +3443,7 @@ fn renew_file_should_work() {
         assert_noop!(
             Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
             DispatchError::Module {
-                index: 3,
+                index: 0,
                 error: 8,
                 message: Some("FileNotExist")
         });

@@ -131,11 +131,8 @@ std = [
     "staking/std",
     "pallet-sudo/std",
     "swork/std",
-<<<<<<< HEAD
     "benefits/std",
-=======
     "locks/std",
->>>>>>> test
     "frame-system/std",
     "frame-system-rpc-runtime-api/std",
     "pallet-timestamp/std",

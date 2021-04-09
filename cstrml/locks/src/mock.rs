@@ -9,7 +9,6 @@ use frame_support::{parameter_types, traits::{OnInitialize, OnFinalize}};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header,
 };
-use hex_literal::hex;
 
 parameter_types! {
     pub const BlockHashCount: u32 = 250;

@@ -42,8 +42,8 @@ pub trait Config: frame_system::Config {
 #[derive(Copy, Clone, Encode, Decode, Default, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct LockType {
-    pub delay: BlockNumber,
-    pub lock_period: u32
+    pub delay: BlockNumber, // Init delay time. Currently only 0 and 6 months
+    pub lock_period: u32 // 18 or 24
 }
 
 pub const CRU18:LockType = LockType {
@@ -56,7 +56,7 @@ pub const CRU24:LockType = LockType {
     lock_period: 24
 };
 
-pub const CRU24_WITH_DELAY:LockType = LockType {
+pub const CRU24D6:LockType = LockType {
     delay: 10 * 60 * 24 * 180 as BlockNumber, // 180 days
     lock_period: 18
 };
@@ -64,9 +64,12 @@ pub const CRU24_WITH_DELAY:LockType = LockType {
 #[derive(Copy, Clone, Encode, Decode, Default, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Lock<Balance: HasCompact> {
+    // Total amount of the lock
     #[codec(compact)]
     pub total: Balance,
+    // The last unlock block number
     pub last_unlock_at: BlockNumber,
+    // The lock type, which is one of CRU18/CRU24/CRU24D6
     pub lock_type: LockType
 }
 
@@ -74,32 +77,31 @@ decl_event!(
     pub enum Event<T> where
         AccountId = <T as frame_system::Config>::AccountId,
     {
-        /// Someone be the new Reviewer
+        /// Set global unlock start date
         SetStartDateSuccess(BlockNumber),
-        /// Remove one month lock success
-        FreeOneMonthSuccess(AccountId, BlockNumber),
+        /// Unlock one month success
+        UnlockOneMonthSuccess(AccountId, BlockNumber),
     }
 );
 
 decl_error! {
     pub enum Error for Module<T: Config> {
-        /// Superior not exist, should set it first
+        /// Already set the start date
         AlreadySet,
-        /// Not started yet
+        /// Unlock has not started
         NotStarted,
-        /// Invalid person who try to unlock
+        /// Invalid account which doesn't have CRU18 or CRU24
         LockNotExist,
-        /// Time is too short
+        /// Wait for the next unlock date
         TimeIsNotEnough,
     }
 }
 
 decl_storage! {
-    // A macro for the Storage config, and its implementation, for this module.
-    // This allows for type-safe usage of the Substrate storage database, so you can
-    // keep things around between blocks.
     trait Store for Module<T: Config> as Claims {
+        // Locks of CRU18, CRU24 and CRU24D6
         Locks get(fn locks): map hasher(blake2_128_concat) T::AccountId => Option<Lock<BalanceOf<T>>>;
+        // The global start date
         StartDate get(fn start_date): Option<u32>;
     }
     add_extra_genesis {
@@ -107,7 +109,7 @@ decl_storage! {
             Vec<(T::AccountId, BalanceOf<T>, LockType)>;
         build(|config: &GenesisConfig<T>| {
             for (who, amount, lock_type) in &config.genesis_locks {
-                <Module<T>>::create_new_lock(who, amount, lock_type.clone());
+                <Module<T>>::create_or_extend_lock(who, amount, lock_type.clone());
             }
         });
     }
@@ -119,6 +121,8 @@ decl_module! {
 
         fn deposit_event() = default;
 
+        /// Set the global start date
+        /// It can only be set once
         #[weight = 1000]
         fn set_start_date(origin, date: BlockNumber) -> DispatchResult {
             ensure_root(origin)?;
@@ -132,18 +136,20 @@ decl_module! {
             Ok(())
         }
 
+        /// Unlock the CRU18 or CRU24 one period
         #[weight = 1000]
         fn unlock_one_period(origin) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
+            // Ensure the start date is set and who has the CRU18 or CRU24
             ensure!(Self::start_date().is_some(), Error::<T>::NotStarted);
-
             ensure!(Self::locks(&who).is_some(), Error::<T>::LockNotExist);
 
             let mut lock = Self::locks(&who).unwrap();
             let start_date = Self::start_date().unwrap();
             let curr_bn = Self::get_current_block_number();
 
+            // The first time that we would add the delay into checking
             let target_unlock_bn = if lock.last_unlock_at == 0 {
                 start_date + lock.lock_type.delay + T::OneUnlockPeriod::get()
             } else {
@@ -152,12 +158,13 @@ decl_module! {
 
             ensure!(curr_bn >= target_unlock_bn, Error::<T>::TimeIsNotEnough);
 
+            // Update lock and extend one period
             Self::update_lock(&who, &lock, start_date + lock.lock_type.delay, target_unlock_bn);
             lock.last_unlock_at = target_unlock_bn;
 
             <Locks<T>>::insert(&who, lock);
 
-            Self::deposit_event(RawEvent::FreeOneMonthSuccess(who, target_unlock_bn));
+            Self::deposit_event(RawEvent::UnlockOneMonthSuccess(who, target_unlock_bn));
 
             Ok(())
         }
@@ -171,9 +178,13 @@ impl<T: Config> Module<T> {
     }
 
     fn update_lock(who: &T::AccountId, lock: &Lock<BalanceOf<T>>, start_date: BlockNumber, target_unlock_bn: BlockNumber) {
+        // Count the total unlock period
         let free_periods = (target_unlock_bn - start_date) / T::OneUnlockPeriod::get();
+        // Count the total unlock amount
         let free_amount = Perbill::from_rational_approximation(free_periods, lock.lock_type.lock_period) * lock.total;
+        // Refresh the remaining locked amount
         let locked_amount = lock.total - free_amount;
+        // Remove the lock or set the new lock
         if locked_amount.is_zero() {
             T::Currency::remove_lock(
                 CRU_LOCK_ID,
@@ -190,9 +201,13 @@ impl<T: Config> Module<T> {
 
     }
 
-    pub fn create_new_lock(who: &T::AccountId, amount: &BalanceOf<T>, lock_type: LockType) {
+    pub fn create_or_extend_lock(who: &T::AccountId, amount: &BalanceOf<T>, lock_type: LockType) {
         <Locks<T>>::mutate_exists(&who, |maybe_lock| {
             match *maybe_lock {
+                // If the lock already exist
+                // Add the amount and set the last_unlock_at to 0
+                // Don't change the type
+                // Maybe we need to refuse the lock with different lock type
                 Some(lock) => {
                     *maybe_lock = Some(Lock {
                         total: lock.total + amount.clone(),
@@ -200,6 +215,7 @@ impl<T: Config> Module<T> {
                         lock_type: lock.lock_type
                     })
                 },
+                // Create a new lock
                 None => {
                     *maybe_lock = Some(Lock {
                         total: amount.clone(),

@@ -44,7 +44,7 @@ pub use frame_support::{
     construct_runtime, parameter_types,
     traits::{Currency, KeyOwnerProofSystem, Randomness, OnUnbalanced, Imbalance, LockIdentifier, SplitTwoWays, U128CurrencyToVote},
     weights::{
-        Weight, IdentityFee, DispatchClass,
+        Weight, DispatchClass, IdentityFee,
         constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
     },
     StorageValue,
@@ -60,7 +60,7 @@ use pallet_session::{historical as session_historical};
 pub use pallet_timestamp::Call as TimestampCall;
 
 /// Implementations of some helper traits passed into runtime modules as associated types.
-use impls::{CurrencyToVoteHandler, ToAuthor};
+use impls::{CurrencyToVoteHandler, ToAuthor, QuarterFee};
 
 /// Crust primitives
 use primitives::{

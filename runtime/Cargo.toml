@@ -16,6 +16,7 @@ substrate-wasm-builder = "3.0.0"
 codec = { default-features = false, features = ["derive"], package = "parity-scale-codec", version = "2.0.0" }
 serde = { features = ["derive"], optional = true, version = "1.0.117" }
 static_assertions = "1.1.0"
+smallvec = "1.4.1"
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = "sp-authority-discovery", version = "3.0.0" }
@@ -32,6 +33,7 @@ sp-staking = { default-features = false, version = "3.0.0" }
 sp-std = { default-features = false, version = "3.0.0" }
 sp-transaction-pool = { default-features = false, version = "3.0.0" }
 sp-version = { default-features = false, version = "3.0.0" }
+sp-arithmetic = { default-features = false, version = "3.0.0" }
 
 # substrate frame dependencies
 pallet-authorship = { default-features = false, version = "3.0.0" }
@@ -102,6 +104,7 @@ std = [
     "sp-std/std",
     "sp-transaction-pool/std",
     "sp-version/std",
+    "sp-arithmetic/std",
     "pallet-authorship/std",
     "pallet-authority-discovery/std",
     "pallet-babe/std",

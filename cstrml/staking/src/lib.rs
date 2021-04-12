@@ -1061,6 +1061,12 @@ decl_module! {
             let v_stash = &ledger.stash;
             <Guarantors<T>>::remove(v_stash);
             <Validators<T>>::insert(v_stash, &prefs);
+            // Set the validator pref to 100% for the ongoing era as the punishment
+            if let Some(active_era) = Self::active_era() {
+                if <ErasValidatorPrefs<T>>::get(&active_era.index, &v_stash).fee > prefs.fee {
+                    <ErasValidatorPrefs<T>>::insert(&active_era.index, &v_stash, ValidatorPrefs { fee: Perbill::one() });
+                }
+            }
             Self::deposit_event(RawEvent::ValidateSuccess(controller, prefs));
         }
 

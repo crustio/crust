@@ -4688,6 +4688,25 @@ fn update_stake_limit_according_to_mpow_should_work() {
         });
 }
 
+#[test]
+fn change_validator_count_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // Set payee to controller
+            assert_ok!(Staking::set_validator_count(
+                Origin::root(),
+                10
+            ));
+            assert_eq!(Staking::validator_count(), 10);
+
+            assert_ok!(Staking::increase_validator_count(
+                Origin::root(),
+                5
+            ));
+            assert_eq!(Staking::validator_count(), 15);
+        });
+}
 
 // #[test]
 // fn randomly_select_validators_works() {

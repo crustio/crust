@@ -2,7 +2,7 @@
 authors = ["crustio"]
 edition = "2018"
 name = "crust-runtime"
-version = "0.11.1"
+version = "0.12.0"
 build = "build.rs"
 license = "Apache-2.0"
 homepage = "https://crust.network"
@@ -72,16 +72,16 @@ frame-system-rpc-runtime-api = { default-features = false, version = "3.0.0" }
 pallet-transaction-payment-rpc-runtime-api = { default-features = false, version = "3.0.0" }
 
 # crust runtime modules
-balances = { package = "cstrml-balances", path = "../cstrml/balances", default-features = false, version = "0.11.1" }
-candy = { package = "cstrml-candy", path = "../cstrml/candy", default-features = false, version = "0.11.1"  }
-claims = { package = "cstrml-claims", path = "../cstrml/claims", default-features = false, version = "0.11.1" }
-market = { package = "cstrml-market", path = "../cstrml/market", default-features = false, version = "0.11.1" }
-primitives = { package = "cst-primitives", path = "../primitives", default-features = false, version = "0.11.1" }
-swork = { package = "cstrml-swork", path = "../cstrml/swork", default-features = false, version = "0.11.1" }
-staking = { package = "cstrml-staking", path = "../cstrml/staking", default-features = false, version = "0.11.1" }
+balances = { package = "cstrml-balances", path = "../cstrml/balances", default-features = false, version = "0.12.0" }
+candy = { package = "cstrml-candy", path = "../cstrml/candy", default-features = false, version = "0.12.0"  }
+claims = { package = "cstrml-claims", path = "../cstrml/claims", default-features = false, version = "0.12.0" }
+market = { package = "cstrml-market", path = "../cstrml/market", default-features = false, version = "0.12.0" }
+primitives = { package = "cst-primitives", path = "../primitives", default-features = false, version = "0.12.0" }
+swork = { package = "cstrml-swork", path = "../cstrml/swork", default-features = false, version = "0.12.0" }
+staking = { package = "cstrml-staking", path = "../cstrml/staking", default-features = false, version = "0.12.0" }
 
 # crust benchmark dependencies
-swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "0.11.1" }
+swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "0.12.0" }
 
 [features]
 default = ["std"]

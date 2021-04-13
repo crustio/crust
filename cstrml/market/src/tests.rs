@@ -19,26 +19,25 @@ fn register_should_work() {
         // generate 50 blocks first
         run_to_block(50);
         let merchant = MERCHANT;
-        let collateral_pot = Market::collateral_pot();
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 180,
             reward: 0
         });
-        assert_eq!(Balances::free_balance(&collateral_pot), 180);
+        assert_eq!(Balances::reserved_balance(&merchant), 180);
         assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 20));
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 160,
             reward: 0
         });
-        assert_eq!(Balances::free_balance(&collateral_pot), 160);
+        assert_eq!(Balances::reserved_balance(&merchant), 160);
         assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 10));
-        assert_eq!(Market::merchant_ledgers(merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 170,
             reward: 0
         });
-        assert_eq!(Balances::free_balance(&collateral_pot), 170);
+        assert_eq!(Balances::reserved_balance(&merchant), 170);
     });
 }
 
@@ -117,17 +116,17 @@ fn cut_collateral_should_fail_due_to_reward() {
         let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 200);
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 180,
             reward: 0
         });
 
-        <self::MerchantLedgers<Test>>::insert(&merchant, MerchantLedger {
+        <self::MerchantLedgersV2<Test>>::insert(&merchant, MerchantLedger {
             collateral: 180,
             reward: 120
         });
         assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 20));
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 160,
             reward: 120
         });
@@ -165,6 +164,7 @@ fn place_storage_order_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
@@ -211,6 +211,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
 
         assert_noop!(Market::place_storage_order(
@@ -247,6 +248,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
 
         // 1. New storage order
@@ -455,6 +457,7 @@ fn do_calculate_reward_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
 
         // 1. New storage order
@@ -552,7 +555,7 @@ fn do_calculate_reward_should_work() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 7089
         })
@@ -574,6 +577,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 70_000));
 
         assert_ok!(Market::place_storage_order(
@@ -668,7 +672,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         );
 
         // collateral is 7020 * 10 < 70000 reward
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 70_000,
             reward: 0
         });
@@ -699,7 +703,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
             })
         );
 
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_070_000,
             reward: 10028
         });
@@ -721,6 +725,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
 
         assert_ok!(Market::place_storage_order(
@@ -800,7 +805,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 23399
         })
@@ -830,6 +835,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -925,7 +931,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 4679
         });
@@ -963,11 +969,11 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 5848
         });
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
@@ -1011,11 +1017,11 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), false)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 6627
         });
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 1948
         });
@@ -1059,15 +1065,15 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false), (hex::decode("11").unwrap(), true)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 6627
         });
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 1948
         });
-        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&dave), MerchantLedger {
             collateral: 6_000_000,
             reward: 1646
         });
@@ -1112,15 +1118,15 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), true)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 9921
         });
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 5242
         });
-        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&dave), MerchantLedger {
             collateral: 6_000_000,
             reward: 4940
         });
@@ -1134,15 +1140,15 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false), (hex::decode("11").unwrap(), false)].into_iter())
         });
 
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 9921
         });
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 5242
         });
-        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&dave), MerchantLedger {
             collateral: 6_000_000,
             reward: 4940
         });
@@ -1168,6 +1174,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
         // collateral is 60 < 121 reward
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
         assert_ok!(Market::place_storage_order(
@@ -1258,6 +1265,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -1414,23 +1422,23 @@ fn do_calculate_reward_should_work_for_more_replicas() {
             })
         );
 
-        assert_eq!(Market::merchant_ledgers(&ferdie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&ferdie), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
-        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&dave), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
-        assert_eq!(Market::merchant_ledgers(&eve), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&eve), MerchantLedger {
             collateral: 6_000_000,
             reward: 0
         });
@@ -1457,6 +1465,7 @@ fn do_calculate_reward_should_only_pay_the_groups() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -1626,24 +1635,24 @@ fn do_calculate_reward_should_only_pay_the_groups() {
             })
         );
 
-        assert_eq!(Market::merchant_ledgers(&ferdie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&ferdie), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
         // charlie won't get payed
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 0
         });
-        assert_eq!(Market::merchant_ledgers(&dave), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&dave), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
-        assert_eq!(Market::merchant_ledgers(&eve), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&eve), MerchantLedger {
             collateral: 6_000_000,
             reward: 1169
         });
@@ -1671,6 +1680,7 @@ fn insert_replica_should_work_for_complex_scenario() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone(), zikun.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -1985,6 +1995,7 @@ fn clear_trash_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
         for cid in file_lists.clone().iter() {
@@ -2150,6 +2161,7 @@ fn withdraw_staking_pot_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
@@ -2205,6 +2217,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
         for cid in file_lists.clone().iter() {
@@ -2262,7 +2275,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         // reported_file_size_cid2 = 1000 > 100 => close this file
         add_who_into_replica(&cid2, reported_file_size_cid2, merchant.clone(), legal_pk.clone(), None, None);
         assert_eq!(Market::files(&cid2).is_none(), true);
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6000,
             reward: 360
         });
@@ -2288,6 +2301,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
 
         assert_ok!(Market::place_storage_order(
@@ -2401,6 +2415,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -2496,7 +2511,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 4679
         });
@@ -2567,11 +2582,11 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             })
         );
 
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 14038
         });
-        assert_eq!(Market::merchant_ledgers(&charlie), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&charlie), MerchantLedger {
             collateral: 6_000_000,
             reward: 9359
         });
@@ -2604,6 +2619,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -2699,7 +2715,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 6_000_000,
             reward: 4679
         });
@@ -2799,6 +2815,7 @@ fn dynamic_used_size_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -2888,6 +2905,7 @@ fn delete_used_size_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -2979,6 +2997,7 @@ fn files_size_should_not_be_decreased_twice() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -3126,6 +3145,7 @@ fn clear_same_file_in_trash_should_work() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -3248,6 +3268,7 @@ fn reward_liquidator_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -3338,13 +3359,13 @@ fn reward_merchant_should_work() {
         let storage_pot = Market::storage_pot();
         let _ = Balances::make_free_balance_be(&storage_pot, 121);
 
-        <self::MerchantLedgers<Test>>::insert(&merchant, MerchantLedger {
+        <self::MerchantLedgersV2<Test>>::insert(&merchant, MerchantLedger {
             collateral: 180,
             reward: 120
         });
 
         assert_ok!(Market::reward_merchant(Origin::signed(merchant.clone())));
-        assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 180,
             reward: 0
         });
@@ -3391,6 +3412,7 @@ fn set_global_switch_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
@@ -3437,6 +3459,7 @@ fn renew_file_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
@@ -3712,6 +3735,7 @@ fn storage_pot_should_be_balanced() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
             assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 

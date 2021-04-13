@@ -18,7 +18,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed, ensure_root};
-use sp_runtime::{Perbill, ModuleId, traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}, DispatchError};
+use sp_runtime::{Perbill, ModuleId, traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -452,7 +452,7 @@ decl_module! {
         #[weight = 1000]
         pub fn bond(
             origin,
-            owner: <T::Lookup as StaticLookup>::Source,
+            owner: <T::Lookup as StaticLookup>::Source
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let owner = T::Lookup::lookup(owner)?;

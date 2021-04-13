@@ -52,7 +52,7 @@ impl<T> WeightToFeePolynomial for QuarterFee<T> where
     fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
         smallvec!(WeightToFeeCoefficient {
 			coeff_integer: 0u32.into(),
-			coeff_frac: Perbill::from_percent(25),
+			coeff_frac: Perbill::from_percent(10),
 			negative: false,
 			degree: 1,
 		})

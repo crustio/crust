@@ -6,11 +6,13 @@ on:
       - master
       - release/*
       - maxwell
+      - rocky
   pull_request:
     branches:
       - master
       - release/*
       - maxwell
+      - rocky
 jobs:
   build_and_test:
     name: Build & Test

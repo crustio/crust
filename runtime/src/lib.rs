@@ -60,7 +60,7 @@ use pallet_session::{historical as session_historical};
 pub use pallet_timestamp::Call as TimestampCall;
 
 /// Implementations of some helper traits passed into runtime modules as associated types.
-use impls::{CurrencyToVoteHandler, Author, QuarterFee};
+use impls::{CurrencyToVoteHandler, Author, OenTenthFee};
 
 /// Crust primitives
 use primitives::{
@@ -713,7 +713,7 @@ parameter_types! {
 impl pallet_transaction_payment::Config for Runtime {
     type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees>;
     type TransactionByteFee = TransactionByteFee;
-    type WeightToFee = QuarterFee<Balance>;
+    type WeightToFee = OenTenthFee<Balance>;
     type FeeMultiplierUpdate =
     TargetedFeeAdjustment<Self, TargetBlockFullness, AdjustmentVariable, MinimumMultiplier>;
 }

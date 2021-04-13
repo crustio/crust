@@ -42,9 +42,9 @@ impl Convert<u64, u128> for CurrencyToVoteHandler {
 }
 
 /// Implementor of `WeightToFeePolynomial` that maps one unit of weight to one unit of fee.
-pub struct OenTenthFee<T>(sp_std::marker::PhantomData<T>);
+pub struct OneTenthFee<T>(sp_std::marker::PhantomData<T>);
 
-impl<T> WeightToFeePolynomial for OenTenthFee<T> where
+impl<T> WeightToFeePolynomial for OneTenthFee<T> where
     T: BaseArithmetic + From<u32> + Copy + Unsigned
 {
     type Balance = T;

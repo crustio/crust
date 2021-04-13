@@ -91,23 +91,6 @@ impl sp_std::fmt::Debug for EcdsaSignature {
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug)]
 pub struct EthereumTxHash([u8; 32]);
 
-/// Locked CRU token type of mainnet.
-#[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug)]
-pub enum TokenType {
-    /// Locked CRU with 18 months.
-    CRU18 = 0,
-    /// Locked CRU with 24 months.
-    CRU24 = 1,
-    /// Locked CRU with 6+18 months.
-    CRU24D6 = 2,
-}
-
-impl Default for TokenType {
-    fn default() -> Self {
-        TokenType::CRU18
-    }
-}
-
 #[cfg(feature = "std")]
 impl Serialize for EthereumTxHash {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -158,12 +141,12 @@ decl_event!(
         Claimed(AccountId, EthereumAddress, Balance),
         /// Ethereum address was bonded to account. [who, ethereum_address]
         BondEthSuccess(AccountId, EthereumAddress),
-        /// Set new mainnet Miner
-        MainnetMinerChanged(AccountId),
-        /// Mint new mainnet pre claims
-        MainnetMintSuccess(EthereumAddress, TokenType, Balance),
-        /// Someone claimed mainnet locked CRUs, [who, ethereum_address, token_type, amount]
-        MainnetClaimed(AccountId, EthereumAddress, TokenType, Balance),
+        /// Set new cru18 Miner
+        Cru18MinerChanged(AccountId),
+        /// Mint new cru18 CRU18 pre claims
+        Cru18MintSuccess(EthereumAddress, Balance),
+        /// Someone claimed cru18 locked CRU18s, [who, ethereum_address, amount]
+        Cru18Claimed(EthereumAddress, AccountId, Balance),
     }
 );
 
@@ -189,8 +172,6 @@ decl_error! {
         ExceedClaimLimit,
         /// Ethereum address and token type has no pre claims.
         SignerHasNoPreClaim,
-        /// This account has already be bonded with other type of locked cru.
-        MainnetAccountAlreadyBeBonded
     }
 }
 
@@ -215,28 +196,21 @@ decl_storage! {
         Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
         BondedEth get(fn bonded_eth): map hasher(blake2_128_concat) T::AccountId => Option<EthereumAddress>;
 
-        /// Mainnet miner set by sudo.
-        MainnetMiner get(fn mainnet_miner): Option<T::AccountId>;
+        /// Cru18 miner set by sudo.
+        Cru18Miner get(fn cru18_miner): Option<T::AccountId>;
 
-        /// ERC20 locked tokens including CRU18/CRU24/CRU24D6, to be claiming information.
-        MainnetPreClaims get(fn mainnet_pre_claims):
-        double_map hasher(identity) EthereumAddress, hasher(twox_64_concat) TokenType => Option<BalanceOf<T>>;
+        /// ERC20 CRU18 locked tokens, to be claimed information.
+        Cru18PreClaims get(fn cru18_pre_claims): map hasher(identity) EthereumAddress => Option<BalanceOf<T>>;
 
-        /// If `MainnetERC20Tokens(EthereumAddress, TokenType)` already been claimed, prevent double claim.
-        MainnetClaimed get(fn mainnet_claimed):
-        double_map hasher(identity) EthereumAddress, hasher(twox_64_concat) TokenType => bool;
+        /// If `Cru18Tokens(EthereumAddress)` already been claimed, prevent double claim.
+        Cru18Claimed get(fn cru18_claimed): map hasher(identity) EthereumAddress => bool;
 
-        /// Mainnet claims information with [EthereumAddress, MainnetPubKey].
-        MainnetClaims get(fn mainnet_claims):
-        double_map hasher(identity) EthereumAddress, hasher(twox_64_concat) TokenType
-        => Option<(T::AccountId, BalanceOf<T>)>;
+        /// CRU18 claims information with [EthereumAddress, Cru18PubKey].
+        Cru18Claims get(fn cru18_claims):
+        double_map hasher(identity) EthereumAddress, hasher(identity) T::AccountId => Option<BalanceOf<T>>;
 
-        /// Mainnet account bonded type of locked cru
-        MainnetAccountClaimedBonds get(fn mainnet_account_claimed_bonds):
-        map hasher(identity) T::AccountId => Option<TokenType>;
-
-        /// Claimed locked tokens, divided by `TokenType`.
-        MainnetTotalClaimed get(fn mainnet_total_claimed): map hasher(identity) TokenType => BalanceOf<T> = Zero::zero();
+        /// Claimed CRU18 locked tokens.
+        Cru18TotalClaimed get(fn cru18_total_claimed): BalanceOf<T> = Zero::zero();
     }
 }
 
@@ -366,50 +340,50 @@ decl_module! {
 			Self::deposit_event(RawEvent::BondEthSuccess(who, address));
 		}
 
-        /// Sets mainnet miner
+        /// Sets cru18 miner
         ///
         /// The dispatch origin for this call must be _Root_.
         ///
         /// Parameters:
-        /// - `new_mainnet_miner`: The new mainnet miner's address, this is a cold pk needs to be offline
+        /// - `new_cru18_miner`: The new cru18 miner's address, this is a cold pk needs to be offline
         #[weight = 0]
-        fn set_mainnet_miner(origin, new_mainnet_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+        fn set_cru18_miner(origin, new_cru18_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
-            let new_mainnet_miner = T::Lookup::lookup(new_mainnet_miner)?;
+            let new_cru18_miner = T::Lookup::lookup(new_cru18_miner)?;
 
-            MainnetMiner::<T>::put(new_mainnet_miner.clone());
+            Cru18Miner::<T>::put(new_cru18_miner.clone());
 
-            Self::deposit_event(RawEvent::MainnetMinerChanged(new_mainnet_miner));
+            Self::deposit_event(RawEvent::Cru18MinerChanged(new_cru18_miner));
             Ok(())
         }
 
-        /// Mint the mainnet erc20 locked-CRU
+        /// Mint the cru18 erc20 CRU18 locked token
         #[weight = 0]
-        fn mint_mainnet_claim(origin, address: EthereumAddress, token_type: TokenType, amount: BalanceOf<T>) -> DispatchResult {
+        fn mint_cru18_claim(origin, address: EthereumAddress, amount: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
-            let maybe_miner = Self::mainnet_miner();
+            let maybe_miner = Self::cru18_miner();
 
-            // 1. Check if mainnet miner exist
+            // 1. Check if cru18 miner exist
             ensure!(maybe_miner.is_some(), Error::<T>::MinerNotExist);
 
-            // 2. Check if this tx already be mint or be claimed
-            ensure!(!MainnetPreClaims::<T>::contains_key(&address, token_type), Error::<T>::AlreadyBeMint);
+            // 2. Check if this eth address already be mint or be claimed
+            ensure!(!Cru18PreClaims::<T>::contains_key(&address), Error::<T>::AlreadyBeMint);
 
             // 3. Check if signer is miner
             ensure!(Some(&signer) == maybe_miner.as_ref(), Error::<T>::IllegalMiner);
 
-            // 4. Save to mainnet pre-claims and set claimed as `false`
-            MainnetPreClaims::<T>::insert(address.clone(), token_type, amount);
-            MainnetClaimed::insert(address.clone(), token_type, false);
+            // 4. Save to cru18 pre-claims and set claimed as `false`
+            Cru18PreClaims::<T>::insert(address.clone(), amount);
+            Cru18Claimed::insert(address.clone(), false);
 
-            Self::deposit_event(RawEvent::MainnetMintSuccess(address, token_type, amount));
+            Self::deposit_event(RawEvent::Cru18MintSuccess(address, amount));
             Ok(())
         }
 
-        /// Make real mainnet claims, should judge the ethereum signature
+        /// Make real cru18 claims, should judge the ethereum signature
         #[weight = 0]
-        fn claim_mainnet(origin, dest: T::AccountId, token_type: TokenType, sig: EcdsaSignature) -> DispatchResult {
+        fn claim_cru18(origin, dest: T::AccountId, sig: EcdsaSignature) -> DispatchResult {
             let _ = ensure_none(origin)?;
 
             // 1. Sign data
@@ -417,11 +391,11 @@ decl_module! {
             let signer = Self::eth_recover(&sig, &data, &[][..]).ok_or(Error::<T>::InvalidEthereumSignature)?;
 
             // 2. Check the signer has pre-claim and not be claimed
-            ensure!(MainnetPreClaims::<T>::contains_key(&signer, token_type), Error::<T>::SignerHasNoPreClaim);
-            ensure!(!Self::mainnet_claimed(&signer, token_type), Error::<T>::AlreadyBeClaimed);
+            ensure!(Cru18PreClaims::<T>::contains_key(&signer), Error::<T>::SignerHasNoPreClaim);
+            ensure!(!Self::cru18_claimed(&signer), Error::<T>::AlreadyBeClaimed);
 
             // 3. Make sure signer is match with pre-claimer
-            Self::process_mainnet_claim(signer, token_type, dest)
+            Self::process_cru18_claim(signer, dest)
         }
     }
 }
@@ -484,26 +458,19 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn process_mainnet_claim(signer: EthereumAddress, token_type: TokenType, dest: T::AccountId) -> DispatchResult {
-        if let Some(amount) = Self::mainnet_pre_claims(&signer, token_type) {
-            // 1. Check if this dest has already been bonded with another type of locked cru
-            ensure!(Self::mainnet_account_claimed_bonds(&dest).is_none() ||
-                Self::mainnet_account_claimed_bonds(&dest).unwrap() == token_type, Error::<T>::MainnetAccountAlreadyBeBonded);
+    fn process_cru18_claim(signer: EthereumAddress, dest: T::AccountId) -> DispatchResult {
+        if let Some(amount) = Self::cru18_pre_claims(&signer) {
+            // 1. Add this token to cru18 claims with [eth_address, mainnet_pk, amount]
+            Cru18Claims::<T>::insert(signer.clone(), dest.clone(), amount.clone());
 
-            // 2. Add this token to mainnet claims
-            MainnetClaims::<T>::insert(signer.clone(), token_type, (dest.clone(), amount.clone()));
+            // 2. Mark this eth_address already be claimed
+            Cru18Claimed::insert(signer.clone(), true);
 
-            // 3. Mark it be claimed
-            MainnetClaimed::insert(signer.clone(), token_type, true);
+            // 3. Update cru18 total claimed
+            Cru18TotalClaimed::<T>::mutate(|total_amount| *total_amount = total_amount.saturating_add(amount));
 
-            // 4. Update mainnet total claimed
-            MainnetTotalClaimed::<T>::mutate(token_type, |total_amount| *total_amount = total_amount.saturating_add(amount));
-
-            // 5. Insert the bonded locked token type with account
-            MainnetAccountClaimedBonds::<T>::insert(dest.clone(), token_type);
-
-            // Let's deposit an event to let the outside world know who claimed mainnet token
-            Self::deposit_event(RawEvent::MainnetClaimed(dest, signer, token_type, amount));
+            // Let's deposit an event to let the outside world know who claimed cru18 token
+            Self::deposit_event(RawEvent::Cru18Claimed(signer, dest, amount));
 
             Ok(())
         } else {
@@ -540,14 +507,14 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
     fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         const PRIORITY: u64 = 100;
 
-        let (maybe_signer, maybe_tx, maybe_ty) = match call {
+        let (maybe_signer, maybe_tx) = match call {
             Call::claim(account, tx, sig) => {
                 let data = account.using_encoded(to_ascii_hex);
-                (Self::eth_recover(&sig, &data, &[][..]), Some(tx), None)
+                (Self::eth_recover(&sig, &data, &[][..]), Some(tx))
             }
-            Call::claim_mainnet(account, ty, sig) => {
+            Call::claim_cru18(account, sig) => {
                 let data = account.using_encoded(to_ascii_hex);
-                (Self::eth_recover(&sig, &data, &[][..]), None, Some(ty))
+                (Self::eth_recover(&sig, &data, &[][..]), None)
             }
             _ => return Err(InvalidTransaction::Call.into()),
         };
@@ -556,7 +523,7 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
             .ok_or(InvalidTransaction::Custom(ValidityError::InvalidEthereumSignature.into()))?;
 
         // CRUPV claims transaction
-        if let Some(tx) = maybe_tx {
+        return if let Some(tx) = maybe_tx {
             let e = InvalidTransaction::Custom(ValidityError::SignerHasNoClaim.into());
             ensure!(<Claims<T>>::contains_key(&tx), e);
 
@@ -567,32 +534,28 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
             let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
             ensure!(!Self::claimed(&tx), e);
 
-            return Ok(ValidTransaction {
+            Ok(ValidTransaction {
                 priority: PRIORITY,
                 requires: vec![],
                 provides: vec![("claims", signer).encode()],
                 longevity: TransactionLongevity::max_value(),
                 propagate: true,
-            });
-        }
-
-        // Mainnet locked CRU claims transaction
-        if let Some(ty) = maybe_ty {
+            })
+            // Cru18 locked CRU claims transaction
+        } else {
             let e = InvalidTransaction::Custom(ValidityError::SignerHasNoPreClaim.into());
-            ensure!(<MainnetPreClaims<T>>::contains_key(&signer, ty), e);
+            ensure!(<Cru18PreClaims<T>>::contains_key(&signer), e);
 
             let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
-            ensure!(!Self::mainnet_claimed(&signer, ty), e);
+            ensure!(!Self::cru18_claimed(&signer), e);
 
-            return Ok(ValidTransaction {
+            Ok(ValidTransaction {
                 priority: PRIORITY,
                 requires: vec![],
-                provides: vec![("mainnet_claims", signer).encode()],
+                provides: vec![("cru18_claims", signer).encode()],
                 longevity: TransactionLongevity::max_value(),
                 propagate: true,
-            });
+            })
         }
-
-        return Err(InvalidTransaction::Call.into());
     }
 }

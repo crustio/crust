@@ -44,7 +44,7 @@ Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust
 ./target/release/crust --chain maxwell
 ```
 
-Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/release/0.11.1/node/res/maxwell.json).
+Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/maxwell/node/res/maxwell.json).
 
 ### 2. Connect to rocky
 

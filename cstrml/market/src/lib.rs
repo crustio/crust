@@ -309,8 +309,20 @@ decl_storage! {
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
+<<<<<<< HEAD
         /// The file information and used information iterated by ipfs cid.
         /// It includes file related info such as file size, expired date and reported replica count.
+=======
+        /// Merchant Ledger V2
+        pub MerchantLedgersV2 get(fn merchant_ledgers_v2):
+        map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
+
+        /// Bonding Information
+        pub Bonded get(fn bonded):
+        map hasher(blake2_128_concat) T::AccountId => Option<T::AccountId>;
+
+        /// File information iterated by order id
+>>>>>>> wip
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)>;
 
@@ -436,6 +448,18 @@ decl_module! {
         /// The max file size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
+        /// Bond the origin to the owner
+        #[weight = 1000]
+        pub fn bond(
+            origin,
+            owner: <T::Lookup as StaticLookup>::Source,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let owner = T::Lookup::lookup(owner)?;
+            <Bonded<T>>::insert(&who, &owner);
+            Ok(())
+        }
+
         /// Register to be a merchant.
         /// This will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
@@ -458,10 +482,10 @@ decl_module! {
             ensure!(collateral <= T::Currency::usable_balance(&who), Error::<T>::InsufficientCurrency);
 
             // 3. Check if merchant has not register before.
-            ensure!(!<MerchantLedgers<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
+            ensure!(!<MerchantLedgersV2<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
 
-            // 4. Transfer from origin to collateral account.
-            T::Currency::transfer(&who, &Self::collateral_pot(), collateral.clone(), AllowDeath)?;
+            // 4. Reserve the collateral.
+            T::Currency::reserve(&who, collateral.clone())?;
 
             // 5. Prepare new ledger
             let ledger = MerchantLedger {
@@ -470,7 +494,7 @@ decl_module! {
             };
 
             // 6. Upsert collateral.
-            <MerchantLedgers<T>>::insert(&who, ledger);
+            <MerchantLedgersV2<T>>::insert(&who, ledger);
 
             // 7. Emit success
             Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), collateral));
@@ -493,19 +517,47 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if merchant has collateral or not
-            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
+            ensure!(<MerchantLedgersV2<T>>::contains_key(&who), Error::<T>::NotRegister);
 
             // 3. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::usable_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 4. Upgrade collateral.
-            <MerchantLedgers<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
+            // 4. Reserve the collateral.
+            T::Currency::reserve(&who, value.clone())?;
 
-            // 5. Transfer from origin to collateral account.
-            T::Currency::transfer(&who, &Self::collateral_pot(), value.clone(), AllowDeath)?;
+            // 5. Upgrade collateral.
+            <MerchantLedgersV2<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
 
             // 6. Emit success
             Self::deposit_event(RawEvent::AddCollateralSuccess(who.clone(), value));
+
+            Ok(())
+        }
+
+        /// Retrieve old collateral
+        ///
+        /// # <weight>
+        /// Complexity: O(logP)
+        /// - Read: Collateral
+        /// - Write: Collateral
+        /// # </weight>
+        #[weight = T::WeightInfo::cut_collateral()]
+        pub fn retrieve_old_collateral(origin) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Check if merchant has collateral or not
+            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
+
+            let merchant_ledger = <MerchantLedgers<T>>::take(&who);
+
+            // 2. Transfer the reward
+            T::Currency::transfer(&Self::storage_pot(), &who, merchant_ledger.reward, KeepAlive)?;
+
+            // 3. Transfer the collateral
+            T::Currency::transfer(&Self::collateral_pot(), &who, merchant_ledger.collateral, KeepAlive)?;
+
+            // 4. Emit success
+            Self::deposit_event(RawEvent::CutCollateralSuccess(who, merchant_ledger.collateral));
 
             Ok(())
         }
@@ -525,22 +577,26 @@ decl_module! {
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             // 2. Check if merchant has collateral or not
-            ensure!(<MerchantLedgers<T>>::contains_key(&who), Error::<T>::NotRegister);
+            ensure!(<MerchantLedgersV2<T>>::contains_key(&who), Error::<T>::NotRegister);
 
-            let mut ledger = Self::merchant_ledgers(&who);
+            let mut ledger = Self::merchant_ledgers_v2(&who);
 
             // 3. Ensure value is smaller than unused.
             ensure!(value <= ledger.collateral - ledger.reward, Error::<T>::InsufficientCollateral);
 
-            // 4. Upgrade collateral.
-            ledger.collateral -= value.clone();
-            <MerchantLedgers<T>>::insert(&who, ledger.clone());
+            // 4. Unreserve the collateral from the account.
+            let unable = T::Currency::unreserve(&who, value.clone());
 
-            // 5. Transfer from origin to collateral account.
-            T::Currency::transfer(&Self::collateral_pot(), &who, value.clone(), KeepAlive)?;
+            // 5. Upgrade collateral.
+            ledger.collateral -= value.clone();
+            if !unable.is_zero() {
+                // 5.1 This should never happen.
+                ledger.collateral = Zero::zero();
+            }
+            <MerchantLedgersV2<T>>::insert(&who, ledger.clone());
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::CutCollateralSuccess(who, value));
+            Self::deposit_event(RawEvent::CutCollateralSuccess(who, value - unable));
 
             Ok(())
         }
@@ -662,10 +718,10 @@ decl_module! {
             let merchant = ensure_signed(origin)?;
 
             // 1. Ensure merchant registered before
-            ensure!(<MerchantLedgers<T>>::contains_key(&merchant), Error::<T>::NotRegister);
+            ensure!(<MerchantLedgersV2<T>>::contains_key(&merchant), Error::<T>::NotRegister);
 
             // 2. Fetch ledger information
-            let mut merchant_ledger = Self::merchant_ledgers(&merchant);
+            let mut merchant_ledger = Self::merchant_ledgers_v2(&merchant);
 
             // 3. Ensure reward is larger than some value
             ensure!(merchant_ledger.reward > Zero::zero(), Error::<T>::NotEnoughReward);
@@ -675,7 +731,7 @@ decl_module! {
 
             // 5. Set the reward to zero and push it back
             merchant_ledger.reward = Zero::zero();
-            <MerchantLedgers<T>>::insert(&merchant, merchant_ledger);
+            <MerchantLedgersV2<T>>::insert(&merchant, merchant_ledger);
 
             Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
             Ok(())
@@ -1074,7 +1130,7 @@ impl<T: Config> Module<T> {
     }
 
     fn has_enough_collateral(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
-        let ledger = Self::merchant_ledgers(who);
+        let ledger = Self::merchant_ledgers_v2(who);
         (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.collateral
     }
 
@@ -1203,11 +1259,13 @@ impl<T: Config> Module<T> {
         if !is_legal_payout_target {
             return false;
         }
-        if Self::has_enough_collateral(&who, amount) {
-            <MerchantLedgers<T>>::mutate(&who, |ledger| {
-                ledger.reward += amount.clone();
-            });
-            return true;
+        if let Some(owner) = Self::bonded(who) {
+            if Self::has_enough_collateral(&owner, amount) {
+                <MerchantLedgersV2<T>>::mutate(&owner, |ledger| {
+                    ledger.reward += amount.clone();
+                });
+                return true;
+            }
         }
         false
     }

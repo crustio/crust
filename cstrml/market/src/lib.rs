@@ -287,7 +287,7 @@ pub trait Config: system::Config {
     type RenewRewardRatio: Get<Perbill>;
 
     /// Tax / Storage plus Staking ratio.
-    type TaxRatio: Get<Perbill>;
+    type StorageRatio: Get<Perbill>;
 
     /// UsedTrashMaxSize.
     type UsedTrashMaxSize: Get<u128>;
@@ -419,7 +419,7 @@ decl_module! {
         const RenewRewardRatio: Perbill = T::RenewRewardRatio::get();
 
         /// Tax / Storage plus Staking ratio.
-        const TaxRatio: Perbill = T::TaxRatio::get();
+        const StorageRatio: Perbill = T::StorageRatio::get();
 
         /// Max size of used trash.
         const UsedTrashMaxSize: u128 = T::UsedTrashMaxSize::get();
@@ -1124,10 +1124,9 @@ impl<T: Config> Module<T> {
     // 72% into staking pot
     // 18% into storage pot
     fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>) -> Result<BalanceOf<T>, DispatchError> {
-        let reserved_amount = T::TaxRatio::get() * value;
-        let staking_and_storage_amount = value - reserved_amount;
-        let staking_amount = T::StakingRatio::get() * staking_and_storage_amount;
-        let storage_amount = staking_and_storage_amount - staking_amount;
+        let staking_amount = T::StakingRatio::get() * value;
+        let storage_amount = T::StorageRatio::get() * value;
+        let reserved_amount = value - staking_amount - storage_amount;
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, KeepAlive)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, KeepAlive)?;

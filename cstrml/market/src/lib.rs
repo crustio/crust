@@ -265,9 +265,6 @@ pub trait Config: system::Config {
     /// File base replica. Use 4 for now
     type FileReplica: Get<u32>;
 
-    /// File Base Fee. Use 0.001 CRU for now
-    type FileBaseFee: Get<BalanceOf<Self>>;
-
     /// File Base Price.
     type FileInitPrice: Get<BalanceOf<Self>>;
 
@@ -302,6 +299,9 @@ pub trait Config: system::Config {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Config> as Market {
+        /// File Base Fee. Use 0.001 CRU for now
+        pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
+
         /// Merchant Ledger
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
@@ -396,9 +396,6 @@ decl_module! {
 
         /// File base replica.
         const FileReplica: u32 = T::FileReplica::get();
-
-        /// File Base Fee.
-        const FileBaseFee: BalanceOf<T> = T::FileBaseFee::get();
 
         /// File Init Price.
         const FileInitPrice: BalanceOf<T> = T::FileInitPrice::get();
@@ -560,7 +557,7 @@ decl_module! {
             }
             // 3. charged_file_size should be smaller than 128G
             ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
-            let amount = T::FileBaseFee::get() + Self::get_file_amount(charged_file_size) + tips;
+            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + tips;
 
             // 4. Check client can afford the sorder
             ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
@@ -682,6 +679,20 @@ decl_module! {
             MarketSwitch::put(is_enabled);
 
             Self::deposit_event(RawEvent::SetMarketSwitchSuccess(is_enabled));
+            Ok(())
+        }
+
+        /// Set the file base fee
+        #[weight = 1000]
+        pub fn set_base_fee(
+            origin,
+            #[compact] base_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+
+            <FileBaseFee<T>>::put(base_fee);
+
+            Self::deposit_event(RawEvent::SetBaseFeeSuccess(base_fee));
             Ok(())
         }
     }
@@ -996,7 +1007,7 @@ impl<T: Config> Module<T> {
     fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             // 1. Calculate total amount
-            let file_amount = T::FileBaseFee::get() + Self::get_file_amount(file_info.file_size);
+            let file_amount = Self::file_base_fee() + Self::get_file_amount(file_info.file_size);
             let renew_reward = T::RenewRewardRatio::get() * file_amount.clone();
             let total_amount = file_amount.clone() + renew_reward.clone();
             // 2. Check prepaid pool can afford the price
@@ -1245,5 +1256,6 @@ decl_event!(
         IllegalFileClosed(MerkleRoot),
         RewardMerchantSuccess(AccountId),
         SetMarketSwitchSuccess(bool),
+        SetBaseFeeSuccess(Balance),
     }
 );

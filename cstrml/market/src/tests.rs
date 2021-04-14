@@ -3566,6 +3566,129 @@ fn renew_file_should_work() {
 }
 
 #[test]
+fn change_base_fee_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // should less than
+        let reserved_pot = Market::reserved_pot();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 2_000_000);
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+
+        // Change base fee to 10000
+        assert_ok!(Market::set_base_fee(Origin::root(), 50000));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                calculated_at: 50,
+                amount: 32_220, // ( 50000 + 1000 * 129 + 0 ) * 0.18
+                prepaid: 0,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+        assert_eq!(Balances::free_balance(reserved_pot), 17900);
+        assert_eq!(Balances::free_balance(staking_pot), 128880);
+        assert_eq!(Balances::free_balance(storage_pot), 32220);
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+            Origin::signed(merchant.clone()),
+            legal_wr_info.curr_pk,
+            legal_wr_info.prev_pk,
+            legal_wr_info.block_number,
+            legal_wr_info.block_hash,
+            legal_wr_info.free,
+            legal_wr_info.used,
+            legal_wr_info.added_files,
+            legal_wr_info.deleted_files,
+            legal_wr_info.srd_root,
+            legal_wr_info.files_root,
+            legal_wr_info.sig
+        ));
+
+        assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 200_000));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 1303,
+                calculated_at: 303,
+                amount: 32_220,
+                prepaid: 200_000,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone(),
+                    is_reported: true
+                }]
+            },
+            UsedInfo {
+                used_size: file_size * 2,
+                reported_group_count: 1,
+                groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
+            })
+        );
+
+        run_to_block(2503);
+        // 20% would be rewarded to liquidator charlie
+        assert_ok!(Market::calculate_reward(Origin::signed(source.clone()), cid.clone()));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 2303,
+                calculated_at: 1303,
+                amount: 57996, // 32_220 * 0.8 + 32_220
+                prepaid: 12050, // 200000 -187950
+                reported_replica_count: 0,
+                replicas: vec![Replica {
+                    who: merchant.clone(),
+                    valid_at: 2503,
+                    anchor: legal_pk.clone(),
+                    is_reported: false
+                }]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
+            })
+        );
+    });
+}
+
+#[test]
 fn storage_pot_should_be_balanced() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first

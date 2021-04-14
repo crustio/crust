@@ -299,7 +299,7 @@ pub trait Config: system::Config {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Config> as Market {
-        /// File Base Fee. Use 0.001 CRU for now
+        /// File Base Fee.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
         /// Merchant Ledger

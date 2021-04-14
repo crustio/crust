@@ -1265,6 +1265,19 @@ decl_module! {
             ValidatorCount::put(new);
         }
 
+		/// Increments the ideal number of validators.
+		///
+		/// The dispatch origin must be Root.
+		///
+		/// # <weight>
+		/// Same as [`set_validator_count`].
+		/// # </weight>
+		#[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1) + T::DbWeight::get().reads(1)]
+		fn increase_validator_count(origin, #[compact] additional: u32) {
+			ensure_root(origin)?;
+			ValidatorCount::mutate(|n| *n += additional);
+		}
+
         /// Force there to be no new eras indefinitely.
         ///
         /// The dispatch origin must be Root.

@@ -745,7 +745,6 @@ parameter_types! {
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 30 * MINUTES;
     pub const FileReplica: u32 = 4;
-    pub const FileBaseFee: Balance = CENTS;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
@@ -767,7 +766,6 @@ impl market::Config for Runtime {
     /// File duration.
     type FileDuration = FileDuration;
     type FileReplica = FileReplica;
-    type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;

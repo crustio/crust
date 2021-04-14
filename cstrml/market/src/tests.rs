@@ -3785,3 +3785,177 @@ fn storage_pot_should_be_balanced() {
         assert_eq!(Balances::free_balance(&reserved_pot), 166000); // 39000 + 127000
     });
 }
+
+#[test]
+fn one_owner_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+        let charlie = CHARLIE;
+        let dave = DAVE;
+        let eve = EVE;
+        let ferdie = FERDIE;
+
+        let bob = BOB; // owner 1, have merchant, charlie and dave
+        let zikun = ZIKUN; // owner 2 have eve and ferdie
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408;
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let group1 = vec![merchant.clone(), charlie.clone(), dave.clone()];
+        let group2 = vec![eve.clone(), ferdie.clone()];
+        for who in group1.iter() {
+            assert_ok!(Market::bond(Origin::signed(who.clone()), bob.clone()));
+        }
+        for who in group2.iter() {
+            assert_ok!(Market::bond(Origin::signed(who.clone()), zikun.clone()));
+        }
+
+        let _ = Balances::make_free_balance_be(&bob, 20_000_000);
+        assert_ok!(Market::register(Origin::signed(bob.clone()), 6_000_000));
+
+        let _ = Balances::make_free_balance_be(&zikun, 20_000_000);
+        assert_ok!(Market::register(Origin::signed(zikun.clone()), 6_000_000));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0
+        ));
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        add_who_into_replica(&cid, file_size, ferdie.clone(), legal_pk.clone(), Some(303u32), None);
+        add_who_into_replica(&cid, file_size, charlie.clone(), legal_pk.clone(), Some(403u32), None);
+        add_who_into_replica(&cid, file_size, dave.clone(), legal_pk.clone(), Some(503u32), None);
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files_size(), (file_size * 4) as u128);
+
+        add_who_into_replica(&cid, file_size, eve.clone(), legal_pk.clone(), Some(503u32), None);
+
+        run_to_block(503);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+
+        assert_eq!(Market::merchant_ledgers_v2(&bob), MerchantLedger {
+            collateral: 6_000_000,
+            reward: 3507 // 1169 * 3
+        });
+
+        assert_eq!(Market::merchant_ledgers_v2(&zikun), MerchantLedger {
+            collateral: 6_000_000,
+            reward: 1169 // 1169 + 0
+        });
+    });
+}
+
+#[test]
+fn no_bonded_owner_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+        let charlie = CHARLIE;
+        let dave = DAVE;
+        let eve = EVE;
+        let ferdie = FERDIE;
+
+        let bob = BOB; // owner 1 have charlie and dave
+        let zikun = ZIKUN; // owner 2 have eve and ferdie
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408;
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let group1 = vec![charlie.clone(), dave.clone()];
+        let group2 = vec![eve.clone(), ferdie.clone()];
+        for who in group1.iter() {
+            assert_ok!(Market::bond(Origin::signed(who.clone()), bob.clone()));
+        }
+        for who in group2.iter() {
+            assert_ok!(Market::bond(Origin::signed(who.clone()), zikun.clone()));
+        }
+
+        let _ = Balances::make_free_balance_be(&bob, 20_000_000);
+        assert_ok!(Market::register(Origin::signed(bob.clone()), 6_000_000));
+
+        let _ = Balances::make_free_balance_be(&zikun, 20_000_000);
+        assert_ok!(Market::register(Origin::signed(zikun.clone()), 6_000_000));
+
+        // merchant doesn't have any collateral
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0
+        ));
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        add_who_into_replica(&cid, file_size, ferdie.clone(), legal_pk.clone(), Some(303u32), None);
+        add_who_into_replica(&cid, file_size, charlie.clone(), legal_pk.clone(), Some(403u32), None);
+        add_who_into_replica(&cid, file_size, dave.clone(), legal_pk.clone(), Some(503u32), None);
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+        assert_eq!(Market::files_size(), (file_size * 4) as u128);
+
+        add_who_into_replica(&cid, file_size, eve.clone(), legal_pk.clone(), Some(503u32), None);
+
+        run_to_block(503);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+
+        assert_eq!(Market::merchant_ledgers_v2(&bob), MerchantLedger {
+            collateral: 6_000_000,
+            reward: 2338 // 1169 * 2
+        });
+
+        assert_eq!(Market::merchant_ledgers_v2(&zikun), MerchantLedger {
+            collateral: 6_000_000,
+            reward: 2338 // 1169 * 2
+        });
+    });
+}

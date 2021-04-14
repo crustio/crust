@@ -55,6 +55,7 @@ macro_rules! log {
 }
 
 pub trait WeightInfo {
+    fn bond() -> Weight;
     fn register() -> Weight;
     fn add_collateral() -> Weight;
     fn cut_collateral() -> Weight;

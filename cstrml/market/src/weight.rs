@@ -31,6 +31,10 @@ use sp_std::marker::PhantomData;
 /// Weight functions for market.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
+	fn bond() -> Weight {
+		(7_000_000 as Weight)
+			.saturating_add(T::DbWeight::get().writes(1 as Weight))
+	}
 	fn register() -> Weight {
 		(166_000_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(8 as Weight))

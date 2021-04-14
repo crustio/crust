@@ -4,7 +4,7 @@
 use crate::*;
 
 pub use frame_support::{
-    parameter_types,
+    parameter_types, assert_ok,
     weights::{Weight, constants::RocksDbWeight},
     traits::{OnInitialize, OnFinalize, Get, TestRandomness}
 };
@@ -79,7 +79,6 @@ parameter_types! {
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
-    pub const FileBaseFee: Balance = 1000;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
@@ -100,7 +99,6 @@ impl market::Config for Test {
     /// File duration.
     type FileDuration = FileDuration;
     type FileReplica = FileReplica;
-    type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
@@ -166,6 +164,12 @@ impl ExtBuilder {
             .build_storage::<Test>()
             .unwrap();
 
-        t.into()
+        let mut ext: sp_io::TestExternalities = t.into();
+        ext.execute_with(|| {
+            assert_ok!(Market::set_market_switch(Origin::root(), true));
+            assert_ok!(Market::set_base_fee(Origin::root(), 1000));
+        });
+
+        ext
     }
 }

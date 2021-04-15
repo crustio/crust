@@ -30,7 +30,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, AccountIdConversion
+        CheckedAdd, AccountIdConversion, CheckedSub
     },
 };
 use sp_staking::{
@@ -50,7 +50,7 @@ pub mod weight;
 use swork;
 use primitives::{
     constants::{currency::*, time::*},
-    traits::{TransferrableCurrency, MarketInterface}
+    traits::{UsableCurrency, MarketInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -378,7 +378,7 @@ pub trait Config: frame_system::Config {
     /// The staking's module id, used for staking pot
     type ModuleId: Get<ModuleId>;
     /// The staking balance.
-    type Currency: TransferrableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+    type Currency: UsableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
     /// Time used for computing era duration.
     ///
@@ -637,7 +637,7 @@ decl_storage! {
             let mut gensis_total_stakes: BalanceOf<T> = Zero::zero();
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 assert!(
-                    T::Currency::transfer_balance(&stash) >= balance,
+                    T::Currency::usable_balance(&stash) >= balance,
                     "Stash does not have enough balance to bond."
                 );
                 let _ = <Module<T>>::bond(
@@ -861,7 +861,7 @@ decl_module! {
             let history_depth = Self::history_depth();
             let last_reward_era = current_era.saturating_sub(history_depth);
 
-            let stash_balance = T::Currency::transfer_balance(&stash);
+            let stash_balance = T::Currency::free_balance(&stash);
             let value = value.min(stash_balance);
             Self::deposit_event(RawEvent::Bonded(stash.clone(), value));
             let item = StakingLedger {
@@ -902,10 +902,9 @@ decl_module! {
             let controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 
-            let mut extra = T::Currency::transfer_balance(&stash);
-
-            if extra > Zero::zero() {
-                extra = extra.min(max_additional);
+            let stash_balance = T::Currency::free_balance(&stash);
+            if let Some(extra) = stash_balance.checked_sub(&ledger.total) {
+                let extra = extra.min(max_additional);
                 ledger.total += extra;
                 ledger.active += extra;
                 Self::deposit_event(RawEvent::Bonded(stash, extra));
@@ -1062,6 +1061,12 @@ decl_module! {
             let v_stash = &ledger.stash;
             <Guarantors<T>>::remove(v_stash);
             <Validators<T>>::insert(v_stash, &prefs);
+            // Set the validator pref to 100% for the ongoing era as the punishment
+            if let Some(active_era) = Self::active_era() {
+                if <ErasValidatorPrefs<T>>::get(&active_era.index, &v_stash).fee > prefs.fee {
+                    <ErasValidatorPrefs<T>>::insert(&active_era.index, &v_stash, ValidatorPrefs { fee: Perbill::one() });
+                }
+            }
             Self::deposit_event(RawEvent::ValidateSuccess(controller, prefs));
         }
 
@@ -1261,6 +1266,19 @@ decl_module! {
             ensure_root(origin)?;
             ValidatorCount::put(new);
         }
+
+		/// Increments the ideal number of validators.
+		///
+		/// The dispatch origin must be Root.
+		///
+		/// # <weight>
+		/// Same as [`set_validator_count`].
+		/// # </weight>
+		#[weight = 2 * WEIGHT_PER_MICROS + T::DbWeight::get().writes(1) + T::DbWeight::get().reads(1)]
+		fn increase_validator_count(origin, #[compact] additional: u32) {
+			ensure_root(origin)?;
+			ValidatorCount::mutate(|n| *n += additional);
+		}
 
         /// Force there to be no new eras indefinitely.
         ///
@@ -1902,12 +1920,10 @@ impl<T: Config> Module<T> {
                 let active_era_index = active_era.index.clone();
                 let points = <ErasRewardPoints<T>>::get(&active_era_index);
                 let mut imbalance = <PositiveImbalanceOf<T>>::zero();
-                let mut total_authoring_payout = Self::authoring_rewards_in_era(active_era_index);
-                let mut total_staking_payout = Self::staking_rewards_in_era(active_era_index);
+                let mut gpos_total_payout = Self::total_rewards_in_era(active_era_index);
 
                 // 1. Check whether staking pot has enough money
-                imbalance.subsume(T::Currency::burn(total_authoring_payout.clone()));
-                imbalance.subsume(T::Currency::burn(total_staking_payout.clone()));
+                imbalance.subsume(T::Currency::burn(gpos_total_payout.clone()));
                 if let Err(_) = T::Currency::settle(
                     &staking_pot,
                     imbalance,
@@ -1919,16 +1935,18 @@ impl<T: Config> Module<T> {
                         "💸 Staking pot is not enough"
                     );
                     // Market staking pot won't be skipped.
-                    total_authoring_payout = Zero::zero();
-                    total_staking_payout = Zero::zero();
+                    gpos_total_payout = Zero::zero();
                 }
 
                 // 2. Market's staking payout
-                let (market_authoring_payout, market_staking_payout) = Self::calculate_market_payout(active_era_index);
-                total_authoring_payout = total_authoring_payout.saturating_add(market_authoring_payout);
-                total_staking_payout = total_staking_payout.saturating_add(market_staking_payout);
+                let market_total_payout = Self::calculate_market_payout(active_era_index);
+                let total_payout = market_total_payout.saturating_add(gpos_total_payout);
 
-                // 3. Block authoring payout
+                // 3. Split the payout for staking and authoring
+                let total_authoring_payout = T::AuthoringAndStakingRatio::get() * total_payout;
+                let total_staking_payout = total_payout.saturating_sub(total_authoring_payout);
+
+                // 4. Block authoring payout
                 for (v, p) in points.individual.iter() {
                     if *p != 0u32 {
                         let authoring_reward =
@@ -1937,10 +1955,10 @@ impl<T: Config> Module<T> {
                     }
                 }
 
-                // 4. Staking payout
+                // 5. Staking payout
                 <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
     
-                // 5. Deposit era reward event
+                // 6. Deposit era reward event
                 Self::deposit_event(RawEvent::EraReward(active_era_index, total_authoring_payout, total_staking_payout));
     
                 // TODO: enable treasury and might bring this back
@@ -1964,18 +1982,8 @@ impl<T: Config> Module<T> {
         ErasStartSessionIndex::remove(era_index);
     }
 
-    /// Block authoring rewards per era, this won't be changed in every era
-    fn authoring_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
-        // TODO: Enable this in the main net
-        // // Milliseconds per year for the Julian year (365.25 days).
-        // const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
-        // // Initial with total rewards per year
-        // let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        //
-        // let reward_this_era = BLOCK_AUTHORING_REWARDS / year_in_eras as u128;
-        //
-        // reward_this_era.try_into().ok().unwrap()
-        let mut maybe_rewards_this_quarter = FIRST_QUARTER_AUTHORING_REWARDS ;
+    fn total_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
+        let mut maybe_rewards_this_quarter = FIRST_QUARTER_TOTAL_REWARDS ;
         const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9000 / 100;
         // 1 quarter = (90d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
         let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
@@ -1987,45 +1995,49 @@ impl<T: Config> Module<T> {
         reward_this_era.try_into().ok().unwrap()
     }
 
-    /// Staking rewards per era
-    fn staking_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
-        // TODO: Enable this in the main net
-        // let mut maybe_rewards_this_year = FIRST_YEAR_REWARDS ;
-        // let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
-        //     .ok()
-        //     .unwrap();
-        //
-        // // Milliseconds per year for the Julian year (365.25 days).
-        // const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
-        // // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
-        // let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        // let year_num = active_era as u64 / year_in_eras;
-        // for _ in 0..year_num {
-        //     // If inflation <= 1%, stop reduce
-        //     if maybe_rewards_this_year <= total_issuance / 100 {
-        //         maybe_rewards_this_year = total_issuance / 100;
-        //         break;
-        //     }
-        //
-        //     maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
-        // }
-        //
-        // let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
-        //
-        // reward_this_era.try_into().ok().unwrap()
-        let mut maybe_rewards_this_quarter = FIRST_QUARTER_STAKING_REWARDS ;
-        const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9000 / 100;
-        // 1 quarter = (90d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
-        let quarter_in_eras = MILLISECONDS_PER_QUARTER / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        let quarter_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / quarter_in_eras;
-        for _ in 0..quarter_num {
-            maybe_rewards_this_quarter = maybe_rewards_this_quarter / 2;
-        }
-        let reward_this_era = maybe_rewards_this_quarter / quarter_in_eras as u128;
-        reward_this_era.try_into().ok().unwrap()
-    }
+    // TODO: Enable this in the main net
+    // /// Block authoring rewards per era, this won't be changed in every era
+    // fn authoring_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
+    //     // Milliseconds per year for the Julian year (365.25 days).
+    //     const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+    //     // Initial with total rewards per year
+    //     let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+    //
+    //     let reward_this_era = BLOCK_AUTHORING_REWARDS / year_in_eras as u128;
+    //
+    //     reward_this_era.try_into().ok().unwrap()
+    // }
 
-    fn calculate_market_payout(active_era: EraIndex) -> (BalanceOf<T>, BalanceOf<T>) {
+    // TODO: Enable this in the main net
+    // /// Staking rewards per era
+    // fn staking_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
+    //
+    //     let mut maybe_rewards_this_year = FIRST_YEAR_REWARDS ;
+    //     let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
+    //         .ok()
+    //         .unwrap();
+    //
+    //     // Milliseconds per year for the Julian year (365.25 days).
+    //     const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+    //     // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
+    //     let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
+    //     let year_num = active_era as u64 / year_in_eras;
+    //     for _ in 0..year_num {
+    //         // If inflation <= 1%, stop reduce
+    //         if maybe_rewards_this_year <= total_issuance / 100 {
+    //             maybe_rewards_this_year = total_issuance / 100;
+    //             break;
+    //         }
+    //
+    //         maybe_rewards_this_year = maybe_rewards_this_year * 4 / 5;
+    //     }
+    //
+    //     let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
+    //
+    //     reward_this_era.try_into().ok().unwrap()
+    // }
+
+    fn calculate_market_payout(active_era: EraIndex) -> BalanceOf<T> {
         let total_dsm_staking_payout = T::MarketStakingPot::withdraw_staking_pot();
         let duration = T::MarketStakingPotDuration::get();
         let dsm_staking_payout_per_era = Perbill::from_rational_approximation(1, duration) * total_dsm_staking_payout;
@@ -2036,11 +2048,7 @@ impl<T: Config> Module<T> {
                 None => *payout = Some(dsm_staking_payout_per_era.clone())
             });
         }
-        let total_market_payout = Self::eras_market_payout(active_era).unwrap();
-        // TODO: merge this logic with GPoS's reward mechanism
-        let market_authoring_payout = T::AuthoringAndStakingRatio::get() * total_market_payout;
-        let market_staking_payout = total_market_payout.saturating_sub(market_authoring_payout);
-        (market_authoring_payout, market_staking_payout)
+        Self::eras_market_payout(active_era).unwrap()
     }
 
     /// Apply previously-unapplied slashes on the beginning of a new era, after a delay.

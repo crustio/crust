@@ -4,7 +4,7 @@
 use sp_runtime::traits::{Convert, SaturatedConversion};
 use frame_support::traits::{OnUnbalanced, Imbalance, Currency};
 use frame_support::weights::{WeightToFeePolynomial, WeightToFeeCoefficients, WeightToFeeCoefficient};
-use crate::{Balances, Authorship, NegativeImbalance};
+use crate::{NegativeImbalance};
 use sp_arithmetic::{Perbill, traits::{BaseArithmetic, Unsigned}};
 use smallvec::smallvec;
 

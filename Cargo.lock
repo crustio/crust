@@ -1287,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "cstrml-fee-reduction"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",

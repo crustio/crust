@@ -23,7 +23,7 @@ cumulus-primitives-core = { path = "../../../cumulus/primitives/core", default-f
 xcm = { git = "https://github.com/paritytech/polkadot", branch = "rococo-v1", default-features = false }
 xcm-executor = { git = "https://github.com/paritytech/polkadot", branch = "rococo-v1", default-features = false }
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "rococo-v1", default-features = false }
-parachain-info = { path = "../parachain-info", default-features = false }
+parachain-info = { path = "../../../cumulus/rococo-parachains/pallets/parachain-info", default-features = false }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }

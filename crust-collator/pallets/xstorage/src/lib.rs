@@ -4,12 +4,11 @@ use frame_support::{decl_error, decl_module, decl_storage, pallet_prelude::*};
 use frame_system::ensure_signed;
 use sp_std::prelude::*;
 
-use cumulus_primitives_core::{ParaId, XcmpMessageSender, ServiceQuality};
-use xcm::v0::{Xcm, OriginKind};
+use xcm::v0::{Xcm, SendXcm, OriginKind, MultiLocation, Junction};
 
 pub trait Config: frame_system::Config {
 	/// Something to send an HRMP message.
-	type XcmpMessageSender: XcmpMessageSender;
+	type XcmpMessageSender: SendXcm;
 }
 
 decl_error! {
@@ -34,19 +33,17 @@ decl_module! {
 		) -> DispatchResultWithPostInfo {
 			let _who = ensure_signed(origin)?;
 
-			let set_call = (9u8, 0u8, cid, size).encode();
+			let set_call = (100u8, 0u8, cid, size).encode();
 
 			// TODO: Use RelayedFrom instead of Transact to include account id
 			let transact = Xcm::Transact {
 				origin_type: OriginKind::Superuser,
-				call: set_call
+				require_weight_at_most: 1_000,
+				call: set_call.into()
 			};
 
-			let message = xcm::VersionedXcm::V0(transact);
-			let recipient: ParaId = 7777.into();
-
 			// TODO: Use Xtoken as well to pay this order
-			T::XcmpMessageSender::send_xcm_message(recipient, message, ServiceQuality::Ordered).map_err(|_| Error::<T>::FailedToSend)?;
+			T::XcmpMessageSender::send_xcm(MultiLocation::X2(Junction::Parent, Junction::Parachain { id: 7777 }), transact).map_err(|_| Error::<T>::FailedToSend)?;
 
 			Ok(().into())
 		}

@@ -7,7 +7,7 @@
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
-    dispatch::DispatchResult, ensure,
+    dispatch::DispatchResult, ensure, PalletId,
     storage::migration::remove_storage_prefix,
     traits::{
         Currency, ReservableCurrency, Get,
@@ -19,7 +19,7 @@ use frame_support::{
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_runtime::{
-    Perbill, ModuleId,
+    Perbill,
     traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating}
 };
 
@@ -240,7 +240,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
 /// The module's configuration trait.
 pub trait Config: system::Config {
     /// The market's module id, used for deriving its sovereign account ID.
-    type ModuleId: Get<ModuleId>;
+    type PalletId: Get<PalletId>;
 
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId>;
@@ -384,7 +384,7 @@ decl_module! {
         fn deposit_event() = default;
 
         /// The market's module id, used for deriving its sovereign account ID.
-        const ModuleId: ModuleId = T::ModuleId::get();
+        const PalletId: PalletId = T::PalletId::get();
 
         /// File duration.
         const FileDuration: BlockNumber = T::FileDuration::get();
@@ -686,25 +686,25 @@ impl<T: Config> Module<T> {
     /// The pot of a collateral account
     pub fn collateral_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "coll" is 16 bytes
-        T::ModuleId::get().into_sub_account("coll")
+        T::PalletId::get().into_sub_account("coll")
     }
 
     /// The pot of a storage account
     pub fn storage_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "stor" is 16 bytes
-        T::ModuleId::get().into_sub_account("stor")
+        T::PalletId::get().into_sub_account("stor")
     }
 
     /// The pot of a staking account
     pub fn staking_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "stak" is 16 bytes
-        T::ModuleId::get().into_sub_account("stak")
+        T::PalletId::get().into_sub_account("stak")
     }
 
     /// The pot of a reserved account
     pub fn reserved_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "rese" is 16 bytes
-        T::ModuleId::get().into_sub_account("rese")
+        T::PalletId::get().into_sub_account("rese")
     }
 
     /// Calculate reward from file's replica

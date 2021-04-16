@@ -61,7 +61,7 @@ impl balances::Config for Test {
 parameter_types! {
     pub const BenefitReportWorkCost: Balance = 50;
     pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
-    pub const BenefitMarketCostRatio: Perbill = Perbill::from_percent(5);
+    pub const BenefitMarketCostRatio: Perbill = Perbill::from_percent(95);
 }
 
 impl Config for Test {

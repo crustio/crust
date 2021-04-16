@@ -40,7 +40,7 @@ pub trait Config: frame_system::Config {
     type BenefitReportWorkCost: Get<BalanceOf<Self>>;
     // The ratio between total benefit limitation and total reward
     type BenefitsLimitRatio: Get<Perbill>;
-    // The ratio that user must pay even if he has enough benefit quota
+    // The ratio that benefit will cost, the remaining fee would still be charged
     type BenefitMarketCostRatio: Get<Perbill>;
 }
 
@@ -93,7 +93,7 @@ pub struct FeeReductionBenefit<Balance> {
 
 impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, BalanceOf<T>, NegativeImbalanceOf<T>> for Module<T> {
     fn update_era_benefit(next_era: EraIndex, total_reward: BalanceOf<T>) -> BalanceOf<T> {
-        Self::update_era_benefit_inner(next_era, T::BenefitsLimitRatio::get() * total_reward)
+        Self::do_update_era_benefit(next_era, T::BenefitsLimitRatio::get() * total_reward)
     }
 
     fn maybe_reduce_fee(who: &<T as frame_system::Config>::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
@@ -109,9 +109,9 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
 decl_storage! {
     trait Store for Module<T: Config> as Benefits {
         // Overall benefits information
-        OverallBenefits get(fn overall_benefits): EraBenefits<BalanceOf<T>>;
+        CurrentBenefits get(fn current_benefits): EraBenefits<BalanceOf<T>>;
         // One fee reduction information
-        FeeReductionLedger get(fn fee_reduction_ledger): map hasher(blake2_128_concat) T::AccountId => FeeReductionBenefit<BalanceOf<T>>;
+        FeeReductionBenefits get(fn fee_reduction_benefits): map hasher(blake2_128_concat) T::AccountId => FeeReductionBenefit<BalanceOf<T>>;
     }
 }
 
@@ -122,19 +122,19 @@ decl_module! {
         fn deposit_event() = default;
 
         #[weight = 1000]
-        pub fn add_benifit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+        pub fn add_benefit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Reserve the currency
             T::Currency::reserve(&who, value.clone()).map_err(|_| Error::<T>::InsuffientBalance)?;
 
-            // 2. Upgrade collateral.
-            <FeeReductionLedger<T>>::mutate(&who, |fee_reduction| {
+            // 2. Update funds and total fee reduction count for report works
+            <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
                     fee_reduction.funds += value.clone();
                     fee_reduction.total_fee_reduction_count = Self::calculate_total_count_reduction(&fee_reduction.funds);
                 }
             );
-            <OverallBenefits<T>>::mutate(|benefits| { benefits.total_funds += value.clone();});
+            <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds += value.clone();});
 
             // 3. Emit success
             Self::deposit_event(RawEvent::AddBenefitFundsSuccess(who.clone(), value));
@@ -143,19 +143,19 @@ decl_module! {
         }
 
         #[weight = 1000]
-        pub fn cut_benifit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
+        pub fn cut_benefit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // 1. Unreserve the currency
             T::Currency::unreserve(&who, value.clone());
 
-            // 2. Upgrade collateral.
-            <FeeReductionLedger<T>>::mutate(&who, |fee_reduction| {
+            // 2. Decrease the fund and total_fee_reduction_count for report works
+            <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
                     fee_reduction.funds = fee_reduction.funds.saturating_sub(value.clone());
                     fee_reduction.total_fee_reduction_count = Self::calculate_total_count_reduction(&fee_reduction.funds);
                 }
             );
-            <OverallBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(value.clone());});
+            <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(value.clone());});
 
             // 3. Emit success
             Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), value));
@@ -168,71 +168,70 @@ decl_module! {
 
 impl<T: Config> Module<T> {
     /// The return value is the used fee quota in the last era
-    pub fn update_era_benefit_inner(next_era: EraIndex, total_benefits: BalanceOf<T>) -> BalanceOf<T> {
+    pub fn do_update_era_benefit(next_era: EraIndex, total_benefits: BalanceOf<T>) -> BalanceOf<T> {
         // Fetch overall benefits information
-        let mut overall_benefits = Self::overall_benefits();
+        let mut current_benefits = Self::current_benefits();
         // Store the used fee reduction in the last era
-        let used_benefits = overall_benefits.used_benefits;
+        let used_benefits = current_benefits.used_benefits;
         // Start the next era and set active era to it
-        overall_benefits.active_era = next_era;
+        current_benefits.active_era = next_era;
         // Set the new total benefits for the next era
-        overall_benefits.total_benefits = total_benefits;
+        current_benefits.total_benefits = total_benefits;
         // Reset used benefits to zero
-        overall_benefits.used_benefits = Zero::zero();
-        <OverallBenefits<T>>::put(overall_benefits);
+        current_benefits.used_benefits = Zero::zero();
+        <CurrentBenefits<T>>::put(current_benefits);
         // Return the used benefits in the last era
         used_benefits
     }
 
     pub fn maybe_free_count_inner(who: &T::AccountId) -> bool {
-        let overall_benefits = Self::overall_benefits();
-        let mut fee_reduction = Self::fee_reduction_ledger(who);
-        Self::try_refresh_fee_reduction(&overall_benefits, &mut fee_reduction);
+        let current_benefits = Self::current_benefits();
+        let mut fee_reduction = Self::fee_reduction_benefits(who);
+        Self::maybe_refresh_fee_reduction_benefits(&current_benefits, &mut fee_reduction);
         // won't update reduction detail if it has no staking
         // to save db writing time
         if fee_reduction.used_fee_reduction_count < fee_reduction.total_fee_reduction_count {
             fee_reduction.used_fee_reduction_count += 1;
-            <FeeReductionLedger<T>>::insert(&who, fee_reduction);
+            <FeeReductionBenefits<T>>::insert(&who, fee_reduction);
             return true;
         }
         return false;
     }
 
     pub fn maybe_reduce_fee_inner(who: &T::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
-        let mut overall_benefits = Self::overall_benefits();
-        let mut fee_reduction = Self::fee_reduction_ledger(who);
+        let mut current_benefits = Self::current_benefits();
+        let mut fee_reduction = Self::fee_reduction_benefits(who);
         // Refresh the reduction
-        Self::try_refresh_fee_reduction(&overall_benefits, &mut fee_reduction);
+        Self::maybe_refresh_fee_reduction_benefits(&current_benefits, &mut fee_reduction);
         // Calculate the own reduction limit
-        let fee_reduction_benefits_quota = Self::calculate_total_benefits(fee_reduction.funds,
-                                                                overall_benefits.total_funds,
-                                                                overall_benefits.total_benefits);
+        let fee_reduction_benefits_quota = Self::calculate_fee_reduction_quota(fee_reduction.funds,
+                                                                               current_benefits.total_funds,
+                                                                               current_benefits.total_benefits);
         // Try to free fee reduction
         // Check the person has his own fee reduction quota and the total benefits
-        let benefit_costs = T::BenefitMarketCostRatio::get() * fee;
-        let fee_reduction_benefits = fee - benefit_costs;
-        let (withdraw_fee, used_fee_reduction) = if fee_reduction.used_fee_reduction_quota + fee_reduction_benefits <= fee_reduction_benefits_quota && overall_benefits.used_benefits + fee_reduction_benefits <= overall_benefits.total_benefits {
+        let fee_reduction_benefit_cost = T::BenefitMarketCostRatio::get() * fee;
+        let (charged_fee, used_fee_reduction) = if fee_reduction.used_fee_reduction_quota + fee_reduction_benefit_cost <= fee_reduction_benefits_quota && current_benefits.used_benefits + fee_reduction_benefit_cost <= current_benefits.total_benefits {
             // it's ok to free this fee
-            // withdraw fee is 5%
+            // charged fee is 5%
             // fee reduction is 95%
-            (benefit_costs, fee_reduction_benefits)
+            (fee - fee_reduction_benefit_cost, fee_reduction_benefit_cost)
         } else {
             // it's not ok to free this fee
-            // withdraw fee is 100%
+            // charged fee is 100%
             // fee reduction is 0%
             (fee, Zero::zero())
         };
         // Try to withdraw the currency
-        let result = match T::Currency::withdraw(who, withdraw_fee, reasons, ExistenceRequirement::KeepAlive) {
+        let result = match T::Currency::withdraw(who, charged_fee, reasons, ExistenceRequirement::KeepAlive) {
             Ok(mut imbalance) => {
                 // won't update reduction detail if it has no funds
                 // to save db writing time
                 if !used_fee_reduction.is_zero() {
                     // update the reduction information
-                    overall_benefits.used_benefits += used_fee_reduction;
+                    current_benefits.used_benefits += used_fee_reduction;
                     fee_reduction.used_fee_reduction_quota += used_fee_reduction;
-                    <FeeReductionLedger<T>>::insert(&who, fee_reduction);
-                    <OverallBenefits<T>>::put(overall_benefits);
+                    <FeeReductionBenefits<T>>::insert(&who, fee_reduction);
+                    <CurrentBenefits<T>>::put(current_benefits);
                     // issue the 95% fee
                     let new_issued = T::Currency::issue(used_fee_reduction.clone());
                     imbalance.subsume(new_issued);
@@ -244,7 +243,7 @@ impl<T: Config> Module<T> {
         result
     }
 
-    pub fn calculate_total_benefits(funds: BalanceOf<T>, total_funds: BalanceOf<T>, total_benefits: BalanceOf<T>) -> BalanceOf<T> {
+    pub fn calculate_fee_reduction_quota(funds: BalanceOf<T>, total_funds: BalanceOf<T>, total_benefits: BalanceOf<T>) -> BalanceOf<T> {
         Perbill::from_rational_approximation(funds, total_funds) * total_benefits
     }
 
@@ -252,9 +251,9 @@ impl<T: Config> Module<T> {
         (*funds / T::BenefitReportWorkCost::get()).saturated_into()
     }
 
-    pub fn try_refresh_fee_reduction(overall_benefits: &EraBenefits<BalanceOf<T>>, fee_reduction: &mut FeeReductionBenefit<BalanceOf<T>>) {
-        if fee_reduction.refreshed_at < overall_benefits.active_era {
-            fee_reduction.refreshed_at = overall_benefits.active_era;
+    pub fn maybe_refresh_fee_reduction_benefits(current_benefits: &EraBenefits<BalanceOf<T>>, fee_reduction: &mut FeeReductionBenefit<BalanceOf<T>>) {
+        if fee_reduction.refreshed_at < current_benefits.active_era {
+            fee_reduction.refreshed_at = current_benefits.active_era;
             fee_reduction.used_fee_reduction_quota = Zero::zero();
             fee_reduction.used_fee_reduction_count = 0;
         }

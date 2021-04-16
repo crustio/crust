@@ -783,7 +783,7 @@ impl market::Config for Runtime {
 parameter_types! {
     pub const BenefitReportWorkCost: Balance = 1 * DOLLARS;
     pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
-    pub const BenefitMarketCostRatio: Perbill = Perbill::from_percent(5);
+    pub const BenefitMarketCostRatio: Perbill = Perbill::from_percent(95);
 }
 
 impl benefits::Config for Runtime {

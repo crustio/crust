@@ -262,6 +262,9 @@ pub trait Config: system::Config {
     /// File duration.
     type FileDuration: Get<BlockNumber>;
 
+    /// Liquidity duration.
+    type LiquidityDuration: Get<BlockNumber>;
+
     /// File base replica. Use 4 for now
     type FileReplica: Get<u32>;
 
@@ -966,7 +969,7 @@ impl<T: Config> Module<T> {
             // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
             // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator
             // 3. curr_bn > expired_on + T::FileDuration::get() * 2 => all amount would be rewarded to the liquidator
-            let reward_liquidator_amount = Perbill::from_rational_approximation(curr_bn.saturating_sub(file_info.expired_on).saturating_sub(T::FileDuration::get()), T::FileDuration::get()) * file_info.amount;
+            let reward_liquidator_amount = Perbill::from_rational_approximation(curr_bn.saturating_sub(file_info.expired_on).saturating_sub(T::LiquidityDuration::get()), T::LiquidityDuration::get()) * file_info.amount;
             if !reward_liquidator_amount.is_zero() {
                 file_info.amount = file_info.amount.saturating_sub(reward_liquidator_amount);
                 T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive)?;

@@ -761,6 +761,7 @@ parameter_types! {
     /// Unit is pico
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 180 * DAYS;
+    pub const LiquidityDuration: BlockNumber = 15 * DAYS;
     pub const FileReplica: u32 = 4;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
@@ -782,6 +783,7 @@ impl market::Config for Runtime {
     type Event = Event;
     /// File duration.
     type FileDuration = FileDuration;
+    type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;

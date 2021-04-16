@@ -17,7 +17,7 @@ fn happy_pass_should_work() {
         assert_eq!(CrustClaims::claim_limit(), 100);
 
         // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
+        let tx_hash = get_legal_tx_hash1();
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
 
@@ -50,7 +50,7 @@ fn change_miner_should_work() {
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1)); // 1 is miner
 
         // 1. Mint a claim with 2, no way
-        let tx_hash = get_legal_tx_hash();
+        let tx_hash = get_legal_tx_hash1();
         let eth_addr = get_legal_eth_addr();
         assert_noop!(
             CrustClaims::mint_claim(Origin::signed(2), tx_hash.clone(), eth_addr.clone(), 100),
@@ -62,7 +62,7 @@ fn change_miner_should_work() {
 #[test]
 fn tx_should_exist() {
     new_test_ext().execute_with(|| {
-        let tx_hash = get_legal_tx_hash();
+        let tx_hash = get_legal_tx_hash1();
         let sig = get_legal_eth_sig();
         assert_noop!(
             CrustClaims::claim(Origin::none(), 1, tx_hash, sig),
@@ -79,25 +79,35 @@ fn illegal_sig_claim_should_failed() {
         assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
 
         // 1. Set limitation
-        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 200));
 
         // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
+        let tx_hash1 = get_legal_tx_hash1();
+        let tx_hash2 = get_legal_tx_hash2();
         let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
+        let sig = get_legal_eth_sig();
+        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash1.clone(), eth_addr.clone(), 100));
+        // This should only claim use both `eth_addr` and `sig(1, tx_hash2)`, that means `sig` cannot unlock it.
+        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash2.clone(), eth_addr.clone(), 90));
 
-        // 3. Claim it with illegal sig
+        // 3. Claim it with illegal sigs
         // 3.1 Another eth account wanna this money, go fuck himself
         let sig1 = get_another_account_eth_sig();
         assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig1.clone()),
+            CrustClaims::claim(Origin::none(), 1, tx_hash1.clone(), sig1.clone()),
             Error::<Test>::SignatureNotMatch
         );
 
-        // 3.2 Sig with wrong message should failed
+        // 3.2 Sign with wrong message should failed
         let sig2 = get_wrong_msg_eth_sig();
         assert_noop!(
-            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig2.clone()),
+            CrustClaims::claim(Origin::none(), 1, tx_hash1.clone(), sig2.clone()),
+            Error::<Test>::SignatureNotMatch
+        );
+
+        // 3.3 Sig with Puzzle {1, tx_hash2} but got Key {1, tx_hash1}
+        assert_noop!(
+            CrustClaims::claim(Origin::none(), 1, tx_hash2.clone(), sig.clone()),
             Error::<Test>::SignatureNotMatch
         );
     });
@@ -114,7 +124,7 @@ fn double_mint_should_failed() {
         assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
 
         // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
+        let tx_hash = get_legal_tx_hash1();
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
 
@@ -137,7 +147,7 @@ fn double_claim_should_failed() {
         assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
 
         // 2. Mint a claim
-        let tx_hash = get_legal_tx_hash();
+        let tx_hash = get_legal_tx_hash1();
         let eth_addr = get_legal_eth_addr();
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
 
@@ -165,7 +175,7 @@ fn claim_limit_should_work() {
         assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
 
         // 1. Mint a claim should failed without limitation
-        let tx_hash = get_legal_tx_hash();
+        let tx_hash = get_legal_tx_hash1();
         let eth_addr = get_legal_eth_addr();
         assert_noop!(
             CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10),

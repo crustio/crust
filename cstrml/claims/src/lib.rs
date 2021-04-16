@@ -286,7 +286,8 @@ decl_module! {
 
             // 2. Sign data
             let data = dest.using_encoded(to_ascii_hex);
-            let signer = Self::eth_recover(&sig, &data, &[][..]).ok_or(Error::<T>::InvalidEthereumSignature)?;
+            let tx_data = tx.using_encoded(to_ascii_hex);
+            let signer = Self::eth_recover(&sig, &data, &tx_data).ok_or(Error::<T>::InvalidEthereumSignature)?;
 
             // 3. Make sure signer is match with claimer
             Self::process_claim(tx, signer, dest)
@@ -397,7 +398,8 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
         let (maybe_signer, tx) = match call {
             Call::claim(account, tx, sig) => {
                 let data = account.using_encoded(to_ascii_hex);
-                (Self::eth_recover(&sig, &data, &[][..]), tx)
+                let tx_data = tx.using_encoded(to_ascii_hex);
+                (Self::eth_recover(&sig, &data, &tx_data), tx)
             }
             _ => return Err(InvalidTransaction::Call.into()),
         };

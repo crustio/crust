@@ -35,10 +35,10 @@ pub trait MarketInterface<AccountId, Balance> {
 	fn withdraw_staking_pot() -> Balance;
 }
 
-pub trait FeeReductionInterface<AccountId, Balance, NegativeImbalance> {
-	fn update_overall_reduction_info(next_era: EraIndex, total_fee_reduction: Balance) -> Balance;
+pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {
+	fn update_era_benefit(next_era: EraIndex, total_benefits: Balance) -> Balance;
 
-	fn try_to_free_fee(who: &AccountId, fee: Balance, reasons: WithdrawReasons) -> Result<NegativeImbalance, DispatchError>;
+	fn maybe_reduce_fee(who: &AccountId, fee: Balance, reasons: WithdrawReasons) -> Result<NegativeImbalance, DispatchError>;
 
-	fn try_to_free_count(who: &AccountId) -> bool;
+	fn maybe_free_count(who: &AccountId) -> bool;
 }

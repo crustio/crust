@@ -22,7 +22,7 @@ use sp_staking::{
 };
 use std::{cell::RefCell, collections::HashSet, collections::btree_set::BTreeSet};
 use balances::{AccountData, NegativeImbalance};
-use primitives::{traits::{MarketInterface, FeeReductionInterface}, MerkleRoot, SworkerAnchor};
+use primitives::{traits::{MarketInterface, BenefitInterface}, MerkleRoot, SworkerAnchor};
 
 /// The AccountId alias in this test module.
 pub type AccountId = u128;
@@ -222,18 +222,18 @@ impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
     }
 }
 
-pub struct TestFeeReductionInterface;
+pub struct TestBenefitInterface;
 
-impl<AID> FeeReductionInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestFeeReductionInterface {
-    fn update_overall_reduction_info(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
+impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestBenefitInterface {
+    fn update_era_benefit(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
         BalanceOf::<Test>::from(MOCK_USED_FEE.with(|v| *v.borrow()))
     }
 
-    fn try_to_free_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+    fn maybe_reduce_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
         Ok(NegativeImbalance::new(0))
     }
 
-    fn try_to_free_count(_: &AID) -> bool {
+    fn maybe_free_count(_: &AID) -> bool {
         return true;
     }
 
@@ -251,7 +251,7 @@ impl swork::Config for Test {
     type Works = TestStaking;
     type MarketInterface = TestStaking;
     type MaxGroupSize = MaxGroupSize;
-    type FeeReductionInterface = TestFeeReductionInterface;
+    type BenefitInterface = TestBenefitInterface;
     type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 
@@ -285,7 +285,7 @@ impl Config for Test {
     type MarketStakingPot = TestStaking;
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
-    type FeeReductionInterface = TestFeeReductionInterface;
+    type BenefitInterface = TestBenefitInterface;
     type WeightInfo = weight::WeightInfo;
 }
 

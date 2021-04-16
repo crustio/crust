@@ -14,7 +14,7 @@ use sp_runtime::{
     transaction_validity::InvalidTransaction,
 };
 use pallet_transaction_payment::{OnChargeTransaction};
-use primitives::traits::FeeReductionInterface;
+use primitives::traits::BenefitInterface;
 
 /// Logic for the author to get a portion of fees.
 pub struct Author;
@@ -79,7 +79,7 @@ impl<T, C, R, OU> OnChargeTransaction<T> for CurrencyAdapter<C, R, OU>
         T: pallet_transaction_payment::Config,
         T::TransactionByteFee: Get<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance>,
         C: Currency<<T as frame_system::Config>::AccountId>,
-        R: FeeReductionInterface<<T as frame_system::Config>::AccountId, <C as Currency<<T as frame_system::Config>::AccountId>>::Balance, NegativeImbalanceOf<C, T>>,
+        R: BenefitInterface<<T as frame_system::Config>::AccountId, <C as Currency<<T as frame_system::Config>::AccountId>>::Balance, NegativeImbalanceOf<C, T>>,
         C::PositiveImbalance:
         Imbalance<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance, Opposite = C::NegativeImbalance>,
         C::NegativeImbalance:
@@ -112,7 +112,7 @@ impl<T, C, R, OU> OnChargeTransaction<T> for CurrencyAdapter<C, R, OU>
 
         let special_call = CallMetadata { function_name: "calculate_reward".into(), pallet_name: "Market".into() };
         if special_call == call.get_call_metadata()  {
-            match R::try_to_free_fee(who, fee, withdraw_reason) {
+            match R::maybe_reduce_fee(who, fee, withdraw_reason) {
                 Ok(imbalance) => Ok(Some(imbalance)),
                 Err(_) => Err(InvalidTransaction::Payment.into()),
             }

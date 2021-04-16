@@ -431,7 +431,7 @@ impl staking::Config for Runtime {
     type MarketStakingPot = Market;
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
-    type FeeReductionInterface = FeeReduction;
+    type BenefitInterface = Benefits;
     type WeightInfo = staking::weight::WeightInfo;
 }
 
@@ -712,7 +712,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Config for Runtime {
-    type OnChargeTransaction = CurrencyAdapter<Balances, FeeReduction, DealWithFees>;
+    type OnChargeTransaction = CurrencyAdapter<Balances, Benefits, DealWithFees>;
     type TransactionByteFee = TransactionByteFee;
     type WeightToFee = OneTenthFee<Balance>;
     type FeeMultiplierUpdate =
@@ -736,7 +736,7 @@ impl swork::Config for Runtime {
     type Works = Staking;
     type MarketInterface = Market;
     type MaxGroupSize = MaxGroupSize;
-    type FeeReductionInterface = FeeReduction;
+    type BenefitInterface = Benefits;
     type WeightInfo = swork::weight::WeightInfo<Runtime>;
 }
 
@@ -781,17 +781,17 @@ impl market::Config for Runtime {
 }
 
 parameter_types! {
-    pub const OneOperationCost: Balance = 1 * DOLLARS;
-    pub const TotalFeeRatio: Perbill = Perbill::from_percent(1);
-    pub const OwnFeeRatio: Perbill = Perbill::from_percent(5);
+    pub const BenefitReportWorkCost: Balance = 1 * DOLLARS;
+    pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
+    pub const BenefitMarketLiquidatorRatio: Perbill = Perbill::from_percent(5);
 }
 
-impl fee_reduction::Config for Runtime {
+impl benefits::Config for Runtime {
     type Event = Event;
     type Currency = Balances;
-    type OneOperationCost = OneOperationCost;
-    type TotalFeeRatio = TotalFeeRatio;
-    type OwnFeeRatio = OwnFeeRatio;
+    type BenefitReportWorkCost = BenefitReportWorkCost;
+    type BenefitsLimitRatio = BenefitsLimitRatio;
+    type BenefitMarketLiquidatorRatio = BenefitMarketLiquidatorRatio;
 }
 
 construct_runtime! {
@@ -851,7 +851,7 @@ construct_runtime! {
         // Token candy and claims bridge
         Candy: candy::{Module, Call, Storage, Event<T>},
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
-        FeeReduction: fee_reduction::{Module, Call, Storage, Event<T>},
+        Benefits: benefits::{Module, Call, Storage, Event<T>},
     }
 }
 

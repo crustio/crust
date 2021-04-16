@@ -2,7 +2,7 @@
 // This file is part of Crust.
 
 use super::*;
-use crate as fee_reduction;
+use crate as benefits;
 
 use frame_support::parameter_types;
 use sp_runtime::{
@@ -59,17 +59,17 @@ impl balances::Config for Test {
 }
 
 parameter_types! {
-    pub const OneOperationCost: Balance = 50;
-    pub const TotalFeeRatio: Perbill = Perbill::from_percent(1);
-    pub const OwnFeeRatio: Perbill = Perbill::from_percent(5);
+    pub const BenefitReportWorkCost: Balance = 50;
+    pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
+    pub const BenefitMarketLiquidatorRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl Config for Test {
     type Event = ();
     type Currency = Balances;
-    type OneOperationCost = OneOperationCost;
-    type TotalFeeRatio = TotalFeeRatio;
-    type OwnFeeRatio = OwnFeeRatio;
+    type BenefitReportWorkCost = BenefitReportWorkCost;
+    type BenefitsLimitRatio = BenefitsLimitRatio;
+    type BenefitMarketLiquidatorRatio = BenefitMarketLiquidatorRatio;
 }
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -82,7 +82,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-        FeeReduction: fee_reduction::{Module, Call, Storage, Event<T>},
+        Benefits: benefits::{Module, Call, Storage, Event<T>},
 	}
 );
 

@@ -18,7 +18,7 @@ pub use market::{Replica, FileInfo, UsedInfo};
 use swork::Works;
 use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
-use primitives::{traits::FeeReductionInterface, EraIndex};
+use primitives::{traits::BenefitInterface, EraIndex};
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;
@@ -124,18 +124,18 @@ impl Works<AccountId> for TestWorksInterface {
     fn report_works(_: BTreeMap<AccountId, u128>, _: u128) {}
 }
 
-pub struct TestFeeReductionInterface;
+pub struct TestBenefitInterface;
 
-impl<AID> FeeReductionInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestFeeReductionInterface {
-    fn update_overall_reduction_info(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
+impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestBenefitInterface {
+    fn update_era_benefit(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
         Zero::zero()
     }
 
-    fn try_to_free_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+    fn maybe_reduce_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
         Ok(NegativeImbalance::new(0))
     }
 
-    fn try_to_free_count(_: &AID) -> bool {
+    fn maybe_free_count(_: &AID) -> bool {
         return true;
     }
 
@@ -153,7 +153,7 @@ impl swork::Config for Test {
     type Works = TestWorksInterface;
     type MarketInterface = Market;
     type MaxGroupSize = MaxGroupSize;
-    type FeeReductionInterface = TestFeeReductionInterface;
+    type BenefitInterface = TestBenefitInterface;
     type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 

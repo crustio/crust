@@ -18,7 +18,7 @@ use sp_runtime::{
 };
 pub use std::{cell::RefCell, iter::FromIterator};
 use balances::{AccountData, NegativeImbalance};
-pub use primitives::{traits::FeeReductionInterface, *};
+pub use primitives::{traits::BenefitInterface, *};
 use swork::{PKInfo, Identity, NegativeImbalanceOf};
 
 pub type AccountId = AccountId32;
@@ -129,18 +129,18 @@ impl balances::Config for Test {
     type MaxLocks = ();
 }
 
-pub struct TestFeeReductionInterface;
+pub struct TestBenefitInterface;
 
-impl<AID> FeeReductionInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestFeeReductionInterface {
-    fn update_overall_reduction_info(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
+impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestBenefitInterface {
+    fn update_era_benefit(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
         Zero::zero()
     }
 
-    fn try_to_free_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+    fn maybe_reduce_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
         Ok(NegativeImbalance::new(0))
     }
 
-    fn try_to_free_count(_: &AID) -> bool {
+    fn maybe_free_count(_: &AID) -> bool {
         return true;
     }
 
@@ -158,7 +158,7 @@ impl swork::Config for Test {
     type Works = ();
     type MarketInterface = Market;
     type MaxGroupSize = MaxGroupSize;
-    type FeeReductionInterface = TestFeeReductionInterface;
+    type BenefitInterface = TestBenefitInterface;
     type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 

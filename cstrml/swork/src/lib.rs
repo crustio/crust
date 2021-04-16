@@ -27,7 +27,7 @@ use primitives::{
     MerkleRoot, SworkerPubKey, SworkerSignature,
     ReportSlot, BlockNumber, IASSig,
     ISVBody, SworkerCert, SworkerCode, SworkerAnchor,
-    traits::{MarketInterface, SworkerInterface, FeeReductionInterface}
+    traits::{MarketInterface, SworkerInterface, BenefitInterface}
 };
 use sp_std::collections::btree_map::BTreeMap;
 
@@ -163,7 +163,7 @@ pub trait Config: system::Config {
     type MaxGroupSize: Get<u32>;
 
     /// Fee reduction interface
-    type FeeReductionInterface: FeeReductionInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
+    type BenefitInterface: BenefitInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -546,7 +546,7 @@ decl_module! {
             if let Some(group) = id.group {
                 owner = group;
             }
-            if T::FeeReductionInterface::try_to_free_count(&owner) {
+            if T::BenefitInterface::maybe_free_count(&owner) {
                return Ok(Pays::No.into());
             }
 

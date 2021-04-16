@@ -51,7 +51,7 @@ use swork;
 use primitives::{
     EraIndex,
     constants::{currency::*, time::*},
-    traits::{UsableCurrency, MarketInterface, FeeReductionInterface}
+    traits::{UsableCurrency, MarketInterface, BenefitInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -442,7 +442,7 @@ pub trait Config: frame_system::Config {
     type AuthoringAndStakingRatio: Get<Perbill>;
 
     /// Fee reduction interface
-    type FeeReductionInterface: FeeReductionInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
+    type BenefitInterface: BenefitInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -1933,7 +1933,7 @@ impl<T: Config> Module<T> {
                 let mut total_payout = market_total_payout.saturating_add(gpos_total_payout);
 
                 // 4. decrease the last fee reduction and update the next total fee reduction
-                let used_fee = T::FeeReductionInterface::update_overall_reduction_info(active_era_index + 1, total_payout);
+                let used_fee = T::BenefitInterface::update_era_benefit(active_era_index + 1, total_payout);
                 total_payout = total_payout.saturating_sub(used_fee);
 
                 // 5. Split the payout for staking and authoring

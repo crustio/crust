@@ -61,7 +61,7 @@ impl balances::Config for Test {
 parameter_types! {
     pub const BenefitReportWorkCost: Balance = 50;
     pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
-    pub const BenefitMarketLiquidatorRatio: Perbill = Perbill::from_percent(5);
+    pub const BenefitMarketCostRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl Config for Test {
@@ -69,7 +69,7 @@ impl Config for Test {
     type Currency = Balances;
     type BenefitReportWorkCost = BenefitReportWorkCost;
     type BenefitsLimitRatio = BenefitsLimitRatio;
-    type BenefitMarketLiquidatorRatio = BenefitMarketLiquidatorRatio;
+    type BenefitMarketCostRatio = BenefitMarketCostRatio;
 }
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;

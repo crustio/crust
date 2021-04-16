@@ -41,7 +41,7 @@ pub trait Config: frame_system::Config {
     // The ratio between total benefit limitation and total reward
     type BenefitsLimitRatio: Get<Perbill>;
     // The ratio that user must pay even if he has enough benefit quota
-    type BenefitMarketLiquidatorRatio: Get<Perbill>;
+    type BenefitMarketCostRatio: Get<Perbill>;
 }
 
 decl_event!(
@@ -209,13 +209,13 @@ impl<T: Config> Module<T> {
                                                                 overall_benefits.total_benefits);
         // Try to free fee reduction
         // Check the person has his own fee reduction quota and the total benefits
-        let real_fee = T::BenefitMarketLiquidatorRatio::get() * fee;
-        let fee_reduction_benefits = fee - real_fee;
+        let benefit_costs = T::BenefitMarketCostRatio::get() * fee;
+        let fee_reduction_benefits = fee - benefit_costs;
         let (withdraw_fee, used_fee_reduction) = if fee_reduction.used_fee_reduction_quota + fee_reduction_benefits <= fee_reduction_benefits_quota && overall_benefits.used_benefits + fee_reduction_benefits <= overall_benefits.total_benefits {
             // it's ok to free this fee
             // withdraw fee is 5%
             // fee reduction is 95%
-            (real_fee, fee_reduction_benefits)
+            (benefit_costs, fee_reduction_benefits)
         } else {
             // it's not ok to free this fee
             // withdraw fee is 100%

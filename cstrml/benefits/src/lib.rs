@@ -133,10 +133,9 @@ decl_module! {
 
             // 2. Update funds and total fee reduction count for report works
             <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
-                    fee_reduction.funds += value.clone();
-                    fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
-                }
-            );
+                fee_reduction.funds += value.clone();
+                fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
+            });
             <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds += value.clone();});
 
             // 3. Emit success

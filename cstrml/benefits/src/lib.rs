@@ -161,7 +161,7 @@ decl_module! {
             let to_unreserved_value = value.min(funds);
             T::Currency::unreserve(&who, to_unreserved_value);
 
-            // 4. Update or remove the FeeReductionBenefits for report works
+            // 4. Update or remove the who's fee reduction benefits for report works
             if to_unreserved_value == funds {
                 <FeeReductionBenefits<T>>::remove(&who);
             } else {

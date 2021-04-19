@@ -7,17 +7,17 @@ use crate as swork;
 pub use frame_support::{
     parameter_types, assert_ok,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{OnInitialize, OnFinalize, Get, TestRandomness}
+    traits::{OnInitialize, OnFinalize, Get, TestRandomness, WithdrawReasons}
 };
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
-    testing::Header, ModuleId,
+    testing::Header, ModuleId, DispatchError,
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
 pub use market::{Replica, FileInfo, UsedInfo};
-use primitives::MerkleRoot;
-use balances::AccountData;
+use primitives::{traits::BenefitInterface, EraIndex, MerkleRoot};
+use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
 
 pub type AccountId = AccountId32;
@@ -179,6 +179,23 @@ impl Works<AccountId> for TestWorksInterface {
     }
 }
 
+pub struct TestBenefitInterface;
+
+impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestBenefitInterface {
+    fn update_era_benefit(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
+        Zero::zero()
+    }
+
+    fn maybe_reduce_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+        Ok(NegativeImbalance::new(0))
+    }
+
+    fn maybe_free_count(_: &AID) -> bool {
+        return true;
+    }
+
+}
+
 parameter_types! {
     pub const PunishmentSlots: u32 = 4;
     pub const MaxGroupSize: u32 = 4;
@@ -191,6 +208,7 @@ impl Config for Test {
     type Works = TestWorksInterface;
     type MarketInterface = Market;
     type MaxGroupSize = MaxGroupSize;
+    type BenefitInterface = TestBenefitInterface;
     type WeightInfo = weight::WeightInfo<Test>;
 }
 

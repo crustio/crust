@@ -79,6 +79,7 @@ market = { package = "cstrml-market", path = "../cstrml/market", default-feature
 primitives = { package = "cst-primitives", path = "../primitives", default-features = false, version = "0.12.0" }
 swork = { package = "cstrml-swork", path = "../cstrml/swork", default-features = false, version = "0.12.0" }
 staking = { package = "cstrml-staking", path = "../cstrml/staking", default-features = false, version = "0.12.0" }
+benefits = { package = "cstrml-benefits", path = "../cstrml/benefits", default-features = false, version = "0.12.0" }
 
 # crust benchmark dependencies
 swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "0.12.0" }
@@ -129,6 +130,7 @@ std = [
     "staking/std",
     "pallet-sudo/std",
     "swork/std",
+    "benefits/std",
     "frame-system/std",
     "frame-system-rpc-runtime-api/std",
     "pallet-timestamp/std",

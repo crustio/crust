@@ -268,6 +268,9 @@ impl<T: Config> Module<T> {
     fn check_and_update_funds(who: &T::AccountId) {
         let reserved_value = T::Currency::reserved_balance(who);
         let old_funds = Self::fee_reduction_benefits(&who).funds;
+        if old_funds <= reserved_value {
+            return;
+        }
         let new_funds = <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
             fee_reduction.funds = old_funds.min(reserved_value);
             fee_reduction.funds

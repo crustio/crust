@@ -60,8 +60,8 @@ decl_error! {
     pub enum Error for Module<T: Config> {
         /// Don't have enough money
         InsuffientBalance,
-        /// Don't have enough funds to cut
-        InvalidFundToCut
+        /// Don't have benefit records
+        InvalidTarget
     }
 }
 
@@ -147,29 +147,33 @@ decl_module! {
         #[weight = 1000]
         pub fn cut_benefit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
+
+            // 1. Ensure who has benefit
+            ensure!(<FeeReductionBenefits<T>>::contains_key(&who), Error::<T>::InvalidTarget);
+
+            // 2. Updated new funds according to the reserved value
+            Self::check_and_update_funds(&who);
             let funds = Self::fee_reduction_benefits(&who).funds;
 
-            // 1. The value should be smaller than the funds
-            ensure!(value <= funds, Error::<T>::InvalidFundToCut);
+            // 3. Unreserve the currency
+            let to_unreserved_value = value.min(funds);
+            T::Currency::unreserve(&who, to_unreserved_value);
 
-            // 2. Unreserve the currency, unable_unreserved_value should be 0
-            let unable_unreserved_value = T::Currency::unreserve(&who, value.clone());
-
-            // 3. Decrease the fund and total_fee_reduction_count for report works
-            if value == funds || !unable_unreserved_value.is_zero() {
+            // 4. Decrease the fund and total_fee_reduction_count for report works
+            if to_unreserved_value == funds {
                 Self::chill_fee_reduction_benefit(&who);
             } else {
                  <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
                         // value is smaller than funds and won't be panic
-                        fee_reduction.funds -= value.clone();
+                        fee_reduction.funds -= to_unreserved_value.clone();
                         fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
                     }
                 );
                 // Should never be overflow, but it's better to use saturating_sub here
-                <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(value.clone());});
+                <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(to_unreserved_value.clone());});
             }
 
-            // 4. Emit success
+            // 5. Emit success
             Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), value));
 
             Ok(())
@@ -259,6 +263,17 @@ impl<T: Config> Module<T> {
         let fee_reduction = <FeeReductionBenefits<T>>::take(&who);
         // Should never be overflow, but it's better to use saturating_sub here
         <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(fee_reduction.funds);});
+    }
+
+    fn check_and_update_funds(who: &T::AccountId) {
+        let reserved_value = T::Currency::reserved_balance(who);
+        let old_funds = Self::fee_reduction_benefits(&who).funds;
+        let new_funds = <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
+            fee_reduction.funds = old_funds.min(reserved_value);
+            fee_reduction.funds
+        }
+        );
+        <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_add(new_funds).saturating_sub(old_funds);});
     }
 
     pub fn calculate_fee_reduction_quota(funds: BalanceOf<T>, total_funds: BalanceOf<T>, total_benefits: BalanceOf<T>) -> BalanceOf<T> {

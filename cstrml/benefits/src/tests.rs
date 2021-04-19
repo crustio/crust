@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::{mock::*, EraBenefits, FeeReductionBenefit};
-use frame_support::{assert_ok, assert_noop};
+use frame_support::assert_ok;
 use balances::NegativeImbalance;
 
 #[test]
@@ -392,18 +392,16 @@ fn cut_benefits_funds_in_weird_situation() {
             used_benefits: 0,
             active_era: 10
         });
-        assert_noop!(
-            Benefits::cut_benefit_funds(
-                Origin::signed(ALICE.clone()),
-                200
-            ),
-            DispatchError::Module {
-                index: 2,
-                error: 1,
-                message: Some("InvalidFundToCut")
-            }
-        );
+        assert_ok!(Benefits::cut_benefit_funds(Origin::signed(ALICE.clone()), 200));
+        assert_eq!(<FeeReductionBenefits<Test>>::contains_key(&ALICE), false);
+        assert_eq!(Benefits::current_benefits(), EraBenefits {
+            total_benefits: 1,
+            total_funds: 0,
+            used_benefits: 0,
+            active_era: 10
+        });
 
+        assert_ok!(Benefits::add_benefit_funds(Origin::signed(ALICE.clone()), 100));
         // Slash this account with 150 and reserved should be 50
         let _ = Balances::slash(&ALICE, 150);
         assert_eq!(Balances::free_balance(&ALICE), 0);
@@ -415,6 +413,26 @@ fn cut_benefits_funds_in_weird_situation() {
         assert_eq!(Benefits::current_benefits(), EraBenefits {
             total_benefits: 1,
             total_funds: 0,
+            used_benefits: 0,
+            active_era: 10
+        });
+
+        let _ = Balances::make_free_balance_be(&ALICE, 200);
+        assert_ok!(Benefits::add_benefit_funds(Origin::signed(ALICE.clone()), 100));
+        let _ = Balances::slash(&ALICE, 150);
+        assert_eq!(Balances::free_balance(&ALICE), 0);
+        assert_eq!(Balances::reserved_balance(&ALICE), 50);
+        assert_ok!(Benefits::cut_benefit_funds(Origin::signed(ALICE.clone()), 0));
+        assert_eq!(Benefits::fee_reduction_benefits(&ALICE), FeeReductionBenefit {
+            funds: 50,
+            total_fee_reduction_count: 1,
+            used_fee_reduction_quota: 0,
+            used_fee_reduction_count: 0,
+            refreshed_at: 0
+        });
+        assert_eq!(Benefits::current_benefits(), EraBenefits {
+            total_benefits: 1,
+            total_funds: 50,
             used_benefits: 0,
             active_era: 10
         });

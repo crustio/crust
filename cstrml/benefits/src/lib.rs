@@ -165,12 +165,11 @@ decl_module! {
             if to_unreserved_value == funds {
                 <FeeReductionBenefits<T>>::remove(&who);
             } else {
-                 <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
-                        // value is smaller than funds and won't be panic
-                        fee_reduction.funds -= to_unreserved_value.clone();
-                        fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
-                    }
-                );
+                <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
+                    // value is smaller than funds and won't be panic
+                    fee_reduction.funds -= to_unreserved_value.clone();
+                    fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
+                });
             }
 
             // 5. Update current benefits

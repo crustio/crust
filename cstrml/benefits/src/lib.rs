@@ -161,9 +161,9 @@ decl_module! {
             let to_unreserved_value = value.min(funds);
             T::Currency::unreserve(&who, to_unreserved_value);
 
-            // 4. Decrease the fund and total_fee_reduction_count for report works
+            // 4. Update or remove the FeeReductionBenefits for report works
             if to_unreserved_value == funds {
-                Self::chill_fee_reduction_benefit(&who);
+                <FeeReductionBenefits<T>>::remove(&who);
             } else {
                  <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
                         // value is smaller than funds and won't be panic
@@ -171,11 +171,13 @@ decl_module! {
                         fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
                     }
                 );
-                // Should never be overflow, but it's better to use saturating_sub here
-                <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(to_unreserved_value.clone());});
             }
 
-            // 5. Emit success
+            // 5. Update current benefits
+            // Should never be overflow, but it's better to use saturating_sub here
+            <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(to_unreserved_value.clone());});
+
+            // 6. Emit success
             Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), to_unreserved_value));
 
             Ok(())
@@ -259,12 +261,6 @@ impl<T: Config> Module<T> {
             Err(err) => Err(err),
         };
         result
-    }
-
-    fn chill_fee_reduction_benefit(who: &T::AccountId) {
-        let fee_reduction = <FeeReductionBenefits<T>>::take(&who);
-        // Should never be overflow, but it's better to use saturating_sub here
-        <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(fee_reduction.funds);});
     }
 
     fn check_and_update_funds(who: &T::AccountId) {

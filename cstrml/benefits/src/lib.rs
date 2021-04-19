@@ -274,8 +274,7 @@ impl<T: Config> Module<T> {
         let new_funds = <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
             fee_reduction.funds = old_funds.min(reserved_value);
             fee_reduction.funds
-        }
-        );
+        });
         <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_add(new_funds).saturating_sub(old_funds);});
     }
 

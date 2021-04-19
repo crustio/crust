@@ -6,21 +6,26 @@ use crate::*;
 pub use frame_support::{
     parameter_types,
     weights::{Weight, constants::RocksDbWeight},
-    traits::{OnInitialize, OnFinalize, Get, TestRandomness}
+    traits::{OnInitialize, OnFinalize, Get, TestRandomness, WithdrawReasons}
 };
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
-    testing::Header, ModuleId,
+    testing::Header, ModuleId, DispatchError,
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
 pub use market::{Replica, FileInfo, UsedInfo};
 use swork::Works;
-use balances::AccountData;
+use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
+use primitives::{traits::BenefitInterface, EraIndex};
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;
+
+pub type BalanceOf<T> =
+<<T as swork::Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
+pub type NegativeImbalanceOf<T> = <<T as swork::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
@@ -119,6 +124,23 @@ impl Works<AccountId> for TestWorksInterface {
     fn report_works(_: BTreeMap<AccountId, u128>, _: u128) {}
 }
 
+pub struct TestBenefitInterface;
+
+impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestBenefitInterface {
+    fn update_era_benefit(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
+        Zero::zero()
+    }
+
+    fn maybe_reduce_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+        Ok(NegativeImbalance::new(0))
+    }
+
+    fn maybe_free_count(_: &AID) -> bool {
+        return true;
+    }
+
+}
+
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
     pub const MaxGroupSize: u32 = 100;
@@ -131,6 +153,7 @@ impl swork::Config for Test {
     type Works = TestWorksInterface;
     type MarketInterface = Market;
     type MaxGroupSize = MaxGroupSize;
+    type BenefitInterface = TestBenefitInterface;
     type WeightInfo = swork::weight::WeightInfo<Test>;
 }
 

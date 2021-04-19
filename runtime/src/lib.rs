@@ -29,7 +29,7 @@ use sp_runtime::{
 use sp_std::prelude::*;
 
 use pallet_grandpa::{AuthorityId as GrandpaId, fg_primitives, AuthorityList as GrandpaAuthorityList};
-pub use pallet_transaction_payment::{Multiplier, TargetedFeeAdjustment, FeeDetails, CurrencyAdapter};
+pub use pallet_transaction_payment::{Multiplier, TargetedFeeAdjustment, FeeDetails, OnChargeTransaction};
 use sp_api::impl_runtime_apis;
 use sp_staking::SessionIndex;
 
@@ -60,7 +60,7 @@ use pallet_session::{historical as session_historical};
 pub use pallet_timestamp::Call as TimestampCall;
 
 /// Implementations of some helper traits passed into runtime modules as associated types.
-use impls::{CurrencyToVoteHandler, Author, OneTenthFee};
+use impls::{CurrencyToVoteHandler, Author, OneTenthFee, CurrencyAdapter};
 
 /// Crust primitives
 use primitives::{
@@ -395,9 +395,9 @@ parameter_types! {
     // 3 sessions in an era (15 mins).
     pub const SessionsPerEra: SessionIndex = 3;
     // 28 eras for unbonding (14 hours).
-    pub const BondingDuration: staking::EraIndex = 28;
+    pub const BondingDuration: EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).
-    pub const SlashDeferDuration: staking::EraIndex = 28;
+    pub const SlashDeferDuration: EraIndex = 28;
     // 1 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `1`
     pub const SPowerRatio: u128 = 1;
     // 64 guarantors for one validator.
@@ -431,6 +431,7 @@ impl staking::Config for Runtime {
     type MarketStakingPot = Market;
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
+    type BenefitInterface = Benefits;
     type WeightInfo = staking::weight::WeightInfo;
 }
 
@@ -711,7 +712,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Config for Runtime {
-    type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees>;
+    type OnChargeTransaction = CurrencyAdapter<Balances, Benefits, DealWithFees>;
     type TransactionByteFee = TransactionByteFee;
     type WeightToFee = OneTenthFee<Balance>;
     type FeeMultiplierUpdate =
@@ -735,6 +736,7 @@ impl swork::Config for Runtime {
     type Works = Staking;
     type MarketInterface = Market;
     type MaxGroupSize = MaxGroupSize;
+    type BenefitInterface = Benefits;
     type WeightInfo = swork::weight::WeightInfo<Runtime>;
 }
 
@@ -776,6 +778,20 @@ impl market::Config for Runtime {
     type UsedTrashMaxSize = UsedTrashMaxSize;
     type WeightInfo = market::weight::WeightInfo<Runtime>;
     type MaximumFileSize = MaximumFileSize;
+}
+
+parameter_types! {
+    pub const BenefitReportWorkCost: Balance = 1 * DOLLARS;
+    pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
+    pub const BenefitMarketCostRatio: Perbill = Perbill::from_percent(95);
+}
+
+impl benefits::Config for Runtime {
+    type Event = Event;
+    type Currency = Balances;
+    type BenefitReportWorkCost = BenefitReportWorkCost;
+    type BenefitsLimitRatio = BenefitsLimitRatio;
+    type BenefitMarketCostRatio = BenefitMarketCostRatio;
 }
 
 construct_runtime! {
@@ -835,6 +851,7 @@ construct_runtime! {
         // Token candy and claims bridge
         Candy: candy::{Module, Call, Storage, Event<T>},
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+        Benefits: benefits::{Module, Call, Storage, Event<T>},
     }
 }
 

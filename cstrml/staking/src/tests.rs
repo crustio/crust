@@ -524,6 +524,80 @@ fn era_reward_with_dsm_staking_pot_should_work() {
         });
 }
 
+#[test]
+fn era_reward_with_used_fee_should_work() {
+    // Should check that:
+    // The value of current_session_reward is set at the end of each era, based on
+    // total_stakes and session_reward.
+    ExtBuilder::default()
+        .guarantee(false)
+        .own_workload(u128::max_value())
+        .staking_pot(100_000_000_000_000)
+        .mock_used_fee(12_500_000_000_000)
+        .build()
+        .execute_with(|| {
+            let init_balance_10 = Balances::total_balance(&10);
+            let init_balance_21 = Balances::total_balance(&21);
+
+            // Set payee to controller
+            assert_ok!(Staking::set_payee(
+                Origin::signed(10),
+                RewardDestination::Controller
+            ));
+
+            // Compute now as other parameter won't change
+            let total_authoring_payout = authoring_rewards_in_era(Staking::current_era().unwrap_or(0)) - 2_500_000_000_000;
+            let total_staking_payout_0 = staking_rewards_in_era(Staking::current_era().unwrap_or(0)) - 10_000_000_000_000;
+            assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
+            assert_eq!(Staking::eras_total_stakes(0), 2001);
+            <Module<Test>>::reward_by_ids(vec![(21, 1)]);
+
+            start_session(0, true);
+            start_session(1, true);
+            start_session(2, true);
+            start_session(3, true);
+            payout_all_stakers(0);
+
+            assert_eq!(Staking::current_era().unwrap_or(0), 1);
+            assert_eq!(Staking::eras_total_stakes(1), 2001);
+            // rewards may round to 0.000001
+            assert_eq!(
+                Balances::total_balance(&10) / 10000000,
+                (init_balance_10 + total_staking_payout_0 * 1000 / 2001) / 10000000
+            );
+            let stakes_21 = Balances::total_balance(&21);
+            let stakes_31 = Balances::total_balance(&31);
+            // candidates should have rewards
+            assert_eq!(
+                stakes_21 / 10000000,
+                (init_balance_21 + total_authoring_payout + total_staking_payout_0 * 1000 / 2001) / 10000000
+            );
+
+            start_session(4, true);
+
+            <Module<Test>>::reward_by_ids(vec![(21, 1)]);
+            <Module<Test>>::reward_by_ids(vec![(31, 1)]);
+            // new era is triggered here.
+            start_session(5, true);
+            start_session(6, true);
+            payout_all_stakers(1);
+            // pay time
+            // staking pot is not enough
+            // only dsm staking payout
+            assert_eq!(
+                Balances::total_balance(&10) / 100000000,
+                (init_balance_10 + total_staking_payout_0 * 1000 / 2001) / 100000000
+            );
+            assert_eq!(
+                Balances::total_balance(&21) / 10000000,
+                stakes_21 / 10000000
+            );
+            assert_eq!(
+                Balances::total_balance(&31) / 10000000,
+                stakes_31 / 10000000
+            );
+        });
+}
 
 #[test]
 fn era_reward_should_fail_due_to_insufficient_staking_pot() {

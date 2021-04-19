@@ -1135,6 +1135,7 @@ version = "0.12.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
+ "cstrml-benefits",
  "cstrml-candy",
  "cstrml-claims",
  "cstrml-market",
@@ -1246,6 +1247,25 @@ dependencies = [
  "pallet-transaction-payment",
  "parity-scale-codec",
  "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-benefits"
+version = "0.12.0"
+dependencies = [
+ "cst-primitives",
+ "cstrml-balances",
+ "frame-support",
+ "frame-system",
+ "hex-literal",
+ "parity-scale-codec",
+ "rustc-hex",
+ "serde",
+ "serde_derive",
  "sp-core",
  "sp-io",
  "sp-runtime",

@@ -49,8 +49,9 @@ pub mod weight;
 // Crust runtime modules
 use swork;
 use primitives::{
+    EraIndex,
     constants::{currency::*, time::*},
-    traits::{UsableCurrency, MarketInterface}
+    traits::{UsableCurrency, MarketInterface, BenefitInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -86,9 +87,6 @@ pub trait WeightInfo {
     fn select_and_update_validators(v: u32, n: u32, m: u32, ) -> Weight;
     fn recharge_staking_pot() -> Weight;
 }
-
-/// Counter for the number of eras that have passed.
-pub type EraIndex = u32;
 
 /// Counter for the number of "reward" points earned by a given validator.
 pub type RewardPoint = u32;
@@ -442,6 +440,9 @@ pub trait Config: frame_system::Config {
 
     /// Authoring and Staking ratio for market staking pot
     type AuthoringAndStakingRatio: Get<Perbill>;
+
+    /// Fee reduction interface
+    type BenefitInterface: BenefitInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -1941,13 +1942,17 @@ impl<T: Config> Module<T> {
 
                 // 2. Market's staking payout
                 let market_total_payout = Self::calculate_market_payout(active_era_index);
-                let total_payout = market_total_payout.saturating_add(gpos_total_payout);
+                let mut total_payout = market_total_payout.saturating_add(gpos_total_payout);
 
-                // 3. Split the payout for staking and authoring
+                // 4. decrease the last fee reduction and update the next total fee reduction
+                let used_fee = T::BenefitInterface::update_era_benefit(active_era_index + 1, total_payout);
+                total_payout = total_payout.saturating_sub(used_fee);
+
+                // 5. Split the payout for staking and authoring
                 let total_authoring_payout = T::AuthoringAndStakingRatio::get() * total_payout;
                 let total_staking_payout = total_payout.saturating_sub(total_authoring_payout);
 
-                // 4. Block authoring payout
+                // 6. Block authoring payout
                 for (v, p) in points.individual.iter() {
                     if *p != 0u32 {
                         let authoring_reward =
@@ -1956,10 +1961,10 @@ impl<T: Config> Module<T> {
                     }
                 }
 
-                // 5. Staking payout
+                // 7. Staking payout
                 <ErasStakingPayout<T>>::insert(active_era_index, total_staking_payout);
     
-                // 6. Deposit era reward event
+                // 8. Deposit era reward event
                 Self::deposit_event(RawEvent::EraReward(active_era_index, total_authoring_payout, total_staking_payout));
     
                 // TODO: enable treasury and might bring this back

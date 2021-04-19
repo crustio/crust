@@ -152,25 +152,24 @@ decl_module! {
             // 1. The value should be smaller than the funds
             ensure!(value <= funds, Error::<T>::InvalidFundToCut);
 
-            // 2. Unreserve the currency
+            // 2. Unreserve the currency, unable_unreserved_value should be 0
             let unable_unreserved_value = T::Currency::unreserve(&who, value.clone());
 
             // 3. Decrease the fund and total_fee_reduction_count for report works
-            let mut reduced_fund = value;
-            if !unable_unreserved_value.is_zero() {
-                // if the unable_unreserved_value is not zero, reduce all funds from FeeReductionBenefits and CurrentBenefits
-                reduced_fund = funds
+            if value == funds || !unable_unreserved_value.is_zero() {
+                Self::chill_fee_reduction_benefit(&who);
+            } else {
+                 <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
+                        // value is smaller than funds and won't be panic
+                        fee_reduction.funds -= value.clone();
+                        fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
+                    }
+                );
+                // Should never be overflow, but it's better to use saturating_sub here
+                <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(value.clone());});
             }
-            <FeeReductionBenefits<T>>::mutate(&who, |fee_reduction| {
-                    // reduced_fund is value or funds, both of then is ok and won't panic
-                    fee_reduction.funds -= reduced_fund.clone();
-                    fee_reduction.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&fee_reduction.funds);
-                }
-            );
-            // Should never be overflow, but it's better to use saturating_sub here
-            <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(reduced_fund.clone());});
 
-            // 3. Emit success
+            // 4. Emit success
             Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), value));
 
             Ok(())
@@ -254,6 +253,12 @@ impl<T: Config> Module<T> {
             Err(err) => Err(err),
         };
         result
+    }
+
+    fn chill_fee_reduction_benefit(who: &T::AccountId) {
+        let fee_reduction = <FeeReductionBenefits<T>>::take(&who);
+        // Should never be overflow, but it's better to use saturating_sub here
+        <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_funds = benefits.total_funds.saturating_sub(fee_reduction.funds);});
     }
 
     pub fn calculate_fee_reduction_quota(funds: BalanceOf<T>, total_funds: BalanceOf<T>, total_benefits: BalanceOf<T>) -> BalanceOf<T> {

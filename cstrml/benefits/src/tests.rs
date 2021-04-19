@@ -88,6 +88,15 @@ fn cut_benefit_funds_should_work() {
             used_benefits: 0,
             active_era: 10
         });
+
+        assert_ok!(Benefits::cut_benefit_funds(Origin::signed(ALICE.clone()), 50));
+        assert_eq!(<FeeReductionBenefits<Test>>::contains_key(&ALICE), false);
+        assert_eq!(Benefits::current_benefits(), EraBenefits {
+            total_benefits: 1,
+            total_funds: 0,
+            used_benefits: 0,
+            active_era: 10
+        });
     });
 }
 
@@ -402,13 +411,7 @@ fn cut_benefits_funds_in_weird_situation() {
 
         // want to cut 80, however reserved only have 50, so cut the total 100
         assert_ok!(Benefits::cut_benefit_funds(Origin::signed(ALICE.clone()), 80));
-        assert_eq!(Benefits::fee_reduction_benefits(&ALICE), FeeReductionBenefit {
-            funds: 0,
-            total_fee_reduction_count: 0,
-            used_fee_reduction_quota: 0,
-            used_fee_reduction_count: 0,
-            refreshed_at: 0
-        });
+        assert_eq!(<FeeReductionBenefits<Test>>::contains_key(&ALICE), false);
         assert_eq!(Benefits::current_benefits(), EraBenefits {
             total_benefits: 1,
             total_funds: 0,

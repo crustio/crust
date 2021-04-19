@@ -714,6 +714,8 @@ decl_event!(
         ValidateSuccess(AccountId, ValidatorPrefs),
         /// An account has called `guarantee` and vote for one validator.
         GuaranteeSuccess(AccountId, AccountId, Balance),
+        /// An account has called `cut_guarantee` and cut vote for one validator.
+        CutGuaranteeSuccess(AccountId, AccountId, Balance),
         /// An account has been chilled from its stash
         ChillSuccess(AccountId, AccountId),
         /// Update the identities success. The stake limit of each identity would be updated.
@@ -1146,7 +1148,7 @@ decl_module! {
             let guarantee = guarantee.unwrap();
 
             <Guarantors<T>>::insert(g_stash, guarantee);
-            Self::deposit_event(RawEvent::GuaranteeSuccess(controller, v_stash, votes));
+            Self::deposit_event(RawEvent::CutGuaranteeSuccess(controller, v_stash, votes));
         }
 
         /// Declare no desire to either validate or guarantee.

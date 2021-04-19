@@ -99,11 +99,11 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
     }
 
     fn maybe_reduce_fee(who: &<T as frame_system::Config>::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
-        Self::maybe_reduce_fee_inner(who, fee, reasons)
+        Self::maybe_do_reduce_fee(who, fee, reasons)
     }
 
     fn maybe_free_count(who: &<T as frame_system::Config>::AccountId) -> bool {
-        Self::maybe_free_count_inner(who)
+        Self::maybe_do_free_count(who)
     }
 }
 
@@ -123,6 +123,7 @@ decl_module! {
 
         fn deposit_event() = default;
 
+        // TODO: Refine this weight
         #[weight = 1000]
         pub fn add_benefit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -144,6 +145,7 @@ decl_module! {
             Ok(())
         }
 
+        // TODO: Refine this weight
         #[weight = 1000]
         pub fn cut_benefit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -174,7 +176,7 @@ decl_module! {
             }
 
             // 5. Emit success
-            Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), value));
+            Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), to_unreserved_value));
 
             Ok(())
         }
@@ -200,7 +202,7 @@ impl<T: Config> Module<T> {
         used_benefits
     }
 
-    pub fn maybe_free_count_inner(who: &T::AccountId) -> bool {
+    pub fn maybe_do_free_count(who: &T::AccountId) -> bool {
         let current_benefits = Self::current_benefits();
         let mut fee_reduction = Self::fee_reduction_benefits(who);
         Self::maybe_refresh_fee_reduction_benefits(&current_benefits, &mut fee_reduction);
@@ -214,7 +216,7 @@ impl<T: Config> Module<T> {
         return false;
     }
 
-    pub fn maybe_reduce_fee_inner(who: &T::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
+    pub fn maybe_do_reduce_fee(who: &T::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
         let mut current_benefits = Self::current_benefits();
         let mut fee_reduction = Self::fee_reduction_benefits(who);
         // Refresh the reduction

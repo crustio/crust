@@ -542,10 +542,7 @@ decl_module! {
 
             // 12. Try to free count limitation
             let id = Self::identities(&reporter).unwrap_or_default();
-            let mut owner = reporter;
-            if let Some(group) = id.group {
-                owner = group;
-            }
+            let owner = if let Some(group) = id.group { group } else { reporter };
             if T::BenefitInterface::maybe_free_count(&owner) {
                return Ok(Pays::No.into());
             }

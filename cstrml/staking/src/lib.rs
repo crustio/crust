@@ -783,7 +783,7 @@ decl_error! {
         /// Don't have enough balance to recharge the staking pot
         InsufficientCurrency,
         /// Can not rebond without unlocking chunks.
-		NoUnlockChunk,
+        NoUnlockChunk,
     }
 }
 
@@ -1009,7 +1009,7 @@ decl_module! {
             }
         }
 
-        /// Rebond a portion of the stash scheduled to be unlocked.
+	    /// Rebond a portion of the stash scheduled to be unlocked.
 		///
 		/// The dispatch origin must be signed by the controller, and it can be only called when
 		/// [`EraElectionStatus`] is `Closed`.

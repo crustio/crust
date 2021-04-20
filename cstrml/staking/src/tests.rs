@@ -2029,8 +2029,8 @@ fn rebond_works() {
         .execute_with(|| {
             // Set payee to controller. avoids confusion
             assert_ok!(Staking::set_payee(
-				Origin::signed(10),
-				RewardDestination::Controller
+                Origin::signed(10),
+                RewardDestination::Controller
 			));
 
             // Give account 11 some large free balance greater than total
@@ -2056,8 +2056,8 @@ fn rebond_works() {
 
             // Try to rebond some funds. We get an error since no fund is unbonded.
             assert_noop!(
-				Staking::rebond(Origin::signed(10), 500),
-				Error::<Test>::NoUnlockChunk,
+                Staking::rebond(Origin::signed(10), 500),
+                Error::<Test>::NoUnlockChunk,
 			);
 
             // Unbond almost all of the funds in stash.
@@ -2174,8 +2174,8 @@ fn rebond_is_fifo() {
         .execute_with(|| {
             // Set payee to controller. avoids confusion
             assert_ok!(Staking::set_payee(
-				Origin::signed(10),
-				RewardDestination::Controller
+                Origin::signed(10),
+                RewardDestination::Controller
 			));
 
             // Give account 11 some large free balance greater than total
@@ -2304,9 +2304,9 @@ fn cannot_rebond_to_lower_than_ed() {
 
             // now bond a wee bit more
             assert_noop!(
-				Staking::rebond(Origin::signed(20), 5),
-				Error::<Test>::InsufficientValue,
-			);
+                Staking::rebond(Origin::signed(20), 5),
+                Error::<Test>::InsufficientValue,
+            );
         })
 }
 

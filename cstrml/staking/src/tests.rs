@@ -2031,7 +2031,7 @@ fn rebond_works() {
             assert_ok!(Staking::set_payee(
                 Origin::signed(10),
                 RewardDestination::Controller
-			));
+            ));
 
             // Give account 11 some large free balance greater than total
             let _ = Balances::make_free_balance_be(&11, 1000000);
@@ -2176,7 +2176,7 @@ fn rebond_is_fifo() {
             assert_ok!(Staking::set_payee(
                 Origin::signed(10),
                 RewardDestination::Controller
-			));
+            ));
 
             // Give account 11 some large free balance greater than total
             let _ = Balances::make_free_balance_be(&11, 1000000);

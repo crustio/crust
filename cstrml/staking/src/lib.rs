@@ -504,6 +504,9 @@ decl_storage! {
         /// Start era for reward curve
         StartRewardEra get(fn start_reward_era) config(): EraIndex = 100000;
 
+        /// Base stake limit ratio
+        StakeLimitRatio get(fn stake_limit_ratio): Perbill = Perbill::from_percent(60);
+
         /// Map from all locked "stash" accounts to the controller account.
         pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
 
@@ -2437,6 +2440,8 @@ impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, 
 
 impl<T: Config> swork::Works<T::AccountId> for Module<T> {
     fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
+        let stake_limit_ratio = Self::stake_limit_ratio() + Self::fix_ratio_according_to_effective_staking();
+
         for (v_stash, _) in <Validators<T>>::iter() {
             let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
             Self::upsert_stake_limit(

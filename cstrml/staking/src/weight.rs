@@ -24,6 +24,13 @@ impl crate::WeightInfo for WeightInfo {
 			.saturating_add(DbWeight::get().reads(8 as Weight))
 			.saturating_add(DbWeight::get().writes(5 as Weight))
 	}
+	fn rebond(l: u32, ) -> Weight {
+		(37_039_000 as Weight)
+			// Standard Error: 2_000
+			.saturating_add((93_000 as Weight).saturating_mul(l as Weight))
+			.saturating_add(DbWeight::get().reads(3 as Weight))
+			.saturating_add(DbWeight::get().writes(3 as Weight))
+	}
 	fn withdraw_unbonded() -> Weight {
 		(34_000_000 as Weight)
 			.saturating_add(DbWeight::get().reads(4 as Weight))

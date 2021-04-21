@@ -207,7 +207,7 @@ impl swork::Works<AccountId> for TestStaking {
             if let Some(ledger) = <Ledger<Test>>::get(&controller) {
                 Staking::upsert_stake_limit(
                     &ledger.stash,
-                    Staking::stake_limit_of(OWN_WORKLOAD.with(|v| *v.borrow()), TOTAL_WORKLOAD.with(|v| *v.borrow())),
+                    Staking::stage_one_stake_limit_of(OWN_WORKLOAD.with(|v| *v.borrow())),
                 );
             }
         }

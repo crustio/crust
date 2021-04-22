@@ -1502,6 +1502,12 @@ decl_module! {
             ensure_root(origin)?;
             StartRewardEra::put(start_reward_era);
         }
+
+        #[weight = 1000]
+        fn set_stake_limit_ratio(origin, stake_limit_ratio: Perbill) {
+            ensure_root(origin)?;
+            StakeLimitRatio::put(stake_limit_ratio);
+        }
     }
 }
 

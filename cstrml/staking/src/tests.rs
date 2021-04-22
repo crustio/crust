@@ -5108,10 +5108,20 @@ fn update_stage_two_stake_limit_according_to_mpow_should_work() {
             workload_map.insert(5, 500_000_000_000_000);
             let total_issuance = Balances::total_issuance();
             <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(20) * total_issuance);
-            Staking::report_works(workload_map, 1_000_000_000_000_000);
+            Staking::report_works(workload_map.clone(), 1_000_000_000_000_000);
             assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 24240000136497);
             assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 16160000090998);
             assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 40400000227495);
+            assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
+
+            assert_ok!(Staking::set_stake_limit_ratio(Origin::root(), Perbill::from_percent(70)));
+            assert_eq!(Staking::stake_limit_ratio(), Perbill::from_percent(70));
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(30) * total_issuance);
+            Staking::report_works(workload_map.clone(), 1_000_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 21210000013385);
+            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 14140000008923);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 35350000022308);
             assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
         });

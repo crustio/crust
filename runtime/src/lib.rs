@@ -102,7 +102,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 16,
+    spec_version: 17,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -711,7 +711,7 @@ impl pallet_sudo::Config for Runtime {
 }
 
 parameter_types! {
-    pub const PunishmentSlots: u32 = 24; // 24 report slot == 2 era == 12 hours
+    pub const PunishmentSlots: u32 = 16; // 16 report slot == 8 hours
     pub const MaxGroupSize: u32 = 100;
 }
 

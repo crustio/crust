@@ -403,41 +403,41 @@ decl_module! {
         /// The market's module id, used for deriving its sovereign account ID.
         const ModuleId: ModuleId = T::ModuleId::get();
 
-        /// File duration.
+        /// The file duration.
         const FileDuration: BlockNumber = T::FileDuration::get();
 
-        /// File base replica.
+        /// The file base replica to get reward.
         const FileReplica: u32 = T::FileReplica::get();
 
-        /// File Init Price.
+        /// The file init price after the chain start.
         const FileInitPrice: BalanceOf<T> = T::FileInitPrice::get();
 
-        /// Storage reference ratio. files_size / total_capacity
+        /// The storage reference ratio to adjust the file price.
         const StorageReferenceRatio: (u128, u128) = T::StorageReferenceRatio::get();
 
-        /// Storage increase ratio.
+        /// The storage increase ratio for each file price change.
         const StorageIncreaseRatio: Perbill = T::StorageIncreaseRatio::get();
 
-        /// Storage decrease ratio.
+        /// The storage decrease ratio for each file price change.
         const StorageDecreaseRatio: Perbill = T::StorageDecreaseRatio::get();
 
-        /// Storage / Staking ratio.
+        /// The staking ratio for how much CRU into staking pot.
         const StakingRatio: Perbill = T::StakingRatio::get();
 
-        /// Renew reward ratio.
+        /// The renew reward ratio for liquidator.
         const RenewRewardRatio: Perbill = T::RenewRewardRatio::get();
 
-        /// Tax / Storage plus Staking ratio.
+        /// The storage ratio for how much CRU into storage pot.
         const StorageRatio: Perbill = T::StorageRatio::get();
 
-        /// Max size of used trash.
+        /// The max size of used trash.
         const UsedTrashMaxSize: u128 = T::UsedTrashMaxSize::get();
 
-        /// Max size of a file
+        /// The max file size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
-        /// Register to be a merchant, you should provide your storage layer's address info
-        /// this will require you to collateral first, complexity depends on `Collaterals`(P).
+        /// Register to be a merchant.
+        /// This will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
         /// # <weight>
         /// Complexity: O(logP)
@@ -478,7 +478,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Collateral extra amount of currency to accept market order.
+        /// Add extra collateral amount of currency to accept storage order.
         ///
         /// # <weight>
         /// Complexity: O(logP)
@@ -510,7 +510,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Decrease collateral amount of currency for market order.
+        /// Decrease extra collateral amount of currency to accept storage order.
         ///
         /// # <weight>
         /// Complexity: O(logP)
@@ -545,7 +545,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Place a storage order
+        /// Place a storage order. The cid and file_size of this file should be provided. Extra tips is accepted.
         #[weight = T::WeightInfo::place_storage_order()]
         pub fn place_storage_order(
             origin,
@@ -594,7 +594,8 @@ decl_module! {
             Ok(())
         }
 
-        /// Place a storage order
+        /// Add prepaid amount of currency for this file.
+        /// If this file has prepaid value and enough for a new storage order, it can be renewed by anyone.
         #[weight = T::WeightInfo::place_storage_order()]
         pub fn add_prepaid(
             origin,
@@ -618,7 +619,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Calculate the payout
+        /// Calculate the reward for a file
         #[weight = T::WeightInfo::calculate_reward()]
         pub fn calculate_reward(
             origin,
@@ -653,7 +654,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Reward the merchant
+        /// Reward a merchant
         #[weight = T::WeightInfo::reward_merchant()]
         pub fn reward_merchant(
             origin
@@ -1257,17 +1258,43 @@ decl_event!(
         AccountId = <T as system::Config>::AccountId,
         Balance = BalanceOf<T>
     {
+        /// Place a storage order success.
+        /// The first item is the account who places the storage order.
+        /// The second item is the cid of the file.
         FileSuccess(AccountId, MerkleRoot),
+        /// Renew an existed file success.
+        /// The first item is the account who renew the storage order.
+        /// The second item is the cid of the file.
         RenewFileSuccess(AccountId, MerkleRoot),
+        /// Add prepaid value for an existed file success.
+        /// The first item is the account who add the prepaid.
+        /// The second item is the cid of the file.
+        /// The third item is the prepaid amount of currency.
         AddPrepaidSuccess(AccountId, MerkleRoot, Balance),
+        /// Register to be a merchant success.
+        /// The first item is the account who want to register.
+        /// The second item is the collateral amount of currency.
         RegisterSuccess(AccountId, Balance),
+        /// Add extra collateral for a merchant success.
+        /// The first item is the account who is the merchant.
+        /// The second item is the extra collateral amount of currency.
         AddCollateralSuccess(AccountId, Balance),
+        /// Cut extra collateral for a merchant success.
+        /// The first item is the account who is the merchant.
+        /// The second item is the extra collateral amount of currency.
         CutCollateralSuccess(AccountId, Balance),
-        PaysOrderSuccess(AccountId),
+        /// Calculate the reward for a file success.
+        /// The first item is the cid of the file.
         CalculateSuccess(MerkleRoot),
+        /// A file is closed due to mismatch file size.
+        /// The first item is the cid of the file.
         IllegalFileClosed(MerkleRoot),
+        /// Reward the merchant success.
+        /// The first item is the account of the merchant.
         RewardMerchantSuccess(AccountId),
+        /// Set the global market switch success.
         SetMarketSwitchSuccess(bool),
+        /// Set the file base fee success.
         SetBaseFeeSuccess(Balance),
     }
 );

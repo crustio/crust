@@ -302,46 +302,53 @@ pub trait Config: system::Config {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Config> as Market {
-        /// File Base Fee.
+        /// The file base fee for each storage order.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
-        /// Merchant Ledger
+        /// The merchant ledger, which contains the collateral and reward value for each merchant.
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
-        /// File information iterated by order id
+        /// The file information and used information iterated by ipfs cid.
+        /// It includes file related info such as file size, expired date and reported replica count.
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)>;
 
-        /// File price. It would change according to First Party Storage, Total Storage and Storage Base Ratio.
+        /// The file price per MB.
+        /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
         pub FilePrice get(fn file_price): BalanceOf<T> = T::FileInitPrice::get();
 
-        /// First Class Storage
+        /// The total files size in Byte.
         pub FilesSize get(fn files_size): u128 = 0;
 
-        /// File trash to store second class storage
+        /// The first file trash to store overdue files for a while
         pub UsedTrashI get(fn used_trash_i):
         map hasher(twox_64_concat) MerkleRoot => Option<UsedInfo>;
 
+        /// The second file trash to store overdue files for a while
         pub UsedTrashII get(fn used_trash_ii):
         map hasher(twox_64_concat) MerkleRoot => Option<UsedInfo>;
 
+        /// The count of overdue files in the first file trash
         pub UsedTrashSizeI get(fn used_trash_size_i): u128 = 0;
 
+        /// The count of overdue files in the second file trash
         pub UsedTrashSizeII get(fn used_trash_size_ii): u128 = 0;
 
+        /// The total counted used size for each anchor in the first file trash
         pub UsedTrashMappingI get(fn used_trash_mapping_i):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
+        /// The total counted used size for each anchor in the second file trash
         pub UsedTrashMappingII get(fn used_trash_mapping_ii):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
-        /// Market switch to enable place storage order
+        /// The global market switch to enable place storage order
         pub MarketSwitch get(fn market_switch): bool = false;
     }
     add_extra_genesis {
 		build(|_config| {
-			// Create Market accounts
+			// Create the market accounts
 			<Module<T>>::init_pot(<Module<T>>::collateral_pot);
 			<Module<T>>::init_pot(<Module<T>>::storage_pot);
 			<Module<T>>::init_pot(<Module<T>>::staking_pot);
@@ -353,32 +360,34 @@ decl_storage! {
 decl_error! {
     /// Error for the market module.
     pub enum Error for Module<T: Config> {
-        /// Don't have enough currency
+        /// Don't have enough currency(CRU) to finish the extrinsic(transaction).
+        /// Please transfer some CRU into this account.
         InsufficientCurrency,
-        /// Don't have enough collateral
+        /// Don't have enough collateral to keep the reward.
+        /// The collateral value of each merchant must be larger than his current reward.
         InsufficientCollateral,
-        /// Can not bond with value less than minimum balance.
+        /// Can not choose the value less than the minimum balance.
+        /// Please increase the value to be larger than the minimu balance.
         InsufficientValue,
-        /// Not Register before
+        /// Didn't register as a merchant before and cannot finish the extrinsic(transaction).
+        /// Please register as a merchant first.
         NotRegister,
-        /// Register before
+        /// Already registered before and cannot register again.
         AlreadyRegistered,
-        /// Reward length is too long
-        RewardLengthTooLong,
-        /// File size is not correct
+        /// The file size is not correct.
+        /// The same file is already on chain and the file size should be same.
+        /// Please check the file size again.
         FileSizeNotCorrect,
-        /// You are not permitted to this function
-        /// You are not in the whitelist
-        NotPermitted,
-        /// File does not exist
+        /// The file does not exist. Please check the cid again.
         FileNotExist,
-        /// File is not in the reward period
+        /// The file is not in the reward period.
+        /// Please wait until the file is expired.
         NotInRewardPeriod,
-        /// Reward is not enough
+        /// The reward is not enough.
         NotEnoughReward,
-        /// File is too large
+        /// The file is too large. Please check the MaximumFileSize value.
         FileTooLarge,
-        /// Place order is not available right now
+        /// Place order is not available right now. Please wait for a while.
         PlaceOrderNotAvailable
     }
 }

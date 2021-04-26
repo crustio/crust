@@ -108,7 +108,7 @@ fn collateral_extra_should_fail_due_to_merchant_not_register() {
 }
 
 #[test]
-fn cut_collateral_should_fail_due_to_reward() {
+fn cut_collateral_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -130,17 +130,31 @@ fn cut_collateral_should_fail_due_to_reward() {
             collateral: 160,
             reward: 120
         });
-        assert_noop!(
-            Market::cut_collateral(
-                Origin::signed(merchant),
-                50
-            ),
-            DispatchError::Module {
-                index: 3,
-                error: 1,
-                message: Some("InsufficientCollateral")
-            }
-        );
+        assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 50));
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
+            collateral: 110,
+            reward: 120
+        });
+        assert_eq!(Balances::reserved_balance(&merchant), 110);
+        let _ = Balances::slash(&merchant, 100);
+        assert_eq!(Balances::free_balance(&merchant), 0);
+        assert_eq!(Balances::reserved_balance(&merchant), 100);
+
+        // 110 -> 100 -> 80
+        assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 20));
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
+            collateral: 80,
+            reward: 120
+        });
+
+        let _ = Balances::slash(&merchant, 50);
+        // 80 -> 50 -> 0
+        assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 60));
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
+            collateral: 0,
+            reward: 120
+        });
+
     });
 }
 

@@ -582,22 +582,19 @@ decl_module! {
 
             let mut ledger = Self::merchant_ledgers_v2(&who);
 
-            // 3. Ensure value is smaller than unused.
-            ensure!(value <= ledger.collateral - ledger.reward, Error::<T>::InsufficientCollateral);
+            // 3. Fix the weird situation.
+            let reserved_value = T::Currency::reserved_balance(&who);
+            ledger.collateral = ledger.collateral.min(reserved_value);
 
             // 4. Unreserve the collateral from the account.
-            let unable = T::Currency::unreserve(&who, value.clone());
+            let to_unreserve_value = value.min(ledger.collateral);
+            T::Currency::unreserve(&who, to_unreserve_value.clone());
+            ledger.collateral -= to_unreserve_value.clone();
 
-            // 5. Upgrade collateral.
-            ledger.collateral -= value.clone();
-            if !unable.is_zero() {
-                // 5.1 This should never happen.
-                ledger.collateral = Zero::zero();
-            }
             <MerchantLedgersV2<T>>::insert(&who, ledger.clone());
 
             // 6. Emit success
-            Self::deposit_event(RawEvent::CutCollateralSuccess(who, value - unable));
+            Self::deposit_event(RawEvent::CutCollateralSuccess(who, to_unreserve_value));
 
             Ok(())
         }

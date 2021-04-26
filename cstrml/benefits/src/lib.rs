@@ -49,9 +49,13 @@ decl_event!(
         Balance = BalanceOf<T>,
         AccountId = <T as frame_system::Config>::AccountId
     {
-        /// Add benefit funds success
+        /// Add benefit funds success.
+        /// The first item is the account.
+        /// The second item is the added benefit amount.
         AddBenefitFundsSuccess(AccountId, Balance),
         /// Cut benefit funds success
+        /// The first item is the account.
+        /// The second item is the decreased benefit amount.
         CutBenefitFundsSuccess(AccountId, Balance),
     }
 );
@@ -110,9 +114,9 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
 
 decl_storage! {
     trait Store for Module<T: Config> as Benefits {
-        // Overall benefits information
+        /// The global benefits information
         CurrentBenefits get(fn current_benefits): EraBenefits<BalanceOf<T>>;
-        // One fee reduction information
+        /// The fee reduction
         FeeReductionBenefits get(fn fee_reduction_benefits): map hasher(blake2_128_concat) T::AccountId => FeeReductionBenefit<BalanceOf<T>>;
     }
 }
@@ -123,6 +127,7 @@ decl_module! {
 
         fn deposit_event() = default;
 
+        /// Add benefit funds
         // TODO: Refine this weight
         #[weight = 1000]
         pub fn add_benefit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
@@ -144,6 +149,7 @@ decl_module! {
             Ok(())
         }
 
+        /// Cut benefit funds
         // TODO: Refine this weight
         #[weight = 1000]
         pub fn cut_benefit_funds(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {

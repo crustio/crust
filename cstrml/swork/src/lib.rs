@@ -174,16 +174,17 @@ pub trait Config: system::Config {
 decl_storage! {
     trait Store for Module<T: Config> as Swork {
 
+        /// The depth of the history of the ReportedInSlot
         HistorySlotDepth get(fn history_slot_depth): ReportSlot = 6 * REPORT_SLOT;
 
         /// The sWorker enclave codes, this should be managed by sudo/democracy
         pub Codes get (fn codes): map hasher(twox_64_concat) SworkerCode => Option<T::BlockNumber>;
 
-        /// The bond relationship between AccountId <-> Identity
+        /// The identity information for each sworker member, which contains the anchor, punishment deadline and group information.
         pub Identities get(fn identities):
             map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
-        /// The sWorker information, mapping from sWorker public key to an optional pubkey information
+        /// The pub key information, mapping from sWorker public key to an pubkey information, including the sworker enclave code and option anchor.
         pub PubKeys get(fn pub_keys):
             map hasher(twox_64_concat) SworkerPubKey => PKInfo;
 
@@ -191,33 +192,33 @@ decl_storage! {
         pub Groups get(fn groups):
             map hasher(blake2_128_concat) T::AccountId => BTreeSet<T::AccountId>;
 
-        /// Node's work report, mapping from sWorker anchor to an optional work report
+        /// Node's work report, mapping from sWorker anchor to an optional work report.
         /// WorkReport only been replaced, it won't get removed cause we need to check the
         /// status transition from off-chain sWorker
         pub WorkReports get(fn work_reports):
             map hasher(twox_64_concat) SworkerAnchor => Option<WorkReport>;
 
-        /// The current report slot block number, this value should be a multiple of era block
+        /// The current report slot block number, this value should be a multiple of report slot block.
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
 
-        /// Recording whether the validator reported works of each era
-        /// We leave it keep all era's report info
-        /// cause B-tree won't build index on key2(ReportSlot)
-        /// value represent if reported in this slot
-        /// TODO: reverse the keys when we launch mainnet
+        /// Recording whether the validator reported works of each report slot.
+        /// We keep the last "HistorySlotDepth" length data
+        /// cause B-tree won't build index on key2(ReportSlot).
+        /// The value represent if reported in this slot
+        // TODO: reverse the keys when we launch mainnet
         pub ReportedInSlot get(fn reported_in_slot):
             double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => bool = false;
 
-        /// The used workload, used for calculating stake limit in the end of era
-        /// default is 0
+        /// The used workload, used for calculating stake limit in the end of each report slot.
+        /// The default value is 0.
         pub Used get(fn used): u128 = 0;
 
         /// The total reported files workload, used for calculating total_capacity for market module
-        /// default is 0
+        /// The default value is 0.
         pub ReportedFilesSize get(fn reported_files_size): u128 = 0;
 
-        /// The free workload, used for calculating stake limit in the end of era
-        /// default is 0
+        /// The free workload, used for calculating stake limit in the end of each report slot.
+        /// The default value is 0.
         pub Free get(fn free): u128 = 0;
 
         /// Enable punishment, the default behavior will have punishment.
@@ -253,27 +254,23 @@ decl_error! {
         ABUpgradeFailed,
         /// Files change not legal
         IllegalFilesTransition,
-        /// Exceed the maximum bonding relation per account
-        ExceedBondsLimit,
-        /// Illegal pubkey
-        IllegalPubKey,
         /// Identity doesn't exist
         IdentityNotExist,
         /// Already joint one group
         AlreadyJoint,
-        /// Not a owner,
+        /// The target is not a group owner. Please make sure that the target is a group owner.
         NotOwner,
-        /// Used is not zero,
+        /// The used value is not zero and cannot join a group.
         IllegalUsed,
-        /// Group already exist
+        /// The group already exist.
         GroupAlreadyExist,
-        /// Group owner cannot register
+        /// The group owner cannot be a sWorker member.
         GroupOwnerForbidden,
-        /// Member is not in a group
+        /// The member is not in this group and cannot quit.
         NotJoint,
-        /// Exceed the limit of members number in one group
+        /// Exceed the limit of members number in one group.
         ExceedGroupLimit,
-        /// Expired block cannot be decreased
+        /// Cannot extend the valid duration for an existed enclave code.
         InvalidExpiredBlock
     }
 }
@@ -282,10 +279,10 @@ decl_module! {
     pub struct Module<T: Config> for enum Call where origin: T::Origin {
         type Error = Error<T>;
 
-        /// Punishment duration if someone offline
+        /// The punishment duration if someone offline
         const PunishmentSlots: u32 = T::PunishmentSlots::get();
 
-        /// Max number of members in one group
+        /// The max number of members in one group
         const MaxGroupSize: u32 = T::MaxGroupSize::get();
 
         // Initializing events
@@ -301,7 +298,7 @@ decl_module! {
             0
         }
 
-        /// AB Upgrade, this should only be called by `root` origin
+        /// Set code for AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`
         ///
         /// # <weight>
@@ -554,6 +551,7 @@ decl_module! {
             Ok(Pays::Yes.into())
         }
 
+        /// Create a group. One account can only create one group once.
         #[weight = T::WeightInfo::create_group()]
         pub fn create_group(
             origin
@@ -575,6 +573,8 @@ decl_module! {
             Ok(())
         }
 
+        /// Join a group. The account should already report works once and cannot have any used value.
+        /// The target must be a group owner.
         #[weight = T::WeightInfo::join_group()]
         pub fn join_group(
             origin,
@@ -616,6 +616,7 @@ decl_module! {
             Ok(())
         }
 
+        /// Quit a group.
         #[weight = T::WeightInfo::quit_group()]
         pub fn quit_group(
             origin
@@ -650,6 +651,7 @@ decl_module! {
             Ok(())
         }
 
+        /// Kick someone out of this group.
         #[weight = T::WeightInfo::kick_out()]
         pub fn kick_out(
             origin,
@@ -678,6 +680,8 @@ decl_module! {
             Ok(())
         }
 
+        /// Cancel punishment for a specific account.
+        /// This can only be done by Root/Democracy.
         #[weight = 1000]
         pub fn cancel_punishment(
             origin,
@@ -1081,15 +1085,38 @@ decl_event!(
         AccountId = <T as system::Config>::AccountId,
         BlockNumber = <T as system::Config>::BlockNumber,
     {
+        /// sWorker registration success.
+        /// The first item is the account who try to register.
+        /// The second item is the pub key of the sWorker.
         RegisterSuccess(AccountId, SworkerPubKey),
+        /// Send the work report success.
+        /// The first item is the account who send the work report
+        /// The second item is the pub key of the sWorker.
         WorksReportSuccess(AccountId, SworkerPubKey),
+        /// AB upgrade success.
+        /// The first item is the account who're doing AB upgrade.
+        /// The second item is the pub key of the previous(A) sWorker.
+        /// The third item is the pub key of the latest(B) sWorker.
         ABUpgradeSuccess(AccountId, SworkerPubKey, SworkerPubKey),
-        ChillSuccess(AccountId, SworkerPubKey),
+        /// Set code success.
+        /// The first item is the enclave code.
+        /// The second item is the expired block number.
         SetCodeSuccess(SworkerCode, BlockNumber),
+        /// Join the group success.
+        /// The first item is the member's account.
+        /// The second item is the group owner's account.
         JoinGroupSuccess(AccountId, AccountId),
+        /// Quit the group success.
+        /// The first item is the member's account.
+        /// The second item is the group owner's account.
         QuitGroupSuccess(AccountId, AccountId),
+        /// Create the group success.
+        /// The first item is the group owner's account.
         CreateGroupSuccess(AccountId),
+        /// Kick some one out of the group.
+        /// The first item is the member's account.
         KickOutSuccess(AccountId),
+        /// Cancel the punishment success.
         CancelPunishmentSuccess(AccountId),
         SetPunishmentSuccess(bool),
     }

@@ -102,8 +102,13 @@ fn register_pk_with_another_code_should_work() {
                     20000
                 ),
                 DispatchError::Module {
+<<<<<<< HEAD
                     index: 0,
                     error: 18,
+=======
+                    index: 2,
+                    error: 16,
+>>>>>>> ce8596e... [Runtime] Refine docs for storage event extrinsic and error for crust api (#580)
                     message: Some("InvalidExpiredBlock"),
                 }
             );
@@ -1346,7 +1351,7 @@ fn create_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
-                error: 14,
+                error: 12,
                 message: Some("GroupAlreadyExist"),
             });
 
@@ -1357,7 +1362,7 @@ fn create_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
-                error: 15,
+                error: 13,
                 message: Some("GroupOwnerForbidden"),
             });
         });
@@ -1389,7 +1394,7 @@ fn register_should_fail_due_to_reporter_is_group_owner() {
                 ),
                 DispatchError::Module {
                     index: 2,
-                    error: 15,
+                    error: 13,
                     message: Some("GroupOwnerForbidden"),
                 }
             );
@@ -1431,7 +1436,7 @@ fn report_works_should_fail_due_to_reporter_is_group_owner() {
                 ),
                 DispatchError::Module {
                     index: 2,
-                    error: 15,
+                    error: 13,
                     message: Some("GroupOwnerForbidden"),
                 });
         });
@@ -1459,7 +1464,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
-                error: 10,
+                error: 8,
                 message: Some("IdentityNotExist"),
             });
 
@@ -1485,7 +1490,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
-                error: 12,
+                error: 10,
                 message: Some("NotOwner"),
             });
 
@@ -1501,7 +1506,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
-                error: 13,
+                error: 11,
                 message: Some("IllegalUsed"),
             });
 
@@ -1537,7 +1542,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
-                error: 17,
+                error: 15,
                 message: Some("ExceedGroupLimit"),
             });
 
@@ -1554,7 +1559,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
-                error: 11,
+                error: 9,
                 message: Some("AlreadyJoint"),
             });
         });
@@ -2317,7 +2322,7 @@ fn quit_group_should_work_for_stake_limit() {
                 ),
                 DispatchError::Module {
                     index: 2,
-                    error: 10,
+                    error: 8,
                     message: Some("IdentityNotExist"),
                 }
             );
@@ -2333,7 +2338,7 @@ fn quit_group_should_work_for_stake_limit() {
                 ),
                 DispatchError::Module {
                     index: 2,
-                    error: 16,
+                    error: 14,
                     message: Some("NotJoint"),
                 }
             );
@@ -2402,7 +2407,7 @@ fn kick_out_should_work_for_stake_limit() {
                 ),
                 DispatchError::Module {
                     index: 2,
-                    error: 12,
+                    error: 10,
                     message: Some("NotOwner"),
                 }
             );

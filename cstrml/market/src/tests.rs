@@ -3907,3 +3907,31 @@ fn no_bonded_owner_should_work() {
         });
     });
 }
+
+#[test]
+fn useless_ledger_should_be_removed() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let storage_pot = Market::storage_pot();
+        let _ = Balances::make_free_balance_be(&storage_pot, 121);
+
+        let merchant = MERCHANT;
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 180));
+        assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
+            collateral: 180,
+            reward: 0
+        });
+
+        assert_ok!(Market::cut_collateral(Origin::signed(merchant.clone()), 180));
+        assert_eq!(<self::MerchantLedgersV2<Test>>::contains_key(&merchant), false);
+        <self::MerchantLedgersV2<Test>>::insert(&merchant, MerchantLedger {
+            collateral: 0,
+            reward: 120
+        });
+        assert_eq!(<self::MerchantLedgersV2<Test>>::contains_key(&merchant), true);
+        assert_ok!(Market::reward_merchant(Origin::signed(merchant.clone())));
+        assert_eq!(<self::MerchantLedgersV2<Test>>::contains_key(&merchant), false);
+    });
+}

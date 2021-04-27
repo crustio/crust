@@ -61,20 +61,9 @@ benchmarks! {
         assert_eq!(Market::<T>::bonded(&user).is_some(), true);
     }
 
-    register {
-        let user = create_funded_user::<T>("user", 100);
-    }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
-    verify {
-        assert_eq!(Market::<T>::merchant_ledgers_v2(&user), MerchantLedger {
-            collateral: T::Currency::minimum_balance() * 10u32.into(),
-            reward: 0u32.into()
-        });
-    }
-
     add_collateral {
         let user = create_funded_user::<T>("user", 100);
-        Market::<T>::register(RawOrigin::Signed(user.clone()).into(), T::Currency::minimum_balance() * 10u32.into()).expect("Something wrong during registering");
-    }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
+    }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 20u32.into())
     verify {
         assert_eq!(Market::<T>::merchant_ledgers_v2(&user), MerchantLedger {
             collateral: T::Currency::minimum_balance() * 20u32.into(),
@@ -84,7 +73,7 @@ benchmarks! {
 
     cut_collateral {
         let user = create_funded_user::<T>("user", 100);
-        Market::<T>::register(RawOrigin::Signed(user.clone()).into(), T::Currency::minimum_balance() * 100u32.into()).expect("Something wrong during registering");
+        Market::<T>::add_collateral(RawOrigin::Signed(user.clone()).into(), T::Currency::minimum_balance() * 100u32.into()).expect("Something wrong during add collateral");
     }: _(RawOrigin::Signed(user.clone()), T::Currency::minimum_balance() * 10u32.into())
     verify {
         assert_eq!(Market::<T>::merchant_ledgers_v2(&user), MerchantLedger {
@@ -130,13 +119,6 @@ mod tests {
     fn bond() {
         new_test_ext().execute_with(|| {
             assert_ok!(test_benchmark_bond::<Test>());
-        });
-    }
-
-    #[test]
-    fn register() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_register::<Test>());
         });
     }
 

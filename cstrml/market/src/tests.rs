@@ -20,7 +20,7 @@ fn register_should_work() {
         run_to_block(50);
         let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 180));
         assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 180,
             reward: 0
@@ -42,72 +42,6 @@ fn register_should_work() {
 }
 
 #[test]
-fn register_should_fail_due_to_insufficient_currency() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let merchant = MERCHANT;
-        let _ = Balances::make_free_balance_be(&merchant, 100);
-        assert_noop!(
-            Market::register(
-                Origin::signed(merchant),
-                200
-            ),
-            DispatchError::Module {
-                index: 3,
-                error: 0,
-                message: Some("InsufficientCurrency")
-            }
-        );
-    });
-}
-
-#[test]
-fn register_should_fail_due_to_double_register() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-        let merchant = MERCHANT;
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 70));
-        assert_noop!(
-            Market::register(
-                Origin::signed(merchant),
-                70
-            ),
-            DispatchError::Module {
-                index: 3,
-                error: 4,
-                message: Some("AlreadyRegistered")
-            }
-        );
-    });
-}
-
-#[test]
-fn collateral_extra_should_fail_due_to_merchant_not_register() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let merchant = MERCHANT;
-        let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_noop!(
-            Market::add_collateral(
-                Origin::signed(merchant),
-                200
-            ),
-            DispatchError::Module {
-                index: 3,
-                error: 3,
-                message: Some("NotRegister")
-            }
-        );
-    });
-}
-
-#[test]
 fn cut_collateral_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
@@ -115,7 +49,7 @@ fn cut_collateral_should_work() {
 
         let merchant = MERCHANT;
         let _ = Balances::make_free_balance_be(&merchant, 200);
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 180));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 180));
         assert_eq!(Market::merchant_ledgers_v2(&merchant), MerchantLedger {
             collateral: 180,
             reward: 0
@@ -179,7 +113,7 @@ fn place_storage_order_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -226,7 +160,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60));
 
         assert_noop!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -234,7 +168,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
         ),
         DispatchError::Module {
             index: 3,
-            error: 9,
+            error: 8,
             message: Some("FileTooLarge")
         });
     });
@@ -263,7 +197,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6_000_000));
 
         // 1. New storage order
         assert_ok!(Market::place_storage_order(
@@ -472,7 +406,7 @@ fn do_calculate_reward_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6_000_000));
 
         // 1. New storage order
         assert_ok!(Market::place_storage_order(
@@ -592,7 +526,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 70_000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 70_000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -740,7 +674,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6_000_000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -850,7 +784,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -1189,7 +1123,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
 
         // collateral is 60 < 121 reward
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -1280,7 +1214,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -1480,7 +1414,7 @@ fn do_calculate_reward_should_only_pay_the_groups() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -1695,7 +1629,7 @@ fn insert_replica_should_work_for_complex_scenario() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -2010,7 +1944,7 @@ fn clear_trash_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6000));
 
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(
@@ -2176,7 +2110,7 @@ fn withdraw_staking_pot_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -2232,7 +2166,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6000));
 
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(
@@ -2316,7 +2250,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6000));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 6000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid1.clone(),
@@ -2371,7 +2305,7 @@ fn double_place_storage_order_file_size_check_should_work() {
             Origin::signed(source.clone()), cid1.clone(), 80, 0),
             DispatchError::Module {
                 index: 3,
-                error: 5,
+                error: 4,
                 message: Some("FileSizeNotCorrect")
             }
         );
@@ -2430,7 +2364,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -2634,7 +2568,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -2830,7 +2764,7 @@ fn dynamic_used_size_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -2920,7 +2854,7 @@ fn delete_used_size_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -3012,7 +2946,7 @@ fn files_size_should_not_be_decreased_twice() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -3160,7 +3094,7 @@ fn clear_same_file_in_trash_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -3283,7 +3217,7 @@ fn reward_liquidator_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
@@ -3297,7 +3231,7 @@ fn reward_liquidator_should_work() {
             Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 3,
-                error: 7,
+                error: 6,
                 message: Some("NotInRewardPeriod")
         });
 
@@ -3327,7 +3261,7 @@ fn reward_liquidator_should_work() {
             Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 3,
-                error: 7,
+                error: 6,
                 message: Some("NotInRewardPeriod")
         });
 
@@ -3391,7 +3325,7 @@ fn reward_merchant_should_work() {
             ),
             DispatchError::Module {
                 index: 3,
-                error: 8,
+                error: 7,
                 message: Some("NotEnoughReward")
             }
         );
@@ -3402,7 +3336,7 @@ fn reward_merchant_should_work() {
             ),
             DispatchError::Module {
                 index: 3,
-                error: 3,
+                error: 2,
                 message: Some("NotRegister")
             }
         );
@@ -3427,7 +3361,7 @@ fn set_global_switch_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -3443,7 +3377,7 @@ fn set_global_switch_should_work() {
         ),
         DispatchError::Module {
             index: 3,
-            error: 10,
+            error: 9,
             message: Some("PlaceOrderNotAvailable")
         });
     });
@@ -3474,14 +3408,14 @@ fn renew_file_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_noop!(
             Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
             DispatchError::Module {
                 index: 3,
-                error: 6,
+                error: 5,
                 message: Some("FileNotExist")
         });
 
@@ -3621,7 +3555,7 @@ fn change_base_fee_should_work() {
         let _ = Balances::make_free_balance_be(&source, 2_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
+        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60));
 
         // Change base fee to 10000
         assert_ok!(Market::set_base_fee(Origin::root(), 50000));
@@ -3750,7 +3684,7 @@ fn storage_pot_should_be_balanced() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -3830,10 +3764,10 @@ fn one_owner_should_work() {
         }
 
         let _ = Balances::make_free_balance_be(&bob, 20_000_000);
-        assert_ok!(Market::register(Origin::signed(bob.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(bob.clone()), 6_000_000));
 
         let _ = Balances::make_free_balance_be(&zikun, 20_000_000);
-        assert_ok!(Market::register(Origin::signed(zikun.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(zikun.clone()), 6_000_000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -3916,10 +3850,10 @@ fn no_bonded_owner_should_work() {
         }
 
         let _ = Balances::make_free_balance_be(&bob, 20_000_000);
-        assert_ok!(Market::register(Origin::signed(bob.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(bob.clone()), 6_000_000));
 
         let _ = Balances::make_free_balance_be(&zikun, 20_000_000);
-        assert_ok!(Market::register(Origin::signed(zikun.clone()), 6_000_000));
+        assert_ok!(Market::add_collateral(Origin::signed(zikun.clone()), 6_000_000));
 
         // merchant doesn't have any collateral
 

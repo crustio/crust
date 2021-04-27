@@ -56,7 +56,6 @@ macro_rules! log {
 
 pub trait WeightInfo {
     fn bond() -> Weight;
-    fn register() -> Weight;
     fn add_collateral() -> Weight;
     fn cut_collateral() -> Weight;
     fn place_storage_order() -> Weight;
@@ -306,15 +305,15 @@ decl_storage! {
         /// The file base fee for each storage order.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
-        /// The merchant ledger, which contains the collateral and reward value for each merchant.
+        /// The file information and used information iterated by ipfs cid.
+        /// It includes file related info such as file size, expired date and reported replica count.
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
-<<<<<<< HEAD
+        /// Merchant Ledger V2
         /// The file information and used information iterated by ipfs cid.
         /// It includes file related info such as file size, expired date and reported replica count.
-=======
-        /// Merchant Ledger V2
+        // TODO: Remove this V2 in MainNet
         pub MerchantLedgersV2 get(fn merchant_ledgers_v2):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
@@ -323,7 +322,6 @@ decl_storage! {
         map hasher(blake2_128_concat) T::AccountId => Option<T::AccountId>;
 
         /// File information iterated by order id
->>>>>>> wip
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)>;
 
@@ -376,9 +374,6 @@ decl_error! {
         /// Don't have enough currency(CRU) to finish the extrinsic(transaction).
         /// Please transfer some CRU into this account.
         InsufficientCurrency,
-        /// Don't have enough collateral to keep the reward.
-        /// The collateral value of each merchant must be larger than his current reward.
-        InsufficientCollateral,
         /// Can not choose the value less than the minimum balance.
         /// Please increase the value to be larger than the minimu balance.
         InsufficientValue,
@@ -461,49 +456,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Register to be a merchant.
-        /// This will require you to collateral first, complexity depends on `Collaterals`(P).
-        ///
-        /// # <weight>
-        /// Complexity: O(logP)
-        /// - Read: Collateral
-        /// - Write: Collateral
-        /// # </weight>
-        #[weight = T::WeightInfo::register()]
-        pub fn register(
-            origin,
-            #[compact] collateral: BalanceOf<T>
-        ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // 1. Reject a collateral which is considered to be _dust_.
-            ensure!(collateral >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
-
-            // 2. Ensure merchant has enough currency.
-            ensure!(collateral <= T::Currency::usable_balance(&who), Error::<T>::InsufficientCurrency);
-
-            // 3. Check if merchant has not register before.
-            ensure!(!<MerchantLedgersV2<T>>::contains_key(&who), Error::<T>::AlreadyRegistered);
-
-            // 4. Reserve the collateral.
-            T::Currency::reserve(&who, collateral.clone())?;
-
-            // 5. Prepare new ledger
-            let ledger = MerchantLedger {
-                reward: Zero::zero(),
-                collateral: collateral.clone()
-            };
-
-            // 6. Upsert collateral.
-            <MerchantLedgersV2<T>>::insert(&who, ledger);
-
-            // 7. Emit success
-            Self::deposit_event(RawEvent::RegisterSuccess(who.clone(), collateral));
-
-            Ok(())
-        }
-
-        /// Add extra collateral amount of currency to accept storage order.
+        /// Add collateral amount of currency to accept storage order.
         ///
         /// # <weight>
         /// Complexity: O(logP)
@@ -517,19 +470,16 @@ decl_module! {
             // 1. Reject a collateral which is considered to be _dust_.
             ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-            // 2. Check if merchant has collateral or not
-            ensure!(<MerchantLedgersV2<T>>::contains_key(&who), Error::<T>::NotRegister);
-
-            // 3. Ensure merchant has enough currency.
+            // 2. Ensure merchant has enough currency.
             ensure!(value <= T::Currency::usable_balance(&who), Error::<T>::InsufficientCurrency);
 
-            // 4. Reserve the collateral.
+            // 3. Reserve the collateral.
             T::Currency::reserve(&who, value.clone())?;
 
-            // 5. Upgrade collateral.
+            // 4. Upgrade collateral.
             <MerchantLedgersV2<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
 
-            // 6. Emit success
+            // 5. Emit success
             Self::deposit_event(RawEvent::AddCollateralSuccess(who.clone(), value));
 
             Ok(())
@@ -586,12 +536,13 @@ decl_module! {
             let reserved_value = T::Currency::reserved_balance(&who);
             ledger.collateral = ledger.collateral.min(reserved_value);
 
-            // 4. Unreserve the collateral from the account.
+            // 4. Update ledger
             let to_unreserve_value = value.min(ledger.collateral);
-            T::Currency::unreserve(&who, to_unreserve_value.clone());
             ledger.collateral -= to_unreserve_value.clone();
+            Self::update_merchant_ledger(&who, ledger.clone());
 
-            <MerchantLedgersV2<T>>::insert(&who, ledger.clone());
+            // 5. Unreserve the collateral from the account.
+            T::Currency::unreserve(&who, to_unreserve_value.clone());
 
             // 6. Emit success
             Self::deposit_event(RawEvent::CutCollateralSuccess(who, to_unreserve_value));
@@ -729,7 +680,7 @@ decl_module! {
 
             // 5. Set the reward to zero and push it back
             merchant_ledger.reward = Zero::zero();
-            <MerchantLedgersV2<T>>::insert(&merchant, merchant_ledger);
+            Self::update_merchant_ledger(&merchant, merchant_ledger);
 
             Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
             Ok(())
@@ -1305,6 +1256,15 @@ impl<T: Config> Module<T> {
         };
 
         used_ratio * file_size
+    }
+
+    fn update_merchant_ledger(who: &T::AccountId, merchant_ledger: MerchantLedger<BalanceOf<T>>)
+    {
+        if merchant_ledger.reward.is_zero() && merchant_ledger.collateral.is_zero() {
+            <MerchantLedgersV2<T>>::remove(who);
+        } else {
+            <MerchantLedgersV2<T>>::insert(who, merchant_ledger);
+        }
     }
 }
 

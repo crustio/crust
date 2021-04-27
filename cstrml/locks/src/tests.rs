@@ -22,24 +22,25 @@ fn create_or_extend_lock_should_work() {
 }
 
 #[test]
-fn set_start_date_should_work() {
+fn set_unlock_date_should_work() {
     new_test_ext().execute_with(|| {
         run_to_block(300);
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 1,
                 message: Some("NotStarted"),
             }
         );
-        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
-        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
+        assert_ok!(CrustLocks::set_unlock_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_date().unwrap(), 1000);
 
         let _ = Balances::make_free_balance_be(&1, 1800);
 
+        run_to_block(1100);
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 2,
@@ -52,7 +53,7 @@ fn set_start_date_should_work() {
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 3,
@@ -66,8 +67,8 @@ fn set_start_date_should_work() {
 fn unlock_cru18_should_work() {
     new_test_ext().execute_with(|| {
         run_to_block(300);
-        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
-        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
+        assert_ok!(CrustLocks::set_unlock_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_date().unwrap(), 1000);
 
         let _ = Balances::make_free_balance_be(&1, 1800);
 
@@ -77,7 +78,7 @@ fn unlock_cru18_should_work() {
 
         run_to_block(1100);
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 3,
@@ -86,12 +87,12 @@ fn unlock_cru18_should_work() {
         );
         run_to_block(2000);
 
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1)[0].amount, 1700);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 3,
@@ -99,18 +100,19 @@ fn unlock_cru18_should_work() {
             }
         );
 
-        for i in 3..19 {
-            run_to_block(i*1000);
-            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
-            assert_eq!(Balances::locks(&1)[0].amount, 1800 - (i - 1)*100);
-            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
-        }
 
-        assert_eq!(Balances::locks(&1)[0].amount, 100);
+        run_to_block(7700);
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 1200);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        run_to_block(17700);
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 200);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
         run_to_block(19000);
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
     });
 }
@@ -119,8 +121,8 @@ fn unlock_cru18_should_work() {
 fn unlock_cru24_should_work() {
     new_test_ext().execute_with(|| {
         run_to_block(300);
-        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
-        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
+        assert_ok!(CrustLocks::set_unlock_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_date().unwrap(), 1000);
 
         let _ = Balances::make_free_balance_be(&1, 2400);
 
@@ -130,7 +132,7 @@ fn unlock_cru24_should_work() {
 
         run_to_block(1100);
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 3,
@@ -139,12 +141,12 @@ fn unlock_cru24_should_work() {
         );
         run_to_block(2000);
 
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1)[0].amount, 2300);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 3,
@@ -152,18 +154,18 @@ fn unlock_cru24_should_work() {
             }
         );
 
-        for i in 3..25 {
-            run_to_block(i*1000);
-            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
-            assert_eq!(Balances::locks(&1)[0].amount, 2400 - (i - 1)*100);
-            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
-        }
+        run_to_block(7700);
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 1800);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        assert_eq!(Balances::locks(&1)[0].amount, 100);
+        run_to_block(23700);
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 200);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
         run_to_block(25000);
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
     });
 }
@@ -172,8 +174,8 @@ fn unlock_cru24_should_work() {
 fn unlock_cru24d6_should_work() {
     new_test_ext().execute_with(|| {
         run_to_block(300);
-        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
-        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
+        assert_ok!(CrustLocks::set_unlock_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_date().unwrap(), 1000);
 
         let _ = Balances::make_free_balance_be(&1, 1800);
 
@@ -183,7 +185,7 @@ fn unlock_cru24d6_should_work() {
 
         run_to_block(7900);
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 3,
@@ -192,12 +194,12 @@ fn unlock_cru24d6_should_work() {
         );
         run_to_block(8000);
 
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1)[0].amount, 1700);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
         assert_noop!(
-            CrustLocks::unlock_one_period(Origin::signed(1)),
+            CrustLocks::unlock(Origin::signed(1)),
             DispatchError::Module {
                 index: 2,
                 error: 3,
@@ -205,18 +207,19 @@ fn unlock_cru24d6_should_work() {
             }
         );
 
-        for i in 9..25 {
-            run_to_block(i*1000);
-            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
-            assert_eq!(Balances::locks(&1)[0].amount, 1800 - (i - 7)*100);
-            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
-        }
-
-        assert_eq!(Balances::locks(&1)[0].amount, 100);
+        run_to_block(17321);
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 800);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
+        run_to_block(23700);
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 200);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+
         run_to_block(25000);
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
     });
 }
@@ -225,8 +228,8 @@ fn unlock_cru24d6_should_work() {
 fn lock_should_be_removed_at_last() {
     new_test_ext().execute_with(|| {
         run_to_block(300);
-        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
-        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
+        assert_ok!(CrustLocks::set_unlock_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_date().unwrap(), 1000);
 
         let _ = Balances::make_free_balance_be(&1, 12364595);
 
@@ -234,14 +237,8 @@ fn lock_should_be_removed_at_last() {
         assert_eq!(Balances::locks(&1)[0].amount, 12364596);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        for i in 2..25 {
-            run_to_block(i*1000);
-            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
-            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
-        }
-
         run_to_block(25000);
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
     });
 }
@@ -250,8 +247,8 @@ fn lock_should_be_removed_at_last() {
 fn extend_lock_should_work() {
     new_test_ext().execute_with(|| {
         run_to_block(300);
-        assert_ok!(CrustLocks::set_start_date(Origin::root(), 1000));
-        assert_eq!(CrustLocks::start_date().unwrap(), 1000);
+        assert_ok!(CrustLocks::set_unlock_date(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_date().unwrap(), 1000);
 
         let _ = Balances::make_free_balance_be(&1, 2400);
 
@@ -261,17 +258,12 @@ fn extend_lock_should_work() {
 
         run_to_block(2000);
 
-        assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1)[0].amount, 2300);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        for i in 3..20 {
-            run_to_block(i*1000);
-            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
-            assert_eq!(Balances::locks(&1)[0].amount, 2400 - (i - 1)*100);
-            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
-        }
-
+        run_to_block(19156);
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1)[0].amount, 600);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
@@ -279,12 +271,7 @@ fn extend_lock_should_work() {
         assert_eq!(Balances::locks(&1)[0].amount, 4800);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        for i in 2..20 {
-            assert_ok!(CrustLocks::unlock_one_period(Origin::signed(1)));
-            assert_eq!(Balances::locks(&1)[0].amount, 4800 - (i - 1)*200);
-            assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
-        }
-
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1)[0].amount, 1200);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
     });

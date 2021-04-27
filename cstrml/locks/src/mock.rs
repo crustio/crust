@@ -53,13 +53,13 @@ impl balances::Config for Test {
 }
 
 parameter_types! {
-    pub const OneUnlockPeriod: BlockNumber = 1000;
+    pub const UnlockPeriod: BlockNumber = 1000;
 }
 
 impl Config for Test {
     type Event = ();
     type Currency = Balances;
-    type OneUnlockPeriod = OneUnlockPeriod;
+    type UnlockPeriod = UnlockPeriod;
 }
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;

@@ -35,8 +35,8 @@ pub trait Config: frame_system::Config {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
     type Currency: LockableCurrency<Self::AccountId>;
-    /// One unlock period. It should be one month
-    type OneUnlockPeriod: Get<BlockNumber>;
+    /// One unlock period.
+    type UnlockPeriod: Get<BlockNumber>;
 }
 
 #[derive(Copy, Clone, Encode, Decode, Default, RuntimeDebug)]
@@ -78,9 +78,9 @@ decl_event!(
         AccountId = <T as frame_system::Config>::AccountId,
     {
         /// Set global unlock start date
-        SetStartDateSuccess(BlockNumber),
-        /// Unlock one month success
-        UnlockOneMonthSuccess(AccountId, BlockNumber),
+        SetUnlockDateSuccess(BlockNumber),
+        /// Unlock success
+        UnlockSuccess(AccountId, BlockNumber),
     }
 );
 
@@ -102,7 +102,7 @@ decl_storage! {
         // Locks of CRU18, CRU24 and CRU24D6
         Locks get(fn locks): map hasher(blake2_128_concat) T::AccountId => Option<Lock<BalanceOf<T>>>;
         // The global start date
-        StartDate get(fn start_date): Option<u32>;
+        UnlockDate get(fn unlock_date): Option<u32>;
     }
     add_extra_genesis {
         config(genesis_locks):
@@ -124,47 +124,56 @@ decl_module! {
         /// Set the global start date
         /// It can only be set once
         #[weight = 1000]
-        fn set_start_date(origin, date: BlockNumber) -> DispatchResult {
+        fn set_unlock_date(origin, date: BlockNumber) -> DispatchResult {
             ensure_root(origin)?;
+            let curr_bn = Self::get_current_block_number();
 
-            ensure!(Self::start_date().is_none(), Error::<T>::AlreadySet);
+            // 1. If we already set the start date, ensure unlocking have not started.
+            if let Some(unlock_date) = Self::unlock_date() {
+                ensure!(curr_bn < unlock_date, Error::<T>::AlreadySet);
+            }
 
-            StartDate::put(date);
+            // 2. Set the start date.
+            UnlockDate::put(date);
 
-            Self::deposit_event(RawEvent::SetStartDateSuccess(date));
+            Self::deposit_event(RawEvent::SetUnlockDateSuccess(date));
 
             Ok(())
         }
 
         /// Unlock the CRU18 or CRU24 one period
         #[weight = 1000]
-        fn unlock_one_period(origin) -> DispatchResult {
+        fn unlock(origin) -> DispatchResult {
             let who = ensure_signed(origin)?;
+            let curr_bn = Self::get_current_block_number();
 
             // Ensure the start date is set and who has the CRU18 or CRU24
-            ensure!(Self::start_date().is_some(), Error::<T>::NotStarted);
+            ensure!(Self::unlock_date().is_some() && curr_bn > Self::unlock_date().unwrap(), Error::<T>::NotStarted);
             ensure!(Self::locks(&who).is_some(), Error::<T>::LockNotExist);
 
             let mut lock = Self::locks(&who).unwrap();
-            let start_date = Self::start_date().unwrap();
-            let curr_bn = Self::get_current_block_number();
+            let unlock_date = Self::unlock_date().unwrap();
+            let curr_period = Self::round_bn_to_period(unlock_date, curr_bn);
 
             // The first time that we would add the delay into checking
-            let target_unlock_bn = if lock.last_unlock_at == 0 {
-                start_date + lock.lock_type.delay + T::OneUnlockPeriod::get()
+            let target_unlock_period = if lock.last_unlock_at == 0 {
+                unlock_date + lock.lock_type.delay
             } else {
-                lock.last_unlock_at + T::OneUnlockPeriod::get()
+                lock.last_unlock_at
             };
 
-            ensure!(curr_bn >= target_unlock_bn, Error::<T>::TimeIsNotEnough);
+            ensure!(curr_period > target_unlock_period, Error::<T>::TimeIsNotEnough);
 
-            // Update lock and extend one period
-            Self::update_lock(&who, &lock, start_date + lock.lock_type.delay, target_unlock_bn);
-            lock.last_unlock_at = target_unlock_bn;
+            // Count the total unlock period => Count the total unlock amount => Refresh the remaining locked amount
+            let free_periods = curr_period.saturating_sub(unlock_date).saturating_sub(lock.lock_type.delay) / T::UnlockPeriod::get();
+            let free_amount = Perbill::from_rational_approximation(free_periods, lock.lock_type.lock_period) * lock.total;
+            let locked_amount = lock.total - free_amount;
+            Self::update_lock(&who, locked_amount);
+            lock.last_unlock_at = curr_period;
 
             <Locks<T>>::insert(&who, lock);
 
-            Self::deposit_event(RawEvent::UnlockOneMonthSuccess(who, target_unlock_bn));
+            Self::deposit_event(RawEvent::UnlockSuccess(who, curr_period));
 
             Ok(())
         }
@@ -177,13 +186,7 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn update_lock(who: &T::AccountId, lock: &Lock<BalanceOf<T>>, start_date: BlockNumber, target_unlock_bn: BlockNumber) {
-        // Count the total unlock period
-        let free_periods = (target_unlock_bn - start_date) / T::OneUnlockPeriod::get();
-        // Count the total unlock amount
-        let free_amount = Perbill::from_rational_approximation(free_periods, lock.lock_type.lock_period) * lock.total;
-        // Refresh the remaining locked amount
-        let locked_amount = lock.total - free_amount;
+    fn update_lock(who: &T::AccountId, locked_amount: BalanceOf<T>) {
         // Remove the lock or set the new lock
         if locked_amount.is_zero() {
             T::Currency::remove_lock(
@@ -234,5 +237,9 @@ impl<T: Config> Module<T> {
             total_amount,
             WithdrawReasons::TRANSFER
         );
+    }
+
+    fn round_bn_to_period(unlock_bn: BlockNumber, bn: BlockNumber) -> BlockNumber {
+        ((bn - unlock_bn) / T::UnlockPeriod::get()) * T::UnlockPeriod::get() + unlock_bn
     }
 }

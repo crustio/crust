@@ -795,13 +795,13 @@ impl benefits::Config for Runtime {
 }
 
 parameter_types! {
-    pub const OneUnlockPeriod: BlockNumber = 432_000; // 30 days
+    pub const UnlockPeriod: BlockNumber = 432_000; // 30 days
 }
 
 impl locks::Config for Runtime {
     type Event = Event;
     type Currency = Balances;
-    type OneUnlockPeriod = OneUnlockPeriod;
+    type UnlockPeriod = UnlockPeriod;
 }
 
 construct_runtime! {

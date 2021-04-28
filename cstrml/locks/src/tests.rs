@@ -12,12 +12,13 @@ pub const CRU24D6:LockType = LockType {
 };
 
 #[test]
-fn create_or_extend_lock_should_work() {
+fn issue_and_set_lock_should_work() {
     new_test_ext().execute_with(|| {
-        let _ = Balances::make_free_balance_be(&1, 200);
-        CrustLocks::create_or_extend_lock(&1, &200, CRU24);
+        CrustLocks::issue_and_set_lock(&1, &200, CRU24);
         assert_eq!(Balances::locks(&1)[0].amount, 200);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+        assert_eq!(Balances::free_balance(&1), 200);
+        assert_eq!(Balances::total_issuance(), 200);
     });
 }
 
@@ -48,7 +49,7 @@ fn set_unlock_date_should_work() {
             }
         );
 
-        CrustLocks::create_or_extend_lock(&1, &1800, CRU18);
+        CrustLocks::issue_and_set_lock(&1, &1800, CRU18);
         assert_eq!(Balances::locks(&1)[0].amount, 1800);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
@@ -72,7 +73,7 @@ fn unlock_cru18_should_work() {
 
         let _ = Balances::make_free_balance_be(&1, 1800);
 
-        CrustLocks::create_or_extend_lock(&1, &1800, CRU18);
+        CrustLocks::issue_and_set_lock(&1, &1800, CRU18);
         assert_eq!(Balances::locks(&1)[0].amount, 1800);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
@@ -135,7 +136,7 @@ fn unlock_cru24_should_work() {
 
         let _ = Balances::make_free_balance_be(&1, 2400);
 
-        CrustLocks::create_or_extend_lock(&1, &2400, CRU24);
+        CrustLocks::issue_and_set_lock(&1, &2400, CRU24);
         assert_eq!(Balances::locks(&1)[0].amount, 2400);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
@@ -197,7 +198,7 @@ fn unlock_cru24d6_should_work() {
 
         let _ = Balances::make_free_balance_be(&1, 1800);
 
-        CrustLocks::create_or_extend_lock(&1, &1800, CRU24D6);
+        CrustLocks::issue_and_set_lock(&1, &1800, CRU24D6);
         assert_eq!(Balances::locks(&1)[0].amount, 1800);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
@@ -260,7 +261,7 @@ fn lock_should_be_removed_at_last() {
 
         let _ = Balances::make_free_balance_be(&1, 12364595);
 
-        CrustLocks::create_or_extend_lock(&1, &12364596, CRU24);
+        CrustLocks::issue_and_set_lock(&1, &12364596, CRU24);
         assert_eq!(Balances::locks(&1)[0].amount, 12364596);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
@@ -280,7 +281,7 @@ fn extend_lock_should_work() {
 
         let _ = Balances::make_free_balance_be(&1, 2400);
 
-        CrustLocks::create_or_extend_lock(&1, &2400, CRU24);
+        CrustLocks::issue_and_set_lock(&1, &2400, CRU24);
         assert_eq!(Balances::locks(&1)[0].amount, 2400);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
@@ -295,7 +296,7 @@ fn extend_lock_should_work() {
         assert_eq!(Balances::locks(&1)[0].amount, 600);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 
-        CrustLocks::create_or_extend_lock(&1, &2400, CRU24);
+        CrustLocks::issue_and_set_lock(&1, &2400, CRU24);
         assert_eq!(Balances::locks(&1)[0].amount, 4800);
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
 

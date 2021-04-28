@@ -109,7 +109,7 @@ decl_storage! {
             Vec<(T::AccountId, BalanceOf<T>, LockType)>;
         build(|config: &GenesisConfig<T>| {
             for (who, amount, lock_type) in &config.genesis_locks {
-                <Module<T>>::create_or_extend_lock(who, amount, lock_type.clone());
+                <Module<T>>::issue_and_set_lock(who, amount, lock_type.clone());
             }
         });
     }
@@ -204,7 +204,7 @@ impl<T: Config> Module<T> {
 
     }
 
-    pub fn create_or_extend_lock(who: &T::AccountId, amount: &BalanceOf<T>, lock_type: LockType) {
+    fn create_or_extend_lock(who: &T::AccountId, amount: &BalanceOf<T>, lock_type: LockType) {
         <Locks<T>>::mutate_exists(&who, |maybe_lock| {
             match *maybe_lock {
                 // If the lock already exist
@@ -241,5 +241,10 @@ impl<T: Config> Module<T> {
 
     fn round_bn_to_period(unlock_bn: BlockNumber, bn: BlockNumber) -> BlockNumber {
         ((bn - unlock_bn) / T::UnlockPeriod::get()) * T::UnlockPeriod::get() + unlock_bn
+    }
+
+    pub fn issue_and_set_lock(who: &T::AccountId, amount: &BalanceOf<T>, lock_type: LockType) {
+        T::Currency::deposit_creating(who, *amount);
+        Self::create_or_extend_lock(who, amount, lock_type);
     }
 }

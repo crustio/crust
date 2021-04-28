@@ -151,7 +151,7 @@ decl_module! {
             ensure!(Self::unlock_date().is_some() && curr_bn > Self::unlock_date().unwrap(), Error::<T>::NotStarted);
             ensure!(Self::locks(&who).is_some(), Error::<T>::LockNotExist);
 
-            let mut lock = Self::locks(&who).unwrap();
+            let lock = Self::locks(&who).unwrap();
             let unlock_date = Self::unlock_date().unwrap();
             let curr_period = Self::round_bn_to_period(unlock_date, curr_bn);
 
@@ -168,10 +168,7 @@ decl_module! {
             let free_periods = curr_period.saturating_sub(unlock_date).saturating_sub(lock.lock_type.delay) / T::UnlockPeriod::get();
             let free_amount = Perbill::from_rational_approximation(free_periods, lock.lock_type.lock_period) * lock.total;
             let locked_amount = lock.total - free_amount;
-            Self::update_lock(&who, locked_amount);
-            lock.last_unlock_at = curr_period;
-
-            <Locks<T>>::insert(&who, lock);
+            Self::update_lock(&who, lock, locked_amount, curr_period);
 
             Self::deposit_event(RawEvent::UnlockSuccess(who, curr_period));
 
@@ -186,13 +183,14 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn update_lock(who: &T::AccountId, locked_amount: BalanceOf<T>) {
+    fn update_lock(who: &T::AccountId, mut lock: Lock<BalanceOf<T>>, locked_amount: BalanceOf<T>, curr_period: BlockNumber) {
         // Remove the lock or set the new lock
         if locked_amount.is_zero() {
             T::Currency::remove_lock(
                 CRU_LOCK_ID,
                 who
             );
+            <Locks<T>>::remove(who);
         } else {
             T::Currency::set_lock(
                 CRU_LOCK_ID,
@@ -200,6 +198,8 @@ impl<T: Config> Module<T> {
                 locked_amount,
                 WithdrawReasons::TRANSFER
             );
+            lock.last_unlock_at = curr_period;
+            <Locks<T>>::insert(who, lock);
         }
 
     }

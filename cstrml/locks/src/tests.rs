@@ -114,6 +114,15 @@ fn unlock_cru18_should_work() {
         run_to_block(19000);
         assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
+        assert_eq!(<Locks<Test>>::contains_key(&1), false);
+        assert_noop!(
+            CrustLocks::unlock(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 2,
+                message: Some("LockNotExist"),
+            }
+        );
     });
 }
 
@@ -167,6 +176,15 @@ fn unlock_cru24_should_work() {
         run_to_block(25000);
         assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
+        assert_eq!(<Locks<Test>>::contains_key(&1), false);
+        assert_noop!(
+            CrustLocks::unlock(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 2,
+                message: Some("LockNotExist"),
+            }
+        );
     });
 }
 
@@ -221,6 +239,15 @@ fn unlock_cru24d6_should_work() {
         run_to_block(25000);
         assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
+        assert_eq!(<Locks<Test>>::contains_key(&1), false);
+        assert_noop!(
+            CrustLocks::unlock(Origin::signed(1)),
+            DispatchError::Module {
+                index: 2,
+                error: 2,
+                message: Some("LockNotExist"),
+            }
+        );
     });
 }
 
@@ -240,6 +267,7 @@ fn lock_should_be_removed_at_last() {
         run_to_block(25000);
         assert_ok!(CrustLocks::unlock(Origin::signed(1)));
         assert_eq!(Balances::locks(&1).len(), 0);
+        assert_eq!(<Locks<Test>>::contains_key(&1), false);
     });
 }
 

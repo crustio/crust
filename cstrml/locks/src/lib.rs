@@ -78,7 +78,7 @@ decl_event!(
         AccountId = <T as frame_system::Config>::AccountId,
     {
         /// Set global unlock start date
-        SetUnlockDateSuccess(BlockNumber),
+        UnlockStartedAt(BlockNumber),
         /// Unlock success
         UnlockSuccess(AccountId, BlockNumber),
     }
@@ -87,7 +87,7 @@ decl_event!(
 decl_error! {
     pub enum Error for Module<T: Config> {
         /// Already set the start date
-        AlreadySet,
+        AlreadyStarted,
         /// Unlock has not started
         NotStarted,
         /// Invalid account which doesn't have CRU18 or CRU24
@@ -101,8 +101,8 @@ decl_storage! {
     trait Store for Module<T: Config> as Claims {
         // Locks of CRU18, CRU24 and CRU24D6
         Locks get(fn locks): map hasher(blake2_128_concat) T::AccountId => Option<Lock<BalanceOf<T>>>;
-        // The global start date
-        UnlockDate get(fn unlock_date): Option<u32>;
+        // The global unlock date
+        UnlockFrom get(fn unlock_from): Option<BlockNumber>;
     }
     add_extra_genesis {
         config(genesis_locks):
@@ -124,19 +124,19 @@ decl_module! {
         /// Set the global start date
         /// It can only be set once
         #[weight = 1000]
-        fn set_unlock_date(origin, date: BlockNumber) -> DispatchResult {
+        fn set_unlock_from(origin, date: BlockNumber) -> DispatchResult {
             ensure_root(origin)?;
             let curr_bn = Self::get_current_block_number();
 
             // 1. If we already set the start date, ensure unlocking have not started.
-            if let Some(unlock_date) = Self::unlock_date() {
-                ensure!(curr_bn < unlock_date, Error::<T>::AlreadySet);
+            if let Some(unlock_from) = Self::unlock_from() {
+                ensure!(curr_bn < unlock_from, Error::<T>::AlreadyStarted);
             }
 
             // 2. Set the start date.
-            UnlockDate::put(date);
+            UnlockFrom::put(date);
 
-            Self::deposit_event(RawEvent::SetUnlockDateSuccess(date));
+            Self::deposit_event(RawEvent::UnlockStartedAt(date));
 
             Ok(())
         }
@@ -148,26 +148,26 @@ decl_module! {
             let curr_bn = Self::get_current_block_number();
 
             // Ensure the start date is set and who has the CRU18 or CRU24
-            ensure!(Self::unlock_date().is_some() && curr_bn > Self::unlock_date().unwrap(), Error::<T>::NotStarted);
+            ensure!(Self::unlock_from().is_some() && curr_bn > Self::unlock_from().unwrap(), Error::<T>::NotStarted);
             ensure!(Self::locks(&who).is_some(), Error::<T>::LockNotExist);
 
             let lock = Self::locks(&who).unwrap();
-            let unlock_date = Self::unlock_date().unwrap();
-            let curr_period = Self::round_bn_to_period(unlock_date, curr_bn);
+            let unlock_from = Self::unlock_from().unwrap();
+            let curr_period = Self::round_bn_to_period(unlock_from, curr_bn);
 
             // The first time that we would add the delay into checking
-            let target_unlock_period = if lock.last_unlock_at == 0 {
-                unlock_date + lock.lock_type.delay
+            let last_unlock_at = if lock.last_unlock_at == 0 {
+                unlock_from + lock.lock_type.delay
             } else {
                 lock.last_unlock_at
             };
 
-            ensure!(curr_period > target_unlock_period, Error::<T>::TimeIsNotEnough);
+            ensure!(curr_period > last_unlock_at, Error::<T>::TimeIsNotEnough);
 
             // Count the total unlock period => Count the total unlock amount => Refresh the remaining locked amount
-            let free_periods = curr_period.saturating_sub(unlock_date).saturating_sub(lock.lock_type.delay) / T::UnlockPeriod::get();
-            let free_amount = Perbill::from_rational_approximation(free_periods, lock.lock_type.lock_period) * lock.total;
-            let locked_amount = lock.total - free_amount;
+            let unlock_peroids = curr_period.saturating_sub(unlock_from).saturating_sub(lock.lock_type.delay) / T::UnlockPeriod::get();
+            let unlock_amount = Perbill::from_rational_approximation(unlock_peroids, lock.lock_type.lock_period) * lock.total;
+            let locked_amount = lock.total - unlock_amount;
             Self::update_lock(&who, lock, locked_amount, curr_period);
 
             Self::deposit_event(RawEvent::UnlockSuccess(who, curr_period));

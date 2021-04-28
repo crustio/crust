@@ -67,6 +67,7 @@ pub struct Lock<Balance: HasCompact> {
     // Total amount of the lock
     #[codec(compact)]
     pub total: Balance,
+    // TODO: add unlocked amount for checking.
     // The last unlock block number
     pub last_unlock_at: BlockNumber,
     // The lock type, which is one of CRU18/CRU24/CRU24D6

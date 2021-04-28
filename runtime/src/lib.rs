@@ -794,6 +794,16 @@ impl benefits::Config for Runtime {
     type BenefitMarketCostRatio = BenefitMarketCostRatio;
 }
 
+parameter_types! {
+    pub const UnlockPeriod: BlockNumber = 432_000; // 30 days
+}
+
+impl locks::Config for Runtime {
+    type Event = Event;
+    type Currency = Balances;
+    type UnlockPeriod = UnlockPeriod;
+}
+
 construct_runtime! {
     pub enum Runtime where
         Block = Block,
@@ -852,6 +862,7 @@ construct_runtime! {
         Candy: candy::{Module, Call, Storage, Event<T>},
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
         Benefits: benefits::{Module, Call, Storage, Event<T>},
+        Locks: locks::{Module, Call, Storage, Config<T>, Event<T>},
     }
 }
 

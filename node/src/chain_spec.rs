@@ -8,7 +8,7 @@ use crust_runtime::{
     AuthorityDiscoveryConfig, SessionConfig, SessionKeys, StakerStatus,
     StakingConfig, IndicesConfig, SystemConfig, SworkConfig, SudoConfig,
     ElectionsConfig, CouncilConfig, TechnicalCommitteeConfig, DemocracyConfig,
-    WASM_BINARY
+    WASM_BINARY, LocksConfig
 };
 use cstrml_staking::Forcing;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
@@ -258,6 +258,9 @@ fn testnet_genesis(
         swork: Some(SworkConfig {
             init_codes: vec![]
         }),
+        locks: Some(LocksConfig {
+            genesis_locks: vec![]
+        }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),
         pallet_elections_phragmen: Some(ElectionsConfig {
@@ -375,6 +378,9 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
         }),
         swork: Some(SworkConfig {
             init_codes: vec![]
+        }),
+        locks: Some(LocksConfig {
+            genesis_locks: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),
@@ -497,6 +503,9 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
         }),
         swork: Some(SworkConfig {
             init_codes: vec![]
+        }),
+        locks: Some(LocksConfig {
+            genesis_locks: vec![]
         }),
         pallet_collective_Instance1: Some(CouncilConfig::default()),
         pallet_treasury: Some(Default::default()),

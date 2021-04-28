@@ -48,6 +48,7 @@ frame-benchmarking = "3.0.0"
 crust-runtime = { path = "../runtime", version = "0.12.0" }
 cstrml-staking = { path = "../cstrml/staking", version = "0.12.0" }
 cstrml-swork = { path = "../cstrml/swork", version = "0.12.0" }
+cstrml-locks = { path = "../cstrml/locks", version = "0.12.0" }
 primitives = { package = "cst-primitives", path = "../primitives", version = "0.12.0" }
 crust-rpc = { path =  "../rpc", version = "0.12.0" }
 

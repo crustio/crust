@@ -507,6 +507,9 @@ decl_storage! {
         /// Base stake limit ratio
         StakeLimitRatio get(fn stake_limit_ratio): Perbill = Perbill::from_percent(60);
 
+        /// Dangerous effective staking limit
+        DangerousEffectiveStakingLimit get(fn dangerous_effective_staking_limit): Perbill = Perbill::from_percent(25);
+
         /// Map from all locked "stash" accounts to the controller account.
         pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
 
@@ -1545,6 +1548,17 @@ impl<T: Config> Module<T> {
         }
     }
 
+    pub fn update_stage_one_stake_limit(workload_map: BTreeMap<T::AccountId, u128>) {
+        // In stage one, state limit / own workload is fixed to T::SPowerRatio
+        for (v_stash, _) in <Validators<T>>::iter() {
+            let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
+            Self::upsert_stake_limit(
+                &v_stash,
+                Self::stage_one_stake_limit_of(*v_own_workload),
+            );
+        }
+    }
+
     /// Calculate the stake limit by storage workloads, returns the stake limit value
     ///
     /// # <weight>
@@ -1557,12 +1571,31 @@ impl<T: Config> Module<T> {
         if total_workloads_in_kb == 0 {
             Zero::zero()
         } else {
-            let workloads_to_stakes = ( own_workloads_in_kb.wrapping_mul(total_stake_limit) / total_workloads_in_kb) as u128;
+            let workloads_to_stakes = (own_workloads_in_kb.wrapping_mul(total_stake_limit) / total_workloads_in_kb) as u128;
             workloads_to_stakes.try_into().ok().unwrap()
         }
     }
 
-    pub fn add_extra_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> Perbill {
+    pub fn update_stage_two_stake_limit(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128, total_stake_limit: u128) {
+
+        let byte_to_kilobyte = |workload_in_byte: u128| {
+            workload_in_byte / 1024
+        };
+
+        // Decrease the precision to kb to avoid overflow
+        let total_workload_in_kb = byte_to_kilobyte(total_workload);
+        for (v_stash, _) in <Validators<T>>::iter() {
+            let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
+            // Decrease the precision to kb to avoid overflow
+            let v_own_workload_in_kb = byte_to_kilobyte(*v_own_workload);
+            Self::upsert_stake_limit(
+                &v_stash,
+                Self::stage_two_stake_limit_of(v_own_workload_in_kb, total_workload_in_kb, total_stake_limit),
+            );
+        }
+    }
+
+    pub fn extra_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> Perbill {
         let to_num =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
         // Multiple the percent by four, maximum value is 100%
@@ -1576,12 +1609,24 @@ impl<T: Config> Module<T> {
         if let Some(active_era) = Self::active_era() {
             let total_effective_stake = <ErasTotalStakes<T>>::get(&active_era.index);
             let effective_stake_ratio = Perbill::from_rational_approximation(to_num(total_effective_stake), to_num(total_issuance));
-            if effective_stake_ratio > Perbill::from_percent(25) {
+            if effective_stake_ratio > Self::dangerous_effective_staking_limit() {
                 return Perbill::zero();
             }
-            return mul_four(Perbill::from_percent(25).saturating_sub(effective_stake_ratio));
+            return mul_four(Self::dangerous_effective_staking_limit().saturating_sub(effective_stake_ratio));
         }
         return Perbill::zero();
+    }
+
+    fn calculate_total_stake_limit() -> u128 {
+        let total_issuance = T::Currency::total_issuance();
+        let stake_limit_ratio = Self::stake_limit_ratio();
+        // If effective staking ratio is smaller than some value, we should increase the total stake limit
+        let extra_stake_limit_ratio = Self::extra_ratio_according_to_effective_staking(total_issuance.clone());
+        // This value can be larger than total issuance.
+        let total_stake_limit = TryInto::<u128>::try_into((stake_limit_ratio * total_issuance).saturating_add(extra_stake_limit_ratio * total_issuance))
+            .ok()
+            .unwrap();
+        total_stake_limit
     }
 
     /// Get the updated (increased) guarantee relationship
@@ -2466,37 +2511,14 @@ impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, 
 
 impl<T: Config> swork::Works<T::AccountId> for Module<T> {
     fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
-        let total_issuance = T::Currency::total_issuance();
-        let stake_limit_ratio = Self::stake_limit_ratio();
-        // If effective staking ratio is smaller than some value, we should increase the total stake limit
-        let extra_stake_limit_ratio = Self::add_extra_ratio_according_to_effective_staking(total_issuance.clone());
-        let total_stake_limit = TryInto::<u128>::try_into((stake_limit_ratio * total_issuance).saturating_add(extra_stake_limit_ratio * total_issuance))
-            .ok()
-            .unwrap();
-        // Judge if we're in stage one or stage two
-        let is_stage_one = total_workload.saturating_mul(T::SPowerRatio::get()) < total_stake_limit;
+        // 1. Calculate total stake limit
+        let total_stake_limit = Self::calculate_total_stake_limit();
 
-        if is_stage_one {
-            // In stage one, state limit / own workload is fixed to T::SPowerRatio
-            for (v_stash, _) in <Validators<T>>::iter() {
-                let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
-                Self::upsert_stake_limit(
-                    &v_stash,
-                    Self::stage_one_stake_limit_of(*v_own_workload),
-                );
-            }
+        // 2. total_workload * SPowerRatio < total_stake_limit => stage one
+        if total_workload.saturating_mul(T::SPowerRatio::get()) < total_stake_limit {
+            Self::update_stage_one_stake_limit(workload_map);
         } else {
-            // Decrease the precision to kb to avoid overflow
-            let total_workload_in_kb = total_workload / 1024;
-            for (v_stash, _) in <Validators<T>>::iter() {
-                let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
-                // Decrease the precision to kb to avoid overflow
-                let v_own_workload_in_kb = v_own_workload / 1024;
-                Self::upsert_stake_limit(
-                    &v_stash,
-                    Self::stage_two_stake_limit_of(v_own_workload_in_kb, total_workload_in_kb, total_stake_limit),
-                );
-            }
+            Self::update_stage_two_stake_limit(workload_map, total_workload, total_stake_limit);
         }
     }
 }

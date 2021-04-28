@@ -77,8 +77,8 @@ decl_event!(
     pub enum Event<T> where
         AccountId = <T as frame_system::Config>::AccountId,
     {
-        /// Set global unlock start date
-        UnlockStartedAt(BlockNumber),
+        /// Set global unlock from date
+        UnlockStartedFrom(BlockNumber),
         /// Unlock success
         UnlockSuccess(AccountId, BlockNumber),
     }
@@ -86,13 +86,13 @@ decl_event!(
 
 decl_error! {
     pub enum Error for Module<T: Config> {
-        /// Already set the start date
+        /// Unlocking period already started and cannot set the unlock from again.
         AlreadyStarted,
-        /// Unlock has not started
+        /// Unlocking period has not started.
         NotStarted,
-        /// Invalid account which doesn't have CRU18 or CRU24
+        /// Invalid account which doesn't have CRU18 or CRU24l
         LockNotExist,
-        /// Wait for the next unlock date
+        /// Wait for the next unlock date.
         TimeIsNotEnough,
     }
 }
@@ -136,7 +136,7 @@ decl_module! {
             // 2. Set the start date.
             UnlockFrom::put(date);
 
-            Self::deposit_event(RawEvent::UnlockStartedAt(date));
+            Self::deposit_event(RawEvent::UnlockStartedFrom(date));
 
             Ok(())
         }
@@ -147,27 +147,31 @@ decl_module! {
             let who = ensure_signed(origin)?;
             let curr_bn = Self::get_current_block_number();
 
-            // Ensure the start date is set and who has the CRU18 or CRU24
+            // 1. Ensure the unlock from is set and now unlocking period has started
             ensure!(Self::unlock_from().is_some() && curr_bn > Self::unlock_from().unwrap(), Error::<T>::NotStarted);
+            // 2. Ensure who has the CRU18 or CRU24
             ensure!(Self::locks(&who).is_some(), Error::<T>::LockNotExist);
 
             let lock = Self::locks(&who).unwrap();
             let unlock_from = Self::unlock_from().unwrap();
             let curr_period = Self::round_bn_to_period(unlock_from, curr_bn);
 
-            // The first time that we would add the delay into checking
+            // 3. The first time that we would add the delay into checking
             let last_unlock_at = if lock.last_unlock_at == 0 {
                 unlock_from + lock.lock_type.delay
             } else {
                 lock.last_unlock_at
             };
 
+            // 4. Ensure who has some CRU to unlock
             ensure!(curr_period > last_unlock_at, Error::<T>::TimeIsNotEnough);
 
-            // Count the total unlock period => Count the total unlock amount => Refresh the remaining locked amount
+            // 5. Count the total unlock period => Count the total unlock amount => Refresh the remaining locked amount
             let unlock_peroids = curr_period.saturating_sub(unlock_from).saturating_sub(lock.lock_type.delay) / T::UnlockPeriod::get();
             let unlock_amount = Perbill::from_rational_approximation(unlock_peroids, lock.lock_type.lock_period) * lock.total;
             let locked_amount = lock.total - unlock_amount;
+
+            // 6. Update the lock
             Self::update_lock(&who, lock, locked_amount, curr_period);
 
             Self::deposit_event(RawEvent::UnlockSuccess(who, curr_period));
@@ -198,6 +202,7 @@ impl<T: Config> Module<T> {
                 locked_amount,
                 WithdrawReasons::TRANSFER
             );
+            // Update the last unlock at to the current period
             lock.last_unlock_at = curr_period;
             <Locks<T>>::insert(who, lock);
         }
@@ -244,7 +249,9 @@ impl<T: Config> Module<T> {
     }
 
     pub fn issue_and_set_lock(who: &T::AccountId, amount: &BalanceOf<T>, lock_type: LockType) {
+        // Issue the money
         T::Currency::deposit_creating(who, *amount);
+        // Create the lock
         Self::create_or_extend_lock(who, amount, lock_type);
     }
 }

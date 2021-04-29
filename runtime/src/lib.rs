@@ -42,7 +42,8 @@ pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 pub use balances::Call as BalancesCall;
 pub use frame_support::{
     construct_runtime, parameter_types,
-    traits::{Currency, KeyOwnerProofSystem, Randomness, OnUnbalanced, Imbalance, LockIdentifier, U128CurrencyToVote},
+    traits::{Currency, KeyOwnerProofSystem, Randomness, OnUnbalanced,
+             Imbalance, LockIdentifier, U128CurrencyToVote, StorageMapShim},
     weights::{
         Weight, DispatchClass,
         constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -676,7 +677,7 @@ impl OnUnbalanced<NegativeImbalance> for DealWithFees {
     }
 }
 
-impl balances::Config for Runtime {
+impl balances::Config<balances::Instance1> for Runtime {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = Event;
@@ -689,6 +690,21 @@ impl balances::Config for Runtime {
 impl candy::Config for Runtime {
     type Event = Event;
     type Balance = Balance;
+}
+
+impl balances::Config<balances::Instance2> for Runtime {
+    type Balance = Balance;
+    type DustRemoval = ();
+    type Event = Event;
+    type ExistentialDeposit = ExistentialDeposit;
+    type AccountStore = StorageMapShim<
+        balances::Account<Runtime, balances::Instance2>,
+        frame_system::Provider<Runtime>,
+        AccountId,
+        balances::AccountData<Balance>,
+    >;
+    type WeightInfo = weights::pallet_balances::WeightInfo<Runtime>;
+    type MaxLocks = MaxLocks;
 }
 
 parameter_types! {
@@ -791,7 +807,7 @@ construct_runtime! {
 
         Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
         Indices: pallet_indices::{Module, Call, Storage, Config<T>, Event<T>},
-        Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+        Balances: balances::<Instance1>::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: pallet_transaction_payment::{Module, Storage},
 
         // Consensus support
@@ -833,6 +849,7 @@ construct_runtime! {
         // Token candy and claims bridge
         Candy: candy::{Module, Call, Storage, Event<T>},
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+        CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
     }
 }
 

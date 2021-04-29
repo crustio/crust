@@ -1549,6 +1549,7 @@ impl<T: Config> Module<T> {
     /// - 0 DB entry.
     /// # </weight>
     pub fn stage_one_stake_limit_of(own_workloads: u128) -> BalanceOf<T> {
+        // we treat 1 terabytes as 1_000_000_000_000 for make `mapping_ratio = 1`
         if let Some(storage_stakes) = own_workloads.checked_mul(T::SPowerRatio::get()) {
             storage_stakes.try_into().ok().unwrap()
         } else {

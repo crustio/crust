@@ -4996,7 +4996,7 @@ fn recharge_staking_pot_should_work() {
 }
 
 #[test]
-fn update_stake_limit_according_to_mpow_should_work() {
+fn update_stage_one_stake_limit_according_to_mpow_should_work() {
     ExtBuilder::default()
         .guarantee(false)
         .staking_pot(100_000_000_000_000)
@@ -5052,6 +5052,81 @@ fn update_stake_limit_according_to_mpow_should_work() {
             assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 12500);
             assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
+        });
+}
+
+#[test]
+fn update_stage_two_stake_limit_according_to_mpow_should_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .staking_pot(100_000_000_000_000)
+        .own_workload(u128::max_value())
+        .build()
+        .execute_with(|| {
+            for i in 1..10 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            Staking::upsert_stake_limit(&1, 5000);
+            Staking::upsert_stake_limit(&3, 5000);
+            Staking::upsert_stake_limit(&5, 5000);
+            Staking::upsert_stake_limit(&7, 5000);
+
+            // Add a new validator
+            assert_ok!(Staking::bond(
+                Origin::signed(1),
+                2,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::bond(
+                Origin::signed(3),
+                4,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::bond(
+                Origin::signed(5),
+                6,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::bond(
+                Origin::signed(7),
+                8,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
+            assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
+            assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
+            assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
+
+            let mut workload_map = BTreeMap::new();
+            workload_map.insert(1, 300_000_000_000_000);
+            workload_map.insert(3, 200_000_000_000_000);
+            workload_map.insert(5, 500_000_000_000_000);
+            let total_issuance = Balances::total_issuance();
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(20) * total_issuance);
+            Staking::report_works(workload_map.clone(), 1_000_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 24240000136497);
+            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 16160000090998);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 40400000227495);
+            assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
+
+            assert_ok!(Staking::set_stake_limit_ratio_limit(Origin::root(), Perbill::from_percent(70)));
+            assert_eq!(Staking::stake_limit_ratio_limit(), Perbill::from_percent(70));
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(30) * total_issuance);
+            Staking::report_works(workload_map.clone(), 1_000_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 21210000013385);
+            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 14140000008923);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 35350000022308);
+            assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
+
+            assert_ok!(Staking::set_effective_staking_ratio_lower_limit(Origin::root(), Perbill::from_percent(20)));
+            assert_eq!(Staking::effective_staking_ratio_lower_limit(), Perbill::from_percent(20));
         });
 }
 

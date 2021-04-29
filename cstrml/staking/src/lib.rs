@@ -504,6 +504,12 @@ decl_storage! {
         /// Start era for reward curve
         StartRewardEra get(fn start_reward_era) config(): EraIndex = 100000;
 
+        /// Base stake limit ratio limit for the stage two
+        StakeLimitRatioLimit get(fn stake_limit_ratio_limit): Perbill = Perbill::from_percent(60);
+
+        /// The effective staking lower limit which trigger the extra stake limit ratio limit
+        EffectiveStakingRatioLowerLimit get(fn effective_staking_ratio_lower_limit): Perbill = Perbill::from_percent(25);
+
         /// Map from all locked "stash" accounts to the controller account.
         pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
 
@@ -1499,6 +1505,20 @@ decl_module! {
             ensure_root(origin)?;
             StartRewardEra::put(start_reward_era);
         }
+
+        /// Set the base stake limit ratio limit
+        #[weight = 1000]
+        fn set_stake_limit_ratio_limit(origin, stake_limit_ratio_limit: Perbill) {
+            ensure_root(origin)?;
+            StakeLimitRatioLimit::put(stake_limit_ratio_limit);
+        }
+
+        /// Set the effective staking ratio lower limit
+        #[weight = 1000]
+        fn set_effective_staking_ratio_lower_limit(origin, effective_staking_ratio_lower_limit: Perbill) {
+            ensure_root(origin)?;
+            EffectiveStakingRatioLowerLimit::put(effective_staking_ratio_lower_limit);
+        }
     }
 }
 
@@ -1528,31 +1548,95 @@ impl<T: Config> Module<T> {
     /// - O(1).
     /// - 0 DB entry.
     /// # </weight>
-    pub fn stake_limit_of(own_workloads: u128, _: u128) -> BalanceOf<T> {
-        // TODO: Stake limit calculation, this should be enable and adjust in olympus phase.
-        /*let total_issuance = TryInto::<u128>::try_into(T::Currency::total_issuance())
-            .ok()
-            .unwrap();
-
-        // total_workloads cannot be zero, or system go panic!
-        if total_workloads == 0 {
-            Zero::zero()
-        } else {
-            let workloads_to_stakes = (( own_workloads.wrapping_mul(total_issuance) / total_workloads / 2) as u128)
-                .min(u64::max_value() as u128);
-
-            workloads_to_stakes.try_into().ok().unwrap()
-        }*/
-
-        // Now, we apply directly mapping algorithm for the early stage:
-        // 1. Maxwell 1.0: 1 terabytes -> 80,000 CRUs
-        // 2. Olympus 1.0: 1 terabytes -> 30 CRUs(tmp)
-        // ps: we treat 1 terabytes as 1_000_000_000_000 for make `mapping_ratio = 1`
+    pub fn stage_one_stake_limit_of(own_workloads: u128) -> BalanceOf<T> {
+        // we treat 1 terabytes as 1_000_000_000_000 for make `mapping_ratio = 1`
         if let Some(storage_stakes) = own_workloads.checked_mul(T::SPowerRatio::get()) {
             storage_stakes.try_into().ok().unwrap()
         } else {
             (u64::max_value() as u128).try_into().ok().unwrap()
         }
+    }
+
+    pub fn update_stage_one_stake_limit(workload_map: BTreeMap<T::AccountId, u128>) {
+        // In stage one, state limit / own workload is fixed to T::SPowerRatio
+        for (v_stash, _) in <Validators<T>>::iter() {
+            let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
+            Self::upsert_stake_limit(
+                &v_stash,
+                Self::stage_one_stake_limit_of(*v_own_workload),
+            );
+        }
+    }
+
+    /// Calculate the stake limit by storage workloads, returns the stake limit value
+    ///
+    /// # <weight>
+    /// - Independent of the arguments. Insignificant complexity.
+    /// - O(1).
+    /// - 0 DB entry.
+    /// # </weight>
+    pub fn stage_two_stake_limit_of(own_workloads_in_kb: u128, total_workloads_in_kb: u128, total_stake_limit: u128) -> BalanceOf<T> {
+        // total_workloads cannot be zero, or system go panic!
+        if total_workloads_in_kb == 0 {
+            Zero::zero()
+        } else {
+            let workloads_to_stakes = (own_workloads_in_kb.wrapping_mul(total_stake_limit) / total_workloads_in_kb) as u128;
+            workloads_to_stakes.try_into().ok().unwrap()
+        }
+    }
+
+    pub fn update_stage_two_stake_limit(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128, total_stake_limit: u128) {
+
+        let byte_to_kilobyte = |workload_in_byte: u128| {
+            workload_in_byte / 1024
+        };
+
+        // Decrease the precision to kb to avoid overflow
+        let total_workload_in_kb = byte_to_kilobyte(total_workload);
+        for (v_stash, _) in <Validators<T>>::iter() {
+            let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
+            // Decrease the precision to kb to avoid overflow
+            let v_own_workload_in_kb = byte_to_kilobyte(*v_own_workload);
+            Self::upsert_stake_limit(
+                &v_stash,
+                Self::stage_two_stake_limit_of(v_own_workload_in_kb, total_workload_in_kb, total_stake_limit),
+            );
+        }
+    }
+
+    pub fn extra_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> Perbill {
+        let to_num =
+            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
+        // TODO: Confirm the real function with Bova and change it
+        // Multiple the percent by four, maximum value is 100%
+        let mul_four = |percent: Perbill| {
+            let mut init_percent = Perbill::zero();
+            for _ in 0..4 {
+                init_percent = init_percent.saturating_add(percent.clone());
+            }
+            init_percent
+        };
+        if let Some(active_era) = Self::active_era() {
+            let total_effective_stake = <ErasTotalStakes<T>>::get(&active_era.index);
+            let effective_stake_ratio = Perbill::from_rational_approximation(to_num(total_effective_stake), to_num(total_issuance));
+            if effective_stake_ratio > Self::effective_staking_ratio_lower_limit() {
+                return Perbill::zero();
+            }
+            return mul_four(Self::effective_staking_ratio_lower_limit().saturating_sub(effective_stake_ratio));
+        }
+        return Perbill::zero();
+    }
+
+    fn calculate_total_stake_limit() -> u128 {
+        let total_issuance = T::Currency::total_issuance();
+        let stake_limit_ratio_limit = Self::stake_limit_ratio_limit();
+        // If effective staking ratio is smaller than some value, we should increase the total stake limit
+        let extra_stake_limit_ratio_limit = Self::extra_ratio_according_to_effective_staking(total_issuance.clone());
+        // This value can be larger than total issuance.
+        let total_stake_limit = TryInto::<u128>::try_into((stake_limit_ratio_limit * total_issuance).saturating_add(extra_stake_limit_ratio_limit * total_issuance))
+            .ok()
+            .unwrap();
+        total_stake_limit
     }
 
     /// Get the updated (increased) guarantee relationship
@@ -2437,12 +2521,14 @@ impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, 
 
 impl<T: Config> swork::Works<T::AccountId> for Module<T> {
     fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
-        for (v_stash, _) in <Validators<T>>::iter() {
-            let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
-            Self::upsert_stake_limit(
-                &v_stash,
-                Self::stake_limit_of(*v_own_workload, total_workload),
-            );
+        // 1. Calculate total stake limit
+        let total_stake_limit = Self::calculate_total_stake_limit();
+
+        // 2. total_workload * SPowerRatio < total_stake_limit => stage one
+        if total_workload.saturating_mul(T::SPowerRatio::get()) < total_stake_limit {
+            Self::update_stage_one_stake_limit(workload_map);
+        } else {
+            Self::update_stage_two_stake_limit(workload_map, total_workload, total_stake_limit);
         }
     }
 }

@@ -81,6 +81,7 @@ swork = { package = "cstrml-swork", path = "../cstrml/swork", default-features =
 staking = { package = "cstrml-staking", path = "../cstrml/staking", default-features = false, version = "0.12.0" }
 benefits = { package = "cstrml-benefits", path = "../cstrml/benefits", default-features = false, version = "0.12.0" }
 locks = { package = "cstrml-locks", path = "../cstrml/locks", default-features = false, version = "0.12.0" }
+csm = { package = "cstrml-csm", path = "../cstrml/csm", default-features = false, version = "0.12.0" }
 
 # crust benchmark dependencies
 swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "0.12.0" }
@@ -133,6 +134,7 @@ std = [
     "swork/std",
     "benefits/std",
     "locks/std",
+    "csm/std",
     "frame-system/std",
     "frame-system-rpc-runtime-api/std",
     "pallet-timestamp/std",
@@ -152,5 +154,6 @@ runtime-benchmarks = [
     "frame-system-benchmarking",
     "staking/runtime-benchmarks",
     "market/runtime-benchmarks",
+    "csm/runtime-benchmarks",
     "swork-benchmarking"
 ]

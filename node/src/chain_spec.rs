@@ -214,13 +214,14 @@ fn testnet_genesis(
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
-        balances: Some(BalancesConfig {
+        balances_Instance1: Some(BalancesConfig {
             balances: endowed_accounts
                 .iter()
                 .cloned()
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
         }),
+        balances_Instance2: Some(Default::default()),
         pallet_indices: Some(IndicesConfig {
             indices: vec![],
         }),
@@ -336,13 +337,14 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
-        balances: Some(BalancesConfig {
+        balances_Instance1: Some(BalancesConfig {
             balances: endowed_accounts
                 .iter()
                 .cloned()
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
         }),
+        balances_Instance2: Some(Default::default()),
         pallet_indices: Some(IndicesConfig {
             indices: vec![],
         }),
@@ -457,13 +459,14 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
         }),
-        balances: Some(BalancesConfig {
+        balances_Instance1: Some(BalancesConfig {
             balances: endowed_accounts
                 .iter()
                 .cloned()
                 .map(|k| (k, ENDOWMENT))
                 .collect(),
         }),
+        balances_Instance2: Some(Default::default()),
         pallet_indices: Some(IndicesConfig {
             indices: vec![],
         }),

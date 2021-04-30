@@ -58,7 +58,7 @@ pub struct CSMUnlockChunk<Balance: HasCompact> {
     bn: BlockNumber,
 }
 
-/// The ledger of a (bonded) stash.
+/// The ledger of a account.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, Default)]
 pub struct CSMLedger<Balance: HasCompact> {
     /// The total amount of the stash's balance that we are currently accounting for.

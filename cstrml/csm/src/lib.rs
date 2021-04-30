@@ -242,26 +242,26 @@ decl_module! {
             }
         }
 
-	    /// Rebond a portion of the account scheduled to be unlocked.
-		#[weight = T::WeightInfo::rebond(MAX_UNLOCKING_CHUNKS as u32)]
-		fn rebond(origin, #[compact] value: BalanceOf<T>) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
+        /// Rebond a portion of the account scheduled to be unlocked.
+        #[weight = T::WeightInfo::rebond(MAX_UNLOCKING_CHUNKS as u32)]
+        fn rebond(origin, #[compact] value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
             // 1. Ensure who has the ledger
             ensure!(<Ledger<T>>::contains_key(&who), Error::<T>::NotBonded);
             let mut ledger = Self::ledger(&who);
-			ensure!(!ledger.unlocking.is_empty(), Error::<T>::NoUnlockChunk);
+            ensure!(!ledger.unlocking.is_empty(), Error::<T>::NoUnlockChunk);
 
-			ledger = ledger.rebond(value);
-			// last check: the new active amount of ledger must be more than ED.
-			ensure!(ledger.active >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+            ledger = ledger.rebond(value);
+            // last check: the new active amount of ledger must be more than ED.
+            ensure!(ledger.active >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
-			Self::update_ledger(&who, &ledger);
-			Ok(Some(
-				35 * WEIGHT_PER_MICROS
-				+ 50 * WEIGHT_PER_NANOS * (ledger.unlocking.len() as Weight)
-				+ T::DbWeight::get().reads_writes(3, 2)
-			).into())
-		}
+            Self::update_ledger(&who, &ledger);
+            Ok(Some(
+                35 * WEIGHT_PER_MICROS
+                + 50 * WEIGHT_PER_NANOS * (ledger.unlocking.len() as Weight)
+                + T::DbWeight::get().reads_writes(3, 2)
+            ).into())
+        }
 
         /// Remove any unlocked chunks from the `unlocking` queue from our management.
         ///

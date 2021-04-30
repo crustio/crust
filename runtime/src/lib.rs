@@ -821,7 +821,7 @@ impl locks::Config for Runtime {
 }
 
 parameter_types! {
-    pub const CSMBondingDuration: BlockNumber = 15*DAYS;
+    pub const CSMBondingDuration: BlockNumber = 15 * DAYS;
 }
 
 impl csm::Config for Runtime {

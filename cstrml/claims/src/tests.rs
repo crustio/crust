@@ -202,6 +202,41 @@ fn bond_eth_should_work() {
     });
 }
 
+#[test]
+fn force_claim_should_work() {
+    new_test_ext().execute_with(|| {
+        // 0. Set miner and superior
+        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
+        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+
+        // 1. Set claim limit = 100
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+        assert_eq!(CrustClaims::claim_limit(), 100);
+
+        // 2. Mint a claim
+        let tx_hash = get_legal_tx_hash1();
+        let eth_addr = get_legal_eth_addr();
+        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
+
+        // 3. Total issuance should be 0
+        assert_eq!(Balances::total_issuance(), 0);
+
+        // 4. Force claim should be ok
+        assert_ok!(CrustClaims::force_claim(Origin::root(), tx_hash.clone()));
+        assert_eq!(CrustClaims::claimed(tx_hash.clone()), true);
+
+        // 5. Total issuance should not change
+        assert_eq!(Balances::total_issuance(), 0);
+
+        // 6. Claim should failed
+        let legal_sig = get_claim_legal_eth_sig();
+        assert_noop!(
+            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), legal_sig.clone()),
+            Error::<Test>::AlreadyBeClaimed
+        );
+    });
+}
+
 /// Mainnet claims test cases
 #[test]
 fn cru18_happy_pass_should_work() {

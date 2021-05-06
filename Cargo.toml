@@ -19,7 +19,7 @@ members = [
     'cstrml/market',
     'cstrml/locks',
     'cstrml/benefits',
-    'cstrml/csm',
+    'cstrml/csm-locking',
     'cstrml/swork/benchmarking',
     'runtime',
     'rpc',

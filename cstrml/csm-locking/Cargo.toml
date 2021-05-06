@@ -1,5 +1,5 @@
 [package]
-name = "cstrml-csm"
+name = "cstrml-csm-locking"
 version = "0.12.0"
 authors = ["crustio"]
 edition = "2018"

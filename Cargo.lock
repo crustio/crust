@@ -1139,7 +1139,7 @@ dependencies = [
  "cstrml-benefits",
  "cstrml-candy",
  "cstrml-claims",
- "cstrml-csm",
+ "cstrml-csm-locking",
  "cstrml-locks",
  "cstrml-market",
  "cstrml-staking",
@@ -1308,7 +1308,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cstrml-csm"
+name = "cstrml-csm-locking"
 version = "0.12.0"
 dependencies = [
  "cst-primitives",

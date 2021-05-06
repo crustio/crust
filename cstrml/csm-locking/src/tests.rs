@@ -14,18 +14,18 @@ use crate::CSMUnlockChunk;
 fn bond_should_work() {
     ExtBuilder::default().build().execute_with(|| {
         let _ = Balances::make_free_balance_be(&11, 1500);
-        assert_ok!(CSM::bond(Origin::signed(11), 1000));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1000));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1000,
                 active: 1000,
                 unlocking: vec![]
             }
         );
-        assert_ok!(CSM::bond(Origin::signed(11), 200));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 200));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1200,
                 active: 1200,
@@ -35,9 +35,9 @@ fn bond_should_work() {
 
         let _ = Balances::make_free_balance_be(&11, 3000);
 
-        assert_ok!(CSM::bond(Origin::signed(11), 1800));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1800));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 3000,
                 active: 3000,
@@ -45,9 +45,9 @@ fn bond_should_work() {
             }
         );
 
-        assert_ok!(CSM::bond(Origin::signed(11), 1000));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1000));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 3000,
                 active: 3000,
@@ -62,13 +62,13 @@ fn unbond_should_work() {
     ExtBuilder::default().build().execute_with(|| {
         let _ = Balances::make_free_balance_be(&11, 1500);
         assert_noop!(
-            CSM::unbond(Origin::signed(11), 500),
+            CSMLocking::unbond(Origin::signed(11), 500),
             Error::<Test>::NotBonded,
         );
 
-        assert_ok!(CSM::bond(Origin::signed(11), 1000));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1000));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1000,
                 active: 1000,
@@ -76,9 +76,9 @@ fn unbond_should_work() {
             }
         );
         run_to_block(300);
-        assert_ok!(CSM::unbond(Origin::signed(11), 200));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 200));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1000,
                 active: 800,
@@ -93,10 +93,10 @@ fn unbond_should_work() {
 
         let _ = Balances::make_free_balance_be(&11, 3000);
 
-        assert_ok!(CSM::bond(Origin::signed(11), 1800));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1800));
         // There is no limits
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 2800,
                 active: 2600,
@@ -110,9 +110,9 @@ fn unbond_should_work() {
         );
 
         run_to_block(700);
-        assert_ok!(CSM::unbond(Origin::signed(11), 400));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 400));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 2800,
                 active: 2200,
@@ -130,10 +130,10 @@ fn unbond_should_work() {
         );
 
         for _ in 0..30 {
-            assert_ok!(CSM::unbond(Origin::signed(11), 1));
+            assert_ok!(CSMLocking::unbond(Origin::signed(11), 1));
         }
         assert_noop!(
-            CSM::unbond(Origin::signed(11), 500),
+            CSMLocking::unbond(Origin::signed(11), 500),
             Error::<Test>::NoMoreChunks,
         );
     });
@@ -144,13 +144,13 @@ fn rebond_should_work() {
     ExtBuilder::default().build().execute_with(|| {
         let _ = Balances::make_free_balance_be(&11, 3000);
         assert_noop!(
-            CSM::rebond(Origin::signed(11), 500),
+            CSMLocking::rebond(Origin::signed(11), 500),
             Error::<Test>::NotBonded,
         );
 
-        assert_ok!(CSM::bond(Origin::signed(11), 1000));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1000));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1000,
                 active: 1000,
@@ -158,15 +158,15 @@ fn rebond_should_work() {
             }
         );
         run_to_block(300);
-        assert_ok!(CSM::unbond(Origin::signed(11), 200));
-        assert_ok!(CSM::bond(Origin::signed(11), 1800));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 200));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1800));
         run_to_block(700);
-        assert_ok!(CSM::unbond(Origin::signed(11), 400));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 400));
 
         run_to_block(1000);
-        assert_ok!(CSM::rebond(Origin::signed(11), 300));
+        assert_ok!(CSMLocking::rebond(Origin::signed(11), 300));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 2800,
                 active: 2500,
@@ -183,9 +183,9 @@ fn rebond_should_work() {
             }
         );
         run_to_block(2000);
-        assert_ok!(CSM::rebond(Origin::signed(11), 200));
+        assert_ok!(CSMLocking::rebond(Origin::signed(11), 200));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 2800,
                 active: 2700,
@@ -198,9 +198,9 @@ fn rebond_should_work() {
             }
         );
         run_to_block(3000);
-        assert_ok!(CSM::rebond(Origin::signed(11), 2000));
+        assert_ok!(CSMLocking::rebond(Origin::signed(11), 2000));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 2800,
                 active: 2800,
@@ -209,7 +209,7 @@ fn rebond_should_work() {
         );
 
         assert_noop!(
-            CSM::rebond(Origin::signed(11), 500),
+            CSMLocking::rebond(Origin::signed(11), 500),
             Error::<Test>::NoUnlockChunk,
         );
     });
@@ -221,13 +221,13 @@ fn withdraw_should_work() {
     ExtBuilder::default().build().execute_with(|| {
         let _ = Balances::make_free_balance_be(&11, 3000);
         assert_noop!(
-            CSM::withdraw_unbonded(Origin::signed(11)),
+            CSMLocking::withdraw_unbonded(Origin::signed(11)),
             Error::<Test>::NotBonded,
         );
 
-        assert_ok!(CSM::bond(Origin::signed(11), 1000));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1000));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1000,
                 active: 1000,
@@ -235,16 +235,16 @@ fn withdraw_should_work() {
             }
         );
         run_to_block(300);
-        assert_ok!(CSM::unbond(Origin::signed(11), 200));
-        assert_ok!(CSM::bond(Origin::signed(11), 1800));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 200));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1800));
         run_to_block(700);
-        assert_ok!(CSM::unbond(Origin::signed(11), 400));
-        assert_ok!(CSM::unbond(Origin::signed(11), 400));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 400));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 400));
 
         run_to_block(1000);
-        assert_ok!(CSM::withdraw_unbonded(Origin::signed(11)));
+        assert_ok!(CSMLocking::withdraw_unbonded(Origin::signed(11)));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 2800,
                 active: 1800,
@@ -266,9 +266,9 @@ fn withdraw_should_work() {
         );
 
         run_to_block(1550);
-        assert_ok!(CSM::withdraw_unbonded(Origin::signed(11)));
+        assert_ok!(CSMLocking::withdraw_unbonded(Origin::signed(11)));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 2600,
                 active: 1800,
@@ -286,18 +286,18 @@ fn withdraw_should_work() {
         );
 
         run_to_block(2000);
-        assert_ok!(CSM::withdraw_unbonded(Origin::signed(11)));
+        assert_ok!(CSMLocking::withdraw_unbonded(Origin::signed(11)));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1800,
                 active: 1800,
                 unlocking: vec![]
             }
         );
-        assert_ok!(CSM::unbond(Origin::signed(11), 2200));
+        assert_ok!(CSMLocking::unbond(Origin::signed(11), 2200));
         run_to_block(3300);
-        assert_ok!(CSM::withdraw_unbonded(Origin::signed(11)));
+        assert_ok!(CSMLocking::withdraw_unbonded(Origin::signed(11)));
         assert_eq!(<Ledger<Test>>::contains_key(&11), false);
         assert_eq!(Balances::locks(&1).len(), 0);
     });
@@ -307,16 +307,16 @@ fn withdraw_should_work() {
 fn force_unstake_should_work() {
     ExtBuilder::default().build().execute_with(|| {
         let _ = Balances::make_free_balance_be(&11, 3000);
-        assert_ok!(CSM::bond(Origin::signed(11), 1000));
+        assert_ok!(CSMLocking::bond(Origin::signed(11), 1000));
         assert_eq!(
-            CSM::ledger(&11),
+            CSMLocking::ledger(&11),
             CSMLedger {
                 total: 1000,
                 active: 1000,
                 unlocking: vec![]
             }
         );
-        assert_ok!(CSM::force_unstake(Origin::root(), 11));
+        assert_ok!(CSMLocking::force_unstake(Origin::root(), 11));
         assert_eq!(<Ledger<Test>>::contains_key(&11), false);
         assert_eq!(Balances::locks(&1).len(), 0);
     });

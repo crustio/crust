@@ -824,11 +824,11 @@ parameter_types! {
     pub const CSMBondingDuration: BlockNumber = 15 * DAYS;
 }
 
-impl csm::Config for Runtime {
-    type Currency = CSMToken;
+impl csm_locking::Config for Runtime {
+    type Currency = CSM;
     type Event = Event;
     type BondingDuration = CSMBondingDuration;
-    type WeightInfo = csm::weight::WeightInfo;
+    type WeightInfo = csm_locking::weight::WeightInfo;
 }
 
 construct_runtime! {
@@ -890,8 +890,8 @@ construct_runtime! {
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
         Benefits: benefits::{Module, Call, Storage, Event<T>},
         Locks: locks::{Module, Call, Storage, Config<T>, Event<T>},
-        CSMToken: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
-        CSM: csm::{Module, Call, Storage, Event<T>},
+        CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
+        CSMLocking: csm_locking::{Module, Call, Storage, Event<T>},
     }
 }
 

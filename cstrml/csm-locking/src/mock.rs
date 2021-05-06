@@ -4,7 +4,7 @@
 //! Test utilities
 
 use crate::*;
-use crate as csm;
+use crate as csm_locking;
 use frame_support::{
     parameter_types,
     traits::{Get, OnInitialize, OnFinalize},
@@ -99,7 +99,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-		CSM: csm::{Module, Call, Storage, Event<T>},
+		CSMLocking: csm_locking::{Module, Call, Storage, Event<T>},
 	}
 );
 

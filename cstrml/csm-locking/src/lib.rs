@@ -37,7 +37,7 @@ use primitives::BlockNumber;
 pub mod weight;
 
 const MAX_UNLOCKING_CHUNKS: usize = 32;
-const STAKING_ID: LockIdentifier = *b"csm-stak";
+const LOCKING_ID: LockIdentifier = *b"csm-lock";
 
 // TODO: Add benchmarking
 pub trait WeightInfo {
@@ -128,7 +128,7 @@ pub type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 pub trait Config: frame_system::Config {
-    /// The staking balance.
+    /// The locking balance.
     type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
 
     /// The overarching event type.
@@ -142,7 +142,7 @@ pub trait Config: frame_system::Config {
 }
 
 decl_storage! {
-    trait Store for Module<T: Config> as Staking {
+    trait Store for Module<T: Config> as CSMLocking {
         /// Map from all (unlocked) "controller" accounts to the info regarding the CSM.
         pub Ledger get(fn ledger):
             map hasher(blake2_128_concat) T::AccountId
@@ -166,7 +166,7 @@ decl_event!(
 );
 
 decl_error! {
-    /// Error for the staking module.
+    /// Error for the locking module.
     pub enum Error for Module<T: Config> {
         /// Not bonded.
         NotBonded,
@@ -228,7 +228,7 @@ decl_module! {
             if !value.is_zero() {
                 ledger.active -= value;
 
-                // 4. Avoid there being a dust balance left in the staking system.
+                // 4. Avoid there being a dust balance left in the csm locking system.
                 if ledger.active < T::Currency::minimum_balance() {
                     value += ledger.active;
                     ledger.active = Zero::zero();
@@ -319,7 +319,7 @@ impl<T: Config> Module<T> {
         ledger: &CSMLedger<BalanceOf<T>>,
     ) {
         T::Currency::set_lock(
-            STAKING_ID,
+            LOCKING_ID,
             who,
             ledger.total,
             WithdrawReasons::all(),
@@ -328,9 +328,9 @@ impl<T: Config> Module<T> {
     }
 
     fn kill_ledger(who: &T::AccountId) {
-        // remove all staking-related information.
+        // remove all locking-related information.
         <Ledger<T>>::remove(who);
         // remove the lock.
-        T::Currency::remove_lock(STAKING_ID, who);
+        T::Currency::remove_lock(LOCKING_ID, who);
     }
 }

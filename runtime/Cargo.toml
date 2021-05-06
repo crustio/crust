@@ -79,7 +79,7 @@ market = { package = "cstrml-market", path = "../cstrml/market", default-feature
 primitives = { package = "cst-primitives", path = "../primitives", default-features = false, version = "0.12.0" }
 swork = { package = "cstrml-swork", path = "../cstrml/swork", default-features = false, version = "0.12.0" }
 staking = { package = "cstrml-staking", path = "../cstrml/staking", default-features = false, version = "0.12.0" }
-
+csm-locking = { package = "cstrml-csm-locking", path = "../cstrml/csm-locking", default-features = false, version = "0.12.0" }
 # crust benchmark dependencies
 swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "0.12.0" }
 
@@ -129,6 +129,7 @@ std = [
     'staking/std',
     'pallet-sudo/std',
     'swork/std',
+    "csm-locking/std",
     'frame-system/std',
     'frame-system-rpc-runtime-api/std',
     'pallet-timestamp/std',
@@ -136,7 +137,7 @@ std = [
     'pallet-transaction-payment/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'pallet-treasury/std',
-    'pallet-utility/std',
+    'pallet-utility/std'
 ]
 runtime-benchmarks = [
     "frame-benchmarking",
@@ -148,5 +149,6 @@ runtime-benchmarks = [
     "frame-system-benchmarking",
     "staking/runtime-benchmarks",
     "market/runtime-benchmarks",
+    "csm-locking/runtime-benchmarks",
     "swork-benchmarking"
 ]

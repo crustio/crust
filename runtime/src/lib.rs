@@ -792,6 +792,13 @@ impl market::Config for Runtime {
     type MaximumFileSize = MaximumFileSize;
 }
 
+impl csm_locking::Config for Runtime {
+    type Currency = CSM;
+    type Event = Event;
+    type BondingDuration = CSMBondingDuration;
+    type WeightInfo = csm_locking::weight::WeightInfo;
+}
+
 construct_runtime! {
     pub enum Runtime where
         Block = Block,
@@ -850,6 +857,7 @@ construct_runtime! {
         Candy: candy::{Module, Call, Storage, Event<T>},
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
         CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
+        CSMLocking: csm_locking::{Module, Call, Storage, Event<T>},
     }
 }
 

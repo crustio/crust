@@ -325,6 +325,12 @@ decl_module! {
             Self::process_claim(tx, signer, dest)
         }
 
+        #[weight = 1000]
+        fn force_claim(origin, tx: EthereumTxHash) {
+            ensure_root(origin)?;
+            Claimed::insert(tx, true);
+        }
+
 		/// Register a Ethereum Address for an given account
 		///
 		/// # <weight>

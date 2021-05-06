@@ -820,6 +820,17 @@ impl locks::Config for Runtime {
     type UnlockPeriod = UnlockPeriod;
 }
 
+parameter_types! {
+    pub const CSMBondingDuration: BlockNumber = 15 * DAYS;
+}
+
+impl csm_locking::Config for Runtime {
+    type Currency = CSM;
+    type Event = Event;
+    type BondingDuration = CSMBondingDuration;
+    type WeightInfo = csm_locking::weight::WeightInfo;
+}
+
 construct_runtime! {
     pub enum Runtime where
         Block = Block,
@@ -880,6 +891,7 @@ construct_runtime! {
         Benefits: benefits::{Module, Call, Storage, Event<T>},
         Locks: locks::{Module, Call, Storage, Config<T>, Event<T>},
         CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
+        CSMLocking: csm_locking::{Module, Call, Storage, Event<T>},
     }
 }
 

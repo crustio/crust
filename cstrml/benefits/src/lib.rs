@@ -285,7 +285,8 @@ impl<T: Config> Module<T> {
     }
 
     pub fn calculate_total_fee_reduction_count(funds: &BalanceOf<T>) -> u32 {
-        (*funds / T::BenefitReportWorkCost::get()).saturated_into()
+        // TODO: Remove the free count later
+        (*funds / T::BenefitReportWorkCost::get()).saturated_into::<u32>().saturating_add(12u32)
     }
 
     pub fn maybe_refresh_fee_reduction_benefits(current_benefits: &EraBenefits<BalanceOf<T>>, fee_reduction: &mut FeeReductionBenefit<BalanceOf<T>>) {

@@ -810,6 +810,13 @@ impl benefits::Config for Runtime {
     type BenefitMarketCostRatio = BenefitMarketCostRatio;
 }
 
+impl csm_locking::Config for Runtime {
+    type Currency = CSM;
+    type Event = Event;
+    type BondingDuration = CSMBondingDuration;
+    type WeightInfo = csm_locking::weight::WeightInfo;
+}
+
 construct_runtime! {
     pub enum Runtime where
         Block = Block,
@@ -869,6 +876,7 @@ construct_runtime! {
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
         Benefits: benefits::{Module, Call, Storage, Event<T>},
         CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
+        CSMLocking: csm_locking::{Module, Call, Storage, Event<T>},
     }
 }
 

@@ -362,3 +362,30 @@ fn double_cru18_claim_should_failed() {
         );
     });
 }
+
+#[test]
+fn force_delete_cru18_preclaim_should_work() {
+    new_test_ext().execute_with(|| {
+        // 0. Set cru18 miner
+        assert_ok!(CrustClaims::set_cru18_miner(Origin::root(), 1));
+
+        // 1. Mint a cru18 claim
+        let eth_addr = get_legal_eth_addr();
+        assert_ok!(CrustClaims::mint_cru18_claim(Origin::signed(1), eth_addr.clone(), 100));
+
+        // 2. Force delete preclaim
+        assert_ok!(CrustClaims::force_delete_cru18_preclaim(Origin::root(), eth_addr.clone()));
+
+        // 3. Check storage
+        assert_eq!(CrustClaims::cru18_pre_claims(eth_addr.clone()), None);
+        assert_eq!(CrustClaims::cru18_claimed(eth_addr.clone()), false);
+
+        // 4. Claim with legal sig should failed
+        // Pay RUSTs to the TEST account:0100000000000000
+        let sig = get_cru18_claim_legal_eth_sig();
+        assert_noop!(
+            CrustClaims::claim_cru18(Origin::none(), 1, sig.clone()),
+            Error::<Test>::SignerHasNoPreClaim
+        );
+    });
+}

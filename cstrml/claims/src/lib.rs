@@ -325,6 +325,8 @@ decl_module! {
             Self::process_claim(tx, signer, dest)
         }
 
+        /// Force claim maxwell token for the 'dead' MINTED claims, this can only be called by `_ROOT_`
+        /// And make sure this `tx` is minted, and this action won't cost claim limit.
         #[weight = 1000]
         fn force_claim(origin, tx: EthereumTxHash) {
             ensure_root(origin)?;
@@ -403,6 +405,15 @@ decl_module! {
 
             // 3. Make sure signer is match with pre-claimer
             Self::process_cru18_claim(signer, dest)
+        }
+
+        /// Force delete the 'dead' cru18 preclaim, this can only be called by `_ROOT_` origin
+        /// And make sure this `address` DO NOT make any claim on cru18 before delete it.
+        #[weight = 1000]
+        fn force_delete_cru18_preclaim(origin, address: EthereumAddress) {
+            ensure_root(origin)?;
+            <Cru18PreClaims<T>>::remove(address.clone());
+            Cru18Claimed::remove(address);
         }
     }
 }

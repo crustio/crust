@@ -146,6 +146,7 @@ decl_module! {
         }
 
         /// Unlock the CRU18 or CRU24 one period
+        // TODO: Refine this weight
         #[weight = 1000]
         fn unlock(origin) -> DispatchResult {
             let who = ensure_signed(origin)?;

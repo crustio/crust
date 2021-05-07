@@ -7,8 +7,8 @@
 #[cfg(test)]
 mod mock;
 
-// #[cfg(any(feature = "runtime-benchmarks", test))]
-// pub mod benchmarking;
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
 
 #[cfg(test)]
 mod tests;

@@ -156,5 +156,6 @@ runtime-benchmarks = [
     "market/runtime-benchmarks",
     "csm-locking/runtime-benchmarks",
     "swork-benchmarking",
-    "benefits/runtime-benchmarks"
+    "benefits/runtime-benchmarks",
+    "csm-locking/runtime-benchmarks",
 ]

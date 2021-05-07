@@ -26,6 +26,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
+
 const CRU_LOCK_ID: LockIdentifier = *b"crulock ";
 
 /// The balance type of this module.

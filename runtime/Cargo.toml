@@ -158,4 +158,5 @@ runtime-benchmarks = [
     "swork-benchmarking",
     "benefits/runtime-benchmarks",
     "csm-locking/runtime-benchmarks",
+    "locks/runtime-benchmarks",
 ]

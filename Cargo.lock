@@ -1335,6 +1335,7 @@ version = "0.12.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex-literal",

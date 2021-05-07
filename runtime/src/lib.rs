@@ -1136,6 +1136,7 @@ impl_runtime_apis! {
             add_benchmark!(params, batches, swork, SworkBench::<Runtime>);
             add_benchmark!(params, batches, benefits, Benefits);
             add_benchmark!(params, batches, csmlocking, CSMLocking);
+            add_benchmark!(params, batches, locks, Locks);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
             Ok(batches)

@@ -22,9 +22,12 @@ sp-std = { default-features = false, version = "3.0.0" }
 sp-io = { default-features = false, version = "3.0.0" }
 primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
 
+frame-benchmarking = { default-features = false, optional = true, version = "3.0.0" }
+
 [dev-dependencies]
 balances = { path = "../balances", package = "cstrml-balances" }
 hex-literal = "0.3.1"
+frame-benchmarking = "3.0.0"
 
 [features]
 default = ["std"]
@@ -39,4 +42,7 @@ std = [
     "sp-io/std",
     "frame-support/std",
     "frame-system/std",
+]
+runtime-benchmarks = [
+    "frame-benchmarking",
 ]

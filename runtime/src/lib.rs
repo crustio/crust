@@ -1129,11 +1129,12 @@ impl_runtime_apis! {
             let whitelist: Vec<TrackedStorageKey> = vec![];
             let mut batches = Vec::<BenchmarkBatch>::new();
             let params = (&config, &whitelist);
-            add_benchmark!(params, batches, balances, Balances);
+            // add_benchmark!(params, batches, balances, Balances);
             add_benchmark!(params, batches, system, SystemBench::<Runtime>);
             add_benchmark!(params, batches, staking, Staking);
             add_benchmark!(params, batches, market, Market);
             add_benchmark!(params, batches, swork, SworkBench::<Runtime>);
+            add_benchmark!(params, batches, benefits, Benefits);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
             Ok(batches)

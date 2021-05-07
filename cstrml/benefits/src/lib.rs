@@ -29,6 +29,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
+
 /// The balance type of this module.
 pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;

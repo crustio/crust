@@ -297,14 +297,6 @@ decl_module! {
             0
         }
 
-        fn on_runtime_upgrade() -> frame_support::weights::Weight {
-            if let Some(code) = take_storage_value::<SworkerCode>(b"Swork", b"Code", &[]) {
-                let expired_bn = <system::Module<T>>::block_number() + T::BlockNumber::from(180 * DAYS);
-                <Codes<T>>::insert(&code, expired_bn);
-            }
-            T::BlockWeights::get().max_block
-        }
-
         /// AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`
         ///

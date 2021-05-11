@@ -810,6 +810,10 @@ impl benefits::Config for Runtime {
     type BenefitMarketCostRatio = BenefitMarketCostRatio;
 }
 
+parameter_types! {
+    pub const CSMBondingDuration: BlockNumber = 15 * DAYS;
+}
+
 impl csm_locking::Config for Runtime {
     type Currency = CSM;
     type Event = Event;

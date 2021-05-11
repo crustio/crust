@@ -214,7 +214,7 @@ impl<T: Config> Module<T> {
         Self::maybe_refresh_fee_reduction_benefits(&current_benefits, &mut fee_reduction);
         // won't update reduction detail if it has no staking
         // to save db writing time
-        if fee_reduction.used_fee_reduction_count < fee_reduction.total_fee_reduction_count {
+        if fee_reduction.used_fee_reduction_count < fee_reduction.total_fee_reduction_count.saturating_add(12u32) {
             fee_reduction.used_fee_reduction_count += 1;
             <FeeReductionBenefits<T>>::insert(&who, fee_reduction);
             return true;
@@ -286,7 +286,7 @@ impl<T: Config> Module<T> {
 
     pub fn calculate_total_fee_reduction_count(funds: &BalanceOf<T>) -> u32 {
         // TODO: Remove the free count later
-        (*funds / T::BenefitReportWorkCost::get()).saturated_into::<u32>().saturating_add(12u32)
+        (*funds / T::BenefitReportWorkCost::get()).saturated_into()
     }
 
     pub fn maybe_refresh_fee_reduction_benefits(current_benefits: &EraBenefits<BalanceOf<T>>, fee_reduction: &mut FeeReductionBenefit<BalanceOf<T>>) {

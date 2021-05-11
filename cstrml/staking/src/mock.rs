@@ -283,7 +283,7 @@ frame_support::construct_runtime!(
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
 		Staking: staking::{Module, Call, Config<T>, Storage, Event<T>},
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
-		Swork: swork::{Module, Call, Storage, Event<T>, Config},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
 

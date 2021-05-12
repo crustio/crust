@@ -287,7 +287,7 @@ pub struct AllowedList;
 impl AllowedList {
 	fn is_allowed(id: u32) -> bool {
 		match id {
-			6666 => true, // Local testnet
+			2001 => true, // Local testnet
 			666 => true, // Acala
 			30 => true, // Phala
 			_ => false

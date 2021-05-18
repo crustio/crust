@@ -43,7 +43,7 @@ decl_module! {
 			};
 
 			// TODO: Use Xtoken as well to pay this order
-			T::XcmpMessageSender::send_xcm(MultiLocation::X2(Junction::Parent, Junction::Parachain { id: 7777 }), transact).map_err(|_| Error::<T>::FailedToSend)?;
+			T::XcmpMessageSender::send_xcm(MultiLocation::X2(Junction::Parent, Junction::Parachain { id: 2001 }), transact).map_err(|_| Error::<T>::FailedToSend)?;
 
 			Ok(().into())
 		}

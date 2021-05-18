@@ -30,7 +30,7 @@ use sp_api::impl_runtime_apis;
 use sp_core::OpaqueMetadata;
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{BlakeTwo256, Block as BlockT, IdentityLookup, Convert, SaturatedConversion},
+	traits::{BlakeTwo256, Block as BlockT, AccountIdLookup, Convert, SaturatedConversion},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult,
 };
@@ -42,7 +42,7 @@ use sp_version::RuntimeVersion;
 // A few exports that help ease life for downstream crates.
 use sp_std::marker::PhantomData;
 pub use frame_support::{
-	construct_runtime, parameter_types, PalletId,
+	construct_runtime, parameter_types, PalletId, match_type,
 	traits::{Randomness, OriginTrait, IsInVec, All},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -59,18 +59,21 @@ pub use sp_runtime::{Perbill, Permill};
 
 // XCM imports
 use polkadot_parachain::primitives::Sibling;
-use xcm::v0::{Junction, MultiLocation, NetworkId, OriginKind};
+use xcm::v0::{MultiAsset, Junction::*, MultiLocation::*, NetworkId, BodyId, OriginKind};
 use xcm_builder::{
 	AccountId32Aliases, CurrencyAdapter, LocationInverter, ParentIsDefault, RelayChainAsNative,
 	SiblingParachainConvertsVia, SignedAccountId32AsNative,
-	SovereignSignedViaLocation, FixedRateOfConcreteFungible, EnsureXcmOrigin,
+	SovereignSignedViaLocation, EnsureXcmOrigin, AllowUnpaidExecutionFrom, ParentAsSuperuser,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds, IsConcrete, NativeAsset,
-	AllowUnpaidExecutionFrom, ParentAsSuperuser, SiblingParachainAsNative
+	UsingComponets, SignedToAccountId32, SiblingParachainAsNative
 };
 use xcm_executor::{
 	traits::ConvertOrigin,
 	Config, XcmExecutor
 };
+use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
+use xcm::v0::Xcm;
+use frame_support::traits::Contains;
 
 pub type SessionHandlers = ();
 
@@ -103,11 +106,9 @@ pub const DAYS: BlockNumber = HOURS * 24;
 // 1 in 4 blocks (on average, not counting collisions) will be primary babe blocks.
 pub const PRIMARY_PROBABILITY: (u64, u64) = (1, 4);
 
-#[derive(codec::Encode, codec::Decode)]
-pub enum XCMPMessage<XAccountId, XBalance> {
-	/// Transfer tokens to the given account from the Parachain account.
-	TransferToken(XAccountId, XBalance),
-}
+pub const ROC: Balance = 1_000_000_000_000;
+pub const MILLIROC: Balance = 1_000_000_000;
+pub const MICROROC: Balance = 1_000_000;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -159,7 +160,7 @@ impl frame_system::Config for Runtime {
 	/// The aggregated dispatch type that is available for extrinsics.
 	type Call = Call;
 	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
-	type Lookup = IdentityLookup<AccountId>;
+	type Lookup = AccountIdLookup<AccountI, ()>;
 	/// The index type for storing how many extrinsics an account has signed.
 	type Index = Index;
 	/// The index type for blocks.
@@ -238,18 +239,16 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
 	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT / 4;
+	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT / 4;
 }
 
 impl cumulus_pallet_parachain_system::Config for Runtime {
 	type Event = Event;
 	type OnValidationData = ();
-	type SelfParaId = parachain_info::Module<Runtime>;
-	type DownwardMessageHandlers = cumulus_primitives_utility::UnqueuedDmpAsParent<
-		MaxDownwardMessageWeight,
-		XcmExecutor<XcmConfig>,
-		Call,
-	>;
+	type SelfParaId = parachain_info::Pallet<Runtime>;
 	type OutboundXcmpMessageSource = XcmpQueue;
+	type DmpMessageHandler = DmpQueue;
+	type ReservedDmpWeight = ReservedDmpWeight;
 	type XcmpMessageHandler = XcmpQueue;
 	type ReservedXcmpWeight = ReservedXcmpWeight;
 }
@@ -257,12 +256,10 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 impl parachain_info::Config for Runtime {}
 
 parameter_types! {
-	pub const RococoLocation: MultiLocation = MultiLocation::X1(Junction::Parent);
+	pub const RococoLocation: MultiLocation = X1(Parent);
 	pub const RococoNetwork: NetworkId = NetworkId::Polkadot;
 	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
-	pub Ancestry: MultiLocation = Junction::Parachain {
-		id: ParachainInfo::parachain_id().into()
-	}.into();
+	pub Ancestry: MultiLocation = X1(Parachain(ParachainInfo::parachain_id().into()));
 }
 
 type LocationToAccountId = (
@@ -287,7 +284,7 @@ pub struct AllowedList;
 impl AllowedList {
 	fn is_allowed(id: u32) -> bool {
 		match id {
-			2001 => true, // Local testnet
+			6666 => true, // Local testnet
 			666 => true, // Acala
 			30 => true, // Phala
 			_ => false
@@ -319,20 +316,22 @@ pub type XcmOriginToTransactDispatchOrigin = (
 );
 
 parameter_types! {
-	pub UnitWeightCost: Weight = 1_000;
+	// One XCM operation is 1_000_000 weight - almost certainly a conservative estimate.
+	pub UnitWeightCost: Weight = 1_000_000;
+	// One ROC buys 1 second of weight.
+	pub const WeightPrice: (MultiLocation, u128) = (X1(Parent), ROC);
 }
 
-parameter_types! {
-	// 1_000_000_000_000 => 1 unit of asset for 1 unit of Weight.
-	// TODO: Should take the actual weight price. This is just 1_000 ROC per second of weight.
-	pub const WeightPrice: (MultiLocation, u128) = (MultiLocation::X1(Junction::Parent), 1_000);
-	pub AllowUnpaidFrom: Vec<MultiLocation> = vec![ MultiLocation::X1(Junction::Parent) ];
+match_type! {
+	pub type ParentOrParentsUnitPlurality: impl Contains<MultiLocation> = {
+		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. })
+	};
 }
 
 pub type Barrier = (
 	TakeWeightCredit,
 	AllowTopLevelPaidExecutionFrom<All<MultiLocation>>,
-	AllowUnpaidExecutionFrom<IsInVec<AllowUnpaidFrom>>,	// <- Parent gets free execution
+	AllowUnpaidExecutionFrom<ParentOrParentsUnitPlurality>,	// <- Parent gets free execution
 );
 
 pub struct XcmConfig;
@@ -347,15 +346,13 @@ impl Config for XcmConfig {
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
-	type Trader = FixedRateOfConcreteFungible<WeightPrice>;
+	type Trader = UsingComponents<IdentityFee<Balance>, RococoLocation, AccountId, Balances, ()>;
 	type ResponseHandler = ();	// Don't handle responses for now.
 }
 
-parameter_types! {
-	pub const MaxDownwardMessageWeight: Weight = MAXIMUM_BLOCK_WEIGHT / 10;
-}
-
-pub type LocalOriginToLocation = ();
+pub type LocalOriginToLocation = (
+	SignedToAccountId32<Origin, AccountId, RococoNetwork>,
+);
 
 /// The means for routing XCM messages which are not for local execution into the right message
 /// queues.
@@ -371,10 +368,22 @@ impl pallet_xcm::Config for Runtime {
 	type SendXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
 	type XcmRouter = XcmRouter;
 	type ExecuteXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
+	type XcmExecuteFilter = All<(MultiLocation, Xcm<Call>)>;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
+	type XcmTeleportFilter = All<(MultiLocation, Vec<MultiAsset>)>;
+	type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
+}
+
+impl cumulus_pallet_xcm::Config for Runtime {
+	type Event = Event;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 }
 
-impl cumulus_pallet_xcm::Config for Runtime {}
+impl cumulus_pallet_dmp_queue::Config for Runtime {
+	type Event = Event;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
+	type ExecuteOverweightOrigin = frame_system::EnsureRoot<AccountId>;
+}
 
 impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type Event = Event;
@@ -470,14 +479,15 @@ construct_runtime! {
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Call, Storage},
-		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>},
+		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>, ValidateUnsigned},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config, Call},
 
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},
-		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin},
-		CumulusXcm: cumulus_pallet_xcm::{Pallet, Origin},
+		PolkadotXcm: pallet_xcm::{Pallet, Call, Storage, Event<T>, Origin},
+		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin},
+		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>}
 		Xstorage: xstorage::{Pallet, Storage, Call},
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
@@ -486,7 +496,7 @@ construct_runtime! {
 }
 
 /// The address format for describing accounts.
-pub type Address = AccountId;
+pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
 /// Block header type as expected by this runtime.
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
 /// Block type as expected by this runtime.
@@ -555,10 +565,6 @@ impl_runtime_apis! {
 
 		fn check_inherents(block: Block, data: sp_inherents::InherentData) -> sp_inherents::CheckInherentsResult {
 			data.check_extrinsics(&block)
-		}
-
-		fn random_seed() -> <Block as BlockT>::Hash {
-			RandomnessCollectiveFlip::random_seed().0
 		}
 	}
 

@@ -2,7 +2,7 @@
 
 ## Add the following dependency into your runtime
 ```rust
-xstorage = { git = "https://github.com/crustio/crust", branch = "parachain/rococo-v2", package= "xstorage", default-features = false }
+xstorage = { git = "https://github.com/crustio/crust", branch = "parachain/shadow", package= "xstorage", default-features = false }
 ```
 
 ## Add the following code into your runtime

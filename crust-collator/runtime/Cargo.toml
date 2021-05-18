@@ -40,9 +40,10 @@ cumulus-pallet-parachain-system = { path = "../../cumulus/pallets/parachain-syst
 cumulus-primitives-core = { path = "../../cumulus/primitives/core", default-features = false }
 cumulus-primitives-utility = { path = "../../cumulus/primitives/utility", default-features = false }
 cumulus-pallet-xcmp-queue = { path = "../../cumulus/pallets/xcmp-queue", default-features = false }
+cumulus-pallet-dmp-queue = { path = "../../cumulus/pallets/dmp-queue", default-features = false }
 cumulus-pallet-xcm = { path = "../../cumulus/pallets/xcm", default-features = false }
-cumulus-ping = { path = "../../cumulus/rococo-parachains/pallets/ping", default-features = false }
-parachain-info = { path = "../../cumulus/rococo-parachains/pallets/parachain-info", default-features = false }
+cumulus-ping = { path = "../../cumulus/polkadot-parachains/pallets/ping", default-features = false }
+parachain-info = { path = "../../cumulus/polkadot-parachains/pallets/parachain-info", default-features = false }
 
 # Polkadot dependencies
 polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "polkadot-v0.9.1" }
@@ -52,7 +53,7 @@ xcm-executor = { git = "https://github.com/paritytech/polkadot", default-feature
 pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "polkadot-v0.9.1" }
 
 [build-dependencies]
-substrate-wasm-builder = "3.0.0"
+substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.1" }
 
 [features]
 default = [ "std" ]
@@ -83,6 +84,7 @@ std = [
 	"crust-parachain-primitives/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-pallet-xcmp-queue/std",
+	"cumulus-pallet-dmp-queue/std",
 	"cumulus-pallet-xcm/std",
 	"cumulus-primitives-core/std",
 	"cumulus-primitives-utility/std",

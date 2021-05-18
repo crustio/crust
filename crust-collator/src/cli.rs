@@ -60,7 +60,7 @@ pub struct ExportGenesisStateCommand {
 	pub output: Option<PathBuf>,
 
 	/// Id of the parachain this state is for.
-	#[structopt(long, default_value = "100")]
+	#[structopt(long)]
 	pub parachain_id: u32,
 
 	/// Write output in binary. Default is to write in hex.
@@ -117,13 +117,7 @@ pub struct Cli {
 	pub subcommand: Option<Subcommand>,
 
 	#[structopt(flatten)]
-	pub run: RunCmd,
-
-	/// Run node as collator.
-	///
-	/// Note that this is the same as running with `--validator`.
-	#[structopt(long, conflicts_with = "validator")]
-	pub collator: bool,
+	pub run: cumulus_client_cli::RunCmd,
 
 	/// Relaychain arguments
 	#[structopt(raw = true)]

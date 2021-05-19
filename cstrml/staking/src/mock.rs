@@ -465,10 +465,6 @@ impl ExtBuilder {
         }
         .assimilate_storage(&mut storage);
 
-        let _ = swork::GenesisConfig {
-            code: vec![],
-        }.assimilate_storage(&mut storage);
-
         let mut ext = sp_io::TestExternalities::from(storage);
         ext.execute_with(|| {
             init_swork_setup();

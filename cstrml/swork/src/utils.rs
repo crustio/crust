@@ -64,16 +64,16 @@ pub fn verify_identity (
     account_id: &Vec<u8>,
     isv_body: &ISVBody,
     sig: &SworkerSignature,
-    enclave_code: &SworkerCode
-) -> Option<Vec<u8>> {
+    enclave_codes: &Vec<SworkerCode>
+) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
     // 1. Decode ias cert from base64
     let ias_cert_dec = match base64::decode_config(&ias_cert, base64::STANDARD) {
         Ok(c) => c,
-        Err(_) => return None,
+        Err(_) => return (None, None),
     };
     let sig_cert: webpki::EndEntityCert = match webpki::EndEntityCert::from(&ias_cert_dec) {
         Ok(c) => c,
-        Err(_) => return None,
+        Err(_) => return (None, None),
     };
 
     let intermediate_certs: Vec<&[u8]> = Vec::new();
@@ -87,7 +87,7 @@ pub fn verify_identity (
         now_func
     ) {
         Ok(()) => {},
-        Err(_e) => return None,
+        Err(_e) => return (None, None),
     };
 
     let ias_sig_dec: Vec<u8> = match base64::decode(ias_sig) {
@@ -102,26 +102,26 @@ pub fn verify_identity (
         &ias_sig_dec
     ) {
         Ok(()) => {},
-        Err(_e) => return None,
+        Err(_e) => return (None, None),
     };
 
     // 4. Parse isv body
     let maybe_isv_body: Value = match serde_json::from_slice(isv_body) {
         Ok(body) => body,
-        Err(_) => return None,
+        Err(_) => return (None, None),
     };
 
     if let Value::String(maybe_isv_quote_body) = &maybe_isv_body["isvEnclaveQuoteBody"] {
         // 5. Decode isv quote body
         let decoded_quote_body = match base64::decode(&maybe_isv_quote_body) {
             Ok(decoded_qb) => decoded_qb,
-            Err(_) => return None,
+            Err(_) => return (None, None),
         };
         let id_code = &decoded_quote_body[112..144].to_vec();
 
         // 6. Verify enclave code
-        if id_code != enclave_code {
-            return None;
+        if !enclave_codes.contains(&id_code) {
+            return (None, None);
         }
 
         // 7. Get public key and decode account id
@@ -138,13 +138,13 @@ pub fn verify_identity (
         let is_legal_sig = verify_p256_sig(&pk, &data, &sig);
 
         if !is_legal_sig {
-            return None;
+            return (None, None);
         }
 
-        return Some(pk.clone())
+        return (Some(pk.clone()), Some(id_code.clone()))
     };
 
-    None
+    (None, None)
 }
 
 pub fn encode_files(fs: &Vec<(Vec<u8>, u64, u64)>) -> Vec<u8> {

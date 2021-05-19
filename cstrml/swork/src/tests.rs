@@ -42,6 +42,89 @@ fn register_should_work() {
     });
 }
 
+#[test]
+fn register_pk_with_another_code_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let applier: AccountId =
+                AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                    .expect("valid ss58 address");
+
+
+            let register_info = legal_register_info();
+
+            assert_ok!(Swork::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ));
+
+            let legal_code = LegalCode::get();
+            let legal_pk = LegalPK::get();
+
+            assert_eq!(Swork::identities(applier.clone()).is_none(), true);
+            assert_eq!(Swork::pub_keys(legal_pk), PKInfo {
+                code: legal_code,
+                anchor: None
+            });
+
+            let register_info = another_legal_register_info();
+            let legal_code = hex::decode("343c2fb57c34cb06ca73ddd0d045ba20dec529e1a98a0d0f7ed7f91bd8f5f261").unwrap();
+            let legal_pk = hex::decode("1bc61dcb7322b16c6687ed40c1be2690d3592ccfc7b2c1dea7aafddc2f2a7fcd94b5f13ee105de2a466e9040be7fbcee54ecd7df1e97f0aea761d233c976c718").unwrap();
+
+            assert_noop!(
+                Swork::register(
+                    Origin::signed(applier.clone()),
+                    register_info.ias_sig,
+                    register_info.ias_cert,
+                    register_info.account_id,
+                    register_info.isv_body,
+                    register_info.sig
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 1,
+                    message: Some("IllegalIdentity"),
+                }
+            );
+
+            let register_info = another_legal_register_info();
+            assert_ok!(Swork::set_code(Origin::root(), legal_code.clone(), 10000));
+
+            assert_noop!(
+                Swork::set_code(
+                    Origin::root(),
+                    legal_code.clone(),
+                    20000
+                ),
+                DispatchError::Module {
+                    index: 0,
+                    error: 18,
+                    message: Some("InvalidExpiredBlock"),
+                }
+            );
+
+            assert_ok!(Swork::register(
+                Origin::signed(applier.clone()),
+                register_info.ias_sig,
+                register_info.ias_cert,
+                register_info.account_id,
+                register_info.isv_body,
+                register_info.sig
+            ));
+
+            assert_eq!(Swork::identities(applier).is_none(), true);
+            assert_eq!(Swork::pub_keys(legal_pk), PKInfo {
+                code: legal_code,
+                anchor: None
+            });
+        });
+}
+
 // Duplicate pk check is removed due to the uniqueness guaranteed by sWorker-side
 
 #[test]
@@ -1063,6 +1146,7 @@ fn ab_upgrade_should_work() {
 #[test]
 fn ab_upgrade_expire_should_work() {
     ExtBuilder::default()
+        .expired_bn(500)
         .build()
         .execute_with(|| {
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
@@ -1081,9 +1165,6 @@ fn ab_upgrade_expire_should_work() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
-            // 1. Arrange an upgrade immediately, expired at 500
-            assert_ok!(Swork::upgrade(Origin::root(), hex::decode("0011").unwrap(), 500));
 
             // 1. Runs to 303 block
             run_to_block(303);

@@ -102,7 +102,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 20,
+    spec_version: 21,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -813,7 +813,7 @@ construct_runtime! {
 		Identity: pallet_identity::{Module, Call, Storage, Event<T>},
 
         // Crust modules
-        Swork: swork::{Module, Call, Storage, Event<T>, Config},
+        Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
         Market: market::{Module, Call, Storage, Event<T>},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.

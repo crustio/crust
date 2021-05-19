@@ -9,6 +9,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::{DispatchResult, DispatchResultWithPostInfo},
     storage::IterableStorageMap,
+    storage::migration::take_storage_value,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
         Weight, DispatchClass, Pays
@@ -24,6 +25,7 @@ use serde::{Deserialize, Serialize};
 // Crust primitives and runtime modules
 use primitives::{
     constants::swork::*,
+    constants::time::DAYS,
     MerkleRoot, SworkerPubKey, SworkerSignature,
     ReportSlot, BlockNumber, IASSig,
     ISVBody, SworkerCert, SworkerCode, SworkerAnchor,
@@ -58,7 +60,7 @@ macro_rules! log {
 }
 
 pub trait WeightInfo {
-    fn upgrade() -> Weight;
+    fn set_code() -> Weight;
     fn register() -> Weight;
     fn report_works(added: u32, deleted: u32) -> Weight;
     fn create_group() -> Weight;
@@ -170,11 +172,8 @@ decl_storage! {
 
         HistorySlotDepth get(fn history_slot_depth): ReportSlot = 6 * REPORT_SLOT;
 
-        /// The sWorker enclave code, this should be managed by sudo/democracy
-        pub Code get(fn code) config(): SworkerCode;
-
-        /// The AB upgrade expired block, this should be managed by sudo/democracy
-        pub ABExpire get(fn ab_expire): Option<T::BlockNumber>;
+        /// The sWorker enclave codes, this should be managed by sudo/democracy
+        pub Codes get (fn codes): map hasher(twox_64_concat) SworkerCode => Option<T::BlockNumber>;
 
         /// The bond relationship between AccountId <-> Identity
         pub Identities get(fn identities):
@@ -220,6 +219,15 @@ decl_storage! {
         /// Enable punishment, the default behavior will have punishment.
         pub EnablePunishment get(fn enable_punishment): bool = true;
     }
+    add_extra_genesis {
+        config(init_codes):
+            Vec<(SworkerCode, T::BlockNumber)>;
+        build(|config: &GenesisConfig<T>| {
+            for (code, expired_bn) in &config.init_codes {
+                <Codes<T>>::insert(code, expired_bn);
+            }
+        });
+    }
 }
 
 decl_error! {
@@ -260,7 +268,9 @@ decl_error! {
         /// Member is not in a group
         NotJoint,
         /// Exceed the limit of members number in one group
-        ExceedGroupLimit
+        ExceedGroupLimit,
+        /// Expired block cannot be decreased
+        InvalidExpiredBlock
     }
 }
 
@@ -287,6 +297,14 @@ decl_module! {
             0
         }
 
+        fn on_runtime_upgrade() -> frame_support::weights::Weight {
+            if let Some(code) = take_storage_value::<SworkerCode>(b"Swork", b"Code", &[]) {
+                let expired_bn = <system::Module<T>>::block_number() + T::BlockNumber::from(365 * DAYS);
+                <Codes<T>>::insert(&code, expired_bn);
+            }
+            T::BlockWeights::get().max_block
+        }
+
         /// AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`
         ///
@@ -294,12 +312,15 @@ decl_module! {
         /// - O(1)
         /// - 2 DB try
         /// # </weight>
-        #[weight = (T::WeightInfo::upgrade(), DispatchClass::Operational)]
-        pub fn upgrade(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
+        #[weight = (T::WeightInfo::set_code(), DispatchClass::Operational)]
+        pub fn set_code(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
+            // TODO: enable democracy
             ensure_root(origin)?;
-            <Code>::put(&new_code);
-            <ABExpire<T>>::put(&expire_block);
-            Self::deposit_event(RawEvent::SworkerUpgradeSuccess(new_code, expire_block));
+            if let Some(old_expired_block) = Self::codes(&new_code) {
+                ensure!(expire_block < old_expired_block, Error::<T>::InvalidExpiredBlock);
+            }
+            <Codes<T>>::insert(&new_code, &expire_block);
+            Self::deposit_event(RawEvent::SetCodeSuccess(new_code, expire_block));
         }
 
         /// Register as new trusted node, can only called from sWorker.
@@ -337,14 +358,17 @@ decl_module! {
             ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupOwnerForbidden);
 
             // 3. Ensure unparsed_identity trusted chain is legal, including signature and sworker code
-            let maybe_pk = Self::check_and_get_pk(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
-            ensure!(maybe_pk.is_some(), Error::<T>::IllegalIdentity);
+            let (maybe_pk, maybe_code) = Self::maybe_get_pk_and_code(&ias_sig, &ias_cert, &applier, &isv_body, &sig);
+            ensure!(maybe_pk.is_some() && maybe_code.is_some(), Error::<T>::IllegalIdentity);
 
             // 4. Insert new pub key info
             let pk = maybe_pk.unwrap();
-            Self::insert_pk_info(pk.clone(), Self::code());
+            let code = maybe_code.unwrap();
 
-            // 5. Emit event
+            // 5. Insert the pk and code
+            Self::insert_pk_info(pk.clone(), code);
+
+            // 6. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
 
             Ok(())
@@ -932,14 +956,14 @@ impl<T: Config> Module<T> {
         true
     }
 
-    fn check_and_get_pk(
+    fn maybe_get_pk_and_code(
         ias_sig: &IASSig,
         ias_cert: &SworkerCert,
         account_id: &T::AccountId,
         isv_body: &ISVBody,
         sig: &SworkerSignature
-    ) -> Option<Vec<u8>> {
-        let enclave_code = Self::code();
+    ) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
+        let legal_codes = <Codes<T>>::iter().map(|(key, _)| key).collect();
         let applier = account_id.encode();
 
         utils::verify_identity(
@@ -948,15 +972,15 @@ impl<T: Config> Module<T> {
             &applier,
             isv_body,
             sig,
-            &enclave_code,
+            &legal_codes,
         )
     }
 
     /// This function is judging if the work report sworker code is legal,
     /// return `is_sworker_code_legal`
     fn reporter_code_check(pk: &SworkerPubKey, block_number: u64) -> bool {
-        return Self::pub_keys(pk).code == Self::code() ||
-            (Self::ab_expire().is_some() && block_number < TryInto::<u64>::try_into(Self::ab_expire().unwrap()).ok().unwrap())
+        let maybe_expired_bn = Self::codes(Self::pub_keys(pk).code);
+        maybe_expired_bn.is_some() && block_number < TryInto::<u64>::try_into(maybe_expired_bn.unwrap()).ok().unwrap()
     }
 
     fn work_report_timing_check(
@@ -1058,7 +1082,7 @@ decl_event!(
         WorksReportSuccess(AccountId, SworkerPubKey),
         ABUpgradeSuccess(AccountId, SworkerPubKey, SworkerPubKey),
         ChillSuccess(AccountId, SworkerPubKey),
-        SworkerUpgradeSuccess(SworkerCode, BlockNumber),
+        SetCodeSuccess(SworkerCode, BlockNumber),
         JoinGroupSuccess(AccountId, AccountId),
         QuitGroupSuccess(AccountId, AccountId),
         CreateGroupSuccess(AccountId),

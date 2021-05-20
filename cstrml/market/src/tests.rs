@@ -4025,5 +4025,9 @@ fn free_space_scenario_should_work() {
             error: 10,
             message: Some("IllegalSuperior")
         });
+
+        assert_ok!(Market::add_into_free_space_list(Origin::signed(bob.clone()), source.clone(), 2));
+        assert_ok!(Market::remove_from_free_space_list(Origin::signed(bob.clone()), source.clone()));
+        assert_eq!(Market::free_space_list(&source).is_none(), true);
     });
 }

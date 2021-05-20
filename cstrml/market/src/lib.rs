@@ -375,7 +375,7 @@ decl_storage! {
 			<Module<T>>::init_pot(<Module<T>>::storage_pot);
 			<Module<T>>::init_pot(<Module<T>>::staking_pot);
 			<Module<T>>::init_pot(<Module<T>>::reserved_pot);
-            <Module<T>>::init_pot(<Module<T>>::free_space_pot);
+			<Module<T>>::init_pot(<Module<T>>::free_space_pot);
 		});
 	}
 }

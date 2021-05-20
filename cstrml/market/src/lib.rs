@@ -10,9 +10,9 @@ use frame_support::{
     dispatch::DispatchResult, ensure,
     storage::migration::remove_storage_prefix,
     traits::{
-        Currency, ReservableCurrency, Get,
+        Currency, ReservableCurrency, Get, LockableCurrency,
         ExistenceRequirement::{AllowDeath, KeepAlive},
-        WithdrawReasons, Imbalance
+        WithdrawReasons, Imbalance, LockIdentifier
     },
     weights::Weight
 };
@@ -43,6 +43,7 @@ use primitives::{
 };
 
 pub(crate) const LOG_TARGET: &'static str = "market";
+const MARKET_LOCK_ID: LockIdentifier = *b"marklock";
 
 #[macro_export]
 macro_rules! log {
@@ -61,6 +62,7 @@ pub trait WeightInfo {
     fn place_storage_order() -> Weight;
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
+    fn recharge_free_space_pot() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -248,7 +250,7 @@ pub trait Config: system::Config {
     type ModuleId: Get<ModuleId>;
 
     /// The payment balance.
-    type Currency: ReservableCurrency<Self::AccountId> + UsableCurrency<Self::AccountId>;
+    type Currency: ReservableCurrency<Self::AccountId> + UsableCurrency<Self::AccountId> + LockableCurrency<Self::AccountId>;
 
     /// Converter from Currency<u64> to Balance.
     type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
@@ -356,6 +358,15 @@ decl_storage! {
 
         /// The global market switch to enable place storage order
         pub MarketSwitch get(fn market_switch): bool = false;
+
+        /// The free space account list
+        pub FreeSpaceList get(fn free_space_list):
+        map hasher(twox_64_concat) T::AccountId => Option<u32>;
+
+        /// The init amount in the free account for transaction fee
+        pub InitFreeAmount get(fn init_free_amount): BalanceOf<T> = Zero::zero();
+
+        Superior get(fn superior): Option<T::AccountId>;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -364,6 +375,7 @@ decl_storage! {
 			<Module<T>>::init_pot(<Module<T>>::storage_pot);
 			<Module<T>>::init_pot(<Module<T>>::staking_pot);
 			<Module<T>>::init_pot(<Module<T>>::reserved_pot);
+            <Module<T>>::init_pot(<Module<T>>::free_space_pot);
 		});
 	}
 }
@@ -396,7 +408,9 @@ decl_error! {
         /// The file is too large. Please check the MaximumFileSize value.
         FileTooLarge,
         /// Place order is not available right now. Please wait for a while.
-        PlaceOrderNotAvailable
+        PlaceOrderNotAvailable,
+        /// Superior not exist or it's illegal.
+        IllegalSuperior
     }
 }
 
@@ -574,23 +588,39 @@ decl_module! {
             }
             // 3. charged_file_size should be smaller than 128G
             ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + tips;
 
-            // 4. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
+            // 4. Check whether the account is free or not
+            let is_free = <FreeSpaceList<T>>::mutate_exists(&who, |maybe_count| match *maybe_count {
+                Some(count) => {
+                    if count > 1u32 {
+                        *maybe_count = Some(count - 1);
+                    } else {
+                        *maybe_count = None;
+                    }
+                    Ok(())
+                },
+                None => {
+                    Err(())
+                }
+            }).is_ok();
+            let (payer, adjusted_tips) = if is_free { (Self::free_space_pot(), Zero::zero()) } else { (who.clone(), tips) };
+            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + adjusted_tips;
 
-            // 5. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone())?;
+            // 5. Check client can afford the sorder
+            ensure!(T::Currency::usable_balance(&payer) >= amount, Error::<T>::InsufficientCurrency);
+
+            // 6. Split into reserved, storage and staking account
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone())?;
 
             let curr_bn = Self::get_current_block_number();
 
-            // 6. do calculate reward. Try to close file and decrease first party storage
+            // 7. do calculate reward. Try to close file and decrease first party storage
             Self::do_calculate_reward(&cid, curr_bn);
 
-            // 7. three scenarios: new file, extend time(refresh time)
+            // 8. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 8. Update storage price.
+            // 9. Update storage price.
             #[cfg(not(test))]
             Self::update_file_price();
 
@@ -713,6 +743,109 @@ decl_module! {
             Self::deposit_event(RawEvent::SetBaseFeeSuccess(base_fee));
             Ok(())
         }
+
+        /// Recharge the free space pot
+        #[weight = T::WeightInfo::recharge_free_space_pot()]
+        pub fn recharge_free_space_pot(origin, #[compact] value: BalanceOf<T>) {
+            let who = ensure_signed(origin)?;
+            ensure!(T::Currency::free_balance(&who) > value, Error::<T>::InsufficientCurrency);
+            let free_space_pot = Self::free_space_pot();
+            T::Currency::transfer(&who, &free_space_pot, value, AllowDeath)?;
+        }
+
+        /// Change superior
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        ///
+        /// Parameter:
+        /// - `new_superior`: The new superior's address
+        #[weight = 1000]
+        pub fn change_superior(origin, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+            ensure_root(origin)?;
+
+            let new_superior = T::Lookup::lookup(new_superior)?;
+
+            Superior::<T>::put(new_superior.clone());
+
+            Self::deposit_event(RawEvent::SuperiorChanged(new_superior));
+
+            Ok(())
+        }
+
+        /// Add the account into free space list
+        #[weight = 1000]
+        pub fn add_into_free_space_list(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source,
+            free_counts: u32,
+        ) -> DispatchResult {
+            let signer = ensure_signed(origin)?;
+            let maybe_superior = Self::superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::IllegalSuperior);
+
+            // 2. Check if signer is superior
+            ensure!(Some(&signer) == maybe_superior.as_ref(), Error::<T>::IllegalSuperior);
+
+            let new_account = T::Lookup::lookup(target)?;
+
+            // 3. Add this account into free space list
+            <FreeSpaceList<T>>::insert(&new_account, free_counts);
+
+            // 4. Set the lock and transfer the money
+            let init_free_amount = Self::init_free_amount();
+            T::Currency::transfer(&Self::free_space_pot(), &new_account, init_free_amount, KeepAlive)?;
+            T::Currency::set_lock(
+                MARKET_LOCK_ID,
+                &new_account,
+                init_free_amount.clone(),
+                WithdrawReasons::TRANSFER
+            );
+
+            Self::deposit_event(RawEvent::NewFreeAccount(new_account));
+            Ok(())
+        }
+
+        /// Remove the account from free space list
+        #[weight = 1000]
+        pub fn remove_from_free_space_list(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let signer = ensure_signed(origin)?;
+            let maybe_superior = Self::superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::IllegalSuperior);
+
+            // 2. Check if signer is superior
+            ensure!(Some(&signer) == maybe_superior.as_ref(), Error::<T>::IllegalSuperior);
+
+            // 3. Remove this account from free space list
+            let old_account = T::Lookup::lookup(target)?;
+            <FreeSpaceList<T>>::remove(&old_account);
+
+            Self::deposit_event(RawEvent::FreeAccountRemoved(old_account));
+            Ok(())
+        }
+
+        /// Change init free amount
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        ///
+        /// Parameter:
+        /// - `new_init_free_amount`: The new init free amount
+        #[weight = 1000]
+        pub fn change_init_free_amount(origin, #[compact] new_init_free_amount: BalanceOf<T>) -> DispatchResult {
+            ensure_root(origin)?;
+
+            InitFreeAmount::<T>::put(new_init_free_amount.clone());
+
+            Self::deposit_event(RawEvent::InitFreeAmountChanged(new_init_free_amount));
+
+            Ok(())
+        }
     }
 }
 
@@ -739,6 +872,12 @@ impl<T: Config> Module<T> {
     pub fn reserved_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "rese" is 16 bytes
         T::ModuleId::get().into_sub_account("rese")
+    }
+
+    /// The pot of a free space account
+    pub fn free_space_pot() -> T::AccountId {
+        // "modl" ++ "crmarket" ++ "rese" is 16 bytes
+        T::ModuleId::get().into_sub_account("free")
     }
 
     /// Calculate reward from file's replica
@@ -1312,5 +1451,13 @@ decl_event!(
         SetMarketSwitchSuccess(bool),
         /// Set the file base fee success.
         SetBaseFeeSuccess(Balance),
+        /// Someone be the new Reviewer
+        SuperiorChanged(AccountId),
+        /// Create a new free account
+        NewFreeAccount(AccountId),
+        /// Change init free amount
+        InitFreeAmountChanged(Balance),
+        /// Remove a free account
+        FreeAccountRemoved(AccountId),
     }
 );

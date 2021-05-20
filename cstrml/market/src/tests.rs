@@ -3935,3 +3935,95 @@ fn useless_ledger_should_be_removed() {
         assert_eq!(<self::MerchantLedgersV2<Test>>::contains_key(&merchant), false);
     });
 }
+
+#[test]
+fn free_space_scenario_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let free_space_pot = Market::free_space_pot();
+        let alice = ALICE;
+        let _ = Balances::make_free_balance_be(&alice, 30_000_000);
+        assert_ok!(Market::recharge_free_space_pot(Origin::signed(alice.clone()), 20_000_000));
+
+        assert_eq!(Balances::free_balance(&free_space_pot), 20_000_000);
+
+        let bob = BOB;
+        assert_ok!(Market::change_superior(Origin::root(), bob.clone()));
+        assert_ok!(Market::change_init_free_amount(Origin::root(), 2000));
+
+        let source = MERCHANT;
+        assert_ok!(Market::add_into_free_space_list(Origin::signed(bob.clone()), source.clone(), 2));
+        assert_eq!(Balances::free_balance(&free_space_pot), 19_998_000);
+        assert_eq!(Balances::free_balance(&source), 2_000);
+
+        let cid =
+        "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // 134289408 / 1_048_576 = 129
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                calculated_at: 50,
+                amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
+                prepaid: 0,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+        assert_eq!(Balances::free_balance(&free_space_pot), 19_868_000);
+        assert_eq!(Market::free_space_list(&source), Some(1));
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        assert_eq!(Balances::free_balance(&free_space_pot), 19_738_000);
+        assert_eq!(Market::free_space_list(&source).is_none(), true);
+
+        assert_noop!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ),
+        DispatchError::Module {
+            index: 3,
+            error: 0,
+            message: Some("InsufficientCurrency")
+        });
+        let _ = Balances::make_free_balance_be(&source, 130_000);
+        assert_noop!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ),
+        DispatchError::Module {
+            index: 3,
+            error: 0,
+            message: Some("InsufficientCurrency")
+        });
+        let _ = Balances::make_free_balance_be(&source, 132_000);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        assert_eq!(Balances::free_balance(&free_space_pot), 19_738_000);
+        assert_eq!(Balances::free_balance(&source), 2_000);
+        assert_noop!(
+        Market::add_into_free_space_list(Origin::signed(alice.clone()), source.clone(), 2),
+        DispatchError::Module {
+            index: 3,
+            error: 10,
+            message: Some("IllegalSuperior")
+        });
+    });
+}

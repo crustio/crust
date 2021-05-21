@@ -2,9 +2,9 @@
 // This file is part of Crust.
 
 use sp_runtime::traits::{Convert, SaturatedConversion};
-use frame_support::traits::{OnUnbalanced, Imbalance, Currency};
+use frame_support::traits::{OnUnbalanced, Currency};
 use frame_support::weights::{WeightToFeePolynomial, WeightToFeeCoefficients, WeightToFeeCoefficient};
-use crate::{NegativeImbalance};
+use crate::{Balances, Authorship, NegativeImbalance};
 use sp_arithmetic::{Perbill, traits::{BaseArithmetic, Unsigned}};
 use smallvec::smallvec;
 

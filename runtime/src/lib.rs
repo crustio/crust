@@ -811,7 +811,7 @@ impl benefits::Config for Runtime {
 }
 
 parameter_types! {
-    pub const CSMBondingDuration: BlockNumber = 15 * DAYS;
+    pub const CSMBondingDuration: BlockNumber = 15 * MINUTES;
 }
 
 impl csm_locking::Config for Runtime {

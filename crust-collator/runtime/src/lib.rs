@@ -59,13 +59,13 @@ pub use sp_runtime::{Perbill, Permill};
 
 // XCM imports
 use polkadot_parachain::primitives::Sibling;
-use xcm::v0::{MultiAsset, Junction::*, MultiLocation::*, NetworkId, BodyId, OriginKind};
+use xcm::v0::{MultiAsset, MultiLocation, Junction::*, MultiLocation::*, NetworkId, BodyId, OriginKind};
 use xcm_builder::{
 	AccountId32Aliases, CurrencyAdapter, LocationInverter, ParentIsDefault, RelayChainAsNative,
 	SiblingParachainConvertsVia, SignedAccountId32AsNative,
 	SovereignSignedViaLocation, EnsureXcmOrigin, AllowUnpaidExecutionFrom, ParentAsSuperuser,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds, IsConcrete, NativeAsset,
-	UsingComponets, SignedToAccountId32, SiblingParachainAsNative
+	UsingComponents, SignedToAccountId32, SiblingParachainAsNative
 };
 use xcm_executor::{
 	traits::ConvertOrigin,
@@ -160,7 +160,7 @@ impl frame_system::Config for Runtime {
 	/// The aggregated dispatch type that is available for extrinsics.
 	type Call = Call;
 	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
-	type Lookup = AccountIdLookup<AccountI, ()>;
+	type Lookup = AccountIdLookup<AccountId, ()>;
 	/// The index type for storing how many extrinsics an account has signed.
 	type Index = Index;
 	/// The index type for blocks.
@@ -257,7 +257,7 @@ impl parachain_info::Config for Runtime {}
 
 parameter_types! {
 	pub const RococoLocation: MultiLocation = X1(Parent);
-	pub const RococoNetwork: NetworkId = NetworkId::Polkadot;
+	pub const RococoNetwork: NetworkId = NetworkId::Kusama;
 	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = X1(Parachain(ParachainInfo::parachain_id().into()));
 }
@@ -277,6 +277,8 @@ type LocalAssetTransactor = CurrencyAdapter<
 	LocationToAccountId,
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
 	AccountId,
+	// We don't track any teleports.
+	(),
 >;
 
 pub struct AllowedList;
@@ -298,7 +300,7 @@ impl<
 > ConvertOrigin<Origin> for IsAllowedToCrust<Origin> {
 	fn convert_origin(origin: MultiLocation, kind: OriginKind) -> Result<Origin, MultiLocation> {
 		match (kind, origin) {
-			(OriginKind::Superuser, MultiLocation::X2(Junction::Parent, Junction::Parachain { id }))
+			(OriginKind::Superuser, X2(Parent, Parachain(id)))
 			if AllowedList::is_allowed(id.into()) =>
 				Ok(Origin::root()),
 			(_, origin) => Err(origin),
@@ -487,7 +489,7 @@ construct_runtime! {
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Storage, Event<T>, Origin},
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin},
-		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>}
+		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>},
 		Xstorage: xstorage::{Pallet, Storage, Call},
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
@@ -592,6 +594,11 @@ impl_runtime_apis! {
 
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
 			SessionKeys::generate(seed)
+		}
+	}
+	impl cumulus_primitives_core::CollectCollationInfo<Block> for Runtime {
+		fn collect_collation_info() -> cumulus_primitives_core::CollationInfo {
+			ParachainSystem::collect_collation_info()
 		}
 	}
 }

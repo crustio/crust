@@ -46,11 +46,11 @@ cumulus-ping = { path = "../../cumulus/polkadot-parachains/pallets/ping", defaul
 parachain-info = { path = "../../cumulus/polkadot-parachains/pallets/parachain-info", default-features = false }
 
 # Polkadot dependencies
-polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "polkadot-v0.9.1" }
-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "polkadot-v0.9.1" }
-xcm-builder = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "polkadot-v0.9.1" }
-xcm-executor = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "polkadot-v0.9.1" }
-pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "polkadot-v0.9.1" }
+polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.1" }
+xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.1" }
+xcm-builder = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.1" }
+xcm-executor = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.1" }
+pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.1" }
 
 [build-dependencies]
 substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.1" }

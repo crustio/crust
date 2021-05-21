@@ -20,13 +20,13 @@ frame-system = { git = "https://github.com/paritytech/substrate", branch = "polk
 
 cumulus-primitives-core = { path = "../../../cumulus/primitives/core", default-features = false }
 
-xcm = { git = "https://github.com/paritytech/polkadot", branch = "polkadot-v0.9.1", default-features = false }
-xcm-executor = { git = "https://github.com/paritytech/polkadot", branch = "polkadot-v0.9.1", default-features = false }
-polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "polkadot-v0.9.1", default-features = false }
+xcm = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.1", default-features = false }
+xcm-executor = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.1", default-features = false }
+polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.1", default-features = false }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.1", default-features = false }
-polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot", branch = "polkadot-v0.9.1" }
+polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.1" }
 
 [features]
 default = ["std"]

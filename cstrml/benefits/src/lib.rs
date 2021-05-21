@@ -214,7 +214,7 @@ impl<T: Config> Module<T> {
         Self::maybe_refresh_fee_reduction_benefits(&current_benefits, &mut fee_reduction);
         // won't update reduction detail if it has no staking
         // to save db writing time
-        if fee_reduction.used_fee_reduction_count < fee_reduction.total_fee_reduction_count.saturating_add(12u32) {
+        if fee_reduction.used_fee_reduction_count < fee_reduction.total_fee_reduction_count.saturating_add(1200u32) {
             fee_reduction.used_fee_reduction_count += 1;
             <FeeReductionBenefits<T>>::insert(&who, fee_reduction);
             return true;

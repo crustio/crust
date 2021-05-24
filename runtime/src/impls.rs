@@ -2,31 +2,17 @@
 // This file is part of Crust.
 
 use sp_runtime::traits::{Convert, SaturatedConversion};
-use frame_support::traits::{OnUnbalanced, Imbalance, Currency};
+use frame_support::traits::{OnUnbalanced, Currency};
 use frame_support::weights::{WeightToFeePolynomial, WeightToFeeCoefficients, WeightToFeeCoefficient};
-use crate::{NegativeImbalance};
+use crate::{Balances, Authorship, NegativeImbalance};
 use sp_arithmetic::{Perbill, traits::{BaseArithmetic, Unsigned}};
 use smallvec::smallvec;
 
 /// Logic for the author to get a portion of fees.
-pub struct ToAuthor<R>(sp_std::marker::PhantomData<R>);
-
-impl<R> OnUnbalanced<NegativeImbalance<R>> for ToAuthor<R>
-    where
-        R: balances::Config + pallet_authorship::Config,
-        <R as frame_system::Config>::AccountId: From<primitives::AccountId>,
-        <R as frame_system::Config>::AccountId: Into<primitives::AccountId>,
-        <R as frame_system::Config>::Event: From<balances::RawEvent<
-            <R as frame_system::Config>::AccountId,
-            <R as balances::Config>::Balance,
-            balances::DefaultInstance>
-        >,
-{
-    fn on_nonzero_unbalanced(amount: NegativeImbalance<R>) {
-        let numeric_amount = amount.peek();
-        let author = <pallet_authorship::Module<R>>::author();
-        <balances::Module<R>>::resolve_creating(&<pallet_authorship::Module<R>>::author(), amount);
-        <frame_system::Module<R>>::deposit_event(balances::RawEvent::Deposit(author, numeric_amount));
+pub struct Author;
+impl OnUnbalanced<NegativeImbalance> for Author {
+    fn on_nonzero_unbalanced(amount: NegativeImbalance) {
+        Balances::resolve_creating(&Authorship::author(), amount);
     }
 }
 

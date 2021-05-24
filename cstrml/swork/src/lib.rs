@@ -9,7 +9,6 @@ use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::{DispatchResult, DispatchResultWithPostInfo},
     storage::IterableStorageMap,
-    storage::migration::take_storage_value,
     traits::{Currency, ReservableCurrency, Get},
     weights::{
         Weight, DispatchClass, Pays
@@ -25,7 +24,6 @@ use serde::{Deserialize, Serialize};
 // Crust primitives and runtime modules
 use primitives::{
     constants::swork::*,
-    constants::time::DAYS,
     MerkleRoot, SworkerPubKey, SworkerSignature,
     ReportSlot, BlockNumber, IASSig,
     ISVBody, SworkerCert, SworkerCode, SworkerAnchor,
@@ -296,15 +294,6 @@ decl_module! {
             // TODO: Recalculate this weight
             0
         }
-
-        fn on_runtime_upgrade() -> frame_support::weights::Weight {
-            if let Some(code) = take_storage_value::<SworkerCode>(b"Swork", b"Code", &[]) {
-                let expired_bn = <system::Module<T>>::block_number() + T::BlockNumber::from(365 * DAYS);
-                <Codes<T>>::insert(&code, expired_bn);
-            }
-            T::BlockWeights::get().max_block
-        }
-
         /// AB Upgrade, this should only be called by `root` origin
         /// Ruled by `sudo/democracy`
         ///

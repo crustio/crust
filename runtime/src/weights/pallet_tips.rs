@@ -40,4 +40,11 @@ impl<T: frame_system::Config> pallet_tips::WeightInfo for WeightInfo<T> {
             .saturating_add(T::DbWeight::get().reads(3 as Weight))
             .saturating_add(T::DbWeight::get().writes(3 as Weight))
     }
+    fn slash_tip(t: u32, ) -> Weight {
+        (37_184_000 as Weight)
+            // Standard Error: 0
+            .saturating_add((11_000 as Weight).saturating_mul(t as Weight))
+            .saturating_add(T::DbWeight::get().reads(1 as Weight))
+            .saturating_add(T::DbWeight::get().writes(2 as Weight))
+    }
 }

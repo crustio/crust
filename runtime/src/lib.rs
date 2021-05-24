@@ -792,6 +792,10 @@ impl market::Config for Runtime {
     type MaximumFileSize = MaximumFileSize;
 }
 
+parameter_types! {
+    pub const CSMBondingDuration: BlockNumber = 7 * DAYS;
+}
+
 impl csm_locking::Config for Runtime {
     type Currency = CSM;
     type Event = Event;

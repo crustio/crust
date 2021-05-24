@@ -10,41 +10,30 @@ use sp_std::marker::PhantomData;
 /// Weight functions for pallet_elections_phragmen.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_elections_phragmen::WeightInfo for WeightInfo<T> {
-	fn vote(v: u32, ) -> Weight {
-		(86_473_000 as Weight)
-			// Standard Error: 9_000
-			.saturating_add((199_000 as Weight).saturating_mul(v as Weight))
+	fn vote_equal(v: u32, ) -> Weight {
+		(45_157_000 as Weight)
+			// Standard Error: 6_000
+			.saturating_add((399_000 as Weight).saturating_mul(v as Weight))
 			.saturating_add(T::DbWeight::get().reads(5 as Weight))
 			.saturating_add(T::DbWeight::get().writes(2 as Weight))
 	}
-	fn vote_update(v: u32, ) -> Weight {
-		(53_531_000 as Weight)
-			// Standard Error: 8_000
-			.saturating_add((126_000 as Weight).saturating_mul(v as Weight))
+	fn vote_more(v: u32, ) -> Weight {
+		(69_738_000 as Weight)
+			// Standard Error: 14_000
+			.saturating_add((450_000 as Weight).saturating_mul(v as Weight))
+			.saturating_add(T::DbWeight::get().reads(5 as Weight))
+			.saturating_add(T::DbWeight::get().writes(2 as Weight))
+	}
+	fn vote_less(v: u32, ) -> Weight {
+		(73_955_000 as Weight)
+			// Standard Error: 38_000
+			.saturating_add((227_000 as Weight).saturating_mul(v as Weight))
 			.saturating_add(T::DbWeight::get().reads(5 as Weight))
 			.saturating_add(T::DbWeight::get().writes(2 as Weight))
 	}
 	fn remove_voter() -> Weight {
 		(69_725_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(2 as Weight))
-			.saturating_add(T::DbWeight::get().writes(2 as Weight))
-	}
-	fn report_defunct_voter_correct(c: u32, v: u32, ) -> Weight {
-		(0 as Weight)
-			// Standard Error: 2_000
-			.saturating_add((1_673_000 as Weight).saturating_mul(c as Weight))
-			// Standard Error: 53_000
-			.saturating_add((33_921_000 as Weight).saturating_mul(v as Weight))
-			.saturating_add(T::DbWeight::get().reads(7 as Weight))
-			.saturating_add(T::DbWeight::get().writes(3 as Weight))
-	}
-	fn report_defunct_voter_incorrect(c: u32, v: u32, ) -> Weight {
-		(0 as Weight)
-			// Standard Error: 0
-			.saturating_add((1_696_000 as Weight).saturating_mul(c as Weight))
-			// Standard Error: 12_000
-			.saturating_add((33_906_000 as Weight).saturating_mul(v as Weight))
-			.saturating_add(T::DbWeight::get().reads(6 as Weight))
 			.saturating_add(T::DbWeight::get().writes(2 as Weight))
 	}
 	fn submit_candidacy(c: u32, ) -> Weight {
@@ -79,5 +68,27 @@ impl<T: frame_system::Config> pallet_elections_phragmen::WeightInfo for WeightIn
 	fn remove_member_wrong_refund() -> Weight {
 		(8_869_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(1 as Weight))
+	}
+	fn clean_defunct_voters(v: u32, d: u32, ) -> Weight {
+		(0 as Weight)
+			// Standard Error: 55_000
+			.saturating_add((114_815_000 as Weight).saturating_mul(v as Weight))
+			// Standard Error: 53_000
+			.saturating_add((49_000 as Weight).saturating_mul(d as Weight))
+			.saturating_add(T::DbWeight::get().reads(4 as Weight))
+			.saturating_add(T::DbWeight::get().reads((3 as Weight).saturating_mul(v as Weight)))
+			.saturating_add(T::DbWeight::get().writes((3 as Weight).saturating_mul(v as Weight)))
+	}
+	fn election_phragmen(c: u32, v: u32, e: u32, ) -> Weight {
+		(0 as Weight)
+			// Standard Error: 1_940_000
+			.saturating_add((43_557_000 as Weight).saturating_mul(c as Weight))
+			// Standard Error: 807_000
+			.saturating_add((65_849_000 as Weight).saturating_mul(v as Weight))
+			// Standard Error: 55_000
+			.saturating_add((4_206_000 as Weight).saturating_mul(e as Weight))
+			.saturating_add(T::DbWeight::get().reads((2 as Weight).saturating_mul(c as Weight)))
+			.saturating_add(T::DbWeight::get().reads((1 as Weight).saturating_mul(v as Weight)))
+			.saturating_add(T::DbWeight::get().writes((1 as Weight).saturating_mul(c as Weight)))
 	}
 }

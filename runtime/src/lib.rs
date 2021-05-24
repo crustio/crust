@@ -29,7 +29,7 @@ use sp_runtime::{
 use sp_std::prelude::*;
 
 use pallet_grandpa::{AuthorityId as GrandpaId, fg_primitives, AuthorityList as GrandpaAuthorityList};
-pub use pallet_transaction_payment::{Multiplier, TargetedFeeAdjustment, CurrencyAdapter};
+pub use pallet_transaction_payment::{Multiplier, TargetedFeeAdjustment, FeeDetails, CurrencyAdapter};
 use sp_api::impl_runtime_apis;
 use sp_staking::SessionIndex;
 
@@ -42,7 +42,7 @@ pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 pub use balances::Call as BalancesCall;
 pub use frame_support::{
     construct_runtime, parameter_types,
-    traits::{Currency, KeyOwnerProofSystem, Randomness, OnUnbalanced, Imbalance, LockIdentifier, SplitTwoWays, U128CurrencyToVote},
+    traits::{Currency, KeyOwnerProofSystem, Randomness, OnUnbalanced, Imbalance, LockIdentifier, U128CurrencyToVote},
     weights::{
         Weight, DispatchClass,
         constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -60,7 +60,7 @@ use pallet_session::{historical as session_historical};
 pub use pallet_timestamp::Call as TimestampCall;
 
 /// Implementations of some helper traits passed into runtime modules as associated types.
-use impls::{CurrencyToVoteHandler, ToAuthor, OneTenthFee};
+use impls::{CurrencyToVoteHandler, Author, OneTenthFee};
 
 /// Crust primitives
 use primitives::{
@@ -102,7 +102,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 21,
+    spec_version: 22,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -159,6 +159,7 @@ parameter_types! {
 		})
 		.avg_block_initialization(AVERAGE_ON_INITIALIZE_RATIO)
 		.build_or_panic();
+	pub const SS58Prefix: u8 = 42;
 }
 
 impl frame_system::Config for Runtime {
@@ -203,6 +204,7 @@ impl frame_system::Config for Runtime {
     type SystemWeightInfo = weights::frame_system::WeightInfo<Runtime>;
     type BlockWeights = RuntimeBlockWeights;
     type BlockLength = RuntimeBlockLength;
+    type SS58Prefix = SS58Prefix;
 }
 
 parameter_types! {
@@ -224,6 +226,8 @@ impl pallet_scheduler::Config for Runtime {
 parameter_types! {
     pub const EpochDuration: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
     pub const ExpectedBlockTime: u64 = MILLISECS_PER_BLOCK;
+    pub const ReportLongevity: u64 =
+		BondingDuration::get() as u64 * SessionsPerEra::get() as u64 * EpochDuration::get();
 }
 
 impl pallet_babe::Config for Runtime {
@@ -245,7 +249,7 @@ impl pallet_babe::Config for Runtime {
 
     type KeyOwnerProofSystem = Historical;
 
-    type HandleEquivocation = pallet_babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
+    type HandleEquivocation = pallet_babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences, ReportLongevity>;
 
     type WeightInfo = ();
 }
@@ -284,6 +288,7 @@ parameter_types! {
 impl pallet_im_online::Config for Runtime {
     type AuthorityId = ImOnlineId;
     type Event = Event;
+    type ValidatorSet = Historical;
     type ReportUnresponsiveness = Offences;
     type SessionDuration = SessionDuration;
     type UnsignedPriority = ImOnlineUnsignedPriority;
@@ -304,7 +309,7 @@ impl pallet_grandpa::Config for Runtime {
         GrandpaId,
     )>>::IdentificationTuple;
 
-    type HandleEquivocation = pallet_grandpa::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
+    type HandleEquivocation = pallet_grandpa::EquivocationHandler<Self::KeyOwnerIdentification, Offences, ReportLongevity>;
 
     type WeightInfo = ();
 }
@@ -447,7 +452,8 @@ parameter_types! {
 
 parameter_types! {
 	pub const CandidacyBond: Balance = 10 * DOLLARS;
-	pub const VotingBond: Balance = 1 * DOLLARS;
+	pub const VotingBondBase: Balance = 1 * DOLLARS;
+	pub const VotingBondFactor: Balance = 10 * CENTS;
 	pub const TermDuration: BlockNumber = 7 * DAYS;
 	pub const DesiredMembers: u32 = 7;
 	pub const DesiredRunnersUp: u32 = 7;
@@ -466,10 +472,10 @@ impl pallet_elections_phragmen::Config for Runtime {
 	type InitializeMembers = Council;
 	type CurrencyToVote = U128CurrencyToVote;
 	type CandidacyBond = CandidacyBond;
-	type VotingBond = VotingBond;
-	type LoserCandidate = Treasury;
-	type BadReport = Treasury;
-	type KickedMember = Treasury;
+    type VotingBondBase = VotingBondBase;
+    type VotingBondFactor = VotingBondFactor;
+	type LoserCandidate = ();
+	type KickedMember = ();
 	type DesiredMembers = DesiredMembers;
 	type DesiredRunnersUp = DesiredRunnersUp;
 	type TermDuration = TermDuration;
@@ -652,16 +658,23 @@ impl pallet_democracy::Config for Runtime {
     type WeightInfo = weights::pallet_democracy::WeightInfo<Runtime>;
 }
 
-/// Splits fees 80/20 between treasury and block author.
-pub type NegativeImbalance<T> = <balances::Module<T> as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
+type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 
-/// Splits fees 80/20 between treasury and block author.
-pub type DealWithFees = SplitTwoWays<
-    Balance,
-    NegativeImbalance<Runtime>,
-    _4, Treasury,   // 4 parts (80%) goes to the treasury.
-    _1, ToAuthor<Runtime>,   // 1 part (20%) goes to the block author.
->;
+pub struct DealWithFees;
+impl OnUnbalanced<NegativeImbalance> for DealWithFees {
+    fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item=NegativeImbalance>) {
+        if let Some(fees) = fees_then_tips.next() {
+            // for fees, 80% to treasury, 20% to author
+            let mut split = fees.ration(80, 20);
+            if let Some(tips) = fees_then_tips.next() {
+                // for tips, if any, 80% to treasury, 20% to author (though this can be anything)
+                tips.ration_merge_into(80, 20, &mut split);
+            }
+            Treasury::on_unbalanced(split.0);
+            Author::on_unbalanced(split.1);
+        }
+    }
+}
 
 impl balances::Config for Runtime {
     type Balance = Balance;
@@ -855,8 +868,24 @@ pub type Executive = frame_executive::Executive<
     Block,
     frame_system::ChainContext<Runtime>,
     Runtime,
-    AllModules
+    AllModules,
+    // CustomOnRuntimeUpgrade,
+    PhragmenElectionDepositRuntimeUpgrade,
 >;
+
+pub struct PhragmenElectionDepositRuntimeUpgrade;
+impl pallet_elections_phragmen::migrations_3_0_0::V2ToV3
+for PhragmenElectionDepositRuntimeUpgrade
+{
+    type AccountId = AccountId;
+    type Balance = Balance;
+    type Module = Elections;
+}
+impl frame_support::traits::OnRuntimeUpgrade for PhragmenElectionDepositRuntimeUpgrade {
+    fn on_runtime_upgrade() -> frame_support::weights::Weight {
+        pallet_elections_phragmen::migrations_3_0_0::apply::<Self>(DOLLARS, 10 * DOLLARS)
+    }
+}
 
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {
@@ -935,12 +964,20 @@ impl_runtime_apis! {
             }
         }
 
-        fn current_epoch_start() -> babe_primitives::SlotNumber {
+        fn current_epoch_start() -> babe_primitives::Slot {
             Babe::current_epoch_start()
         }
 
+        fn current_epoch() -> babe_primitives::Epoch {
+			Babe::current_epoch()
+		}
+
+		fn next_epoch() -> babe_primitives::Epoch {
+			Babe::next_epoch()
+		}
+
         fn generate_key_ownership_proof(
-            _slot_number: babe_primitives::SlotNumber,
+            _slot_number: babe_primitives::Slot,
             authority_id: babe_primitives::AuthorityId,
         ) -> Option<babe_primitives::OpaqueKeyOwnershipProof> {
             use codec::Encode;
@@ -1028,6 +1065,9 @@ impl_runtime_apis! {
             len: u32
         ) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
 			TransactionPayment::query_info(uxt, len)
+		}
+		fn query_fee_details(uxt: <Block as BlockT>::Extrinsic, len: u32) -> FeeDetails<Balance> {
+			TransactionPayment::query_fee_details(uxt, len)
 		}
     }
 

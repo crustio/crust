@@ -109,8 +109,6 @@ pub fn create_one_validator_with_one_guarantor<T: Config>(n: u32) -> Result<(T::
 }
 
 benchmarks! {
-    _{}
-
     bond {
         let stash = create_funded_user::<T>("stash",100);
         let controller = create_funded_user::<T>("controller", 100);

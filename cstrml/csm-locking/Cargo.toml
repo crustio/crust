@@ -1,42 +1,56 @@
 [package]
-name = "cstrml-balances"
+name = "cstrml-csm-locking"
 version = "0.12.0"
 authors = ["crustio"]
 edition = "2018"
-license = "GPL-3.0"
+license = "Apache-2.0"
 homepage = "https://crust.network"
 repository = "https://github.com/crustio/crust/"
 
-[package.metadata.docs.rs]
-targets = ["x86_64-unknown-linux-gnu"]
-
 [dependencies]
+# third party dependencies
 serde = { optional = true, version = "1.0.116" }
+safe-mix = { default-features = false, version = "1.0.0" }
 codec = { package = "parity-scale-codec", default-features = false, features = ["derive"], version = "2.0.0" }
-sp-std = { default-features = false, version = "3.0.0" }
-sp-runtime = { default-features = false, version = "3.0.0" }
-frame-benchmarking = { default-features = false, optional = true, version = "3.0.0" }
+
+# substrate frame dependencies
 frame-support = { default-features = false, version = "3.0.0" }
 frame-system = { default-features = false, version = "3.0.0" }
+
+# substrate primitives
+sp-keyring = { optional = true, version = "3.0.0" }
+sp-std = { default-features = false, version = "3.0.0" }
+sp-io ={ default-features = false, version = "3.0.0" }
+sp-runtime = { default-features = false, version = "3.0.0" }
+frame-benchmarking = { default-features = false, optional = true, version = "3.0.0" }
 
 # crust runtime modules
 primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
 
 [dev-dependencies]
-sp-io = "3.0.0"
 sp-core = "3.0.0"
-pallet-transaction-payment = "3.0.0"
+balances = { package = "cstrml-balances", path = "../balances" }
+pallet-timestamp = "3.0.0"
+frame-benchmarking = "3.0.0"
+
+# private crate inside substrate
+substrate-test-utils = "3.0.0"
 
 [features]
-default = ["std"]
+equalize = []
+migrate = []
+default = ["std", "equalize"]
 std = [
 	"serde",
+	"safe-mix/std",
+	"sp-keyring",
 	"codec/std",
 	"sp-std/std",
-	"sp-runtime/std",
-	"frame-benchmarking/std",
+	"sp-io/std",
 	"frame-support/std",
+	"sp-runtime/std",
 	"frame-system/std",
-	"primitives/std"
 ]
-runtime-benchmarks = ["frame-benchmarking"]
+runtime-benchmarks = [
+    "frame-benchmarking",
+]

@@ -149,13 +149,12 @@ parameter_types! {
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
-    pub const FileBaseFee: Balance = 1000;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
-    pub const StakingRatio: Perbill = Perbill::from_percent(80);
-    pub const TaxRatio: Perbill = Perbill::from_percent(10);
+    pub const StakingRatio: Perbill = Perbill::from_percent(72);
+    pub const StorageRatio: Perbill = Perbill::from_percent(18);
     pub const UsedTrashMaxSize: u128 = 2;
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
     pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
@@ -169,14 +168,13 @@ impl Config for Test {
     type Event = ();
     type FileDuration = FileDuration;
     type FileReplica = FileReplica;
-    type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
     type RenewRewardRatio = RenewRewardRatio;
-    type TaxRatio = TaxRatio;
+    type StorageRatio = StorageRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
     type MaximumFileSize = MaximumFileSize;
     type WeightInfo = weight::WeightInfo<Test>;
@@ -211,6 +209,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ext.execute_with(|| {
         init_swork_setup();
         assert_ok!(Market::set_market_switch(Origin::root(), true));
+        assert_ok!(Market::set_base_fee(Origin::root(), 1000));
     });
 
     ext

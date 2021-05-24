@@ -23,14 +23,14 @@ use frame_support::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
         UnixTime, EnsureOrigin, Randomness, ExistenceRequirement::{KeepAlive, AllowDeath}
     },
-    dispatch::DispatchResult
+    dispatch::{DispatchResult, DispatchResultWithPostInfo}
 };
 use pallet_session::historical;
 use sp_runtime::{
     Perbill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, AccountIdConversion, CheckedSub
+        CheckedAdd, AccountIdConversion, CheckedSub, AtLeast32BitUnsigned
     },
 };
 use sp_staking::{
@@ -74,6 +74,7 @@ pub trait WeightInfo {
     fn bond() -> Weight;
     fn bond_extra() -> Weight;
     fn unbond() -> Weight;
+    fn rebond(l: u32, ) -> Weight;
     fn withdraw_unbonded() -> Weight;
     fn validate() -> Weight;
     fn guarantee() -> Weight;
@@ -210,7 +211,7 @@ pub struct StakingLedger<AccountId, Balance: HasCompact> {
     pub claimed_rewards: Vec<EraIndex>,
 }
 
-impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId, Balance> {
+impl<AccountId, Balance: HasCompact + Copy + Saturating + AtLeast32BitUnsigned> StakingLedger<AccountId, Balance> {
     /// Remove entries from `unlocking` that are sufficiently old and reduce the
     /// total by the sum of their balances.
     fn consolidate_unlocked(self, current_era: EraIndex) -> Self {
@@ -234,6 +235,31 @@ impl<AccountId, Balance: HasCompact + Copy + Saturating> StakingLedger<AccountId
             unlocking,
             claimed_rewards: self.claimed_rewards
         }
+    }
+
+    /// Re-bond funds that were scheduled for unlocking.
+    fn rebond(mut self, value: Balance) -> Self {
+        let mut unlocking_balance: Balance = Zero::zero();
+
+        while let Some(last) = self.unlocking.last_mut() {
+            if unlocking_balance + last.value <= value {
+                unlocking_balance += last.value;
+                self.active += last.value;
+                self.unlocking.pop();
+            } else {
+                let diff = value - unlocking_balance;
+
+                unlocking_balance += diff;
+                self.active += diff;
+                last.value -= diff;
+            }
+
+            if unlocking_balance >= value {
+                break
+            }
+        }
+
+        self
     }
 }
 
@@ -755,6 +781,8 @@ decl_error! {
         AlreadyClaimed,
         /// Don't have enough balance to recharge the staking pot
         InsufficientCurrency,
+        /// Can not rebond without unlocking chunks.
+        NoUnlockChunk,
     }
 }
 
@@ -979,6 +1007,38 @@ decl_module! {
                 Self::deposit_event(RawEvent::Unbonded(ledger.stash, value));
             }
         }
+
+	    /// Rebond a portion of the stash scheduled to be unlocked.
+		///
+		/// The dispatch origin must be signed by the controller, and it can be only called when
+		/// [`EraElectionStatus`] is `Closed`.
+		///
+		/// # <weight>
+		/// - Time complexity: O(L), where L is unlocking chunks
+		/// - Bounded by `MAX_UNLOCKING_CHUNKS`.
+		/// - Storage changes: Can't increase storage, only decrease it.
+		/// ---------------
+		/// - DB Weight:
+		///     - Reads: EraElectionStatus, Ledger, Locks, [Origin Account]
+		///     - Writes: [Origin Account], Locks, Ledger
+		/// # </weight>
+		#[weight = T::WeightInfo::rebond(MAX_UNLOCKING_CHUNKS as u32)]
+		fn rebond(origin, #[compact] value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+			let controller = ensure_signed(origin)?;
+			let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+			ensure!(!ledger.unlocking.is_empty(), Error::<T>::NoUnlockChunk);
+
+			let ledger = ledger.rebond(value);
+			// last check: the new active amount of ledger must be more than ED.
+			ensure!(ledger.active >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+
+			Self::update_ledger(&controller, &ledger);
+			Ok(Some(
+				35 * WEIGHT_PER_MICROS
+				+ 50 * WEIGHT_PER_NANOS * (ledger.unlocking.len() as Weight)
+				+ T::DbWeight::get().reads_writes(3, 2)
+			).into())
+		}
 
         /// Remove any unlocked chunks from the `unlocking` queue from our management.
         ///

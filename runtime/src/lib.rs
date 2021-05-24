@@ -42,7 +42,8 @@ pub use authority_discovery_primitives::AuthorityId as AuthorityDiscoveryId;
 pub use balances::Call as BalancesCall;
 pub use frame_support::{
     construct_runtime, parameter_types,
-    traits::{Currency, KeyOwnerProofSystem, Randomness, OnUnbalanced, Imbalance, LockIdentifier, U128CurrencyToVote},
+    traits::{Currency, KeyOwnerProofSystem, Randomness, OnUnbalanced,
+             Imbalance, LockIdentifier, U128CurrencyToVote, StorageMapShim},
     weights::{
         Weight, DispatchClass,
         constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -102,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 22,
+    spec_version: 23,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -676,7 +677,7 @@ impl OnUnbalanced<NegativeImbalance> for DealWithFees {
     }
 }
 
-impl balances::Config for Runtime {
+impl balances::Config<balances::Instance1> for Runtime {
     type Balance = Balance;
     type DustRemoval = ();
     type Event = Event;
@@ -689,6 +690,21 @@ impl balances::Config for Runtime {
 impl candy::Config for Runtime {
     type Event = Event;
     type Balance = Balance;
+}
+
+impl balances::Config<balances::Instance2> for Runtime {
+    type Balance = Balance;
+    type DustRemoval = ();
+    type Event = Event;
+    type ExistentialDeposit = ExistentialDeposit;
+    type AccountStore = StorageMapShim<
+        balances::Account<Runtime, balances::Instance2>,
+        frame_system::Provider<Runtime>,
+        AccountId,
+        balances::AccountData<Balance>,
+    >;
+    type WeightInfo = weights::pallet_balances::WeightInfo<Runtime>;
+    type MaxLocks = MaxLocks;
 }
 
 parameter_types! {
@@ -743,13 +759,12 @@ parameter_types! {
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
     pub const FileDuration: BlockNumber = 180 * DAYS;
     pub const FileReplica: u32 = 4;
-    pub const FileBaseFee: Balance = CENTS / 10;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
-    pub const StakingRatio: Perbill = Perbill::from_percent(80);
-    pub const TaxRatio: Perbill = Perbill::from_percent(10);
+    pub const StakingRatio: Perbill = Perbill::from_percent(72);
+    pub const StorageRatio: Perbill = Perbill::from_percent(18);
     pub const UsedTrashMaxSize: u128 = 1_000;
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
     pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
@@ -765,17 +780,27 @@ impl market::Config for Runtime {
     /// File duration.
     type FileDuration = FileDuration;
     type FileReplica = FileReplica;
-    type FileBaseFee = FileBaseFee;
     type FileInitPrice = FileInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
     type RenewRewardRatio = RenewRewardRatio;
-    type TaxRatio = TaxRatio;
+    type StorageRatio = StorageRatio;
     type UsedTrashMaxSize = UsedTrashMaxSize;
     type WeightInfo = market::weight::WeightInfo<Runtime>;
     type MaximumFileSize = MaximumFileSize;
+}
+
+parameter_types! {
+    pub const CSMBondingDuration: BlockNumber = 7 * DAYS;
+}
+
+impl csm_locking::Config for Runtime {
+    type Currency = CSM;
+    type Event = Event;
+    type BondingDuration = CSMBondingDuration;
+    type WeightInfo = csm_locking::weight::WeightInfo;
 }
 
 construct_runtime! {
@@ -793,7 +818,7 @@ construct_runtime! {
 
         Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
         Indices: pallet_indices::{Module, Call, Storage, Config<T>, Event<T>},
-        Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+        Balances: balances::<Instance1>::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: pallet_transaction_payment::{Module, Storage},
 
         // Consensus support
@@ -835,6 +860,8 @@ construct_runtime! {
         // Token candy and claims bridge
         Candy: candy::{Module, Call, Storage, Event<T>},
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+        CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
+        CSMLocking: csm_locking::{Module, Call, Storage, Event<T>},
     }
 }
 
@@ -868,24 +895,8 @@ pub type Executive = frame_executive::Executive<
     Block,
     frame_system::ChainContext<Runtime>,
     Runtime,
-    AllModules,
-    // CustomOnRuntimeUpgrade,
-    PhragmenElectionDepositRuntimeUpgrade,
+    AllModules
 >;
-
-pub struct PhragmenElectionDepositRuntimeUpgrade;
-impl pallet_elections_phragmen::migrations_3_0_0::V2ToV3
-for PhragmenElectionDepositRuntimeUpgrade
-{
-    type AccountId = AccountId;
-    type Balance = Balance;
-    type Module = Elections;
-}
-impl frame_support::traits::OnRuntimeUpgrade for PhragmenElectionDepositRuntimeUpgrade {
-    fn on_runtime_upgrade() -> frame_support::weights::Weight {
-        pallet_elections_phragmen::migrations_3_0_0::apply::<Self>(DOLLARS, 10 * DOLLARS)
-    }
-}
 
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {

@@ -94,12 +94,42 @@ pub fn new_partial(
 		client.clone(),
 	);
 
-	let import_queue = shell_build_import_queue(
-		client.clone(),
-		config,
-		telemetry.as_ref().map(|telemetry| telemetry.handle()),
-		&task_manager,
-	)?;
+	let slot_duration = cumulus_client_consensus_aura::slot_duration(&*client)?;
+
+	let block_import = cumulus_client_consensus_aura::AuraBlockImport::<
+		_,
+		_,
+		_,
+		sp_consensus_aura::sr25519::AuthorityPair,
+	>::new(client.clone(), client.clone());
+
+	let import_queue = cumulus_client_consensus_aura::import_queue::<
+		sp_consensus_aura::sr25519::AuthorityPair,
+		_,
+		_,
+		_,
+		_,
+		_,
+		_,
+		>(cumulus_client_consensus_aura::ImportQueueParams {
+			block_import,
+			client: client.clone(),
+			create_inherent_data_providers: move |_, _| async move {
+				let time = sp_timestamp::InherentDataProvider::from_system_time();
+
+				let slot =
+					sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_duration(
+						*time,
+						slot_duration.slot_duration(),
+					);
+
+				Ok((time, slot))
+			},
+			registry: config.prometheus_registry().clone(),
+			can_author_with: sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
+			spawner: &task_manager.spawn_essential_handle(),
+			telemetry,
+		})?;
 
 	let params = PartialComponents {
 		backend,
@@ -233,35 +263,72 @@ where
 			telemetry.as_ref().map(|x| x.handle()),
 		);
 		let spawner = task_manager.spawn_handle();
+
+		let slot_duration = cumulus_client_consensus_aura::slot_duration(&*client)?;
+
+		let proposer_factory = sc_basic_authorship::ProposerFactory::with_proof_recording(
+			task_manager.spawn_handle(),
+			client.clone(),
+			transaction_pool,
+			prometheus_registry.clone(),
+			telemetry.clone(),
+		);
+
 		let relay_chain_backend = polkadot_full_node.backend.clone();
 		let relay_chain_client = polkadot_full_node.client.clone();
 
-		let parachain_consensus = build_relay_chain_consensus(BuildRelayChainConsensusParams {
-			para_id: id,
-			proposer_factory,
-			create_inherent_data_providers: move |_, (relay_parent, validation_data)| {
+		let parachain_consensus = build_aura_consensus::<
+		sp_consensus_aura::sr25519::AuthorityPair,
+		_,
+		_,
+		_,
+		_,
+		_,
+		_,
+		_,
+		_,
+		_,
+	>(BuildAuraConsensusParams {
+		proposer_factory,
+		create_inherent_data_providers: move |_, (relay_parent, validation_data)| {
+			let parachain_inherent =
+			cumulus_primitives_parachain_inherent::ParachainInherentData::create_at_with_client(
+				relay_parent,
+				&relay_chain_client,
+				&*relay_chain_backend,
+				&validation_data,
+				id,
+			);
+			async move {
 				let time = sp_timestamp::InherentDataProvider::from_system_time();
-				let parachain_inherent = cumulus_primitives_parachain_inherent::ParachainInherentData::create_at_with_client(
-					relay_parent,
-					&relay_chain_client,
-					&*relay_chain_backend,
-						&validation_data,
-						id,
+
+				let slot =
+				sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_duration(
+					*time,
+					slot_duration.slot_duration(),
 				);
-				async move {
-					let parachain_inherent =
-						parachain_inherent.ok_or_else(|| {
-							Box::<dyn std::error::Error + Send + Sync>::from(
-								"Failed to create parachain inherent",
-							)
-						})?;
-					Ok((time, parachain_inherent))
-				}
-			},
-			block_import: client.clone(),
-			relay_chain_client: polkadot_full_node.client.clone(),
-			relay_chain_backend: polkadot_full_node.backend.clone(),
-		});
+
+				let parachain_inherent = parachain_inherent.ok_or_else(|| {
+					Box::<dyn std::error::Error + Send + Sync>::from(
+						"Failed to create parachain inherent",
+					)
+				})?;
+				Ok((time, slot, parachain_inherent))
+			}
+		},
+		block_import: client.clone(),
+		relay_chain_client: relay_chain_node.client.clone(),
+		relay_chain_backend: relay_chain_node.backend.clone(),
+		para_client: client.clone(),
+		backoff_authoring_blocks: Option::<()>::None,
+		sync_oracle,
+		keystore,
+		force_authoring,
+		slot_duration,
+		// We got around 500ms for proposing
+		block_proposal_slot_portion: SlotProportion::new(1f32 / 24f32),
+		telemetry,
+	});
 
 		let params = StartCollatorParams {
 			para_id: id,

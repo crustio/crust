@@ -51,6 +51,7 @@ sc-chain-spec = { git = "https://github.com/paritytech/substrate", branch = "pol
 sc-rpc = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.3" }
 sc-tracing = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.3" }
 sp-offchain = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.3" }
+sp-consensus-aura = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.3" }
 
 # RPC related dependencies
 jsonrpc-core = "15.1.0"

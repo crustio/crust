@@ -35,8 +35,10 @@ pallet-timestamp = { git = "https://github.com/paritytech/substrate", default-fe
 pallet-sudo = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
 pallet-transaction-payment = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
 pallet-scheduler = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.3" }
+pallet-aura = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
 
 # Cumulus dependencies
+cumulus-pallet-aura-ext = { path = "../../cumulus/pallets/aura-ext", default-features = false }
 cumulus-pallet-parachain-system = { path = "../../cumulus/pallets/parachain-system", default-features = false }
 cumulus-primitives-core = { path = "../../cumulus/primitives/core", default-features = false }
 cumulus-primitives-utility = { path = "../../cumulus/primitives/utility", default-features = false }
@@ -96,4 +98,7 @@ std = [
 	"xcm-executor/std",
 	"xstorage/std",
 	"market/std",
+	"pallet-aura/std",
+	"sp-consensus-aura/std",
+	"cumulus-pallet-aura-ext/std",
 ]

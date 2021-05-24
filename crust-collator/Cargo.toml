@@ -62,6 +62,7 @@ cumulus-client-collator = { path = "../cumulus/client/collator" }
 cumulus-client-service = { path = "../cumulus/client/service" }
 cumulus-client-network = { path = "../cumulus/client/network" }
 cumulus-primitives-core = { path = "../cumulus/primitives/core" }
+cumulus-primitives-parachain-inherent = { path = "../cumulus/primitives/parachain-inherent" }
 
 # Polkadot dependencies
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.1" }

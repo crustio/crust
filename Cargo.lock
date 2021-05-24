@@ -1282,6 +1282,7 @@ dependencies = [
  "cumulus-client-network",
  "cumulus-client-service",
  "cumulus-primitives-core",
+ "cumulus-primitives-parachain-inherent",
  "derive_more 0.15.0",
  "exit-future 0.1.4",
  "futures 0.3.14",

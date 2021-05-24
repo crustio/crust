@@ -103,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 22,
+    spec_version: 23,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -891,24 +891,8 @@ pub type Executive = frame_executive::Executive<
     Block,
     frame_system::ChainContext<Runtime>,
     Runtime,
-    AllModules,
-    // CustomOnRuntimeUpgrade,
-    PhragmenElectionDepositRuntimeUpgrade,
+    AllModules
 >;
-
-pub struct PhragmenElectionDepositRuntimeUpgrade;
-impl pallet_elections_phragmen::migrations_3_0_0::V2ToV3
-for PhragmenElectionDepositRuntimeUpgrade
-{
-    type AccountId = AccountId;
-    type Balance = Balance;
-    type Module = Elections;
-}
-impl frame_support::traits::OnRuntimeUpgrade for PhragmenElectionDepositRuntimeUpgrade {
-    fn on_runtime_upgrade() -> frame_support::weights::Weight {
-        pallet_elections_phragmen::migrations_3_0_0::apply::<Self>(DOLLARS, 10 * DOLLARS)
-    }
-}
 
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {

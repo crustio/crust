@@ -5,7 +5,9 @@ use super::*;
 use crate as claims;
 
 use sp_core::H256;
-use frame_support::parameter_types;
+use frame_support::{
+    parameter_types, traits::StorageMapShim
+};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header,
 };
@@ -53,13 +55,30 @@ impl balances::Config for Test {
     type MaxLocks = ();
 }
 
+impl balances::Config<balances::Instance2> for Test {
+    type Balance = u64;
+    type DustRemoval = ();
+    type Event = ();
+    type ExistentialDeposit = ExistentialDeposit;
+    type AccountStore = StorageMapShim<
+        balances::Account<Test, balances::Instance2>,
+        frame_system::Provider<Test>,
+        u64,
+        balances::AccountData<u64>,
+    >;
+    type WeightInfo = ();
+    type MaxLocks = ();
+}
+
 parameter_types!{
     pub Prefix: &'static [u8] = b"Pay RUSTs to the TEST account:";
 }
 impl Config for Test {
     type Event = ();
     type Currency = Balances;
+    type CsmCurrency = CSM;
     type Prefix = Prefix;
+    type CsmPrefix = Prefix;
 }
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -72,6 +91,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+        CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
         CrustClaims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
 	}
 );
@@ -122,5 +142,4 @@ pub fn get_wrong_msg_eth_sig() -> EcdsaSignature {
     // `0xba0d7d9d1cea3276a6e9082026b80f8e75350306`'s sig
     // data: wrong message
     EcdsaSignature(hex!["132ffc29ee017b5affa39367b31b66ff47d8db402dbee9c900128728c9b60096401f3126c6748c4f19bb262e80ab5f5d759dbe69c05d84464def96afe6d699ea1b"])
-
 }

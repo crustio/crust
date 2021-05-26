@@ -91,8 +91,8 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-        CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
-        CrustClaims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+		CSM: balances::<Instance2>::{Module, Call, Storage, Config<T>, Event<T>},
+		CrustClaims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
 	}
 );
 

@@ -363,13 +363,9 @@ decl_module! {
 
             // 2. Sign data
             let data = dest.using_encoded(to_ascii_hex);
-<<<<<<< HEAD
-            let signer = Self::eth_recover(&sig, &data, &[][..]).ok_or(Error::<T>::InvalidEthereumSignature)?;
-=======
             let tx_data = tx.using_encoded(to_ascii_hex);
             let prefix = T::Prefix::get();
             let signer = Self::eth_recover(&sig, &prefix, &data, &tx_data).ok_or(Error::<T>::InvalidEthereumSignature)?;
->>>>>>> 5630956 (Add csm claim)
 
             // 3. Make sure signer is match with claimer
             Self::process_claim(tx, signer, dest)
@@ -449,8 +445,6 @@ decl_module! {
             // 3. Make sure signer is match with pre-claimer
             Self::process_cru18_claim(signer, dest)
         }
-<<<<<<< HEAD
-=======
 
         /// Force delete the 'dead' cru18 preclaim, this can only be called by `_ROOT_` origin
         /// And make sure this `address` DO NOT make any claim on cru18 before delete it.
@@ -555,7 +549,6 @@ decl_module! {
             ensure_root(origin)?;
             CsmClaimed::insert(tx, true);
         }
->>>>>>> 5630956 (Add csm claim)
     }
 }
 
@@ -702,13 +695,9 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
         let (maybe_signer, maybe_tx, flag) = match call {
             Call::claim(account, tx, sig) => {
                 let data = account.using_encoded(to_ascii_hex);
-<<<<<<< HEAD
-                (Self::eth_recover(&sig, &data, &[][..]), Some(tx))
-=======
                 let tx_data = tx.using_encoded(to_ascii_hex);
                 let prefix = T::Prefix::get();
                 (Self::eth_recover(&sig, &prefix, &data, &tx_data), Some(tx), ClaimType::CRU)
->>>>>>> 5630956 (Add csm claim)
             }
             Call::claim_cru18(account, sig) => {
                 let data = account.using_encoded(to_ascii_hex);

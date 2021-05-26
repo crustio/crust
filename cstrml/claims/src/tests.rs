@@ -192,9 +192,6 @@ fn bond_eth_should_work() {
     });
 }
 
-<<<<<<< HEAD
-/// Mainnet claims test cases
-=======
 #[test]
 fn force_claim_should_work() {
     new_test_ext().execute_with(|| {
@@ -231,7 +228,6 @@ fn force_claim_should_work() {
 }
 
 /// CRU18 claims test cases
->>>>>>> 5630956 (Add csm claim)
 #[test]
 fn cru18_happy_pass_should_work() {
     new_test_ext().execute_with(|| {
@@ -355,8 +351,6 @@ fn double_cru18_claim_should_failed() {
             Some(100)
         );
     });
-<<<<<<< HEAD
-=======
 }
 
 #[test]
@@ -607,5 +601,4 @@ fn force_csm_claim_should_work() {
             Error::<Test>::CsmAlreadyBeClaimed
         );
     });
->>>>>>> 5630956 (Add csm claim)
 }

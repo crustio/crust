@@ -709,12 +709,15 @@ impl balances::Config<balances::Instance2> for Runtime {
 
 parameter_types! {
 	pub Prefix: &'static [u8] = b"Pay CRUs to the Crust account:";
+    pub CsmPrefix: &'static [u8] = b"Pay CSMs to the Crust account:";
 }
 
 impl claims::Config for Runtime {
     type Event = Event;
     type Currency = Balances;
+    type CsmCurrency = CSM;
     type Prefix = Prefix;
+    type CsmPrefix = CsmPrefix;
 }
 
 // TODO: better way to deal with fee(s)

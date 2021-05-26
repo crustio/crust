@@ -595,6 +595,10 @@ decl_module! {
                     if count > 1u32 {
                         *maybe_count = Some(count - 1);
                     } else {
+                        T::Currency::remove_lock(
+                            MARKET_LOCK_ID,
+                            &who
+                        );
                         *maybe_count = None;
                     }
                     Ok(())
@@ -826,6 +830,12 @@ decl_module! {
             // 3. Remove this account from free space list
             let old_account = T::Lookup::lookup(target)?;
             <FreeOrderAccounts<T>>::remove(&old_account);
+
+            // 4. Remove market lock
+            T::Currency::remove_lock(
+                MARKET_LOCK_ID,
+                &old_account
+            );
 
             Self::deposit_event(RawEvent::FreeAccountRemoved(old_account));
             Ok(())

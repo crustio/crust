@@ -3991,6 +3991,7 @@ fn free_space_scenario_should_work() {
         ));
         assert_eq!(Balances::free_balance(&free_order_pot), 19_738_000);
         assert_eq!(Market::free_order_accounts(&source).is_none(), true);
+        assert_eq!(Balances::locks(&source).len(), 0);
 
         assert_noop!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -4002,22 +4003,12 @@ fn free_space_scenario_should_work() {
             message: Some("InsufficientCurrency")
         });
         let _ = Balances::make_free_balance_be(&source, 130_000);
-        assert_noop!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
-            file_size, 0
-        ),
-        DispatchError::Module {
-            index: 3,
-            error: 0,
-            message: Some("InsufficientCurrency")
-        });
-        let _ = Balances::make_free_balance_be(&source, 132_000);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0
         ));
         assert_eq!(Balances::free_balance(&free_order_pot), 19_738_000);
-        assert_eq!(Balances::free_balance(&source), 2_000);
+        assert_eq!(Balances::free_balance(&source), 0);
         assert_noop!(
         Market::add_into_free_order_accounts(Origin::signed(alice.clone()), source.clone(), 2),
         DispatchError::Module {
@@ -4029,5 +4020,6 @@ fn free_space_scenario_should_work() {
         assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2));
         assert_ok!(Market::remove_from_free_order_accounts(Origin::signed(bob.clone()), source.clone()));
         assert_eq!(Market::free_order_accounts(&source).is_none(), true);
+        assert_eq!(Balances::locks(&source).len(), 0);
     });
 }

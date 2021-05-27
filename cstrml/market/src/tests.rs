@@ -3985,6 +3985,14 @@ fn free_space_scenario_should_work() {
         assert_eq!(Balances::free_balance(&free_order_pot), 19_868_000);
         assert_eq!(Market::free_order_accounts(&source), Some(1));
 
+        assert_noop!(
+        Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2),
+        DispatchError::Module {
+            index: 3,
+            error: 11,
+            message: Some("AlreadyInFreeAccounts")
+        });
+
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0

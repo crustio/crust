@@ -410,7 +410,9 @@ decl_error! {
         /// Place order is not available right now. Please wait for a while.
         PlaceOrderNotAvailable,
         /// FreeOrderAdmin not exist or it's illegal.
-        IllegalFreeOrderAdmin
+        IllegalFreeOrderAdmin,
+        /// The account already in free accounts
+        AlreadyInFreeAccounts
     }
 }
 
@@ -795,10 +797,13 @@ decl_module! {
 
             let new_account = T::Lookup::lookup(target)?;
 
-            // 3. Add this account into free space list
+            // 3. Ensure it's a new account not in free accounts
+            ensure!(Self::free_order_accounts(&new_account).is_none(), Error::<T>::AlreadyInFreeAccounts);
+
+            // 4. Add this account into free space list
             <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
 
-            // 4. Set the lock and transfer the money
+            // 5. Set the lock and transfer the money
             let total_free_fee = Self::free_fee().saturating_mul(<BalanceOf<T>>::from(free_counts));
             T::Currency::transfer(&Self::free_order_pot(), &new_account, total_free_fee, KeepAlive)?;
             T::Currency::set_lock(

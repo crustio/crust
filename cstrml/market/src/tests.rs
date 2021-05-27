@@ -3839,7 +3839,7 @@ fn free_space_scenario_should_work() {
         Market::add_into_free_order_accounts(Origin::signed(alice.clone()), source.clone(), 2),
         DispatchError::Module {
             index: 3,
-            error: 10,
+            error: 13,
             message: Some("IllegalFreeOrderAdmin")
         });
 

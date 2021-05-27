@@ -363,6 +363,12 @@ decl_storage! {
         pub FreeOrderAccounts get(fn free_order_accounts):
         map hasher(twox_64_concat) T::AccountId => Option<u32>;
 
+        /// The upper limit for free counts
+        pub FreeCountsLimit get(fn free_counts_limit): u32 = 1000;
+
+        /// The total free fee limit
+        pub TotalFreeFeeLimit get(fn total_free_fee_limit): BalanceOf<T> = Zero::zero();
+
         /// The init amount in the free account for transaction fee
         pub FreeFee get(fn free_fee): BalanceOf<T> = Zero::zero();
 
@@ -412,7 +418,11 @@ decl_error! {
         /// FreeOrderAdmin not exist or it's illegal.
         IllegalFreeOrderAdmin,
         /// The account already in free accounts
-        AlreadyInFreeAccounts
+        AlreadyInFreeAccounts,
+        /// The free count exceed the upper limit
+        ExceedFreeCountsLimit,
+        /// The total free fee limit is exceeded
+        ExceedTotalFreeFeeLimit
     }
 }
 
@@ -760,25 +770,6 @@ decl_module! {
             T::Currency::transfer(&who, &free_order_pot, value, AllowDeath)?;
         }
 
-        /// Change free_order_admin
-        ///
-        /// The dispatch origin for this call must be _Root_.
-        ///
-        /// Parameter:
-        /// - `new_free_order_admin`: The new free_order_admin's address
-        #[weight = 1000]
-        pub fn change_free_order_admin(origin, new_free_order_admin: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
-            ensure_root(origin)?;
-
-            let new_free_order_admin = T::Lookup::lookup(new_free_order_admin)?;
-
-            FreeOrderAdmin::<T>::put(new_free_order_admin.clone());
-
-            Self::deposit_event(RawEvent::FreeOrderAdminChanged(new_free_order_admin));
-
-            Ok(())
-        }
-
         /// Add the account into free space list
         #[weight = 1000]
         pub fn add_into_free_order_accounts(
@@ -800,11 +791,16 @@ decl_module! {
             // 3. Ensure it's a new account not in free accounts
             ensure!(Self::free_order_accounts(&new_account).is_none(), Error::<T>::AlreadyInFreeAccounts);
 
-            // 4. Add this account into free space list
-            <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
+            // 4. Ensure free count does not exceed the upper limit and is reasonable
+            ensure!(free_counts <= Self::free_counts_limit(), Error::<T>::ExceedFreeCountsLimit);
 
-            // 5. Set the lock and transfer the money
-            let total_free_fee = Self::free_fee().saturating_mul(<BalanceOf<T>>::from(free_counts));
+            // 5. Ensure the total free fee is not exceeded
+            let total_free_fee = Self::free_fee().saturating_mul(<BalanceOf<T>>::from(free_counts)).saturating_add(T::Currency::minimum_balance());
+            ensure!(total_free_fee <= Self::total_free_fee_limit(), Error::<T>::ExceedTotalFreeFeeLimit);
+            <TotalFreeFeeLimit<T>>::mutate(|value| {*value = value.saturating_sub(total_free_fee.clone())});
+
+            // 6. Add this account into free space list
+            <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
             T::Currency::transfer(&Self::free_order_pot(), &new_account, total_free_fee, KeepAlive)?;
             T::Currency::set_lock(
                 MARKET_LOCK_ID,
@@ -846,19 +842,72 @@ decl_module! {
             Ok(())
         }
 
-        /// Change init free amount
+        /// Set free order admin
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        ///
+        /// Parameter:
+        /// - `new_free_order_admin`: The new free_order_admin's address
+        #[weight = 1000]
+        pub fn set_free_order_admin(origin, new_free_order_admin: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+            ensure_root(origin)?;
+
+            let new_free_order_admin = T::Lookup::lookup(new_free_order_admin)?;
+
+            FreeOrderAdmin::<T>::put(new_free_order_admin.clone());
+
+            Self::deposit_event(RawEvent::SetFreeOrderAdminSuccess(new_free_order_admin));
+
+            Ok(())
+        }
+
+        /// Set free fee amount
         ///
         /// The dispatch origin for this call must be _Root_.
         ///
         /// Parameter:
         /// - `new_free_fee`: The new init free amount
         #[weight = 1000]
-        pub fn change_free_fee(origin, #[compact] new_free_fee: BalanceOf<T>) -> DispatchResult {
+        pub fn set_free_fee(origin, #[compact] new_free_fee: BalanceOf<T>) -> DispatchResult {
             ensure_root(origin)?;
 
             FreeFee::<T>::put(new_free_fee.clone());
 
-            Self::deposit_event(RawEvent::FreeFeeChanged(new_free_fee));
+            Self::deposit_event(RawEvent::SetFreeFeeSuccess(new_free_fee));
+
+            Ok(())
+        }
+
+        /// Set free account limit
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        ///
+        /// Parameter:
+        /// - `new_free_count_limit`: The new free count limit
+        #[weight = 1000]
+        pub fn set_free_counts_limit(origin, new_free_count_limit: u32) -> DispatchResult {
+            ensure_root(origin)?;
+
+            FreeCountsLimit::put(new_free_count_limit);
+
+            Self::deposit_event(RawEvent::SetFreeCountsLimitSuccess(new_free_count_limit));
+
+            Ok(())
+        }
+
+        /// Set total free fee limit
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        ///
+        /// Parameter:
+        /// - `new_total_free_fee_limit`: The new total free fee limit
+        #[weight = 1000]
+        pub fn set_total_free_fee_limit(origin, #[compact] new_total_free_fee_limit: BalanceOf<T>) -> DispatchResult {
+            ensure_root(origin)?;
+
+            TotalFreeFeeLimit::<T>::put(new_total_free_fee_limit);
+
+            Self::deposit_event(RawEvent::SetTotalFreeFeeLimitSuccess(new_total_free_fee_limit));
 
             Ok(())
         }
@@ -1469,12 +1518,16 @@ decl_event!(
         /// Set the file base fee success.
         SetBaseFeeSuccess(Balance),
         /// Someone be the new Reviewer
-        FreeOrderAdminChanged(AccountId),
+        SetFreeOrderAdminSuccess(AccountId),
         /// Create a new free account
         NewFreeAccount(AccountId),
-        /// Change init free amount
-        FreeFeeChanged(Balance),
+        /// Set init free amount
+        SetFreeFeeSuccess(Balance),
         /// Remove a free account
         FreeAccountRemoved(AccountId),
+        /// Set the free counts limit
+        SetFreeCountsLimitSuccess(u32),
+        /// Set the total free fee limit
+        SetTotalFreeFeeLimitSuccess(Balance),
     }
 );

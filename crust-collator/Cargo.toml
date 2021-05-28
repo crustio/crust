@@ -58,6 +58,7 @@ jsonrpc-core = "15.1.0"
 
 # Cumulus dependencies
 cumulus-client-cli = { path = "../cumulus/client/cli" }
+cumulus-client-consensus-aura = { path = "../cumulus/client/consensus/aura" }
 cumulus-client-consensus-relay-chain = { path = "../cumulus/client/consensus/relay-chain" }
 cumulus-client-collator = { path = "../cumulus/client/collator" }
 cumulus-client-service = { path = "../cumulus/client/service" }

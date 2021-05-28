@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Cumulus.  If not, see <http://www.gnu.org/licenses/>.
 
+use cumulus_client_consensus_aura::{
+	build_aura_consensus, BuildAuraConsensusParams, SlotProportion,
+};
+use sc_client_api::ExecutorProvider;
 use cumulus_client_consensus_relay_chain::{
 	build_relay_chain_consensus, BuildRelayChainConsensusParams,
 };
@@ -33,6 +37,7 @@ use sp_core::Pair;
 use sp_runtime::traits::BlakeTwo256;
 use sp_trie::PrefixedMemoryDB;
 use std::sync::Arc;
+use sp_consensus::SlotData;
 
 // Native executor instance.
 native_executor_instance!(
@@ -128,8 +133,8 @@ pub fn new_partial(
 			registry: config.prometheus_registry().clone(),
 			can_author_with: sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
 			spawner: &task_manager.spawn_essential_handle(),
-			telemetry,
-		})?;
+			telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
+		}).map_err(Into::into);
 
 	let params = PartialComponents {
 		backend,
@@ -232,6 +237,7 @@ where
 
 	let rpc_client = client.clone();
 	let rpc_extensions_builder = Box::new(move |_, _| rpc_ext_builder(rpc_client.clone()));
+	let force_authoring = parachain_config.force_authoring;
 
 	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
 		on_demand: None,
@@ -266,13 +272,7 @@ where
 
 		let slot_duration = cumulus_client_consensus_aura::slot_duration(&*client)?;
 
-		let proposer_factory = sc_basic_authorship::ProposerFactory::with_proof_recording(
-			task_manager.spawn_handle(),
-			client.clone(),
-			transaction_pool,
-			prometheus_registry.clone(),
-			telemetry.clone(),
-		);
+		let keystore_container = params.keystore_container.sync_keystore();
 
 		let relay_chain_backend = polkadot_full_node.backend.clone();
 		let relay_chain_client = polkadot_full_node.client.clone();
@@ -317,17 +317,17 @@ where
 			}
 		},
 		block_import: client.clone(),
-		relay_chain_client: relay_chain_node.client.clone(),
-		relay_chain_backend: relay_chain_node.backend.clone(),
+		relay_chain_client: polkadot_full_node.client.clone(),
+		relay_chain_backend: polkadot_full_node.backend.clone(),
 		para_client: client.clone(),
 		backoff_authoring_blocks: Option::<()>::None,
-		sync_oracle,
-		keystore,
+		sync_oracle: network,
+		keystore: keystore_container,
 		force_authoring,
 		slot_duration,
 		// We got around 500ms for proposing
 		block_proposal_slot_portion: SlotProportion::new(1f32 / 24f32),
-		telemetry,
+		telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
 	});
 
 		let params = StartCollatorParams {

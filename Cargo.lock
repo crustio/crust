@@ -1386,6 +1386,7 @@ dependencies = [
  "crust-parachain-runtime",
  "cumulus-client-cli",
  "cumulus-client-collator",
+ "cumulus-client-consensus-aura",
  "cumulus-client-consensus-relay-chain",
  "cumulus-client-network",
  "cumulus-client-service",
@@ -1827,6 +1828,35 @@ dependencies = [
  "sp-core 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "sp-io 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "sp-runtime 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "tracing",
+]
+
+[[package]]
+name = "cumulus-client-consensus-aura"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cumulus-client-consensus-common",
+ "cumulus-primitives-core",
+ "futures 0.3.14",
+ "parity-scale-codec 2.1.1",
+ "parking_lot 0.9.0",
+ "polkadot-service",
+ "sc-client-api 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sc-consensus-aura",
+ "sc-consensus-slots 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sc-telemetry 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-api 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-application-crypto 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-block-builder 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-blockchain 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-consensus 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-consensus-aura",
+ "sp-core 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-inherents 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-keystore 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-runtime 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "substrate-prometheus-endpoint 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
  "tracing",
 ]
 
@@ -9177,6 +9207,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-consensus-aura"
+version = "0.9.0"
+source = "git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2#1d7f6e12c651d776fc0dc1adefd007bb60f60b63"
+dependencies = [
+ "async-trait",
+ "derive_more 0.99.13",
+ "futures 0.3.14",
+ "futures-timer 3.0.2",
+ "log",
+ "parity-scale-codec 2.1.1",
+ "sc-block-builder 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sc-client-api 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sc-consensus-slots 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sc-telemetry 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-api 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-application-crypto 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-block-builder 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-blockchain 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-consensus 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-consensus-aura",
+ "sp-consensus-slots 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-core 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-inherents 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-io 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-keystore 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-runtime 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "sp-version 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+ "substrate-prometheus-endpoint 0.9.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.2)",
+]
+
+[[package]]
 name = "sc-consensus-babe"
 version = "0.9.0"
 source = "git+https://github.com/paritytech/substrate?branch=master#de2423492815fa60017fd7c2c14a490bcdba0441"
@@ -13606,7 +13667,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04f8ab788026715fa63b31960869617cba39117e520eb415b0139543e325ab59"
 dependencies = [
  "cfg-if 0.1.10",
- "rand 0.7.3",
+ "rand 0.6.5",
  "static_assertions",
 ]
 

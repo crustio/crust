@@ -263,6 +263,9 @@ decl_module! {
         /// The Prefix that is used in signed Ethereum messages for this network
         const Prefix: &[u8] = T::Prefix::get();
 
+        /// The CSM Prefix that is used in signed Ethereum messages for this network
+        const CsmPrefix: &[u8] = T::CsmPrefix::get();
+
         fn deposit_event() = default;
 
         /// Auth control

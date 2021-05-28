@@ -3775,13 +3775,15 @@ fn free_space_scenario_should_work() {
         assert_eq!(Balances::free_balance(&free_order_pot), 20_000_000);
 
         let bob = BOB;
-        assert_ok!(Market::change_free_order_admin(Origin::root(), bob.clone()));
-        assert_ok!(Market::change_free_fee(Origin::root(), 1000));
+        assert_ok!(Market::set_free_order_admin(Origin::root(), bob.clone()));
+        assert_ok!(Market::set_total_free_fee_limit(Origin::root(), 4000));
+        assert_ok!(Market::set_free_fee(Origin::root(), 1000));
 
         let source = MERCHANT;
         assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2));
-        assert_eq!(Balances::free_balance(&free_order_pot), 19_998_000);
-        assert_eq!(Balances::free_balance(&source), 2_000);
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_997_999);
+        assert_eq!(Balances::free_balance(&source), 2_001);
+        assert_eq!(Market::total_free_fee_limit(), 1_999);
 
         let cid =
         "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -3808,14 +3810,22 @@ fn free_space_scenario_should_work() {
                 groups: BTreeMap::new()
             })
         );
-        assert_eq!(Balances::free_balance(&free_order_pot), 19_868_000);
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_867_999);
         assert_eq!(Market::free_order_accounts(&source), Some(1));
+
+        assert_noop!(
+        Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2),
+        DispatchError::Module {
+            index: 3,
+            error: 11,
+            message: Some("AlreadyInFreeAccounts")
+        });
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0
         ));
-        assert_eq!(Balances::free_balance(&free_order_pot), 19_738_000);
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_737_999);
         assert_eq!(Market::free_order_accounts(&source).is_none(), true);
         assert_eq!(Balances::locks(&source).len(), 0);
 
@@ -3833,7 +3843,7 @@ fn free_space_scenario_should_work() {
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0
         ));
-        assert_eq!(Balances::free_balance(&free_order_pot), 19_738_000);
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_737_999);
         assert_eq!(Balances::free_balance(&source), 0);
         assert_noop!(
         Market::add_into_free_order_accounts(Origin::signed(alice.clone()), source.clone(), 2),
@@ -3843,9 +3853,30 @@ fn free_space_scenario_should_work() {
             message: Some("IllegalFreeOrderAdmin")
         });
 
+        assert_ok!(Market::set_total_free_fee_limit(Origin::root(), 4000));
         assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2));
         assert_ok!(Market::remove_from_free_order_accounts(Origin::signed(bob.clone()), source.clone()));
         assert_eq!(Market::free_order_accounts(&source).is_none(), true);
         assert_eq!(Balances::locks(&source).len(), 0);
+
+
+        assert_noop!(
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
+            DispatchError::Module {
+                index: 3,
+                error: 12,
+                message: Some("ExceedFreeCountsLimit")
+            });
+
+        assert_ok!(Market::set_free_counts_limit(Origin::root(), 2000));
+
+        // Pass the above check
+        assert_noop!(
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
+            DispatchError::Module {
+                index: 3,
+                error: 13,
+                message: Some("ExceedTotalFreeFeeLimit")
+            });
     });
 }

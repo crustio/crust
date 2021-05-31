@@ -28,7 +28,7 @@ use crust_parachain_primitives::Block;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
 use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
-use sc_telemetry::{Telemetry, TelemetryWorker, TelemetryWorkerHandle};
+use sc_telemetry::{Telemetry, TelemetryHandle, TelemetryWorker, TelemetryWorkerHandle};
 use sp_core::Pair;
 use sp_runtime::traits::BlakeTwo256;
 use sp_trie::PrefixedMemoryDB;
@@ -52,7 +52,7 @@ pub fn new_partial(
 		TFullClient<Block, RuntimeApi, Executor>,
 		TFullBackend<Block>,
 		(),
-		sp_consensus::import_queue::BasicQueue<Block, PrefixedMemoryDB<BlakeTwo256>>,
+		sp_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, Executor>>,
 		sc_transaction_pool::FullPool<Block, TFullClient<Block, RuntimeApi, Executor>>,
 		(Option<Telemetry>, Option<TelemetryWorkerHandle>),
 	>,
@@ -94,12 +94,11 @@ pub fn new_partial(
 		client.clone(),
 	);
 
-	let import_queue = cumulus_client_consensus_relay_chain::import_queue(
+	let import_queue = shell_build_import_queue(
 		client.clone(),
-		client.clone(),
-		|_, _| async { Ok(sp_timestamp::InherentDataProvider::from_system_time()) },
-		&task_manager.spawn_essential_handle(),
-		registry.clone(),
+		config,
+		telemetry.as_ref().map(|telemetry| telemetry.handle()),
+		&task_manager,
 	)?;
 
 	let params = PartialComponents {
@@ -114,6 +113,29 @@ pub fn new_partial(
 	};
 
 	Ok(params)
+}
+
+/// Build the import queue for the shell runtime.
+pub fn shell_build_import_queue(
+	client: Arc<TFullClient<Block, RuntimeApi, Executor>>,
+	config: &Configuration,
+	_: Option<TelemetryHandle>,
+	task_manager: &TaskManager,
+) -> Result<
+	sp_consensus::DefaultImportQueue<
+		Block,
+		TFullClient<Block, RuntimeApi, Executor>,
+	>,
+	sc_service::Error,
+> {
+	cumulus_client_consensus_relay_chain::import_queue(
+		client.clone(),
+		client,
+		|_, _| async { Ok(sp_timestamp::InherentDataProvider::from_system_time()) },
+		&task_manager.spawn_essential_handle(),
+		config.prometheus_registry().clone(),
+	)
+	.map_err(Into::into)
 }
 
 /// Start a node with the given parachain `Configuration` and relay chain `Configuration`.
@@ -166,14 +188,14 @@ where
 	let prometheus_registry = parachain_config.prometheus_registry().cloned();
 	let transaction_pool = params.transaction_pool.clone();
 	let mut task_manager = params.task_manager;
-	let import_queue = params.import_queue;
+	let import_queue = cumulus_client_service::SharedImportQueue::new(params.import_queue);
 	let (network, network_status_sinks, system_rpc_tx, start_network) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &parachain_config,
 			client: client.clone(),
 			transaction_pool: transaction_pool.clone(),
 			spawn_handle: task_manager.spawn_handle(),
-			import_queue,
+			import_queue: import_queue.clone(),
 			on_demand: None,
 			block_announce_validator_builder: Some(Box::new(|_| block_announce_validator)),
 		})?;
@@ -251,6 +273,7 @@ where
 			relay_chain_full_node: polkadot_full_node,
 			spawner,
 			parachain_consensus,
+			import_queue
 		};
 
 		start_collator(params).await?;
@@ -260,7 +283,7 @@ where
 			announce_block,
 			task_manager: &mut task_manager,
 			para_id: id,
-			polkadot_full_node,
+			relay_chain_full_node: polkadot_full_node,
 		};
 
 		start_full_node(params)?;

@@ -286,9 +286,11 @@ pub struct AllowedList;
 impl AllowedList {
 	fn is_allowed(id: u32) -> bool {
 		match id {
-			6666 => true, // Local testnet
-			666 => true, // Acala
-			30 => true, // Phala
+			2001 => true, // Local testnet
+			2002 => true, // Local testnet
+			2000 => true, // Acala
+			2004 => true, // Phala
+			2003 => true, // Reserved
 			_ => false
 		}
 	}
@@ -326,7 +328,7 @@ parameter_types! {
 
 match_type! {
 	pub type ParentOrParentsUnitPlurality: impl Contains<MultiLocation> = {
-		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. })
+		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. }) | X2(Parent, Parachain(2002)) | X2(Parent, Parachain(2001))
 	};
 }
 
@@ -430,7 +432,7 @@ impl Convert<u64, u128> for CurrencyToVoteHandler {
 parameter_types! {
     /// Unit is pico
     pub const MarketPalletId: PalletId = PalletId(*b"crmarket");
-    pub const FileDuration: BlockNumber = 15 * DAYS;
+    pub const FileDuration: BlockNumber = 30 * DAYS;
     pub const FileReplica: u32 = 4;
     pub const FileBaseFee: Balance = MILLICENTS * 2;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica

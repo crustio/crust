@@ -3817,7 +3817,7 @@ fn free_space_scenario_should_work() {
         Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2),
         DispatchError::Module {
             index: 3,
-            error: 11,
+            error: 14,
             message: Some("AlreadyInFreeAccounts")
         });
 
@@ -3864,7 +3864,7 @@ fn free_space_scenario_should_work() {
             Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
             DispatchError::Module {
                 index: 3,
-                error: 12,
+                error: 15,
                 message: Some("ExceedFreeCountsLimit")
             });
 
@@ -3875,7 +3875,7 @@ fn free_space_scenario_should_work() {
             Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
             DispatchError::Module {
                 index: 3,
-                error: 13,
+                error: 16,
                 message: Some("ExceedTotalFreeFeeLimit")
             });
     });

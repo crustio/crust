@@ -805,17 +805,20 @@ decl_module! {
             // 5. Ensure the total free fee is not exceeded
             let total_free_fee = Self::free_fee().saturating_mul(<BalanceOf<T>>::from(free_counts)).saturating_add(T::Currency::minimum_balance());
             ensure!(total_free_fee <= Self::total_free_fee_limit(), Error::<T>::ExceedTotalFreeFeeLimit);
-            <TotalFreeFeeLimit<T>>::mutate(|value| {*value = value.saturating_sub(total_free_fee.clone())});
 
             // 6. Add this account into free space list
-            <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
-            T::Currency::transfer(&Self::free_order_pot(), &new_account, total_free_fee, KeepAlive)?;
+            // 6.1 Transfer the money first since it might fail
+            T::Currency::transfer(&Self::free_order_pot(), &new_account, total_free_fee.clone(), KeepAlive)?;
             T::Currency::set_lock(
                 MARKET_LOCK_ID,
                 &new_account,
                 total_free_fee,
                 WithdrawReasons::TRANSFER
             );
+            // 6.2 Decrease the totoal free fee limit
+            <TotalFreeFeeLimit<T>>::mutate(|value| {*value = value.saturating_sub(total_free_fee.clone())});
+            // 6.3 Add into free order accounts
+            <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
 
             Self::deposit_event(RawEvent::NewFreeAccount(new_account));
             Ok(())

@@ -1499,7 +1499,7 @@ decl_module! {
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
 
-        // TODO: Remove it in the main net
+        // TODO: Remove it after the main net start
         #[weight = 1000]
         fn set_start_reward_era(origin, start_reward_era: EraIndex) {
             ensure_root(origin)?;
@@ -2123,6 +2123,8 @@ impl<T: Config> Module<T> {
     }
 
     fn total_rewards_in_era(active_era: EraIndex) -> BalanceOf<T> {
+        // 1. Has not start rewarding yet
+        if active_era < Self::start_reward_era() { return Zero::zero(); }
         let mut maybe_rewards_this_quarter = FIRST_QUARTER_TOTAL_REWARDS ;
         const MILLISECONDS_PER_QUARTER: u64 = 1000 * 3600 * 24 * 9000 / 100;
         // 1 quarter = (90d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)

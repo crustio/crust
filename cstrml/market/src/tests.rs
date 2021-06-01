@@ -4052,5 +4052,18 @@ fn free_space_scenario_should_work() {
                 error: 13,
                 message: Some("ExceedTotalFreeFeeLimit")
             });
+
+        let _ = Balances::make_free_balance_be(&free_order_pot, 1000);
+        // Transfer the money would fail
+        assert_noop!(
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1),
+            DispatchError::Module {
+                index: 1,
+                error: 3,
+                message: Some("InsufficientBalance")
+            });
+        let _ = Balances::make_free_balance_be(&free_order_pot, 2000);
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1));
+        assert_eq!(Market::free_order_accounts(&source), Some(1));
     });
 }

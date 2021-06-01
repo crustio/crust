@@ -25,7 +25,7 @@ use frame_support::{
 use sp_runtime::{
     RuntimeDebug,
     traits::{
-        Zero, Saturating, CheckedSub, AtLeast32BitUnsigned
+        Zero, Saturating, CheckedSub, StaticLookup, AtLeast32BitUnsigned
     },
 };
 
@@ -153,7 +153,7 @@ decl_storage! {
 decl_event!(
     pub enum Event<T> where
         Balance = BalanceOf<T>,
-        <T as frame_system::Config>::AccountId
+        <T as frame_system::Config>::AccountId,
     {
         /// An account has bonded this amount. [stash, amount]
         Bonded(AccountId, Balance),
@@ -162,6 +162,12 @@ decl_event!(
         /// An account has called `withdraw_unbonded` and removed unbonding chunks worth `Balance`
         /// from the unlocking queue. [stash, amount]
         Withdrawn(AccountId, Balance),
+        /// Set guarantee pref success
+        SetCSMGuaranteePerfSuccess(AccountId, u32),
+        /// Guarantee success
+        CSMGuaranteeSuccess(AccountId, AccountId),
+        /// Cancel guarantee success
+        CancelCSMGuaranteeSuccess(AccountId),
     }
 );
 
@@ -302,6 +308,36 @@ decl_module! {
         fn force_unstake(origin, who: T::AccountId) {
             ensure_root(origin)?;
             Self::kill_ledger(&who);
+        }
+
+        /// Set the guarantee pref
+        ///
+        /// The dispatch used by layer-2
+        #[weight = T::DbWeight::get().reads_writes(4, 2)
+            .saturating_add(53 * WEIGHT_PER_MICROS)]
+        fn set_guarantee_pref(origin, pref: u32) {
+            let who = ensure_signed(origin)?;
+            let pref = pref.min(100u32);
+            Self::deposit_event(RawEvent::SetCSMGuaranteePerfSuccess(who, pref));
+        }
+
+        /// Guarantee all locking CSM to someone
+        ///
+        /// The dispatch used by layer-2
+        #[weight = T::DbWeight::get().reads_writes(4, 2)
+            .saturating_add(53 * WEIGHT_PER_MICROS)]
+        fn guarantee(origin, target: <T::Lookup as StaticLookup>::Source) {
+            let who = ensure_signed(origin)?;
+            let target = T::Lookup::lookup(target)?;
+            Self::deposit_event(RawEvent::CSMGuaranteeSuccess(who, target));
+        }
+
+        /// Cut all guaranteed CSM
+        #[weight = T::DbWeight::get().reads_writes(4, 2)
+            .saturating_add(53 * WEIGHT_PER_MICROS)]
+        fn cancel_guarantee(origin) {
+            let who = ensure_signed(origin)?;
+            Self::deposit_event(RawEvent::CancelCSMGuaranteeSuccess(who));
         }
     }
 }

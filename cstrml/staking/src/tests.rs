@@ -1564,9 +1564,9 @@ fn staking_and_authoring_reward_change_work() {
         .execute_with(|| {
             // Make 1 account be max balance
             let _ = Balances::make_free_balance_be(&11, Balance::max_value());
-            // less than 10000
-            assert_eq!(staking_rewards_in_era(4381), 50000000000000);
-            assert_eq!(staking_rewards_in_era(8382), 50000000000000);
+            // should be zero
+            assert_eq!(staking_rewards_in_era(4381), 0);
+            assert_eq!(staking_rewards_in_era(8382), 0);
             // If 1 era is 30 min, Julian year should contains 17532 eras.
             // If era_num < 4382, staking_rewards should be
             assert_eq!(staking_rewards_in_era(14319), 50000000000000);
@@ -1580,8 +1580,8 @@ fn staking_and_authoring_reward_change_work() {
             assert_eq!(authoring_rewards_in_era(18640), 3125000000000);
 
             assert_ok!(Staking::set_start_reward_era(Origin::root(), 20000));
-            assert_eq!(staking_rewards_in_era(18640), 50000000000000);
-            assert_eq!(staking_rewards_in_era(18640), 50000000000000);
+            assert_eq!(staking_rewards_in_era(18640), 0);
+            assert_eq!(staking_rewards_in_era(18640), 0);
             assert_eq!(staking_rewards_in_era(24320), 25000000000000);
             // // TODO: for test case max issue is 18446744
             // // era_num > 210384 * 3, inflation rate will reduce less than 1%, then it should be

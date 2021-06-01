@@ -1499,7 +1499,7 @@ decl_module! {
             T::Currency::remove_lock(STAKING_ID, &stash);
         }
 
-        // TODO: Remove it after the main net start
+        // TODO: Remove it after the main net reward start
         #[weight = 1000]
         fn set_start_reward_era(origin, start_reward_era: EraIndex) {
             ensure_root(origin)?;

@@ -75,7 +75,7 @@ pub struct ReportWorksInfo {
     pub block_number: u64,
     pub block_hash: Vec<u8>,
     pub free: u64,
-    pub storage_power: u64,
+    pub reported_files_size: u64,
     pub srd_root: MerkleRoot,
     pub files_root: MerkleRoot,
     pub added_files: Vec<(MerkleRoot, u64, u64)>,
@@ -272,7 +272,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let storage_power: u64 = 402868224;
+    let reported_files_size: u64 = 402868224;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(), 134289408, 303),
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oH".as_bytes().to_vec(), 268578816, 303)
@@ -288,7 +288,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        storage_power,
+        reported_files_size,
         srd_root,
         files_root,
         added_files,

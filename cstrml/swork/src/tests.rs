@@ -322,7 +322,7 @@ fn report_works_should_work() {
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
                 storage_power: legal_wr_info.reported_files_size * 2,
-                free: legal_wr_info.reported_srd_size,
+                srd_power: legal_wr_info.reported_srd_size,
                 reported_files_size: legal_wr_info.reported_files_size,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
                 reported_files_root: legal_wr_info.files_root.clone()
@@ -332,7 +332,7 @@ fn report_works_should_work() {
             add_not_live_files();
 
             // Check workloads before reporting
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
 
             assert_ok!(Swork::report_works(
@@ -354,7 +354,7 @@ fn report_works_should_work() {
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
             // Check workloads after work report
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 402868224 * 2);
             assert_eq!(Swork::reported_files_size(), 402868224);
             assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
@@ -416,7 +416,7 @@ fn report_works_should_work_without_files() {
             register(&legal_pk, LegalCode::get());
 
             // Check workloads before reporting
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
 
             assert_ok!(Swork::report_works(
@@ -435,7 +435,7 @@ fn report_works_should_work_without_files() {
             ));
 
             // Check workloads after work report
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 402868224);
         });
@@ -666,7 +666,7 @@ fn report_works_should_failed_with_illegal_file_transition() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 0,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 5,
                 reported_srd_root: vec![],
                 reported_files_root: vec![]
@@ -714,7 +714,7 @@ fn incremental_report_should_work_without_change() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -752,7 +752,7 @@ fn incremental_report_should_work_with_files_change() {
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
                 storage_power: legal_wr_info.reported_files_size,
-                free: legal_wr_info.reported_srd_size,
+                srd_power: legal_wr_info.reported_srd_size,
                 reported_files_size: legal_wr_info.reported_files_size,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
                 reported_files_root: legal_wr_info.files_root.clone()
@@ -762,7 +762,7 @@ fn incremental_report_should_work_with_files_change() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 3,
                 reported_srd_root: vec![],
                 reported_files_root: vec![]
@@ -788,7 +788,7 @@ fn incremental_report_should_work_with_files_change() {
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
             // Check workloads after work report
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
         });
@@ -811,7 +811,7 @@ fn incremental_report_should_failed_with_root_change() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: vec![],
                 reported_files_root: vec![]
@@ -859,7 +859,7 @@ fn incremental_report_should_failed_with_wrong_file_size_change() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 40,
-                free: 40,
+                srd_power: 40,
                 reported_files_size: 40,
                 reported_srd_root: vec![],
                 reported_files_root: vec![]
@@ -904,7 +904,7 @@ fn update_identities_should_work() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -915,7 +915,7 @@ fn update_identities_should_work() {
             run_to_block(303);
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 300);
@@ -937,8 +937,8 @@ fn update_identities_should_work() {
                 legal_wr_info.sig
             ));
 
-            // 3. Free and storage_power should already been updated
-            assert_eq!(Swork::free(), 4294967296);
+            // 3. srd_power and storage_power should already been updated
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
@@ -947,8 +947,8 @@ fn update_identities_should_work() {
             run_to_block(606);
             Swork::update_identities();
 
-            // 5. Free and storage_power should not change, but current_rs should already been updated
-            assert_eq!(Swork::free(), 4294967296);
+            // 5. srd_power and storage_power should not change, but current_rs should already been updated
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 600);
@@ -958,8 +958,8 @@ fn update_identities_should_work() {
             run_to_block(909);
             Swork::update_identities();
 
-            // 7. Free and storage_power should goes to 0, and the corresponding storage order should failed
-            assert_eq!(Swork::free(), 0);
+            // 7. srd_power and storage_power should goes to 0, and the corresponding storage order should failed
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
@@ -980,7 +980,7 @@ fn abnormal_era_should_work() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -992,7 +992,7 @@ fn abnormal_era_should_work() {
             Swork::update_identities();
 
             // 2. Everything goes well
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
 
@@ -1000,8 +1000,8 @@ fn abnormal_era_should_work() {
             run_to_block(404);
             Swork::update_identities();
 
-            // 5. Free and storage_power should not change
-            assert_eq!(Swork::free(), 0);
+            // 5. srd_power and storage_power should not change
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
         });
@@ -1026,7 +1026,7 @@ fn ab_upgrade_should_work() {
             add_wr(&a_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1053,16 +1053,16 @@ fn ab_upgrade_should_work() {
                 a_wr_info.sig
             ));
 
-            // 3. Check A's work report and free & storage_power
+            // 3. Check A's work report and srd_power & storage_power
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 storage_power: 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
@@ -1091,16 +1091,16 @@ fn ab_upgrade_should_work() {
                 b_wr_info_1.sig
             ));
 
-            // 7. Check B's work report and free & storage_power
+            // 7. Check B's work report and srd_power & storage_power
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 600,
                 storage_power: 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
@@ -1128,16 +1128,16 @@ fn ab_upgrade_should_work() {
                 b_wr_info_2.sig
             ));
 
-            // 11. Check B's work report and free & storage_power again
+            // 11. Check B's work report and srd_power & storage_power again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
                 storage_power: 62, // 2 + 2 * 37 - 7 * 2
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 32,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 62);
             assert_eq!(Swork::reported_files_size(), 32);
         });
@@ -1160,7 +1160,7 @@ fn ab_upgrade_expire_should_work() {
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1229,7 +1229,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
             add_wr(&a_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 2,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1302,7 +1302,7 @@ fn create_and_join_group_should_work() {
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 0,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1472,7 +1472,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 100,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1508,7 +1508,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
                 storage_power: 0,
-                free: 0,
+                srd_power: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1696,7 +1696,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 storage_power: 57 * 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1801,7 +1801,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 storage_power: 55 * 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 99,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -1912,7 +1912,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 storage_power: 22 * 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 114,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -2022,7 +2022,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
                 storage_power: 55 * 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -2108,7 +2108,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 600,
                 storage_power: 0,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 0,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -2131,7 +2131,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 storage_power: 57 * 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -2140,7 +2140,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
                 storage_power: 55 * 2,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -2178,7 +2178,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
                 storage_power: 0,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -2187,7 +2187,7 @@ fn join_group_should_work_for_storage_power_in_work_report() {
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 1500,
                 storage_power: 0,
-                free: 4294967296,
+                srd_power: 4294967296,
                 reported_files_size: 0,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
@@ -2290,7 +2290,7 @@ fn join_group_should_work_for_stake_limit() {
             run_to_block(603);
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 12884901888);
+            assert_eq!(Swork::srd_power(), 12884901888);
             assert_eq!(Swork::storage_power(), 134 * 2);
             assert_eq!(Swork::reported_files_size(), 270); // 57 + 99 + 134
             assert_eq!(Swork::current_report_slot(), 600);
@@ -2376,7 +2376,7 @@ fn quit_group_should_work_for_stake_limit() {
 
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 57 * 2);
             assert_eq!(Swork::reported_files_size(), 57); // 57
             assert_eq!(Swork::current_report_slot(), 600);
@@ -2451,7 +2451,7 @@ fn kick_out_should_work_for_stake_limit() {
 
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 57 * 2);
             assert_eq!(Swork::reported_files_size(), 57); // 57
             assert_eq!(Swork::current_report_slot(), 600);
@@ -2508,7 +2508,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             run_to_block(603);
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 57 * 2);
             assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 600);
@@ -2520,7 +2520,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             // Punishment happen. Can't find report work at 600 report_slot. punishment deadline would be 1800. Block would be after 2100
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
@@ -2543,7 +2543,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             run_to_block(1803);
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 1800);
@@ -2567,7 +2567,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
                 let legal_wr = WorkReport {
                     report_slot: alice_wr_info.block_number,
                     storage_power: alice_wr_info.reported_files_size * 2,
-                    free: alice_wr_info.reported_srd_size,
+                    srd_power: alice_wr_info.reported_srd_size,
                     reported_files_size: alice_wr_info.reported_files_size,
                     reported_srd_root: alice_wr_info.srd_root.clone(),
                     reported_files_root: alice_wr_info.files_root.clone()
@@ -2577,7 +2577,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             run_to_block(3003);
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 3000);
@@ -2594,7 +2594,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
                 group: Some(ferdie.clone())
             });
 
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 57 * 2);
             assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 3300);
@@ -2650,7 +2650,7 @@ fn cancel_punishment_should_work() {
             run_to_block(603);
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 57 * 2);
             assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 600);
@@ -2662,7 +2662,7 @@ fn cancel_punishment_should_work() {
             // Punishment happen. Can't find report work at 600 report_slot. punishment deadline would be 1800. Block would be after 2100
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
@@ -2675,7 +2675,7 @@ fn cancel_punishment_should_work() {
 
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::srd_power(), 0);
             assert_eq!(Swork::storage_power(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 1500);
@@ -2690,7 +2690,7 @@ fn cancel_punishment_should_work() {
             let legal_wr = WorkReport {
                 report_slot: alice_wr_info.block_number,
                 storage_power: alice_wr_info.reported_files_size * 2,
-                free: alice_wr_info.reported_srd_size,
+                srd_power: alice_wr_info.reported_srd_size,
                 reported_files_size: alice_wr_info.reported_files_size,
                 reported_srd_root: alice_wr_info.srd_root.clone(),
                 reported_files_root: alice_wr_info.files_root.clone()
@@ -2707,7 +2707,7 @@ fn cancel_punishment_should_work() {
             });
             Swork::update_identities();
 
-            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::srd_power(), 4294967296);
             assert_eq!(Swork::storage_power(), 57 * 2);
             assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 1800);

@@ -76,7 +76,7 @@ pub struct WorkReport {
 
     /// Storage information
     pub storage_power: u64, // Real file(mapping with sOrder) size
-    pub free: u64,
+    pub srd_power: u64,
 
     /// Assist judgement
     pub reported_files_size: u64, // Reported files size
@@ -135,9 +135,10 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         false
     }
 
-    /// get total reported files size and free space
+    /// get total reported files size and reported srd space
     fn get_total_capacity() -> u128 {
-        return Self::reported_files_size().saturating_add(Self::free());
+        // Since srd power == reported srd size, we do a hack here
+        return Self::reported_files_size().saturating_add(Self::srd_power());
     }
 }
 
@@ -207,7 +208,7 @@ decl_storage! {
         pub ReportedInSlot get(fn reported_in_slot):
             double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => bool = false;
 
-        /// The storage_power workload, used for calculating stake limit in the end of each report slot.
+        /// The storage_power workload, used for calculating stake limit with srd power workload in the end of each report slot.
         /// The default value is 0.
         pub StoragePower get(fn storage_power): u128 = 0;
 
@@ -215,9 +216,9 @@ decl_storage! {
         /// The default value is 0.
         pub ReportedFilesSize get(fn reported_files_size): u128 = 0;
 
-        /// The free workload, used for calculating stake limit in the end of each report slot.
+        /// The srd power workload, used for calculating stake limit with storage power workload in the end of each report slot.
         /// The default value is 0.
-        pub Free get(fn free): u128 = 0;
+        pub SrdPower get(fn srd_power): u128 = 0;
     }
     add_extra_genesis {
         config(init_codes):
@@ -520,7 +521,7 @@ decl_module! {
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
             // d. Update `report_in_slot`
-            // e. Update total spaces(storage_power and free)
+            // e. Update total value(srd_power, storage_power and reported_files_size)
             let anchor = Self::pub_keys(&curr_pk).anchor.unwrap();
             Self::maybe_upsert_work_report(
                 &reporter,
@@ -709,9 +710,9 @@ decl_module! {
 impl<T: Config> Module<T> {
     // PUBLIC MUTABLES
     /// This function is for updating all identities, in details:
-    /// 1. call `update_and_get_workload` for every identity, which will return (free, storage_power)
+    /// 1. call `update_and_get_workload` for every identity, which will return (srd_power, storage_power)
     /// this also (maybe) remove the `outdated` work report
-    /// 2. re-calculate `StoragePower` and `Free`
+    /// 2. re-calculate `StoragePower` and `SrdPower`
     /// 3. update `CurrentReportSlot`
     /// 4. call `Works::report_works` interface for every identity
     ///
@@ -728,7 +729,7 @@ impl<T: Config> Module<T> {
         }
 
         let mut total_storage_power = 0u128;
-        let mut total_free = 0u128;
+        let mut total_srd_power = 0u128;
         let mut total_reported_files_size = 0u128;
 
         log!(
@@ -741,23 +742,23 @@ impl<T: Config> Module<T> {
         // TODO: add check when we launch mainnet
         let to_removed_slot = current_rs.saturating_sub(Self::history_slot_depth());
         for (reporter, mut id) in <Identities<T>>::iter() {
-            let (free, storage_power, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);
+            let (srd_power, storage_power, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);
             total_storage_power = total_storage_power.saturating_add(storage_power);
-            total_free = total_free.saturating_add(free);
+            total_srd_power = total_srd_power.saturating_add(srd_power);
             total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
             let mut owner = reporter;
             if let Some(group) = id.group {
                 owner = group;
             }
-            let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(storage_power).saturating_add(free);
+            let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(storage_power).saturating_add(srd_power);
             workload_map.insert(owner, workload);
             ReportedInSlot::remove(&id.anchor, to_removed_slot);
         }
 
         StoragePower::put(total_storage_power);
-        Free::put(total_free);
+        SrdPower::put(total_srd_power);
         ReportedFilesSize::put(total_reported_files_size);
-        let total_workload = total_storage_power.saturating_add(total_free);
+        let total_workload = total_storage_power.saturating_add(total_srd_power);
 
         // 3. Update current report slot
         CurrentReportSlot::mutate(|crs| *crs = reported_rs);
@@ -796,7 +797,7 @@ impl<T: Config> Module<T> {
     /// This function will (maybe) update or insert a work report, in details:
     /// 1. calculate storage_power from reported files
     /// 2. set `ReportedInSlot`
-    /// 3. update `StoragePower` and `Free`
+    /// 3. update `StoragePower` and `SrdPower`
     /// 4. call `Works::report_works` interface
     fn maybe_upsert_work_report(
         reporter: &T::AccountId,
@@ -810,7 +811,7 @@ impl<T: Config> Module<T> {
         report_slot: u64,
     ) {
         let mut old_storage_power: u64 = 0;
-        let mut old_free: u64 = 0;
+        let mut old_srd_power: u64 = 0;
         let mut old_reported_files_size: u64 = 0;
         // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
@@ -824,7 +825,7 @@ impl<T: Config> Module<T> {
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
             old_storage_power = old_wr.storage_power;
-            old_free = old_wr.free;
+            old_srd_power = old_wr.srd_power;
             old_reported_files_size = old_wr.reported_files_size;
         }
 
@@ -833,7 +834,7 @@ impl<T: Config> Module<T> {
         let wr = WorkReport {
             report_slot,
             storage_power,
-            free: reported_srd_size,
+            srd_power: reported_srd_size,
             reported_files_size,
             reported_srd_root: reported_srd_root.clone(),
             reported_files_root: reported_files_root.clone()
@@ -844,11 +845,11 @@ impl<T: Config> Module<T> {
 
         // 6. Update workload
         let total_storage_power = Self::storage_power().saturating_sub(old_storage_power as u128).saturating_add(storage_power as u128);
-        let total_free = Self::free().saturating_sub(old_free as u128).saturating_add(reported_srd_size as u128);
+        let total_srd_power = Self::srd_power().saturating_sub(old_srd_power as u128).saturating_add(reported_srd_size as u128);
         let total_reported_files_size = Self::reported_files_size().saturating_sub(old_reported_files_size as u128).saturating_add(reported_files_size as u128);
 
         StoragePower::put(total_storage_power);
-        Free::put(total_free);
+        SrdPower::put(total_srd_power);
         ReportedFilesSize::put(total_reported_files_size);
     }
 
@@ -884,12 +885,12 @@ impl<T: Config> Module<T> {
     /// otherwise, it will be an void in this recursive loop, it mainly includes:
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
-    /// 2. return the (free, storage_power) storage of this reporter account
+    /// 2. return the (srd_power, storage_power) storage of this reporter account
     fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(&id.anchor) {
             if Self::is_fully_reported(reporter, id, current_rs) {
-                return (wr.free as u128, wr.storage_power as u128, wr.reported_files_size as u128)
+                return (wr.srd_power as u128, wr.storage_power as u128, wr.reported_files_size as u128)
             }
         }
         // Or nope, idk wtf? 🙂
@@ -1015,9 +1016,9 @@ impl<T: Config> Module<T> {
         //    prev_pk: SworkerPubKey,
         //    block_number: u64, -> Vec<u8>
         //    block_hash: Vec<u8>,
-        //    free: u64, -> Vec<u8>
+        //    reported_srd_size: u64, -> Vec<u8>
         //    reported_files_size: u64, -> Vec<u8>
-        //    free_root: MerkleRoot,
+        //    srd_root: MerkleRoot,
         //    reported_files_size_root: MerkleRoot,
         //    added_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>
         //    deleted_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>

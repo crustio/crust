@@ -214,7 +214,7 @@ benchmarks! {
             wr.sig
         ).expect("Something wrong during reporting works");
     } verify {
-        assert_eq!(swork::Module::<T>::free(), wr.reported_srd_size as u128);
+        assert_eq!(swork::Module::<T>::srd_power(), wr.reported_srd_size as u128);
         assert_eq!(swork::Module::<T>::storage_power(), 0 as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
@@ -253,7 +253,7 @@ benchmarks! {
             wr.sig
         ).expect("Something wrong during reporting works");
     } verify {
-        assert_eq!(swork::Module::<T>::free(), wr.reported_srd_size as u128);
+        assert_eq!(swork::Module::<T>::srd_power(), wr.reported_srd_size as u128);
         assert_eq!(swork::Module::<T>::storage_power(), (wr.reported_files_size * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
@@ -315,7 +315,7 @@ benchmarks! {
             wr.sig
         ).expect("Something wrong during reporting works");
     } verify {
-        assert_eq!(swork::Module::<T>::free(), wr.reported_srd_size as u128);
+        assert_eq!(swork::Module::<T>::srd_power(), wr.reported_srd_size as u128);
         assert_eq!(swork::Module::<T>::storage_power(), (wr.reported_files_size * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }

@@ -105,7 +105,7 @@ pub struct Replica<AccountId> {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct StoragePowerInfo {
     // The size of used value in MPoW
-    pub used_size: u64,
+    pub storage_power: u64,
     // The count of valid group in the previous report slot
     pub reported_group_count: u32,
     // Anchors which is counted as contributor for this file in its own group, bool means in the last check the group is calculated as reported_group_count
@@ -145,7 +145,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
         // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
-        let mut used_size: u64 = 0;
+        let mut storage_power: u64 = 0;
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
             let mut is_counted = true;
             // 1. Check if the file is stored by other members
@@ -172,7 +172,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
             // 3. Update used_info
             if is_counted {
-                used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the used_size after the update
+                storage_power = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the storage_power after the update
             };
 
             // 4. The first join the replicas and file become live(expired_on > calculated_at)
@@ -185,7 +185,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 5. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
-        return used_size
+        return storage_power
     }
 
     /// Node who delete the replica
@@ -1062,7 +1062,7 @@ impl<T: Config> Module<T> {
             // archive used for each merchant
             for anchor in used_info.groups.keys() {
                 UsedTrashMappingI::mutate(&anchor, |value| {
-                    *value += used_info.used_size;
+                    *value += used_info.storage_power;
                 })
             }
             // trash I is full => dump trash II
@@ -1075,7 +1075,7 @@ impl<T: Config> Module<T> {
             // archive used for each merchant
             for anchor in used_info.groups.keys() {
                 UsedTrashMappingII::mutate(&anchor, |value| {
-                    *value += used_info.used_size;
+                    *value += used_info.storage_power;
                 })
             }
             // trash II is full => dump trash I
@@ -1111,9 +1111,9 @@ impl<T: Config> Module<T> {
                 Some(ref mut used_info) => {
                     for anchor in used_info.groups.keys() {
                         UsedTrashMappingI::mutate(anchor, |value| {
-                            *value -= used_info.used_size;
+                            *value -= used_info.storage_power;
                         });
-                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                        T::SworkerInterface::update_used(anchor, used_info.storage_power, 0);
                     }
                     UsedTrashSizeI::mutate(|value| {*value -= 1;});
                 },
@@ -1130,9 +1130,9 @@ impl<T: Config> Module<T> {
                 Some(ref mut used_info) => {
                     for anchor in used_info.groups.keys() {
                         UsedTrashMappingII::mutate(anchor, |value| {
-                            *value -= used_info.used_size;
+                            *value -= used_info.storage_power;
                         });
-                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                        T::SworkerInterface::update_used(anchor, used_info.storage_power, 0);
                     }
                     UsedTrashSizeII::mutate(|value| {*value -= 1;});
                 },
@@ -1143,35 +1143,35 @@ impl<T: Config> Module<T> {
     }
 
     fn maybe_delete_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
-        let mut used_size = 0;
+        let mut storage_power = 0;
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.groups.remove(anchor).is_some() {
-                    used_size = used_info.used_size;
+                    storage_power = used_info.storage_power;
                     UsedTrashMappingI::mutate(anchor, |value| {
-                        *value -= used_info.used_size;
+                        *value -= used_info.storage_power;
                     });
                 }
             },
             None => {}
         });
-        used_size
+        storage_power
     }
 
     fn maybe_delete_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
-        let mut used_size = 0;
+        let mut storage_power = 0;
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut used_info) => {
                 if used_info.groups.remove(anchor).is_some() {
-                    used_size = used_info.used_size;
+                    storage_power = used_info.storage_power;
                     UsedTrashMappingII::mutate(anchor, |value| {
-                        *value -= used_info.used_size;
+                        *value -= used_info.storage_power;
                     });
                 }
             },
             None => {}
         });
-        used_size
+        storage_power
     }
 
     fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
@@ -1222,7 +1222,7 @@ impl<T: Config> Module<T> {
                 replicas: vec![]
             };
             let used_info = StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: <BTreeMap<SworkerAnchor, bool>>::new()
             };
@@ -1354,21 +1354,21 @@ impl<T: Config> Module<T> {
         Self::update_groups_used_info(file_size, used_info);
         Self::update_files_size(file_size, 0, 1);
         used_info.groups.insert(anchor.clone(), true);
-        used_info.used_size
+        used_info.storage_power
     }
 
     fn delete_used_group(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
-        let mut used_size: u64 = 0;
+        let mut storage_power: u64 = 0;
         
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
             Some((ref file_info, ref mut used_info)) => {
                 if let Some(is_calculated_as_reported_group_count) = used_info.groups.remove(anchor) {
-                    // need to delete the used_size before the update.
-                    // we should always return the used_size no matter `is_calculated_as_reported_group_count` is true of false.
-                    // `is_calculated_as_reported_group_count` only change the used_size factor.
+                    // need to delete the storage_power before the update.
+                    // we should always return the storage_power no matter `is_calculated_as_reported_group_count` is true of false.
+                    // `is_calculated_as_reported_group_count` only change the storage_power factor.
                     // we should delete the used from wr no matter what's the factor right now.
-                    used_size = used_info.used_size;
+                    storage_power = used_info.storage_power;
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
                         Self::update_groups_used_info(file_info.file_size, used_info);
@@ -1380,12 +1380,12 @@ impl<T: Config> Module<T> {
         });
 
         // 2. Delete trashI's anchor
-        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_i(cid, anchor));
+        storage_power = storage_power.max(Self::maybe_delete_anchor_from_used_trash_i(cid, anchor));
 
         // 3. Delete trashII's anchor
-        used_size = used_size.max(Self::maybe_delete_anchor_from_used_trash_ii(cid, anchor));
+        storage_power = storage_power.max(Self::maybe_delete_anchor_from_used_trash_ii(cid, anchor));
 
-        used_size
+        storage_power
     }
 
     fn maybe_upsert_file_size(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
@@ -1428,14 +1428,14 @@ impl<T: Config> Module<T> {
     }
 
     fn update_groups_used_info(file_size: u64, used_info: &mut StoragePowerInfo) {
-        let new_used_size = Self::calculate_used_size(file_size, used_info.reported_group_count);
-        let prev_used_size = used_info.used_size;
-        if prev_used_size != new_used_size {
+        let new_storage_power = Self::calculate_storage_power(file_size, used_info.reported_group_count);
+        let prev_storage_power = used_info.storage_power;
+        if prev_storage_power != new_storage_power {
             for anchor in used_info.groups.keys() {
-                T::SworkerInterface::update_used(anchor, prev_used_size, new_used_size);
+                T::SworkerInterface::update_used(anchor, prev_storage_power, new_storage_power);
             }
         }
-        used_info.used_size = new_used_size;
+        used_info.storage_power = new_storage_power;
     }
 
     fn count_reported_groups(groups: &mut BTreeMap<SworkerAnchor, bool>, curr_bn: BlockNumber) -> u32 {
@@ -1449,7 +1449,7 @@ impl<T: Config> Module<T> {
         return count;
     }
 
-    fn calculate_used_size(file_size: u64, reported_group_count: u32) -> u64 {
+    fn calculate_storage_power(file_size: u64, reported_group_count: u32) -> u64 {
         let used_ratio: u64 = match reported_group_count {
             1..=10 => 2,
             11..=20 => 4,

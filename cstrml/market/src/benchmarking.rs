@@ -25,7 +25,7 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
     -> (FileInfo<T::AccountId, BalanceOf<T>>, StoragePowerInfo)
 {
     let used_info = StoragePowerInfo {
-        used_size: file_size * 2,
+        storage_power: file_size * 2,
         reported_group_count: 1,
         groups: <BTreeMap<SworkerAnchor, bool>>::new()
     };

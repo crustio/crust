@@ -131,7 +131,7 @@ fn place_storage_order_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -216,7 +216,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -243,7 +243,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -288,7 +288,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -314,7 +314,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -343,7 +343,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -372,7 +372,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -425,7 +425,7 @@ fn do_calculate_reward_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -472,7 +472,7 @@ fn do_calculate_reward_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -498,7 +498,7 @@ fn do_calculate_reward_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -544,7 +544,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -588,7 +588,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -613,7 +613,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -645,7 +645,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -692,7 +692,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -736,7 +736,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -748,7 +748,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
         assert_eq!(Market::files(&cid), None);
 
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
@@ -803,7 +803,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -849,7 +849,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -874,7 +874,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -912,7 +912,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -960,7 +960,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), false)].into_iter())
             })
@@ -1008,7 +1008,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false), (hex::decode("11").unwrap(), true)].into_iter())
             })
@@ -1061,7 +1061,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 2,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), true)].into_iter())
             })
@@ -1083,7 +1083,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         run_to_block(1803);
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false), (hex::decode("11").unwrap(), false)].into_iter())
         });
@@ -1141,7 +1141,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -1165,7 +1165,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -1185,7 +1185,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -1233,7 +1233,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -1314,7 +1314,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
                 ]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 5,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1364,7 +1364,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
                 ]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1433,7 +1433,7 @@ fn do_calculate_reward_should_only_pay_the_groups() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -1524,7 +1524,7 @@ fn do_calculate_reward_should_only_pay_the_groups() {
                 ]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 4,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), true), (hex::decode("33").unwrap(), true)].into_iter())
             })
@@ -1577,7 +1577,7 @@ fn do_calculate_reward_should_only_pay_the_groups() {
                 ]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 3,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), true), (hex::decode("33").unwrap(), true)].into_iter())
             })
@@ -1648,7 +1648,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -1678,7 +1678,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1709,7 +1709,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 2,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1746,7 +1746,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 3,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1806,7 +1806,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 4,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1853,7 +1853,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 5,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1907,7 +1907,7 @@ fn insert_replica_should_work_for_complex_scenario() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 6,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -1962,7 +1962,7 @@ fn clear_trash_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -1994,7 +1994,7 @@ fn clear_trash_should_work() {
                     }]
                 },
                 StoragePowerInfo {
-                    used_size: file_size * 2,
+                    storage_power: file_size * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
                 })
@@ -2006,28 +2006,28 @@ fn clear_trash_should_work() {
         // close files one by one
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
         assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
         assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
         assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
         assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
@@ -2036,14 +2036,14 @@ fn clear_trash_should_work() {
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
         assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
         assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), StoragePowerInfo {
-            used_size: file_size * 2,
+            storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
@@ -2128,7 +2128,7 @@ fn withdraw_staking_pot_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -2184,7 +2184,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                     replicas: vec![]
                 },
                 StoragePowerInfo {
-                    used_size: 0,
+                    storage_power: 0,
                     reported_group_count: 0,
                     groups: BTreeMap::new()
                 })
@@ -2214,7 +2214,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 }]
             },
             StoragePowerInfo {
-                used_size: reported_file_size_cid1 * 2,
+                storage_power: reported_file_size_cid1 * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2267,7 +2267,7 @@ fn double_place_storage_order_file_size_check_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -2294,7 +2294,7 @@ fn double_place_storage_order_file_size_check_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: reported_file_size_cid1 * 2,
+                storage_power: reported_file_size_cid1 * 2,
                 reported_group_count: 1, // duplicate legal pk and this scenario only occurs in test
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2332,7 +2332,7 @@ fn double_place_storage_order_file_size_check_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
             })
@@ -2383,7 +2383,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -2429,7 +2429,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2454,7 +2454,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2489,7 +2489,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 2,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2524,7 +2524,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2587,7 +2587,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -2633,7 +2633,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2658,7 +2658,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2693,7 +2693,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 2,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -2715,7 +2715,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::from_iter(vec![].into_iter())
             })
@@ -2738,7 +2738,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::from_iter(vec![].into_iter())
             })
@@ -2748,7 +2748,7 @@ fn place_storage_order_for_expired_file_should_make_it_pending_if_replicas_is_ze
 
 
 #[test]
-fn dynamic_used_size_should_work() {
+fn dynamic_storage_power_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -2783,7 +2783,7 @@ fn dynamic_used_size_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -2799,7 +2799,7 @@ fn dynamic_used_size_should_work() {
         }
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 10,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             }
@@ -2809,7 +2809,7 @@ fn dynamic_used_size_should_work() {
         }
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            StoragePowerInfo {
-               used_size: file_size * 4,
+               storage_power: file_size * 4,
                reported_group_count: 20,
                groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
            }
@@ -2819,7 +2819,7 @@ fn dynamic_used_size_should_work() {
         }
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            StoragePowerInfo {
-               used_size: 0,
+               storage_power: 0,
                reported_group_count: 220,
                groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
            }
@@ -2829,7 +2829,7 @@ fn dynamic_used_size_should_work() {
         }
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            StoragePowerInfo {
-               used_size: 0,
+               storage_power: 0,
                reported_group_count: 219, // This would never happen in the real world.
                groups: BTreeMap::new()
            }
@@ -2838,7 +2838,7 @@ fn dynamic_used_size_should_work() {
 }
 
 #[test]
-fn delete_used_size_should_work() {
+fn delete_storage_power_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first
         run_to_block(50);
@@ -2873,7 +2873,7 @@ fn delete_used_size_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -2890,7 +2890,7 @@ fn delete_used_size_should_work() {
         }
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            StoragePowerInfo {
-               used_size: file_size * 4,
+               storage_power: file_size * 4,
                reported_group_count: 20,
                groups: expected_groups.clone()
            }
@@ -2899,7 +2899,7 @@ fn delete_used_size_should_work() {
         expected_groups.remove(&hex::decode("10").unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            StoragePowerInfo {
-               used_size: file_size * 4,
+               storage_power: file_size * 4,
                reported_group_count: 19,
                groups: expected_groups.clone()
            }
@@ -2914,7 +2914,7 @@ fn delete_used_size_should_work() {
         expected_groups.remove(&hex::decode("21").unwrap());
         assert_eq!(Market::files(&cid).unwrap_or_default().1,
            StoragePowerInfo {
-               used_size: file_size * 4,
+               storage_power: file_size * 4,
                reported_group_count: 18, // this should be nine instead of eight.
                groups: expected_groups.clone()
            }
@@ -2965,7 +2965,7 @@ fn files_size_should_not_be_decreased_twice() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -3031,7 +3031,7 @@ fn files_size_should_not_be_decreased_twice() {
                     }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), false)].into_iter())
             })
@@ -3062,7 +3062,7 @@ fn files_size_should_not_be_decreased_twice() {
                     ]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -3113,7 +3113,7 @@ fn clear_same_file_in_trash_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -3154,7 +3154,7 @@ fn clear_same_file_in_trash_should_work() {
         assert_eq!(Market::files(&cid).is_none(), true);
         assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), (
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), true)].into_iter())
             })
@@ -3180,7 +3180,7 @@ fn clear_same_file_in_trash_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -3464,7 +3464,7 @@ fn renew_file_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -3490,7 +3490,7 @@ fn renew_file_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
             })
@@ -3520,7 +3520,7 @@ fn renew_file_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
             })
@@ -3576,7 +3576,7 @@ fn change_base_fee_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })
@@ -3625,7 +3625,7 @@ fn change_base_fee_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: file_size * 2,
+                storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
@@ -3651,7 +3651,7 @@ fn change_base_fee_should_work() {
                 }]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false)].into_iter())
             })
@@ -3979,7 +3979,7 @@ fn free_space_scenario_should_work() {
                 replicas: vec![]
             },
             StoragePowerInfo {
-                used_size: 0,
+                storage_power: 0,
                 reported_group_count: 0,
                 groups: BTreeMap::new()
             })

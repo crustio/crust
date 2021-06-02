@@ -291,8 +291,8 @@ pub trait Config: system::Config {
     /// Tax / Storage plus Staking ratio.
     type StorageRatio: Get<Perbill>;
 
-    /// UsedTrashMaxSize.
-    type UsedTrashMaxSize: Get<u128>;
+    /// StoragePowerTrashMaxSize.
+    type StoragePowerTrashMaxSize: Get<u128>;
 
     /// Maximum file size
     type MaximumFileSize: Get<u64>;
@@ -335,25 +335,25 @@ decl_storage! {
         pub FilesSize get(fn files_size): u128 = 0;
 
         /// The first file trash to store overdue files for a while
-        pub UsedTrashI get(fn used_trash_i):
+        pub StoragePowerTrashI get(fn used_trash_i):
         map hasher(twox_64_concat) MerkleRoot => Option<StoragePowerInfo>;
 
         /// The second file trash to store overdue files for a while
-        pub UsedTrashII get(fn used_trash_ii):
+        pub StoragePowerTrashII get(fn used_trash_ii):
         map hasher(twox_64_concat) MerkleRoot => Option<StoragePowerInfo>;
 
         /// The count of overdue files in the first file trash
-        pub UsedTrashSizeI get(fn used_trash_size_i): u128 = 0;
+        pub StoragePowerTrashSizeI get(fn used_trash_size_i): u128 = 0;
 
         /// The count of overdue files in the second file trash
-        pub UsedTrashSizeII get(fn used_trash_size_ii): u128 = 0;
+        pub StoragePowerTrashSizeII get(fn used_trash_size_ii): u128 = 0;
 
         /// The total counted used size for each anchor in the first file trash
-        pub UsedTrashMappingI get(fn used_trash_mapping_i):
+        pub StoragePowerTrashMappingI get(fn used_trash_mapping_i):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
         /// The total counted used size for each anchor in the second file trash
-        pub UsedTrashMappingII get(fn used_trash_mapping_ii):
+        pub StoragePowerTrashMappingII get(fn used_trash_mapping_ii):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
         /// The global market switch to enable place storage order
@@ -465,7 +465,7 @@ decl_module! {
         const StorageRatio: Perbill = T::StorageRatio::get();
 
         /// The max size of used trash.
-        const UsedTrashMaxSize: u128 = T::UsedTrashMaxSize::get();
+        const StoragePowerTrashMaxSize: u128 = T::StoragePowerTrashMaxSize::get();
 
         /// The max file size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
@@ -1056,30 +1056,30 @@ impl<T: Config> Module<T> {
         storage_power_info.reported_group_count = 1;
         Self::update_groups_storage_power_info(file_size, &mut storage_power_info);
 
-        if Self::used_trash_size_i() < T::UsedTrashMaxSize::get() {
-            UsedTrashI::insert(cid, storage_power_info.clone());
-            UsedTrashSizeI::mutate(|value| {*value += 1;});
+        if Self::used_trash_size_i() < T::StoragePowerTrashMaxSize::get() {
+            StoragePowerTrashI::insert(cid, storage_power_info.clone());
+            StoragePowerTrashSizeI::mutate(|value| {*value += 1;});
             // archive used for each merchant
             for anchor in storage_power_info.groups.keys() {
-                UsedTrashMappingI::mutate(&anchor, |value| {
+                StoragePowerTrashMappingI::mutate(&anchor, |value| {
                     *value += storage_power_info.storage_power;
                 })
             }
             // trash I is full => dump trash II
-            if Self::used_trash_size_i() >= T::UsedTrashMaxSize::get() {
+            if Self::used_trash_size_i() >= T::StoragePowerTrashMaxSize::get() {
                 Self::dump_used_trash_ii();
             }
         } else {
-            UsedTrashII::insert(cid, storage_power_info.clone());
-            UsedTrashSizeII::mutate(|value| {*value += 1;});
+            StoragePowerTrashII::insert(cid, storage_power_info.clone());
+            StoragePowerTrashSizeII::mutate(|value| {*value += 1;});
             // archive used for each merchant
             for anchor in storage_power_info.groups.keys() {
-                UsedTrashMappingII::mutate(&anchor, |value| {
+                StoragePowerTrashMappingII::mutate(&anchor, |value| {
                     *value += storage_power_info.storage_power;
                 })
             }
             // trash II is full => dump trash I
-            if Self::used_trash_size_ii() >= T::UsedTrashMaxSize::get() {
+            if Self::used_trash_size_ii() >= T::StoragePowerTrashMaxSize::get() {
                 Self::dump_used_trash_i();
             }
         }
@@ -1087,35 +1087,35 @@ impl<T: Config> Module<T> {
     }
 
     fn dump_used_trash_i() {
-        for (anchor, used) in UsedTrashMappingI::iter() {
+        for (anchor, used) in StoragePowerTrashMappingI::iter() {
             T::SworkerInterface::update_used(&anchor, used, 0);
         }
-        remove_storage_prefix(UsedTrashMappingI::module_prefix(), UsedTrashMappingI::storage_prefix(), &[]);
-        remove_storage_prefix(UsedTrashI::module_prefix(), UsedTrashI::storage_prefix(), &[]);
-        UsedTrashSizeI::mutate(|value| {*value = 0;});
+        remove_storage_prefix(StoragePowerTrashMappingI::module_prefix(), StoragePowerTrashMappingI::storage_prefix(), &[]);
+        remove_storage_prefix(StoragePowerTrashI::module_prefix(), StoragePowerTrashI::storage_prefix(), &[]);
+        StoragePowerTrashSizeI::mutate(|value| {*value = 0;});
     }
 
     fn dump_used_trash_ii() {
-        for (anchor, used) in UsedTrashMappingII::iter() {
+        for (anchor, used) in StoragePowerTrashMappingII::iter() {
             T::SworkerInterface::update_used(&anchor, used, 0);
         }
-        remove_storage_prefix(UsedTrashMappingII::module_prefix(), UsedTrashMappingII::storage_prefix(), &[]);
-        remove_storage_prefix(UsedTrashII::module_prefix(), UsedTrashII::storage_prefix(), &[]);
-        UsedTrashSizeII::mutate(|value| {*value = 0;});
+        remove_storage_prefix(StoragePowerTrashMappingII::module_prefix(), StoragePowerTrashMappingII::storage_prefix(), &[]);
+        remove_storage_prefix(StoragePowerTrashII::module_prefix(), StoragePowerTrashII::storage_prefix(), &[]);
+        StoragePowerTrashSizeII::mutate(|value| {*value = 0;});
     }
 
     fn maybe_delete_file_from_used_trash_i(cid: &MerkleRoot) {
         // 1. Delete trashI's anchor
-        UsedTrashI::mutate_exists(cid, |maybe_used| {
+        StoragePowerTrashI::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
                 Some(ref mut storage_power_info) => {
                     for anchor in storage_power_info.groups.keys() {
-                        UsedTrashMappingI::mutate(anchor, |value| {
+                        StoragePowerTrashMappingI::mutate(anchor, |value| {
                             *value -= storage_power_info.storage_power;
                         });
                         T::SworkerInterface::update_used(anchor, storage_power_info.storage_power, 0);
                     }
-                    UsedTrashSizeI::mutate(|value| {*value -= 1;});
+                    StoragePowerTrashSizeI::mutate(|value| {*value -= 1;});
                 },
                 None => {}
             }
@@ -1125,16 +1125,16 @@ impl<T: Config> Module<T> {
 
     fn maybe_delete_file_from_used_trash_ii(cid: &MerkleRoot) {
         // 1. Delete trashII's anchor
-        UsedTrashII::mutate_exists(cid, |maybe_used| {
+        StoragePowerTrashII::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
                 Some(ref mut storage_power_info) => {
                     for anchor in storage_power_info.groups.keys() {
-                        UsedTrashMappingII::mutate(anchor, |value| {
+                        StoragePowerTrashMappingII::mutate(anchor, |value| {
                             *value -= storage_power_info.storage_power;
                         });
                         T::SworkerInterface::update_used(anchor, storage_power_info.storage_power, 0);
                     }
-                    UsedTrashSizeII::mutate(|value| {*value -= 1;});
+                    StoragePowerTrashSizeII::mutate(|value| {*value -= 1;});
                 },
                 None => {}
             }
@@ -1144,11 +1144,11 @@ impl<T: Config> Module<T> {
 
     fn maybe_delete_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
-        UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
+        StoragePowerTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut storage_power_info) => {
                 if storage_power_info.groups.remove(anchor).is_some() {
                     storage_power = storage_power_info.storage_power;
-                    UsedTrashMappingI::mutate(anchor, |value| {
+                    StoragePowerTrashMappingI::mutate(anchor, |value| {
                         *value -= storage_power_info.storage_power;
                     });
                 }
@@ -1160,11 +1160,11 @@ impl<T: Config> Module<T> {
 
     fn maybe_delete_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
-        UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
+        StoragePowerTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut storage_power_info) => {
                 if storage_power_info.groups.remove(anchor).is_some() {
                     storage_power = storage_power_info.storage_power;
-                    UsedTrashMappingII::mutate(anchor, |value| {
+                    StoragePowerTrashMappingII::mutate(anchor, |value| {
                         *value -= storage_power_info.storage_power;
                     });
                 }

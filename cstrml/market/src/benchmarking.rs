@@ -22,9 +22,9 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
 }
 
 fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, calculated_at: BlockNumber, amount: u32)
-    -> (FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)
+    -> (FileInfo<T::AccountId, BalanceOf<T>>, StoragePowerInfo)
 {
-    let used_info = UsedInfo {
+    let used_info = StoragePowerInfo {
         used_size: file_size * 2,
         reported_group_count: 1,
         groups: <BTreeMap<SworkerAnchor, bool>>::new()

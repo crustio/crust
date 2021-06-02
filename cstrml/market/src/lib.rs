@@ -103,7 +103,7 @@ pub struct Replica<AccountId> {
 /// we put this in market to avoid too many keys in storage
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct UsedInfo {
+pub struct StoragePowerInfo {
     // The size of used value in MPoW
     pub used_size: u64,
     // The count of valid group in the previous report slot
@@ -325,7 +325,7 @@ decl_storage! {
 
         /// File information iterated by order id
         pub Files get(fn files):
-        map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)>;
+        map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, StoragePowerInfo)>;
 
         /// The file price per MB.
         /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
@@ -336,11 +336,11 @@ decl_storage! {
 
         /// The first file trash to store overdue files for a while
         pub UsedTrashI get(fn used_trash_i):
-        map hasher(twox_64_concat) MerkleRoot => Option<UsedInfo>;
+        map hasher(twox_64_concat) MerkleRoot => Option<StoragePowerInfo>;
 
         /// The second file trash to store overdue files for a while
         pub UsedTrashII get(fn used_trash_ii):
-        map hasher(twox_64_concat) MerkleRoot => Option<UsedInfo>;
+        map hasher(twox_64_concat) MerkleRoot => Option<StoragePowerInfo>;
 
         /// The count of overdue files in the first file trash
         pub UsedTrashSizeI get(fn used_trash_size_i): u128 = 0;
@@ -1051,7 +1051,7 @@ impl<T: Config> Module<T> {
     }
 
     /// Trashbag operations
-    fn move_into_trash(cid: &MerkleRoot, mut used_info: UsedInfo, file_size: u64) {
+    fn move_into_trash(cid: &MerkleRoot, mut used_info: StoragePowerInfo, file_size: u64) {
         // Update used info
         used_info.reported_group_count = 1;
         Self::update_groups_used_info(file_size, &mut used_info);
@@ -1221,7 +1221,7 @@ impl<T: Config> Module<T> {
                 reported_replica_count: 0u32,
                 replicas: vec![]
             };
-            let used_info = UsedInfo {
+            let used_info = StoragePowerInfo {
                 used_size: 0,
                 reported_group_count: 0,
                 groups: <BTreeMap<SworkerAnchor, bool>>::new()
@@ -1349,7 +1349,7 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
+    fn add_used_group(used_info: &mut StoragePowerInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
         used_info.reported_group_count += 1;
         Self::update_groups_used_info(file_size, used_info);
         Self::update_files_size(file_size, 0, 1);
@@ -1427,7 +1427,7 @@ impl<T: Config> Module<T> {
         false
     }
 
-    fn update_groups_used_info(file_size: u64, used_info: &mut UsedInfo) {
+    fn update_groups_used_info(file_size: u64, used_info: &mut StoragePowerInfo) {
         let new_used_size = Self::calculate_used_size(file_size, used_info.reported_group_count);
         let prev_used_size = used_info.used_size;
         if prev_used_size != new_used_size {

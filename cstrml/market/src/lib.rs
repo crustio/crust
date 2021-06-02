@@ -335,25 +335,25 @@ decl_storage! {
         pub FilesSize get(fn files_size): u128 = 0;
 
         /// The first file trash to store overdue files for a while
-        pub StoragePowerTrashI get(fn used_trash_i):
+        pub StoragePowerTrashI get(fn storage_power_trash_i):
         map hasher(twox_64_concat) MerkleRoot => Option<StoragePowerInfo>;
 
         /// The second file trash to store overdue files for a while
-        pub StoragePowerTrashII get(fn used_trash_ii):
+        pub StoragePowerTrashII get(fn storage_power_trash_ii):
         map hasher(twox_64_concat) MerkleRoot => Option<StoragePowerInfo>;
 
         /// The count of overdue files in the first file trash
-        pub StoragePowerTrashSizeI get(fn used_trash_size_i): u128 = 0;
+        pub StoragePowerTrashSizeI get(fn storage_power_trash_size_i): u128 = 0;
 
         /// The count of overdue files in the second file trash
-        pub StoragePowerTrashSizeII get(fn used_trash_size_ii): u128 = 0;
+        pub StoragePowerTrashSizeII get(fn storage_power_trash_size_ii): u128 = 0;
 
         /// The total counted used size for each anchor in the first file trash
-        pub StoragePowerTrashMappingI get(fn used_trash_mapping_i):
+        pub StoragePowerTrashMappingI get(fn storage_power_trash_mapping_i):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
         /// The total counted used size for each anchor in the second file trash
-        pub StoragePowerTrashMappingII get(fn used_trash_mapping_ii):
+        pub StoragePowerTrashMappingII get(fn storage_power_trash_mapping_ii):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
         /// The global market switch to enable place storage order
@@ -1056,7 +1056,7 @@ impl<T: Config> Module<T> {
         storage_power_info.reported_group_count = 1;
         Self::update_groups_storage_power_info(file_size, &mut storage_power_info);
 
-        if Self::used_trash_size_i() < T::StoragePowerTrashMaxSize::get() {
+        if Self::storage_power_trash_size_i() < T::StoragePowerTrashMaxSize::get() {
             StoragePowerTrashI::insert(cid, storage_power_info.clone());
             StoragePowerTrashSizeI::mutate(|value| {*value += 1;});
             // archive used for each merchant
@@ -1066,8 +1066,8 @@ impl<T: Config> Module<T> {
                 })
             }
             // trash I is full => dump trash II
-            if Self::used_trash_size_i() >= T::StoragePowerTrashMaxSize::get() {
-                Self::dump_used_trash_ii();
+            if Self::storage_power_trash_size_i() >= T::StoragePowerTrashMaxSize::get() {
+                Self::dump_storage_power_trash_ii();
             }
         } else {
             StoragePowerTrashII::insert(cid, storage_power_info.clone());
@@ -1079,14 +1079,14 @@ impl<T: Config> Module<T> {
                 })
             }
             // trash II is full => dump trash I
-            if Self::used_trash_size_ii() >= T::StoragePowerTrashMaxSize::get() {
-                Self::dump_used_trash_i();
+            if Self::storage_power_trash_size_ii() >= T::StoragePowerTrashMaxSize::get() {
+                Self::dump_storage_power_trash_i();
             }
         }
         <Files<T>>::remove(&cid);
     }
 
-    fn dump_used_trash_i() {
+    fn dump_storage_power_trash_i() {
         for (anchor, used) in StoragePowerTrashMappingI::iter() {
             T::SworkerInterface::update_used(&anchor, used, 0);
         }
@@ -1095,7 +1095,7 @@ impl<T: Config> Module<T> {
         StoragePowerTrashSizeI::mutate(|value| {*value = 0;});
     }
 
-    fn dump_used_trash_ii() {
+    fn dump_storage_power_trash_ii() {
         for (anchor, used) in StoragePowerTrashMappingII::iter() {
             T::SworkerInterface::update_used(&anchor, used, 0);
         }
@@ -1104,7 +1104,7 @@ impl<T: Config> Module<T> {
         StoragePowerTrashSizeII::mutate(|value| {*value = 0;});
     }
 
-    fn maybe_delete_file_from_used_trash_i(cid: &MerkleRoot) {
+    fn maybe_delete_file_from_storage_power_trash_i(cid: &MerkleRoot) {
         // 1. Delete trashI's anchor
         StoragePowerTrashI::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
@@ -1123,7 +1123,7 @@ impl<T: Config> Module<T> {
         });
     }
 
-    fn maybe_delete_file_from_used_trash_ii(cid: &MerkleRoot) {
+    fn maybe_delete_file_from_storage_power_trash_ii(cid: &MerkleRoot) {
         // 1. Delete trashII's anchor
         StoragePowerTrashII::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
@@ -1142,7 +1142,7 @@ impl<T: Config> Module<T> {
         });
     }
 
-    fn maybe_delete_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn maybe_delete_anchor_from_storage_power_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
         StoragePowerTrashI::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut storage_power_info) => {
@@ -1158,7 +1158,7 @@ impl<T: Config> Module<T> {
         storage_power
     }
 
-    fn maybe_delete_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn maybe_delete_anchor_from_storage_power_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
         StoragePowerTrashII::mutate(cid, |maybe_used| match *maybe_used {
             Some(ref mut storage_power_info) => {
@@ -1265,9 +1265,9 @@ impl<T: Config> Module<T> {
 
     fn check_file_in_trash(cid: &MerkleRoot) {
         // I. Delete trashI's anchor
-        Self::maybe_delete_file_from_used_trash_i(cid);
+        Self::maybe_delete_file_from_storage_power_trash_i(cid);
         // 2. Delete trashII's anchor
-        Self::maybe_delete_file_from_used_trash_ii(cid);
+        Self::maybe_delete_file_from_storage_power_trash_ii(cid);
     }
 
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
@@ -1380,10 +1380,10 @@ impl<T: Config> Module<T> {
         });
 
         // 2. Delete trashI's anchor
-        storage_power = storage_power.max(Self::maybe_delete_anchor_from_used_trash_i(cid, anchor));
+        storage_power = storage_power.max(Self::maybe_delete_anchor_from_storage_power_trash_i(cid, anchor));
 
         // 3. Delete trashII's anchor
-        storage_power = storage_power.max(Self::maybe_delete_anchor_from_used_trash_ii(cid, anchor));
+        storage_power = storage_power.max(Self::maybe_delete_anchor_from_storage_power_trash_ii(cid, anchor));
 
         storage_power
     }

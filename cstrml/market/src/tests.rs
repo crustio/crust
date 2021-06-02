@@ -747,7 +747,7 @@ fn do_calculate_reward_should_move_file_to_trash_due_to_expired() {
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
         assert_eq!(Market::files(&cid), None);
 
-        assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_i(&cid).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
@@ -1082,7 +1082,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
 
         run_to_block(1803);
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
-        assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_i(&cid).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), false), (hex::decode("11").unwrap(), false)].into_iter())
@@ -2005,51 +2005,51 @@ fn clear_trash_should_work() {
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 1200, true);
         // close files one by one
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
-        assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_i(&cid1).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
-        assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_i(&cid2).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
-        assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_ii(&cid3).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
-        assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_ii(&cid4).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
-        assert_eq!(Market::used_trash_i(&cid1), None);
-        assert_eq!(Market::used_trash_i(&cid2), None);
+        assert_eq!(Market::storage_power_trash_i(&cid1), None);
+        assert_eq!(Market::storage_power_trash_i(&cid2), None);
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
-        assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_i(&cid5).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
-        assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), StoragePowerInfo {
+        assert_eq!(Market::storage_power_trash_i(&cid6).unwrap_or_default(), StoragePowerInfo {
             storage_power: file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
-        assert_eq!(Market::used_trash_ii(&cid3), None);
-        assert_eq!(Market::used_trash_ii(&cid4), None);
+        assert_eq!(Market::storage_power_trash_ii(&cid3), None);
+        assert_eq!(Market::storage_power_trash_ii(&cid4), None);
     });
 }
 
@@ -3152,16 +3152,16 @@ fn clear_same_file_in_trash_should_work() {
 
         // Prepare a file in the trash
         assert_eq!(Market::files(&cid).is_none(), true);
-        assert_eq!(Market::used_trash_i(&cid).unwrap_or_default(), (
+        assert_eq!(Market::storage_power_trash_i(&cid).unwrap_or_default(), (
             StoragePowerInfo {
                 storage_power: file_size * 2,
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true), (hex::decode("11").unwrap(), true)].into_iter())
             })
         );
-        assert_eq!(Market::used_trash_mapping_i(legal_pk.clone()), file_size * 2);
-        assert_eq!(Market::used_trash_mapping_i(hex::decode("11").unwrap()), file_size * 2);
-        assert_eq!(Market::used_trash_size_i(), 1);
+        assert_eq!(Market::storage_power_trash_mapping_i(legal_pk.clone()), file_size * 2);
+        assert_eq!(Market::storage_power_trash_mapping_i(hex::decode("11").unwrap()), file_size * 2);
+        assert_eq!(Market::storage_power_trash_size_i(), 1);
 
         // place a same storage order
         assert_ok!(Market::place_storage_order(
@@ -3186,10 +3186,10 @@ fn clear_same_file_in_trash_should_work() {
             })
         );
         // trash has been cleared.
-        assert_eq!(Market::used_trash_i(&cid).is_none(), true);
-        assert_eq!(Market::used_trash_mapping_i(legal_pk.clone()), 0);
-        assert_eq!(Market::used_trash_mapping_i(hex::decode("11").unwrap()), 0);
-        assert_eq!(Market::used_trash_size_i(), 0);
+        assert_eq!(Market::storage_power_trash_i(&cid).is_none(), true);
+        assert_eq!(Market::storage_power_trash_mapping_i(legal_pk.clone()), 0);
+        assert_eq!(Market::storage_power_trash_mapping_i(hex::decode("11").unwrap()), 0);
+        assert_eq!(Market::storage_power_trash_size_i(), 0);
     });
 }
 
@@ -3270,7 +3270,7 @@ fn reward_liquidator_should_work() {
         assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 4680);
         assert_eq!(Market::files(&cid).is_none(), true);
-        assert_eq!(Market::used_trash_i(&cid).is_some(), true);
+        assert_eq!(Market::storage_power_trash_i(&cid).is_some(), true);
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -3498,7 +3498,7 @@ fn renew_file_should_work() {
 
 
         assert_eq!(Balances::free_balance(&charlie), 11180);
-        assert_eq!(Market::used_trash_i(&cid).is_none(), true);
+        assert_eq!(Market::storage_power_trash_i(&cid).is_none(), true);
         assert_eq!(Balances::free_balance(&reserved_pot), 26000);
 
         run_to_block(8000); // expired_on 2303 => all reward to liquidator charlie
@@ -3526,11 +3526,11 @@ fn renew_file_should_work() {
             })
         );
         assert_eq!(Balances::free_balance(&reserved_pot), 39000);
-        assert_eq!(Market::used_trash_i(&cid).is_none(), true);
+        assert_eq!(Market::storage_power_trash_i(&cid).is_none(), true);
         run_to_block(9000); // expired_on 3303 => all reward to liquidator charlie
         assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 83200); // 42120 + 11180 + 6500 + 23400
-        assert_eq!(Market::used_trash_i(&cid).is_some(), true);
+        assert_eq!(Market::storage_power_trash_i(&cid).is_some(), true);
         assert_eq!(Market::files(&cid).is_none(), true);
         assert_eq!(Balances::free_balance(&reserved_pot), 166000); // 39000 + 127000
     });

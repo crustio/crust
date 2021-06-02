@@ -105,7 +105,7 @@ benchmarks! {
         <T as crate::Config>::Currency::make_free_balance_be(&crate::Module::<T>::storage_pot(), T::Currency::minimum_balance() * 2000u32.into());
     }: _(RawOrigin::Signed(user.clone()), cid.clone())
     verify {
-        assert_eq!(Market::<T>::used_trash_i(&cid).is_some(), true);
+        assert_eq!(Market::<T>::storage_power_trash_i(&cid).is_some(), true);
     }
 
 }

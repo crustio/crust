@@ -28,7 +28,7 @@ struct ReportWorksInfo {
     pub prev_pk: SworkerPubKey,
     pub block_number: u64,
     pub block_hash: Vec<u8>,
-    pub free: u64,
+    pub reported_srd_size: u64,
     pub reported_files_size: u64,
     pub srd_root: MerkleRoot,
     pub files_root: MerkleRoot,
@@ -42,7 +42,7 @@ fn legal_work_report_with_srd() -> ReportWorksInfo {
     let prev_pk: Vec<u8> = vec![];
     let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-    let free: u64 = 4294967296;
+    let reported_srd_size: u64 = 4294967296;
     let reported_files_size: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
@@ -55,7 +55,7 @@ fn legal_work_report_with_srd() -> ReportWorksInfo {
         prev_pk,
         block_number,
         block_hash,
-        free,
+        reported_srd_size,
         reported_files_size,
         srd_root,
         files_root,
@@ -69,7 +69,7 @@ fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let curr_pk = vec![195,241,106,199,76,125,81,125,26,117,176,66,252,255,206,238,68,30,96,209,41,237,109,243,254,76,189,155,229,59,97,72,5,116,123,242,43,147,98,200,159,209,55,186,10,144,58,167,242,242,168,41,216,173,145,161,38,58,49,164,243,161,139,172];    let prev_pk: Vec<u8> = vec![];
     let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-    let free: u64 = 4294967296;
+    let reported_srd_size: u64 = 4294967296;
     let reported_files_size: u64 = 1000;
     let mut added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     for i in 0..reported_files_size {
@@ -88,7 +88,7 @@ fn legal_work_report_with_added_files() -> ReportWorksInfo {
         prev_pk,
         block_number,
         block_hash,
-        free,
+        reported_srd_size,
         reported_files_size,
         srd_root,
         files_root,
@@ -102,7 +102,7 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
     let curr_pk = vec![195,241,106,199,76,125,81,125,26,117,176,66,252,255,206,238,68,30,96,209,41,237,109,243,254,76,189,155,229,59,97,72,5,116,123,242,43,147,98,200,159,209,55,186,10,144,58,167,242,242,168,41,216,173,145,161,38,58,49,164,243,161,139,172];    let prev_pk: Vec<u8> = vec![];
     let block_number = 600;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-    let free: u64 = 4294967296;
+    let reported_srd_size: u64 = 4294967296;
     let reported_files_size: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let mut deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
@@ -121,7 +121,7 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
         prev_pk,
         block_number,
         block_hash,
-        free,
+        reported_srd_size,
         reported_files_size,
         srd_root,
         files_root,
@@ -205,7 +205,7 @@ benchmarks! {
             wr.prev_pk,
             wr.block_number,
             wr.block_hash,
-            wr.free,
+            wr.reported_srd_size,
             wr.reported_files_size,
             wr.added_files,
             wr.deleted_files,
@@ -214,7 +214,7 @@ benchmarks! {
             wr.sig
         ).expect("Something wrong during reporting works");
     } verify {
-        assert_eq!(swork::Module::<T>::free(), wr.free as u128);
+        assert_eq!(swork::Module::<T>::free(), wr.reported_srd_size as u128);
         assert_eq!(swork::Module::<T>::storage_power(), 0 as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
@@ -244,7 +244,7 @@ benchmarks! {
             wr.prev_pk,
             wr.block_number,
             wr.block_hash,
-            wr.free,
+            wr.reported_srd_size,
             wr.reported_files_size,
             wr.added_files,
             wr.deleted_files,
@@ -253,7 +253,7 @@ benchmarks! {
             wr.sig
         ).expect("Something wrong during reporting works");
     } verify {
-        assert_eq!(swork::Module::<T>::free(), wr.free as u128);
+        assert_eq!(swork::Module::<T>::free(), wr.reported_srd_size as u128);
         assert_eq!(swork::Module::<T>::storage_power(), (wr.reported_files_size * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
@@ -284,7 +284,7 @@ benchmarks! {
             wr.prev_pk,
             wr.block_number,
             wr.block_hash,
-            wr.free,
+            wr.reported_srd_size,
             wr.reported_files_size,
             wr.added_files,
             wr.deleted_files,
@@ -306,7 +306,7 @@ benchmarks! {
             wr.prev_pk,
             wr.block_number,
             wr.block_hash,
-            wr.free,
+            wr.reported_srd_size,
             wr.reported_files_size,
             wr.added_files,
             wr.deleted_files,
@@ -315,7 +315,7 @@ benchmarks! {
             wr.sig
         ).expect("Something wrong during reporting works");
     } verify {
-        assert_eq!(swork::Module::<T>::free(), wr.free as u128);
+        assert_eq!(swork::Module::<T>::free(), wr.reported_srd_size as u128);
         assert_eq!(swork::Module::<T>::storage_power(), (wr.reported_files_size * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
@@ -355,7 +355,7 @@ benchmarks! {
             wr.prev_pk,
             wr.block_number,
             wr.block_hash,
-            wr.free,
+            wr.reported_srd_size,
             wr.reported_files_size,
             wr.added_files,
             wr.deleted_files,

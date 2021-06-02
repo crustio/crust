@@ -74,7 +74,7 @@ pub struct ReportWorksInfo {
     pub prev_pk: SworkerPubKey,
     pub block_number: u64,
     pub block_hash: Vec<u8>,
-    pub free: u64,
+    pub reported_srd_size: u64,
     pub reported_files_size: u64,
     pub srd_root: MerkleRoot,
     pub files_root: MerkleRoot,
@@ -240,7 +240,7 @@ pub fn init_swork_setup() {
     let whos = vec![ALICE, BOB, CHARLIE, DAVE];
     let frees: Vec<u64> = vec![0, 50, 50, 200];
     let code = LegalCode::get();
-    for ((pk, who), free) in pks.iter().zip(whos.iter()).zip(frees.iter()) {
+    for ((pk, who), reported_srd_size) in pks.iter().zip(whos.iter()).zip(frees.iter()) {
         <swork::PubKeys>::insert(pk.clone(), PKInfo {
             code: code.clone(),
             anchor: Some(pk.clone())
@@ -253,7 +253,7 @@ pub fn init_swork_setup() {
         <swork::WorkReports>::insert(pk.clone(), swork::WorkReport{
             report_slot: 0,
             storage_power: 0,
-            free: *free,
+            free: *reported_srd_size,
             reported_files_size: 0,
             reported_srd_root: vec![],
             reported_files_root: vec![]
@@ -271,7 +271,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let prev_pk = hex::decode("").unwrap();
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
-    let free: u64 = 4294967296;
+    let reported_srd_size: u64 = 4294967296;
     let reported_files_size: u64 = 402868224;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(), 134289408, 303),
@@ -287,7 +287,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
         prev_pk,
         block_number,
         block_hash,
-        free,
+        reported_srd_size,
         reported_files_size,
         srd_root,
         files_root,

@@ -1468,6 +1468,7 @@ dependencies = [
  "log",
  "pallet-balances 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-randomness-collective-flip 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "pallet-scheduler 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-sudo 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-timestamp 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-transaction-payment 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",

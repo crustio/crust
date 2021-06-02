@@ -15,21 +15,21 @@ pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
 pub trait SworkerInterface<AccountId> {
 	// Check whether work report was reported in the last report slot according to given block number
 	fn is_wr_reported(anchor: &SworkerAnchor, bn: BlockNumber) -> bool;
-	// Update the used value in anchor's work report
-	fn update_used(anchor: &SworkerAnchor, decreased_used: u64, increased_used: u64);
+	// Update the storage_power value in anchor's work report
+	fn update_storage_power(anchor: &SworkerAnchor, decreased_storage_power: u64, increased_storage_power: u64);
     // Check whether the who and anchor is consistent with current status
 	fn check_anchor(who: &AccountId, anchor: &SworkerAnchor) -> bool;
-	// Get total used and free space
+	// Get total report files size and srd space
 	fn get_total_capacity() -> u128;
 }
 
 /// Means for interacting with a specialized version of the `market` trait.
 pub trait MarketInterface<AccountId, Balance> {
 	// used for `added_files`
-	// return real used size of this file
+	// return real storage power of this file
 	fn upsert_replica(who: &AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> u64;
 	// used for `delete_files`
-	// return real used size of this file
+	// return real storage power of this file
 	fn delete_replica(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64;
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;

@@ -701,7 +701,7 @@ pub fn add_not_live_files() {
 
     for (file, file_size) in files.iter() {
         let used_info = StoragePowerInfo {
-            used_size: 0,
+            storage_power: 0,
             reported_group_count: 0,
             groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };
@@ -730,7 +730,7 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
     };
     for (file, file_size) in files.iter() {
         let used_info = StoragePowerInfo {
-            used_size: *file_size * 2,
+            storage_power: *file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(anchor.clone(), true)].into_iter())
         };

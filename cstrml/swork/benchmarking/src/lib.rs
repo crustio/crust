@@ -134,7 +134,7 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
 fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::AccountId, pub_key: Vec<u8>) {
     for (file, file_size, _) in files.clone().iter() {
         let used_info = StoragePowerInfo {
-            used_size: *file_size,
+            storage_power: *file_size,
             reported_group_count: 0,
             groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };

@@ -1646,7 +1646,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 StoragePowerInfo {
-                    used_size: 13 * 2,
+                    storage_power: 13 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1667,7 +1667,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 StoragePowerInfo {
-                    used_size: 7 * 2,
+                    storage_power: 7 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1688,7 +1688,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 StoragePowerInfo {
-                    used_size: 37 * 2,
+                    storage_power: 37 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1740,7 +1740,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 7 * 2,
+                    storage_power: 7 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1769,7 +1769,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 37 * 2,
+                    storage_power: 37 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1793,7 +1793,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 55 * 2,
+                    storage_power: 55 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -1851,7 +1851,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 37 * 2,
+                    storage_power: 37 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1880,7 +1880,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 55 * 2,
+                    storage_power: 55 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -1904,7 +1904,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 22 * 2,
+                    storage_power: 22 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(c_pk.clone(), true)].into_iter())
                 })
@@ -1955,7 +1955,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 7 * 2,
+                    storage_power: 7 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1984,7 +1984,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 37 * 2,
+                    storage_power: 37 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -2014,7 +2014,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 55 * 2,
+                    storage_power: 55 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -2060,7 +2060,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 37 * 2,
+                    storage_power: 37 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -2083,7 +2083,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 StoragePowerInfo {
-                    used_size: 55 * 2,
+                    storage_power: 55 * 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -2100,7 +2100,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![]
                 },
                 StoragePowerInfo {
-                    used_size: 0,
+                    storage_power: 0,
                     reported_group_count: 0,
                     groups: BTreeMap::new()
                 })

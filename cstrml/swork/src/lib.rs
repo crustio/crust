@@ -520,7 +520,7 @@ decl_module! {
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
             // d. Update `report_in_slot`
-            // e. Update total spaces(storage_power and reserved)
+            // e. Update total spaces(storage_power and free)
             let anchor = Self::pub_keys(&curr_pk).anchor.unwrap();
             Self::maybe_upsert_work_report(
                 &reporter,
@@ -709,7 +709,7 @@ decl_module! {
 impl<T: Config> Module<T> {
     // PUBLIC MUTABLES
     /// This function is for updating all identities, in details:
-    /// 1. call `update_and_get_workload` for every identity, which will return (reserved, storage_power)
+    /// 1. call `update_and_get_workload` for every identity, which will return (free, storage_power)
     /// this also (maybe) remove the `outdated` work report
     /// 2. re-calculate `StoragePower` and `Free`
     /// 3. update `CurrentReportSlot`
@@ -884,7 +884,7 @@ impl<T: Config> Module<T> {
     /// otherwise, it will be an void in this recursive loop, it mainly includes:
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
-    /// 2. return the (reserved, storage_power) storage of this reporter account
+    /// 2. return the (free, storage_power) storage of this reporter account
     fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(&id.anchor) {
@@ -994,7 +994,7 @@ impl<T: Config> Module<T> {
         prev_pk: &SworkerPubKey,
         block_number: u64,
         block_hash: &Vec<u8>,
-        reserved: u64,
+        reported_srd_size: u64,
         reported_files_size: u64,
         srd_root: &MerkleRoot,
         files_root: &MerkleRoot,
@@ -1004,7 +1004,7 @@ impl<T: Config> Module<T> {
     ) -> bool {
         // 1. Encode
         let block_number_bytes = utils::encode_u64_to_string_to_bytes(block_number);
-        let reserved_bytes = utils::encode_u64_to_string_to_bytes(reserved);
+        let reported_srd_size_bytes = utils::encode_u64_to_string_to_bytes(reported_srd_size);
         let reported_files_size_bytes = utils::encode_u64_to_string_to_bytes(reported_files_size);
         let added_files_bytes = utils::encode_files(added_files);
         let deleted_files_bytes = utils::encode_files(deleted_files);
@@ -1027,7 +1027,7 @@ impl<T: Config> Module<T> {
             &prev_pk[..],
             &block_number_bytes[..],
             &block_hash[..],
-            &reserved_bytes[..],
+            &reported_srd_size_bytes[..],
             &reported_files_size_bytes[..],
             &srd_root[..],
             &files_root[..],

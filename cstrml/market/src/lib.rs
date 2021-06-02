@@ -104,7 +104,7 @@ pub struct Replica<AccountId> {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct StoragePowerInfo {
-    // The size of used value in MPoW
+    // The storage power value in MPoW
     pub storage_power: u64,
     // The count of valid group in the previous report slot
     pub reported_group_count: u32,
@@ -130,8 +130,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 {
     /// Upsert new replica
     /// Accept id(who, anchor), reported_file_size, cid, valid_at and maybe_member
-    /// Returns the real used size of this file
-    /// used size is decided by market
+    /// Returns the real storage power of this file
+    /// storage power is decided by market
     fn upsert_replica(who: &<T as system::Config>::AccountId,
                       cid: &MerkleRoot,
                       reported_file_size: u64,
@@ -142,8 +142,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // Judge if file_info.file_size == reported_file_size or not
         Self::maybe_upsert_file_size(who, cid, reported_file_size);
 
-        // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
-        // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
+        // `is_counted` is a concept in swork-side, which means if this `cid`'s `storage power` is counted by `(who, anchor)`
+        // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase storage power) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
         let mut storage_power: u64 = 0;
         if let Some((mut file_info, mut storage_power_info)) = <Files<T>>::get(cid) {
@@ -172,7 +172,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
             // 3. Update storage_power_info
             if is_counted {
-                storage_power = Self::add_used_group(&mut storage_power_info, anchor, file_info.file_size); // need to add the storage_power after the update
+                storage_power = Self::add_storage_power_group(&mut storage_power_info, anchor, file_info.file_size); // need to add the storage_power after the update
             };
 
             // 4. The first join the replicas and file become live(expired_on > calculated_at)
@@ -190,7 +190,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
-    /// Returns the real used size of this file
+    /// Returns the real storage power of this file
     fn delete_replica(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         // 1. Delete replica from file_info
         if let Some((mut file_info, storage_power_info)) = <Files<T>>::get(cid) {
@@ -209,7 +209,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         }
 
         // 2. Delete anchor from file_info/file_trash and return whether it is counted
-        Self::delete_used_group(cid, anchor)
+        Self::delete_storage_power_group(cid, anchor)
     }
 
     // withdraw market staking pot for distributing staking reward
@@ -307,13 +307,13 @@ decl_storage! {
         /// The file base fee for each storage order.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
-        /// The file information and used information iterated by ipfs cid.
+        /// The file information and storage power information iterated by ipfs cid.
         /// It includes file related info such as file size, expired date and reported replica count.
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
         /// Merchant Ledger V2
-        /// The file information and used information iterated by ipfs cid.
+        /// The file information and storage power information iterated by ipfs cid.
         /// It includes file related info such as file size, expired date and reported replica count.
         // TODO: Remove this V2 in MainNet
         pub MerchantLedgersV2 get(fn merchant_ledgers_v2):
@@ -348,11 +348,11 @@ decl_storage! {
         /// The count of overdue files in the second file trash
         pub StoragePowerTrashSizeII get(fn storage_power_trash_size_ii): u128 = 0;
 
-        /// The total counted used size for each anchor in the first file trash
+        /// The total counted storage power for each anchor in the first file trash
         pub StoragePowerTrashMappingI get(fn storage_power_trash_mapping_i):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
-        /// The total counted used size for each anchor in the second file trash
+        /// The total counted storage power for each anchor in the second file trash
         pub StoragePowerTrashMappingII get(fn storage_power_trash_mapping_ii):
         map hasher(blake2_128_concat) SworkerAnchor => u64 = 0;
 
@@ -464,7 +464,7 @@ decl_module! {
         /// The storage ratio for how much CRU into storage pot.
         const StorageRatio: Perbill = T::StorageRatio::get();
 
-        /// The max size of used trash.
+        /// The max size of storage power trash.
         const StoragePowerTrashMaxSize: u128 = T::StoragePowerTrashMaxSize::get();
 
         /// The max file size of a file
@@ -995,7 +995,7 @@ impl<T: Config> Module<T> {
                     invalid_replica.is_reported = false;
                     // move it to the end of replica
                     invalid_replicas.push(invalid_replica);
-                    // TODO: kick this anchor out of used info
+                    // TODO: kick this anchor out of storage power info
                 // b. keep the replica's sequence
                 } else {
                     let mut valid_replica = replica.clone();
@@ -1052,14 +1052,14 @@ impl<T: Config> Module<T> {
 
     /// Trashbag operations
     fn move_into_trash(cid: &MerkleRoot, mut storage_power_info: StoragePowerInfo, file_size: u64) {
-        // Update used info
+        // Update storage power info
         storage_power_info.reported_group_count = 1;
         Self::update_groups_storage_power_info(file_size, &mut storage_power_info);
 
         if Self::storage_power_trash_size_i() < T::StoragePowerTrashMaxSize::get() {
             StoragePowerTrashI::insert(cid, storage_power_info.clone());
             StoragePowerTrashSizeI::mutate(|value| {*value += 1;});
-            // archive used for each merchant
+            // archive storage power for each merchant
             for anchor in storage_power_info.groups.keys() {
                 StoragePowerTrashMappingI::mutate(&anchor, |value| {
                     *value += storage_power_info.storage_power;
@@ -1072,7 +1072,7 @@ impl<T: Config> Module<T> {
         } else {
             StoragePowerTrashII::insert(cid, storage_power_info.clone());
             StoragePowerTrashSizeII::mutate(|value| {*value += 1;});
-            // archive used for each merchant
+            // archive storage power for each merchant
             for anchor in storage_power_info.groups.keys() {
                 StoragePowerTrashMappingII::mutate(&anchor, |value| {
                     *value += storage_power_info.storage_power;
@@ -1087,8 +1087,8 @@ impl<T: Config> Module<T> {
     }
 
     fn dump_storage_power_trash_i() {
-        for (anchor, used) in StoragePowerTrashMappingI::iter() {
-            T::SworkerInterface::update_used(&anchor, used, 0);
+        for (anchor, storage_power) in StoragePowerTrashMappingI::iter() {
+            T::SworkerInterface::update_storage_power(&anchor, storage_power, 0);
         }
         remove_storage_prefix(StoragePowerTrashMappingI::module_prefix(), StoragePowerTrashMappingI::storage_prefix(), &[]);
         remove_storage_prefix(StoragePowerTrashI::module_prefix(), StoragePowerTrashI::storage_prefix(), &[]);
@@ -1096,8 +1096,8 @@ impl<T: Config> Module<T> {
     }
 
     fn dump_storage_power_trash_ii() {
-        for (anchor, used) in StoragePowerTrashMappingII::iter() {
-            T::SworkerInterface::update_used(&anchor, used, 0);
+        for (anchor, storage_power) in StoragePowerTrashMappingII::iter() {
+            T::SworkerInterface::update_storage_power(&anchor, storage_power, 0);
         }
         remove_storage_prefix(StoragePowerTrashMappingII::module_prefix(), StoragePowerTrashMappingII::storage_prefix(), &[]);
         remove_storage_prefix(StoragePowerTrashII::module_prefix(), StoragePowerTrashII::storage_prefix(), &[]);
@@ -1106,45 +1106,45 @@ impl<T: Config> Module<T> {
 
     fn maybe_delete_file_from_storage_power_trash_i(cid: &MerkleRoot) {
         // 1. Delete trashI's anchor
-        StoragePowerTrashI::mutate_exists(cid, |maybe_used| {
-            match *maybe_used {
+        StoragePowerTrashI::mutate_exists(cid, |maybe_storage_power| {
+            match *maybe_storage_power {
                 Some(ref mut storage_power_info) => {
                     for anchor in storage_power_info.groups.keys() {
                         StoragePowerTrashMappingI::mutate(anchor, |value| {
                             *value -= storage_power_info.storage_power;
                         });
-                        T::SworkerInterface::update_used(anchor, storage_power_info.storage_power, 0);
+                        T::SworkerInterface::update_storage_power(anchor, storage_power_info.storage_power, 0);
                     }
                     StoragePowerTrashSizeI::mutate(|value| {*value -= 1;});
                 },
                 None => {}
             }
-            *maybe_used = None;
+            *maybe_storage_power = None;
         });
     }
 
     fn maybe_delete_file_from_storage_power_trash_ii(cid: &MerkleRoot) {
         // 1. Delete trashII's anchor
-        StoragePowerTrashII::mutate_exists(cid, |maybe_used| {
-            match *maybe_used {
+        StoragePowerTrashII::mutate_exists(cid, |maybe_storage_power| {
+            match *maybe_storage_power {
                 Some(ref mut storage_power_info) => {
                     for anchor in storage_power_info.groups.keys() {
                         StoragePowerTrashMappingII::mutate(anchor, |value| {
                             *value -= storage_power_info.storage_power;
                         });
-                        T::SworkerInterface::update_used(anchor, storage_power_info.storage_power, 0);
+                        T::SworkerInterface::update_storage_power(anchor, storage_power_info.storage_power, 0);
                     }
                     StoragePowerTrashSizeII::mutate(|value| {*value -= 1;});
                 },
                 None => {}
             }
-            *maybe_used = None;
+            *maybe_storage_power = None;
         });
     }
 
     fn maybe_delete_anchor_from_storage_power_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
-        StoragePowerTrashI::mutate(cid, |maybe_used| match *maybe_used {
+        StoragePowerTrashI::mutate(cid, |maybe_storage_power| match *maybe_storage_power {
             Some(ref mut storage_power_info) => {
                 if storage_power_info.groups.remove(anchor).is_some() {
                     storage_power = storage_power_info.storage_power;
@@ -1160,7 +1160,7 @@ impl<T: Config> Module<T> {
 
     fn maybe_delete_anchor_from_storage_power_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
-        StoragePowerTrashII::mutate(cid, |maybe_used| match *maybe_used {
+        StoragePowerTrashII::mutate(cid, |maybe_storage_power| match *maybe_storage_power {
             Some(ref mut storage_power_info) => {
                 if storage_power_info.groups.remove(anchor).is_some() {
                     storage_power = storage_power_info.storage_power;
@@ -1349,7 +1349,7 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn add_used_group(storage_power_info: &mut StoragePowerInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
+    fn add_storage_power_group(storage_power_info: &mut StoragePowerInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
         storage_power_info.reported_group_count += 1;
         Self::update_groups_storage_power_info(file_size, storage_power_info);
         Self::update_files_size(file_size, 0, 1);
@@ -1357,7 +1357,7 @@ impl<T: Config> Module<T> {
         storage_power_info.storage_power
     }
 
-    fn delete_used_group(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    fn delete_storage_power_group(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power: u64 = 0;
         
         // 1. Delete files anchor
@@ -1367,7 +1367,7 @@ impl<T: Config> Module<T> {
                     // need to delete the storage_power before the update.
                     // we should always return the storage_power no matter `is_calculated_as_reported_group_count` is true of false.
                     // `is_calculated_as_reported_group_count` only change the storage_power factor.
-                    // we should delete the used from wr no matter what's the factor right now.
+                    // we should delete the storage_power from wr no matter what's the factor right now.
                     storage_power = storage_power_info.storage_power;
                     if is_calculated_as_reported_group_count {
                         storage_power_info.reported_group_count = storage_power_info.reported_group_count.saturating_sub(1);
@@ -1432,7 +1432,7 @@ impl<T: Config> Module<T> {
         let prev_storage_power = storage_power_info.storage_power;
         if prev_storage_power != new_storage_power {
             for anchor in storage_power_info.groups.keys() {
-                T::SworkerInterface::update_used(anchor, prev_storage_power, new_storage_power);
+                T::SworkerInterface::update_storage_power(anchor, prev_storage_power, new_storage_power);
             }
         }
         storage_power_info.storage_power = new_storage_power;
@@ -1450,7 +1450,7 @@ impl<T: Config> Module<T> {
     }
 
     fn calculate_storage_power(file_size: u64, reported_group_count: u32) -> u64 {
-        let used_ratio: u64 = match reported_group_count {
+        let storage_power_ratio: u64 = match reported_group_count {
             1..=10 => 2,
             11..=20 => 4,
             21..=30 => 6,
@@ -1463,7 +1463,7 @@ impl<T: Config> Module<T> {
             _ => return 0,
         };
 
-        used_ratio * file_size
+        storage_power_ratio * file_size
     }
 
     fn update_merchant_ledger(who: &T::AccountId, merchant_ledger: MerchantLedger<BalanceOf<T>>)

@@ -2124,9 +2124,9 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_d), None);
             assert_eq!(Market::files(&file_e), None);
 
-            assert_eq!(Market::used_trash_i(&file_c).is_some(), true);
-            assert_eq!(Market::used_trash_i(&file_d).is_some(), true);
-            assert_eq!(Market::used_trash_ii(&file_e).is_some(), true);
+            assert_eq!(Market::storage_power_trash_i(&file_c).is_some(), true);
+            assert_eq!(Market::storage_power_trash_i(&file_d).is_some(), true);
+            assert_eq!(Market::storage_power_trash_ii(&file_e).is_some(), true);
 
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
@@ -2168,11 +2168,11 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_b.clone()));
             assert_eq!(Market::files(&file_a), None);
             assert_eq!(Market::files(&file_b), None);
-            assert_eq!(Market::used_trash_i(&file_b).is_some(), true);
-            assert_eq!(Market::used_trash_ii(&file_e).is_some(), true);
-            assert_eq!(Market::used_trash_ii(&file_a).is_some(), true);
-            assert_eq!(Market::used_trash_i(&file_c).is_none(), true);
-            assert_eq!(Market::used_trash_i(&file_d).is_none(), true);
+            assert_eq!(Market::storage_power_trash_i(&file_b).is_some(), true);
+            assert_eq!(Market::storage_power_trash_ii(&file_e).is_some(), true);
+            assert_eq!(Market::storage_power_trash_ii(&file_a).is_some(), true);
+            assert_eq!(Market::storage_power_trash_i(&file_c).is_none(), true);
+            assert_eq!(Market::storage_power_trash_i(&file_d).is_none(), true);
 
             // d has gone!
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {

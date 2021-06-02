@@ -146,12 +146,12 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
         let mut storage_power: u64 = 0;
-        if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
+        if let Some((mut file_info, mut storage_power_info)) = <Files<T>>::get(cid) {
             let mut is_counted = true;
             // 1. Check if the file is stored by other members
             if let Some(members) = maybe_members {
                 for replica in file_info.replicas.iter() {
-                    if used_info.groups.contains_key(&replica.anchor) && members.contains(&replica.who) {
+                    if storage_power_info.groups.contains_key(&replica.anchor) && members.contains(&replica.who) {
                         if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
                             // duplicated in group and set is_counted to false
                             is_counted = false;
@@ -170,9 +170,9 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             Self::insert_replica(&mut file_info, new_replica);
             file_info.reported_replica_count += 1;
 
-            // 3. Update used_info
+            // 3. Update storage_power_info
             if is_counted {
-                storage_power = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the storage_power after the update
+                storage_power = Self::add_used_group(&mut storage_power_info, anchor, file_info.file_size); // need to add the storage_power after the update
             };
 
             // 4. The first join the replicas and file become live(expired_on > calculated_at)
@@ -183,7 +183,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             }
 
             // 5. Update files
-            <Files<T>>::insert(cid, (file_info, used_info));
+            <Files<T>>::insert(cid, (file_info, storage_power_info));
         }
         return storage_power
     }
@@ -193,7 +193,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Returns the real used size of this file
     fn delete_replica(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         // 1. Delete replica from file_info
-        if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+        if let Some((mut file_info, storage_power_info)) = <Files<T>>::get(cid) {
             let mut is_to_decreased = false;
             file_info.replicas.retain(|replica| {
                 if replica.who == *who && replica.is_reported {
@@ -205,7 +205,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             if is_to_decreased {
                 file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
             }
-            <Files<T>>::insert(cid, (file_info, used_info));
+            <Files<T>>::insert(cid, (file_info, storage_power_info));
         }
 
         // 2. Delete anchor from file_info/file_trash and return whether it is counted
@@ -657,10 +657,10 @@ decl_module! {
 
             ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
 
-            if let Some((mut file_info, used_info)) = Self::files(&cid) {
+            if let Some((mut file_info, storage_power_info)) = Self::files(&cid) {
                 T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath)?;
                 file_info.prepaid += amount;
-                <Files<T>>::insert(&cid, (file_info, used_info));
+                <Files<T>>::insert(&cid, (file_info, storage_power_info));
             } else {
                 Err(Error::<T>::FileNotExist)?
             }
@@ -961,16 +961,16 @@ impl<T: Config> Module<T> {
         if Self::files(cid).is_none() { return; }
         
         // 2. File must already started
-        let (mut file_info, mut used_info) = Self::files(cid).unwrap_or_default();
+        let (mut file_info, mut storage_power_info) = Self::files(cid).unwrap_or_default();
         
         // 3. File already expired
         if file_info.expired_on <= file_info.calculated_at { return; }
 
-        // 4. Update used_info and files_size
-        let prev_reported_group_count = used_info.reported_group_count;
-        used_info.reported_group_count = Self::count_reported_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
-        Self::update_groups_used_info(file_info.file_size, &mut used_info);
-        Self::update_files_size(file_info.file_size, prev_reported_group_count, used_info.reported_group_count);
+        // 4. Update storage_power_info and files_size
+        let prev_reported_group_count = storage_power_info.reported_group_count;
+        storage_power_info.reported_group_count = Self::count_reported_groups(&mut storage_power_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
+        Self::update_groups_storage_power_info(file_info.file_size, &mut storage_power_info);
+        Self::update_files_size(file_info.file_size, prev_reported_group_count, storage_power_info.reported_group_count);
 
         let calculated_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(T::FileReplica::get() as usize) as u32;
@@ -1009,7 +1009,7 @@ impl<T: Config> Module<T> {
                     
                     // if that guy is poor, just pass him ☠️
                     // Only the first member in the groups can accept the storage reward.
-                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount, used_info.groups.contains_key(&replica.anchor)) {
+                    if Self::maybe_reward_merchant(&replica.who, &one_payout_amount, storage_power_info.groups.contains_key(&replica.anchor)) {
                         rewarded_amount += one_payout_amount.clone();
                         rewarded_count +=1;
                     }
@@ -1026,7 +1026,7 @@ impl<T: Config> Module<T> {
         // 6. File status might become ready to be closed if calculated_block == expired_on
         file_info.calculated_at = calculated_block;
         // 7. Update files
-        <Files<T>>::insert(cid, (file_info, used_info));
+        <Files<T>>::insert(cid, (file_info, storage_power_info));
     }
 
     /// Update the first class storage's size
@@ -1038,31 +1038,31 @@ impl<T: Config> Module<T> {
 
     /// Close file, maybe move into trash
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) -> DispatchResult {
-        if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
+        if let Some((file_info, storage_power_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn && file_info.expired_on == file_info.calculated_at {
-                Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
+                Self::update_files_size(file_info.file_size, storage_power_info.reported_group_count, 0);
                 let total_amount = file_info.amount.saturating_add(file_info.prepaid);
                 T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive)?;
-                Self::move_into_trash(cid, used_info, file_info.file_size);
+                Self::move_into_trash(cid, storage_power_info, file_info.file_size);
             };
         }
         Ok(())
     }
 
     /// Trashbag operations
-    fn move_into_trash(cid: &MerkleRoot, mut used_info: StoragePowerInfo, file_size: u64) {
+    fn move_into_trash(cid: &MerkleRoot, mut storage_power_info: StoragePowerInfo, file_size: u64) {
         // Update used info
-        used_info.reported_group_count = 1;
-        Self::update_groups_used_info(file_size, &mut used_info);
+        storage_power_info.reported_group_count = 1;
+        Self::update_groups_storage_power_info(file_size, &mut storage_power_info);
 
         if Self::used_trash_size_i() < T::UsedTrashMaxSize::get() {
-            UsedTrashI::insert(cid, used_info.clone());
+            UsedTrashI::insert(cid, storage_power_info.clone());
             UsedTrashSizeI::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for anchor in used_info.groups.keys() {
+            for anchor in storage_power_info.groups.keys() {
                 UsedTrashMappingI::mutate(&anchor, |value| {
-                    *value += used_info.storage_power;
+                    *value += storage_power_info.storage_power;
                 })
             }
             // trash I is full => dump trash II
@@ -1070,12 +1070,12 @@ impl<T: Config> Module<T> {
                 Self::dump_used_trash_ii();
             }
         } else {
-            UsedTrashII::insert(cid, used_info.clone());
+            UsedTrashII::insert(cid, storage_power_info.clone());
             UsedTrashSizeII::mutate(|value| {*value += 1;});
             // archive used for each merchant
-            for anchor in used_info.groups.keys() {
+            for anchor in storage_power_info.groups.keys() {
                 UsedTrashMappingII::mutate(&anchor, |value| {
-                    *value += used_info.storage_power;
+                    *value += storage_power_info.storage_power;
                 })
             }
             // trash II is full => dump trash I
@@ -1108,12 +1108,12 @@ impl<T: Config> Module<T> {
         // 1. Delete trashI's anchor
         UsedTrashI::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
-                Some(ref mut used_info) => {
-                    for anchor in used_info.groups.keys() {
+                Some(ref mut storage_power_info) => {
+                    for anchor in storage_power_info.groups.keys() {
                         UsedTrashMappingI::mutate(anchor, |value| {
-                            *value -= used_info.storage_power;
+                            *value -= storage_power_info.storage_power;
                         });
-                        T::SworkerInterface::update_used(anchor, used_info.storage_power, 0);
+                        T::SworkerInterface::update_used(anchor, storage_power_info.storage_power, 0);
                     }
                     UsedTrashSizeI::mutate(|value| {*value -= 1;});
                 },
@@ -1127,12 +1127,12 @@ impl<T: Config> Module<T> {
         // 1. Delete trashII's anchor
         UsedTrashII::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
-                Some(ref mut used_info) => {
-                    for anchor in used_info.groups.keys() {
+                Some(ref mut storage_power_info) => {
+                    for anchor in storage_power_info.groups.keys() {
                         UsedTrashMappingII::mutate(anchor, |value| {
-                            *value -= used_info.storage_power;
+                            *value -= storage_power_info.storage_power;
                         });
-                        T::SworkerInterface::update_used(anchor, used_info.storage_power, 0);
+                        T::SworkerInterface::update_used(anchor, storage_power_info.storage_power, 0);
                     }
                     UsedTrashSizeII::mutate(|value| {*value -= 1;});
                 },
@@ -1145,11 +1145,11 @@ impl<T: Config> Module<T> {
     fn maybe_delete_anchor_from_used_trash_i(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
         UsedTrashI::mutate(cid, |maybe_used| match *maybe_used {
-            Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
-                    storage_power = used_info.storage_power;
+            Some(ref mut storage_power_info) => {
+                if storage_power_info.groups.remove(anchor).is_some() {
+                    storage_power = storage_power_info.storage_power;
                     UsedTrashMappingI::mutate(anchor, |value| {
-                        *value -= used_info.storage_power;
+                        *value -= storage_power_info.storage_power;
                     });
                 }
             },
@@ -1161,11 +1161,11 @@ impl<T: Config> Module<T> {
     fn maybe_delete_anchor_from_used_trash_ii(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
         let mut storage_power = 0;
         UsedTrashII::mutate(cid, |maybe_used| match *maybe_used {
-            Some(ref mut used_info) => {
-                if used_info.groups.remove(anchor).is_some() {
-                    storage_power = used_info.storage_power;
+            Some(ref mut storage_power_info) => {
+                if storage_power_info.groups.remove(anchor).is_some() {
+                    storage_power = storage_power_info.storage_power;
                     UsedTrashMappingII::mutate(anchor, |value| {
-                        *value -= used_info.storage_power;
+                        *value -= storage_power_info.storage_power;
                     });
                 }
             },
@@ -1175,7 +1175,7 @@ impl<T: Config> Module<T> {
     }
 
     fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
-        if let Some((mut file_info, used_info)) = Self::files(cid) {
+        if let Some((mut file_info, storage_power_info)) = Self::files(cid) {
             // 1. expired_on <= curr_bn <= expired_on + T::FileDuration::get() => no reward for liquidator
             // 2. expired_on + T::FileDuration::get() < curr_bn <= expired_on + T::FileDuration::get() * 2 => linearly reward liquidator
             // 3. curr_bn > expired_on + T::FileDuration::get() * 2 => all amount would be rewarded to the liquidator
@@ -1183,7 +1183,7 @@ impl<T: Config> Module<T> {
             if !reward_liquidator_amount.is_zero() {
                 file_info.amount = file_info.amount.saturating_sub(reward_liquidator_amount);
                 T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive)?;
-                <Files<T>>::insert(cid, (file_info, used_info));
+                <Files<T>>::insert(cid, (file_info, storage_power_info));
             }
         }
         Ok(())
@@ -1191,7 +1191,7 @@ impl<T: Config> Module<T> {
 
     fn upsert_new_file_info(cid: &MerkleRoot, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on
-        if let Some((mut file_info, used_info)) = Self::files(cid) {
+        if let Some((mut file_info, storage_power_info)) = Self::files(cid) {
             // expired_on < calculated_at => file is not live yet. This situation only happen for new file.
             // expired_on == calculated_at => file is ready to be closed(wait to be put into trash or refreshed).
             // expired_on > calculated_at => file is ongoing.
@@ -1208,7 +1208,7 @@ impl<T: Config> Module<T> {
                 }
             }
             file_info.amount += amount.clone();
-            <Files<T>>::insert(cid, (file_info, used_info));
+            <Files<T>>::insert(cid, (file_info, storage_power_info));
         } else {
             Self::check_file_in_trash(cid);
             // New file
@@ -1221,17 +1221,17 @@ impl<T: Config> Module<T> {
                 reported_replica_count: 0u32,
                 replicas: vec![]
             };
-            let used_info = StoragePowerInfo {
+            let storage_power_info = StoragePowerInfo {
                 storage_power: 0,
                 reported_group_count: 0,
                 groups: <BTreeMap<SworkerAnchor, bool>>::new()
             };
-            <Files<T>>::insert(cid, (file_info, used_info));
+            <Files<T>>::insert(cid, (file_info, storage_power_info));
         }
     }
 
     fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
-        if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+        if let Some((mut file_info, storage_power_info)) = <Files<T>>::get(cid) {
             // 1. Calculate total amount
             let file_amount = Self::file_base_fee() + Self::get_file_amount(file_info.file_size);
             let renew_reward = T::RenewRewardRatio::get() * file_amount.clone();
@@ -1252,7 +1252,7 @@ impl<T: Config> Module<T> {
                 } else {
                     file_info.expired_on = file_info.expired_on + T::FileDuration::get();
                 }
-                <Files<T>>::insert(cid, (file_info, used_info));
+                <Files<T>>::insert(cid, (file_info, storage_power_info));
 
                 #[cfg(not(test))]
                 Self::update_file_price();
@@ -1349,12 +1349,12 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn add_used_group(used_info: &mut StoragePowerInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
-        used_info.reported_group_count += 1;
-        Self::update_groups_used_info(file_size, used_info);
+    fn add_used_group(storage_power_info: &mut StoragePowerInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
+        storage_power_info.reported_group_count += 1;
+        Self::update_groups_storage_power_info(file_size, storage_power_info);
         Self::update_files_size(file_size, 0, 1);
-        used_info.groups.insert(anchor.clone(), true);
-        used_info.storage_power
+        storage_power_info.groups.insert(anchor.clone(), true);
+        storage_power_info.storage_power
     }
 
     fn delete_used_group(cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
@@ -1362,16 +1362,16 @@ impl<T: Config> Module<T> {
         
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
-            Some((ref file_info, ref mut used_info)) => {
-                if let Some(is_calculated_as_reported_group_count) = used_info.groups.remove(anchor) {
+            Some((ref file_info, ref mut storage_power_info)) => {
+                if let Some(is_calculated_as_reported_group_count) = storage_power_info.groups.remove(anchor) {
                     // need to delete the storage_power before the update.
                     // we should always return the storage_power no matter `is_calculated_as_reported_group_count` is true of false.
                     // `is_calculated_as_reported_group_count` only change the storage_power factor.
                     // we should delete the used from wr no matter what's the factor right now.
-                    storage_power = used_info.storage_power;
+                    storage_power = storage_power_info.storage_power;
                     if is_calculated_as_reported_group_count {
-                        used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
-                        Self::update_groups_used_info(file_info.file_size, used_info);
+                        storage_power_info.reported_group_count = storage_power_info.reported_group_count.saturating_sub(1);
+                        Self::update_groups_storage_power_info(file_info.file_size, storage_power_info);
                         Self::update_files_size(file_info.file_size, 1, 0);
                     }
                 }
@@ -1389,7 +1389,7 @@ impl<T: Config> Module<T> {
     }
 
     fn maybe_upsert_file_size(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
-        if let Some((mut file_info, used_info)) = Self::files(cid) {
+        if let Some((mut file_info, storage_power_info)) = Self::files(cid) {
             if file_info.replicas.len().is_zero() {
                 // ordered_file_size == reported_file_size, return it
                 if file_info.file_size == reported_file_size {
@@ -1397,7 +1397,7 @@ impl<T: Config> Module<T> {
                 // ordered_file_size > reported_file_size, correct it
                 } else if file_info.file_size > reported_file_size {
                     file_info.file_size = reported_file_size;
-                    <Files<T>>::insert(cid, (file_info, used_info));
+                    <Files<T>>::insert(cid, (file_info, storage_power_info));
                 // ordered_file_size < reported_file_size, close it with notification
                 } else {
                     let total_amount = file_info.amount + file_info.prepaid;
@@ -1427,15 +1427,15 @@ impl<T: Config> Module<T> {
         false
     }
 
-    fn update_groups_used_info(file_size: u64, used_info: &mut StoragePowerInfo) {
-        let new_storage_power = Self::calculate_storage_power(file_size, used_info.reported_group_count);
-        let prev_storage_power = used_info.storage_power;
+    fn update_groups_storage_power_info(file_size: u64, storage_power_info: &mut StoragePowerInfo) {
+        let new_storage_power = Self::calculate_storage_power(file_size, storage_power_info.reported_group_count);
+        let prev_storage_power = storage_power_info.storage_power;
         if prev_storage_power != new_storage_power {
-            for anchor in used_info.groups.keys() {
+            for anchor in storage_power_info.groups.keys() {
                 T::SworkerInterface::update_used(anchor, prev_storage_power, new_storage_power);
             }
         }
-        used_info.storage_power = new_storage_power;
+        storage_power_info.storage_power = new_storage_power;
     }
 
     fn count_reported_groups(groups: &mut BTreeMap<SworkerAnchor, bool>, curr_bn: BlockNumber) -> u32 {

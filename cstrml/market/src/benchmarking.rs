@@ -24,7 +24,7 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
 fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, calculated_at: BlockNumber, amount: u32)
     -> (FileInfo<T::AccountId, BalanceOf<T>>, StoragePowerInfo)
 {
-    let used_info = StoragePowerInfo {
+    let storage_power_info = StoragePowerInfo {
         storage_power: file_size * 2,
         reported_group_count: 1,
         groups: <BTreeMap<SworkerAnchor, bool>>::new()
@@ -48,7 +48,7 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
         reported_replica_count: 0,
         replicas
     };
-    (file_info, used_info)
+    (file_info, storage_power_info)
 }
 
 benchmarks! {

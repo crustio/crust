@@ -995,7 +995,7 @@ impl<T: Config> Module<T> {
         block_number: u64,
         block_hash: &Vec<u8>,
         reserved: u64,
-        reported_file_size: u64,
+        reported_files_size: u64,
         srd_root: &MerkleRoot,
         files_root: &MerkleRoot,
         added_files: &Vec<(MerkleRoot, u64, u64)>,
@@ -1005,7 +1005,7 @@ impl<T: Config> Module<T> {
         // 1. Encode
         let block_number_bytes = utils::encode_u64_to_string_to_bytes(block_number);
         let reserved_bytes = utils::encode_u64_to_string_to_bytes(reserved);
-        let reported_file_size_bytes = utils::encode_u64_to_string_to_bytes(reported_file_size);
+        let reported_files_size_bytes = utils::encode_u64_to_string_to_bytes(reported_files_size);
         let added_files_bytes = utils::encode_files(added_files);
         let deleted_files_bytes = utils::encode_files(deleted_files);
 
@@ -1016,9 +1016,9 @@ impl<T: Config> Module<T> {
         //    block_number: u64, -> Vec<u8>
         //    block_hash: Vec<u8>,
         //    free: u64, -> Vec<u8>
-        //    reported_file_size: u64, -> Vec<u8>
+        //    reported_files_size: u64, -> Vec<u8>
         //    free_root: MerkleRoot,
-        //    reported_file_size_root: MerkleRoot,
+        //    reported_files_size_root: MerkleRoot,
         //    added_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>
         //    deleted_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>
         //}
@@ -1028,7 +1028,7 @@ impl<T: Config> Module<T> {
             &block_number_bytes[..],
             &block_hash[..],
             &reserved_bytes[..],
-            &reported_file_size_bytes[..],
+            &reported_files_size_bytes[..],
             &srd_root[..],
             &files_root[..],
             &added_files_bytes[..],

@@ -15,7 +15,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market::{Replica, FileInfo, UsedInfo};
+pub use market::{Replica, FileInfo, StoragePowerInfo};
 use primitives::{traits::BenefitInterface, EraIndex, MerkleRoot};
 use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
@@ -700,7 +700,7 @@ pub fn add_not_live_files() {
     ].to_vec();
 
     for (file, file_size) in files.iter() {
-        let used_info = UsedInfo {
+        let used_info = StoragePowerInfo {
             used_size: 0,
             reported_group_count: 0,
             groups: <BTreeMap<SworkerAnchor, bool>>::new()
@@ -729,7 +729,7 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
         is_reported: true
     };
     for (file, file_size) in files.iter() {
-        let used_info = UsedInfo {
+        let used_info = StoragePowerInfo {
             used_size: *file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(anchor.clone(), true)].into_iter())
@@ -738,7 +738,7 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: StoragePowerInfo) {
     let file_info = FileInfo {
         file_size,
         expired_on,

@@ -23,7 +23,7 @@ use frame_support::{
     dispatch::{DispatchResultWithPostInfo}
 };
 use sp_runtime::{
-    RuntimeDebug,
+    RuntimeDebug, Perbill,
     traits::{
         Zero, Saturating, CheckedSub, StaticLookup, AtLeast32BitUnsigned
     },
@@ -163,7 +163,7 @@ decl_event!(
         /// from the unlocking queue. [stash, amount]
         Withdrawn(AccountId, Balance),
         /// Set guarantee pref success
-        SetCSMGuaranteePerfSuccess(AccountId, u32),
+        SetCSMGuaranteePerfSuccess(AccountId, Perbill),
         /// Guarantee success
         CSMGuaranteeSuccess(AccountId, AccountId),
         /// Cancel guarantee success
@@ -315,9 +315,8 @@ decl_module! {
         /// The dispatch used by layer-2
         #[weight = T::DbWeight::get().reads_writes(4, 2)
             .saturating_add(53 * WEIGHT_PER_MICROS)]
-        fn set_guarantee_pref(origin, pref: u32) {
+        fn set_guarantee_pref(origin, #[compact] pref: Perbill) {
             let who = ensure_signed(origin)?;
-            let pref = pref.min(100u32);
             Self::deposit_event(RawEvent::SetCSMGuaranteePerfSuccess(who, pref));
         }
 

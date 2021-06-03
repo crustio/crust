@@ -307,14 +307,11 @@ decl_storage! {
         /// The file base fee for each storage order.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
-        /// The file information and storage power information iterated by ipfs cid.
-        /// It includes file related info such as file size, expired date and reported replica count.
+        /// Merchant Ledger V1
         pub MerchantLedgers get(fn merchant_ledgers):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
         /// Merchant Ledger V2
-        /// The file information and storage power information iterated by ipfs cid.
-        /// It includes file related info such as file size, expired date and reported replica count.
         // TODO: Remove this V2 in MainNet
         pub MerchantLedgersV2 get(fn merchant_ledgers_v2):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
@@ -323,7 +320,8 @@ decl_storage! {
         pub Bonded get(fn bonded):
         map hasher(blake2_128_concat) T::AccountId => Option<T::AccountId>;
 
-        /// File information iterated by order id
+        /// The file information and storage power information iterated by ipfs cid.
+        /// It includes file related info such as file size, expired date and reported replica count.
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, StoragePowerInfo)>;
 

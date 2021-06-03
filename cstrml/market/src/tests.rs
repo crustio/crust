@@ -162,7 +162,7 @@ fn place_storage_order_should_work() {
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
-        let _ = Balances::make_free_balance_be(&source, 20000);
+        let _ = Balances::make_free_balance_be(&source, 2000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
         assert_ok!(Market::register(Origin::signed(merchant.clone()), 60));
@@ -3759,5 +3759,137 @@ fn storage_pot_should_be_balanced() {
         assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 1);
         assert_eq!(Balances::free_balance(&reserved_pot), 166000); // 39000 + 127000
+    });
+}
+
+#[test]
+fn free_space_scenario_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        let free_order_pot = Market::free_order_pot();
+        let alice = ALICE;
+        let _ = Balances::make_free_balance_be(&alice, 30_000_000);
+        assert_ok!(Market::recharge_free_order_pot(Origin::signed(alice.clone()), 20_000_000));
+
+        assert_eq!(Balances::free_balance(&free_order_pot), 20_000_000);
+
+        let bob = BOB;
+        assert_ok!(Market::set_free_order_admin(Origin::root(), bob.clone()));
+        assert_ok!(Market::set_total_free_fee_limit(Origin::root(), 4000));
+        assert_ok!(Market::set_free_fee(Origin::root(), 1000));
+
+        let source = MERCHANT;
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2));
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_997_999);
+        assert_eq!(Balances::free_balance(&source), 2_001);
+        assert_eq!(Market::total_free_fee_limit(), 1_999);
+
+        let cid =
+        "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // 134289408 / 1_048_576 = 129
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                calculated_at: 50,
+                amount: 23400, // ( 1000 + 1000 * 129 + 0 ) * 0.18
+                prepaid: 0,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_867_999);
+        assert_eq!(Market::free_order_accounts(&source), Some(1));
+
+        assert_noop!(
+        Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2),
+        DispatchError::Module {
+            index: 3,
+            error: 14,
+            message: Some("AlreadyInFreeAccounts")
+        });
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_737_999);
+        assert_eq!(Market::free_order_accounts(&source).is_none(), true);
+        assert_eq!(Balances::locks(&source).len(), 0);
+
+        assert_noop!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ),
+        DispatchError::Module {
+            index: 3,
+            error: 0,
+            message: Some("InsufficientCurrency")
+        });
+        let _ = Balances::make_free_balance_be(&source, 130_000);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        assert_eq!(Balances::free_balance(&free_order_pot), 19_737_999);
+        assert_eq!(Balances::free_balance(&source), 0);
+        assert_noop!(
+        Market::add_into_free_order_accounts(Origin::signed(alice.clone()), source.clone(), 2),
+        DispatchError::Module {
+            index: 3,
+            error: 13,
+            message: Some("IllegalFreeOrderAdmin")
+        });
+
+        assert_ok!(Market::set_total_free_fee_limit(Origin::root(), 4000));
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2));
+        assert_ok!(Market::remove_from_free_order_accounts(Origin::signed(bob.clone()), source.clone()));
+        assert_eq!(Market::free_order_accounts(&source).is_none(), true);
+        assert_eq!(Balances::locks(&source).len(), 0);
+
+
+        assert_noop!(
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
+            DispatchError::Module {
+                index: 3,
+                error: 15,
+                message: Some("ExceedFreeCountsLimit")
+            });
+
+        assert_ok!(Market::set_free_counts_limit(Origin::root(), 2000));
+
+        // Pass the above check
+        assert_noop!(
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
+            DispatchError::Module {
+                index: 3,
+                error: 16,
+                message: Some("ExceedTotalFreeFeeLimit")
+            });
+
+        let _ = Balances::make_free_balance_be(&free_order_pot, 1000);
+        // Transfer the money would fail
+        assert_noop!(
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1),
+            DispatchError::Module {
+                index: 1,
+                error: 3,
+                message: Some("InsufficientBalance")
+            });
+        let _ = Balances::make_free_balance_be(&free_order_pot, 2000);
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1));
+        assert_eq!(Market::free_order_accounts(&source), Some(1));
     });
 }

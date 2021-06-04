@@ -73,6 +73,9 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 				vec![
 					get_from_seed::<AuraId>("Alice"),
 					get_from_seed::<AuraId>("Bob"),
+					get_from_seed::<AuraId>("Charlie"),
+					get_from_seed::<AuraId>("Dave"),
+					get_from_seed::<AuraId>("Eve")
 				],
 				vec![
 					get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -113,6 +116,9 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 				vec![
 					get_from_seed::<AuraId>("Alice"),
 					get_from_seed::<AuraId>("Bob"),
+					get_from_seed::<AuraId>("Charlie"),
+					get_from_seed::<AuraId>("Dave"),
+					get_from_seed::<AuraId>("Eve")
 				],
 				vec![
 					hex!["9ed7705e3c7da027ba0583a22a3212042f7e715d3c168ba14f1424e2bc111d00"].into(),

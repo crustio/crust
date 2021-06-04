@@ -101,13 +101,6 @@ pub fn new_partial(
 
 	let slot_duration = cumulus_client_consensus_aura::slot_duration(&*client)?;
 
-	let block_import = cumulus_client_consensus_aura::AuraBlockImport::<
-		_,
-		_,
-		_,
-		sp_consensus_aura::sr25519::AuthorityPair,
-	>::new(client.clone(), client.clone());
-
 	let import_queue = cumulus_client_consensus_aura::import_queue::<
 		sp_consensus_aura::sr25519::AuthorityPair,
 		_,
@@ -117,7 +110,7 @@ pub fn new_partial(
 		_,
 		_,
 		>(cumulus_client_consensus_aura::ImportQueueParams {
-			block_import,
+			block_import: client.clone(),
 			client: client.clone(),
 			create_inherent_data_providers: move |_, _| async move {
 				let time = sp_timestamp::InherentDataProvider::from_system_time();
@@ -134,7 +127,7 @@ pub fn new_partial(
 			can_author_with: sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
 			spawner: &task_manager.spawn_essential_handle(),
 			telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
-		}).map_err(Into::into);
+		})?;
 
 	let params = PartialComponents {
 		backend,

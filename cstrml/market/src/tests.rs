@@ -4067,3 +4067,67 @@ fn free_space_scenario_should_work() {
         assert_eq!(Market::free_order_accounts(&source), Some(1));
     });
 }
+
+#[test]
+fn max_replicas_and_groups_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408;
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let merchants = vec![merchant.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
+        }
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                calculated_at: 50,
+                amount: 23400,
+                prepaid: 0,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+
+        run_to_block(303);
+
+        for index in 0..200 {
+            let who = AccountId32::new([index as u8; 32]);
+            let pk = hex::decode(format!("{:04}", index)).unwrap();
+            add_who_into_replica(&cid, file_size, who, pk, Some(303u32), None);
+        }
+
+        for index in 200..512 {
+            let who = AccountId32::new([index as u8; 32]);
+            let pk = hex::decode(format!("{:04}", index)).unwrap();
+            assert_eq!(add_who_into_replica(&cid, file_size, who, pk, Some(303u32), None), 0);
+        }
+
+        assert_eq!(Market::files(&cid).unwrap_or_default().1.reported_group_count, 200);
+        assert_eq!(Market::files(&cid).unwrap_or_default().1.used_size, file_size * 2);
+        assert_eq!(Market::files(&cid).unwrap_or_default().1.groups.len(), 200); // Only store the first 200 candidates
+        assert_eq!(Market::files(&cid).unwrap_or_default().0.replicas.len(), 500);
+        assert_eq!(Market::files(&cid).unwrap_or_default().0.reported_replica_count, 500); // Only store the first 500 candidates
+    });
+}

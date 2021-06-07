@@ -620,13 +620,13 @@ decl_module! {
                 }
             }).is_ok();
             let (payer, adjusted_tips) = if is_free { (Self::free_order_pot(), Zero::zero()) } else { (who.clone(), tips) };
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + adjusted_tips;
+            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size);
 
             // 5. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&payer) >= amount, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&payer) >= amount + adjusted_tips, Error::<T>::InsufficientCurrency);
 
             // 6. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), AllowDeath)?;
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), adjusted_tips, AllowDeath)?;
 
             let curr_bn = Self::get_current_block_number();
 
@@ -1242,7 +1242,7 @@ impl<T: Config> Module<T> {
                 // 3. Reward liquidator.
                 T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
                 // 4. Split into reserved, storage and staking account
-                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), KeepAlive)?;
+                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), Zero::zero(), KeepAlive)?;
                 file_info.amount += file_amount;
                 if file_info.replicas.len() == 0 {
                     // turn this file into pending status since replicas.len() is zero
@@ -1333,10 +1333,14 @@ impl<T: Config> Module<T> {
     // 10% into reserved pot
     // 72% into staking pot
     // 18% into storage pot
-    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
+    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, tips: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
+        // Split the original amount into three parts
         let staking_amount = T::StakingRatio::get() * value;
         let storage_amount = T::StorageRatio::get() * value;
         let reserved_amount = value - staking_amount - storage_amount;
+
+        // Add the tips into storage amount
+        let storage_amount = storage_amount + tips;
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, liveness)?;

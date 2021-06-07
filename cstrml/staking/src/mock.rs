@@ -262,7 +262,6 @@ parameter_types! {
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
     pub const MarketStakingPotDuration: u32 = 5;
-    pub const AuthoringAndStakingRatio: Perbill = Perbill::from_percent(20);
 }
 
 impl Config for Test {
@@ -284,7 +283,6 @@ impl Config for Test {
     type SPowerRatio = SPowerRatio;
     type MarketStakingPot = TestStaking;
     type MarketStakingPotDuration = MarketStakingPotDuration;
-    type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
     type BenefitInterface = TestBenefitInterface;
     type WeightInfo = weight::WeightInfo;
 }

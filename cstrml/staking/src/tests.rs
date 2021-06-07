@@ -470,7 +470,7 @@ fn era_reward_with_dsm_staking_pot_should_work() {
             // Compute now as other parameter won't change
             let total_authoring_payout = authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
             let total_staking_payout_0 = staking_rewards_in_era(Staking::current_era().unwrap_or(0));
-            let market_authoring_payout = <<Test as Config>::AuthoringAndStakingRatio>::get() * dsm_staking_payout_per_era;
+            let market_authoring_payout = Staking::get_authoring_and_staking_reward_ratio(10) * dsm_staking_payout_per_era;
             let market_staking_payout = dsm_staking_payout_per_era - market_authoring_payout;
             assert!(total_staking_payout_0 > 10); // Test is meaningful if reward something
             assert_eq!(Staking::eras_total_stakes(0), 2001);
@@ -5147,6 +5147,32 @@ fn change_validator_count_should_work() {
                 5
             ));
             assert_eq!(Staking::validator_count(), 15);
+        });
+}
+
+#[test]
+fn change_authoring_reward_ratio_according_to_validator_count_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(0), Perbill::from_percent(20));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(200), Perbill::from_percent(20));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(500), Perbill::from_percent(20));
+
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(501), Perbill::from_percent(25));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(700), Perbill::from_percent(25));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(1000), Perbill::from_percent(25));
+
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(1001), Perbill::from_percent(30));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(2000), Perbill::from_percent(30));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(2500), Perbill::from_percent(30));
+
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(2501), Perbill::from_percent(40));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(4000), Perbill::from_percent(40));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(5000), Perbill::from_percent(40));
+
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(5001), Perbill::from_percent(50));
+            assert_eq!(Staking::get_authoring_and_staking_reward_ratio(u32::max_value()), Perbill::from_percent(50));
         });
 }
 

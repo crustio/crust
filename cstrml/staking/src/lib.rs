@@ -464,9 +464,6 @@ pub trait Config: frame_system::Config {
     /// Market Staking Pot Duration. Count of EraIndex
     type MarketStakingPotDuration: Get<u32>;
 
-    /// Authoring and Staking ratio for market staking pot
-    type AuthoringAndStakingRatio: Get<Perbill>;
-
     /// Fee reduction interface
     type BenefitInterface: BenefitInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
 
@@ -822,9 +819,6 @@ decl_module! {
 
         /// Storage power ratio for crust network phase 1
         const SPowerRatio: u128 = T::SPowerRatio::get();
-
-        /// Authoring and Staking ratio for market staking pot
-        const AuthoringAndStakingRatio: Perbill = T::AuthoringAndStakingRatio::get();
 
         type Error = Error<T>;
 
@@ -2083,7 +2077,8 @@ impl<T: Config> Module<T> {
                 total_payout = total_payout.saturating_sub(used_fee);
 
                 // 5. Split the payout for staking and authoring
-                let total_authoring_payout = T::AuthoringAndStakingRatio::get() * total_payout;
+                let num_of_validators = points.individual.len();
+                let total_authoring_payout = Self::get_authoring_and_staking_reward_ratio(num_of_validators as u32) * total_payout;
                 let total_staking_payout = total_payout.saturating_sub(total_authoring_payout);
 
                 // 6. Block authoring payout
@@ -2454,6 +2449,16 @@ impl<T: Config> Module<T> {
         .map(|(who, _stakes)| who.clone())
         .collect::<Vec<T::AccountId>>();
         elected_stashes
+    }
+
+    pub fn get_authoring_and_staking_reward_ratio(num_of_validators: u32) -> Perbill {
+        match num_of_validators {
+            0 ..= 500 => Perbill::from_percent(20),
+            501 ..= 1000 => Perbill::from_percent(25),
+            1001 ..= 2500 => Perbill::from_percent(30),
+            2501 ..= 5000 => Perbill::from_percent(40),
+            5001 ..= u32::MAX => Perbill::from_percent(50),
+        }
     }
 
     // fn shuffle_candidates(candidates_stakes: &mut Vec<(T::AccountId, u128)>) {

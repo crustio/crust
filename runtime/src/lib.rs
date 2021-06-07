@@ -405,8 +405,6 @@ parameter_types! {
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
     // 60 eras means 15 days if era = 6 hours
     pub const MarketStakingPotDuration: u32 = 60;
-    // Authoring and Staking reward ratio
-    pub const AuthoringAndStakingRatio: Perbill = Perbill::from_percent(20);
 }
 
 impl staking::Config for Runtime {
@@ -431,7 +429,6 @@ impl staking::Config for Runtime {
     type SPowerRatio = SPowerRatio;
     type MarketStakingPot = Market;
     type MarketStakingPotDuration = MarketStakingPotDuration;
-    type AuthoringAndStakingRatio = AuthoringAndStakingRatio;
     type BenefitInterface = Benefits;
     type WeightInfo = staking::weight::WeightInfo;
 }

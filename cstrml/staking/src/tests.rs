@@ -4627,6 +4627,7 @@ fn new_era_with_stake_limit_should_work() {
                 }
             );
             assert_eq!(Staking::current_elected(), vec![11, 21, 31, 7]);
+            assert_eq!(Staking::current_elected().len(), 4);
         });
 }
 

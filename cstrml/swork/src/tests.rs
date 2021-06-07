@@ -1313,6 +1313,11 @@ fn create_and_join_group_should_work() {
                 Origin::signed(alice.clone())
             ));
 
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                bob.clone()
+            ));
+
             // Bob join the alice's group
             assert_ok!(Swork::join_group(
                 Origin::signed(bob.clone()),
@@ -1323,6 +1328,143 @@ fn create_and_join_group_should_work() {
                 anchor: b_pk.clone(),
                 punishment_deadline: 0,
                 group: Some(alice.clone())
+            });
+        });
+}
+
+#[test]
+fn group_allowlist_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let bob = Sr25519Keyring::Bob.to_account_id();
+            let charlie = Sr25519Keyring::Charlie.to_account_id();
+            let dave = Sr25519Keyring::Dave.to_account_id();
+            let eve = Sr25519Keyring::Eve.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+            let one = Sr25519Keyring::One.to_account_id();
+
+            // Prepare two work reports
+            let b_wr_info = ab_upgrade_work_report();
+            let b_pk = b_wr_info.curr_pk.clone();
+
+            register_identity(&bob, &b_pk, &b_pk);
+
+            add_wr(&b_pk, &WorkReport {
+                report_slot: 0,
+                used: 0,
+                free: 0,
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            assert_noop!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                bob.clone()
+            ),
+            DispatchError::Module {
+                index: 2,
+                error: 10,
+                message: Some("NotOwner"),
+            });
+
+            assert_noop!(Swork::remove_member_from_allowlist(
+                Origin::signed(alice.clone()),
+                bob.clone()
+            ),
+            DispatchError::Module {
+                index: 2,
+                error: 10,
+                message: Some("NotOwner"),
+            });
+
+            // Alice create a group and be the owner
+            assert_ok!(Swork::create_group(
+                Origin::signed(alice.clone())
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                bob.clone()
+            ));
+
+            assert_ok!(Swork::remove_member_from_allowlist(
+                Origin::signed(alice.clone()),
+                bob.clone()
+            ));
+
+            assert_noop!(Swork::join_group(
+                Origin::signed(bob.clone()),
+                alice.clone()
+            ),
+            DispatchError::Module {
+                index: 2,
+                error: 17,
+                message: Some("NotInAllowlist"),
+            });
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                bob.clone()
+            ));
+
+            // Bob join the alice's group
+            assert_ok!(Swork::join_group(
+                Origin::signed(bob.clone()),
+                alice.clone()
+            ));
+
+            assert_eq!(Swork::identities(&bob).unwrap_or_default(), Identity {
+                anchor: b_pk.clone(),
+                punishment_deadline: 0,
+                group: Some(alice.clone())
+            });
+
+            assert_ok!(Swork::create_group(
+                Origin::signed(ferdie.clone())
+            ));
+
+            assert_noop!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                bob.clone()
+            ),
+            DispatchError::Module {
+                index: 2,
+                error: 9,
+                message: Some("AlreadyJoint"),
+            });
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                charlie.clone()
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                dave.clone()
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                eve.clone()
+            ));
+
+            // alice has been removed
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                one.clone()
+            ));
+
+            assert_noop!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                ferdie.clone()
+            ),
+            DispatchError::Module {
+                index: 2,
+                error: 18,
+                message: Some("ExceedAllowlistLimit"),
             });
         });
 }
@@ -1501,6 +1643,22 @@ fn join_group_should_fail_due_to_invalid_situations() {
             ),
             DispatchError::Module {
                 index: 2,
+                error: 17,
+                message: Some("NotInAllowlist"),
+            });
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                bob.clone()
+            ));
+
+            // bob's used is not 0
+            assert_noop!(Swork::join_group(
+                Origin::signed(bob.clone()),
+                alice.clone()
+            ),
+            DispatchError::Module {
+                index: 2,
                 error: 11,
                 message: Some("IllegalUsed"),
             });
@@ -1513,6 +1671,19 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                charlie.clone()
+            ));
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                dave.clone()
+            ));
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(alice.clone()),
+                eve.clone()
+            ));
 
             // Bob join the alice's group
             assert_ok!(Swork::join_group(
@@ -1595,6 +1766,21 @@ fn join_group_should_work_for_used_in_work_report() {
             // alice, bob and eve become a group
             assert_ok!(Swork::create_group(
                 Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                bob.clone()
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                eve.clone()
             ));
 
             assert_ok!(Swork::join_group(
@@ -2225,6 +2411,21 @@ fn join_group_should_work_for_stake_limit() {
                 Origin::signed(ferdie.clone())
             ));
 
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                bob.clone()
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                eve.clone()
+            ));
+
             assert_ok!(Swork::join_group(
                 Origin::signed(alice.clone()),
                 ferdie.clone()
@@ -2343,6 +2544,11 @@ fn quit_group_should_work_for_stake_limit() {
                 Origin::signed(ferdie.clone())
             ));
 
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
+            ));
+
             assert_ok!(Swork::join_group(
                 Origin::signed(alice.clone()),
                 ferdie.clone()
@@ -2372,7 +2578,7 @@ fn quit_group_should_work_for_stake_limit() {
             assert_ok!(Swork::quit_group(
                 Origin::signed(alice.clone())
             ));
-            assert_eq!(Swork::groups(ferdie.clone()), BTreeSet::from_iter(vec![].into_iter()));
+            assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
 
             Swork::update_identities();
 
@@ -2393,6 +2599,8 @@ fn kick_out_should_work_for_stake_limit() {
         .build()
         .execute_with(|| {
             let alice = Sr25519Keyring::Alice.to_account_id();
+            let bob = Sr25519Keyring::Bob.to_account_id();
+            let eve = Sr25519Keyring::Eve.to_account_id();
             let ferdie = Sr25519Keyring::Ferdie.to_account_id();
 
             assert_noop!(
@@ -2409,17 +2617,39 @@ fn kick_out_should_work_for_stake_limit() {
 
             let alice_wr_info = group_work_report_alice_300();
             let a_pk = alice_wr_info.curr_pk.clone();
+            let b_pk = group_work_report_bob_300().curr_pk.clone();
 
             register(&a_pk, LegalCode::get());
             register_identity(&alice, &a_pk, &a_pk);
-            // alice, bob and eve become a group
+            register_identity(&bob, &b_pk, &b_pk);
+            // alice and ferdie become a group
             assert_ok!(Swork::create_group(
                 Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
             ));
 
             assert_ok!(Swork::join_group(
                 Origin::signed(alice.clone()),
                 ferdie.clone()
+            ));
+
+            // bob and eve become a group
+            assert_ok!(Swork::create_group(
+                Origin::signed(eve.clone())
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(eve.clone()),
+                bob.clone()
+            ));
+
+            assert_ok!(Swork::join_group(
+                Origin::signed(bob.clone()),
+                eve.clone()
             ));
 
             run_to_block(303);
@@ -2443,11 +2673,23 @@ fn kick_out_should_work_for_stake_limit() {
 
             run_to_block(603);
 
+            assert_noop!(
+                Swork::kick_out(
+                    Origin::signed(ferdie.clone()),
+                    bob.clone()
+                ),
+                DispatchError::Module {
+                    index: 2,
+                    error: 14,
+                    message: Some("NotJoint"),
+                }
+            );
+
             assert_ok!(Swork::kick_out(
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));
-            assert_eq!(Swork::groups(ferdie.clone()), BTreeSet::from_iter(vec![].into_iter()));
+            assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
 
             Swork::update_identities();
 
@@ -2479,6 +2721,11 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             // alice join the ferdie's group
             assert_ok!(Swork::create_group(
                 Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
             ));
 
             assert_ok!(Swork::join_group(
@@ -2621,6 +2868,11 @@ fn cancel_punishment_should_work() {
             // alice join the ferdie's group
             assert_ok!(Swork::create_group(
                 Origin::signed(ferdie.clone())
+            ));
+
+            assert_ok!(Swork::add_member_into_allowlist(
+                Origin::signed(ferdie.clone()),
+                alice.clone()
             ));
 
             assert_ok!(Swork::join_group(

@@ -12,6 +12,7 @@ log = { version = "0.4.14", default-features = false }
 crust-parachain-primitives = { path = "../primitives", default-features = false }
 xstorage = { path = "../pallets/xstorage", default-features = false }
 market = { version = "0.11.1", package = 'parachain-market', path = '../pallets/market', default-features = false }
+pallet-collator-selection = { path = '../pallets/collator-selection', default-features = false }
 
 # Substrate dependencies
 sp-std = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
@@ -37,6 +38,8 @@ pallet-sudo = { git = "https://github.com/paritytech/substrate", default-feature
 pallet-transaction-payment = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
 pallet-scheduler = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.3" }
 pallet-aura = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
+pallet-session = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
+pallet-authorship = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.3" }
 
 # Cumulus dependencies
 cumulus-pallet-aura-ext = { path = "../../cumulus/pallets/aura-ext", default-features = false }
@@ -99,6 +102,9 @@ std = [
 	"xcm-executor/std",
 	"xstorage/std",
 	"market/std",
+	"pallet-collator-selection/std",
+	"pallet-session/std",
+	"pallet-authorship/std",
 	"pallet-aura/std",
 	"sp-consensus-aura/std",
 	"cumulus-pallet-aura-ext/std",

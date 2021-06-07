@@ -23,7 +23,10 @@ use serde::{Deserialize, Serialize};
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_core::crypto::UncheckedInto;
-use parachain_runtime::AuraId;
+use parachain_runtime::{AuraId};
+use parachain_runtime::{Balance, CENTS};
+
+const SHADOW_ED: Balance = 10 * CENTS;
 
 /// Specialized `ChainSpec` for the normal parachain runtime.
 pub type ChainSpec = sc_service::GenericChainSpec<parachain_runtime::GenesisConfig, Extensions>;
@@ -33,6 +36,24 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 	TPublic::Pair::from_string(&format!("//{}", seed), None)
 		.expect("static values are valid; qed")
 		.public()
+}
+
+/// Helper function to generate a crypto pair from seed
+pub fn get_pair_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
+	TPublic::Pair::from_string(&format!("//{}", seed), None)
+		.expect("static values are valid; qed")
+		.public()
+}
+
+/// Generate collator keys from seed.
+///
+/// This function's return type must always match the session keys of the chain in tuple format.
+pub fn get_collator_keys_from_seed(seed: &str) -> AuraId {
+	get_pair_from_seed::<AuraId>(seed)
+}
+
+pub fn crust_shadow_session_keys(keys: AuraId) -> parachain_runtime::opaque::SessionKeys {
+	parachain_runtime::opaque::SessionKeys { aura: keys }
 }
 
 /// The extensions for the [`ChainSpec`].
@@ -70,13 +91,23 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 		move || {
 			testnet_genesis(
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
-				vec![
-					get_from_seed::<AuraId>("Alice"),
-					get_from_seed::<AuraId>("Bob"),
-					get_from_seed::<AuraId>("Charlie"),
-					get_from_seed::<AuraId>("Dave"),
-					get_from_seed::<AuraId>("Eve")
-				],
+				vec![(
+					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").into(),
+					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").unchecked_into()
+				),
+				(
+					hex!("7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348").into(),
+					hex!("7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348").unchecked_into()
+				),
+				(
+					hex!("869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c").into(),
+					hex!("869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c").unchecked_into()
+				),
+				(
+					hex!("7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65").into(),
+					hex!("7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65").unchecked_into()
+				),
+			],
 				vec![
 					get_account_id_from_seed::<sr25519::Public>("Alice"),
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
@@ -90,6 +121,10 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 					get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+					hex!["0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a"].into(),
+					hex!["7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348"].into(),
+					hex!["869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c"].into(),
+					hex!["7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65"].into()
 				],
 				id,
 			)
@@ -113,15 +148,29 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 		move || {
 			testnet_genesis(
 				hex!["9ed7705e3c7da027ba0583a22a3212042f7e715d3c168ba14f1424e2bc111d00"].into(),
-				vec![
-					get_from_seed::<AuraId>("Alice"),
-					get_from_seed::<AuraId>("Bob"),
-					get_from_seed::<AuraId>("Charlie"),
-					get_from_seed::<AuraId>("Dave"),
-					get_from_seed::<AuraId>("Eve")
-				],
+				vec![(
+					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").into(),
+					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").unchecked_into()
+				),
+				(
+					hex!("7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348").into(),
+					hex!("7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348").unchecked_into()
+				),
+				(
+					hex!("869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c").into(),
+					hex!("869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c").unchecked_into()
+				),
+				(
+					hex!("7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65").into(),
+					hex!("7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65").unchecked_into()
+				),
+			],
 				vec![
 					hex!["9ed7705e3c7da027ba0583a22a3212042f7e715d3c168ba14f1424e2bc111d00"].into(),
+					hex!["0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a"].into(),
+					hex!["7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348"].into(),
+					hex!["869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c"].into(),
+					hex!["7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65"].into()
 				],
 				id,
 			)
@@ -139,7 +188,7 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 
 fn testnet_genesis(
 	root_key: AccountId,
-	initial_authorities: Vec<AuraId>,
+	invulnerables: Vec<(AccountId, AuraId)>,
 	endowed_accounts: Vec<AccountId>,
 	id: ParaId,
 ) -> parachain_runtime::GenesisConfig {
@@ -160,9 +209,21 @@ fn testnet_genesis(
 		market: parachain_runtime::MarketConfig { },
 		pallet_sudo: parachain_runtime::SudoConfig { key: root_key },
 		parachain_info: parachain_runtime::ParachainInfoConfig { parachain_id: id },
-		pallet_aura: parachain_runtime::AuraConfig {
-			authorities: initial_authorities,
+		pallet_collator_selection: parachain_runtime::CollatorSelectionConfig {
+			invulnerables: invulnerables.iter().cloned().map(|(acc, _)| acc).collect(),
+			candidacy_bond: SHADOW_ED * 16,
+			..Default::default()
 		},
+		pallet_session: parachain_runtime::SessionConfig {
+			keys: invulnerables.iter().cloned().map(|(acc, aura)| (
+				acc.clone(), // account id
+				acc.clone(), // validator id
+				crust_shadow_session_keys(aura), // session keys
+			)).collect()
+		},
+		// no need to pass anything to aura, in fact it will panic if we do. Session will take care
+		// of this.
+		pallet_aura: Default::default(),
 		cumulus_pallet_aura_ext: Default::default(),
 	}
 }

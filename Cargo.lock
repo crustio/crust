@@ -1470,9 +1470,12 @@ dependencies = [
  "frame-system 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "log",
  "pallet-aura",
+ "pallet-authorship 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-balances 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "pallet-collator-selection",
  "pallet-randomness-collective-flip 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-scheduler 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "pallet-session 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-sudo 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-timestamp 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "pallet-transaction-payment 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
@@ -5751,6 +5754,30 @@ dependencies = [
  "sp-runtime 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "sp-std 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
  "sp-trie 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+]
+
+[[package]]
+name = "pallet-collator-selection"
+version = "3.0.0"
+dependencies = [
+ "frame-benchmarking 3.1.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "frame-support 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "frame-system 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "log",
+ "pallet-aura",
+ "pallet-authorship 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "pallet-balances 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "pallet-session 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "pallet-timestamp 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "parity-scale-codec 2.1.1",
+ "serde",
+ "sp-consensus-aura",
+ "sp-core 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "sp-io 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "sp-runtime 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "sp-staking 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "sp-std 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
+ "sp-tracing 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.3)",
 ]
 
 [[package]]

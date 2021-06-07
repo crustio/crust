@@ -44,6 +44,8 @@ use primitives::{
 
 pub(crate) const LOG_TARGET: &'static str = "market";
 const MARKET_LOCK_ID: LockIdentifier = *b"marklock";
+const MAX_REPLICAS: usize = 500;
+const MAX_GROUPS: usize = 200;
 
 #[macro_export]
 macro_rules! log {
@@ -147,42 +149,47 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // if the file exist, is_counted == true, will change it later.
         let mut used_size: u64 = 0;
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
-            let mut is_counted = true;
-            // 1. Check if the file is stored by other members
-            if let Some(members) = maybe_members {
-                for replica in file_info.replicas.iter() {
-                    if used_info.groups.contains_key(&replica.anchor) && members.contains(&replica.who) {
-                        if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
-                            // duplicated in group and set is_counted to false
-                            is_counted = false;
+            // 1. Check if the length of the groups exceed MAX_GROUPS or not
+            let mut is_counted = used_info.groups.len() < MAX_GROUPS;
+            // 2. Check if the file is stored by other members
+            if is_counted {
+                if let Some(members) = maybe_members {
+                    for replica in file_info.replicas.iter() {
+                        if used_info.groups.contains_key(&replica.anchor) && members.contains(&replica.who) {
+                            if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
+                                // duplicated in group and set is_counted to false
+                                is_counted = false;
+                            }
                         }
                     }
                 }
             }
 
-            // 2. Prepare new replica info
-            let new_replica = Replica {
-                who: who.clone(),
-                valid_at,
-                anchor: anchor.clone(),
-                is_reported: true
-            };
-            Self::insert_replica(&mut file_info, new_replica);
-            file_info.reported_replica_count += 1;
+            // 3. Prepare new replica info
+            if file_info.replicas.len() < MAX_REPLICAS {
+                let new_replica = Replica {
+                    who: who.clone(),
+                    valid_at,
+                    anchor: anchor.clone(),
+                    is_reported: true
+                };
+                Self::insert_replica(&mut file_info, new_replica);
+                file_info.reported_replica_count += 1;
+            }
 
-            // 3. Update used_info
+            // 4. Update used_info
             if is_counted {
                 used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the used_size after the update
             };
 
-            // 4. The first join the replicas and file become live(expired_on > calculated_at)
+            // 5. The first join the replicas and file become live(expired_on > calculated_at)
             let curr_bn = Self::get_current_block_number();
             if file_info.replicas.len() == 1 {
                 file_info.calculated_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
 
-            // 5. Update files
+            // 6. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
         return used_size

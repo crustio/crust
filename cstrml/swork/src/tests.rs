@@ -1313,7 +1313,7 @@ fn create_and_join_group_should_work() {
                 Origin::signed(alice.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 bob.clone()
             ));
@@ -1333,7 +1333,7 @@ fn create_and_join_group_should_work() {
 }
 
 #[test]
-fn group_whitelist_should_work() {
+fn group_allowlist_should_work() {
     ExtBuilder::default()
         .build()
         .execute_with(|| {
@@ -1360,7 +1360,7 @@ fn group_whitelist_should_work() {
                 reported_files_root: hex::decode("11").unwrap()
             });
 
-            assert_noop!(Swork::add_member_into_whitelist(
+            assert_noop!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 bob.clone()
             ),
@@ -1370,7 +1370,7 @@ fn group_whitelist_should_work() {
                 message: Some("NotOwner"),
             });
 
-            assert_noop!(Swork::remove_member_from_whitelist(
+            assert_noop!(Swork::remove_member_from_allowlist(
                 Origin::signed(alice.clone()),
                 bob.clone()
             ),
@@ -1385,12 +1385,12 @@ fn group_whitelist_should_work() {
                 Origin::signed(alice.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 bob.clone()
             ));
 
-            assert_ok!(Swork::remove_member_from_whitelist(
+            assert_ok!(Swork::remove_member_from_allowlist(
                 Origin::signed(alice.clone()),
                 bob.clone()
             ));
@@ -1402,10 +1402,10 @@ fn group_whitelist_should_work() {
             DispatchError::Module {
                 index: 2,
                 error: 17,
-                message: Some("NotInWhitelist"),
+                message: Some("NotInAllowlist"),
             });
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 bob.clone()
             ));
@@ -1426,7 +1426,7 @@ fn group_whitelist_should_work() {
                 Origin::signed(ferdie.clone())
             ));
 
-            assert_noop!(Swork::add_member_into_whitelist(
+            assert_noop!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 bob.clone()
             ),
@@ -1436,35 +1436,35 @@ fn group_whitelist_should_work() {
                 message: Some("AlreadyJoint"),
             });
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 charlie.clone()
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 dave.clone()
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 eve.clone()
             ));
 
             // alice has been removed
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 one.clone()
             ));
 
-            assert_noop!(Swork::add_member_into_whitelist(
+            assert_noop!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 ferdie.clone()
             ),
             DispatchError::Module {
                 index: 2,
                 error: 18,
-                message: Some("ExceedWhitelistLimit"),
+                message: Some("ExceedAllowlistLimit"),
             });
         });
 }
@@ -1644,10 +1644,10 @@ fn join_group_should_fail_due_to_invalid_situations() {
             DispatchError::Module {
                 index: 2,
                 error: 17,
-                message: Some("NotInWhitelist"),
+                message: Some("NotInAllowlist"),
             });
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 bob.clone()
             ));
@@ -1672,15 +1672,15 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 reported_files_root: hex::decode("11").unwrap()
             });
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 charlie.clone()
             ));
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 dave.clone()
             ));
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(alice.clone()),
                 eve.clone()
             ));
@@ -1768,17 +1768,17 @@ fn join_group_should_work_for_used_in_work_report() {
                 Origin::signed(ferdie.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 bob.clone()
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 eve.clone()
             ));
@@ -2411,17 +2411,17 @@ fn join_group_should_work_for_stake_limit() {
                 Origin::signed(ferdie.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 bob.clone()
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 eve.clone()
             ));
@@ -2544,7 +2544,7 @@ fn quit_group_should_work_for_stake_limit() {
                 Origin::signed(ferdie.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));
@@ -2578,7 +2578,7 @@ fn quit_group_should_work_for_stake_limit() {
             assert_ok!(Swork::quit_group(
                 Origin::signed(alice.clone())
             ));
-            assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), whitelist: BTreeSet::from_iter(vec![].into_iter()) });
+            assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
 
             Swork::update_identities();
 
@@ -2627,7 +2627,7 @@ fn kick_out_should_work_for_stake_limit() {
                 Origin::signed(ferdie.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));
@@ -2642,7 +2642,7 @@ fn kick_out_should_work_for_stake_limit() {
                 Origin::signed(eve.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(eve.clone()),
                 bob.clone()
             ));
@@ -2689,7 +2689,7 @@ fn kick_out_should_work_for_stake_limit() {
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));
-            assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), whitelist: BTreeSet::from_iter(vec![].into_iter()) });
+            assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
 
             Swork::update_identities();
 
@@ -2723,7 +2723,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
                 Origin::signed(ferdie.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));
@@ -2870,7 +2870,7 @@ fn cancel_punishment_should_work() {
                 Origin::signed(ferdie.clone())
             ));
 
-            assert_ok!(Swork::add_member_into_whitelist(
+            assert_ok!(Swork::add_member_into_allowlist(
                 Origin::signed(ferdie.clone()),
                 alice.clone()
             ));

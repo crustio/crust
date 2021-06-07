@@ -363,7 +363,7 @@ benchmarks! {
             wr.files_root,
             wr.sig
         ).expect("Something wrong during reporting works");
-        swork::Module::<T>::add_member_into_whitelist(RawOrigin::Signed(owner.clone()).into(), T::Lookup::unlookup(member.clone())).expect("Something wrong during adding into whitelist");
+        swork::Module::<T>::add_member_into_allowlist(RawOrigin::Signed(owner.clone()).into(), T::Lookup::unlookup(member.clone())).expect("Something wrong during adding into allowlist");
     }: {
         swork::Module::<T>::join_group(RawOrigin::Signed(member.clone()).into(), T::Lookup::unlookup(owner.clone())).expect("Something wrong during joining group");
     } verify {

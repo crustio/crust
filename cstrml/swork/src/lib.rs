@@ -105,7 +105,7 @@ pub struct Identity<AccountId> {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Group<AccountId: Ord + PartialOrd> {
     pub members: BTreeSet<AccountId>,
-    pub whitelist: BTreeSet<AccountId>,
+    pub allowlist: BTreeSet<AccountId>,
 }
 
 /// An event handler for reporting works
@@ -274,10 +274,10 @@ decl_error! {
         ExceedGroupLimit,
         /// Cannot extend the valid duration for an existed enclave code.
         InvalidExpiredBlock,
-        /// Who is not in the whitelist. Please ask owner to add you into the whitelist before you join the group.
-        NotInWhitelist,
-        /// Exceed the limit of whitelist number in one group.
-        ExceedWhitelistLimit
+        /// Who is not in the allowlist. Please ask owner to add you into the allowlist before you join the group.
+        NotInAllowlist,
+        /// Exceed the limit of allowlist number in one group.
+        ExceedAllowlistLimit
     }
 }
 
@@ -581,7 +581,7 @@ decl_module! {
         }
 
         #[weight = T::WeightInfo::create_group()]
-        pub fn add_member_into_whitelist(
+        pub fn add_member_into_allowlist(
             origin,
             target: <T::Lookup as StaticLookup>::Source
         ) -> DispatchResult {
@@ -594,22 +594,22 @@ decl_module! {
             // 2. Ensure who doesn't in any group right now
             ensure!(Self::identities(&who).is_none() || Self::identities(&who).unwrap().group.is_none(), Error::<T>::AlreadyJoint);
 
-            // 3. Ensure whitelist has the space
-            ensure!(Self::groups(&owner).whitelist.len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedWhitelistLimit);
+            // 3. Ensure allowlist has the space
+            ensure!(Self::groups(&owner).allowlist.len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedAllowlistLimit);
 
-            // 3. Add who into whitelist
+            // 3. Add who into allowlist
             <Groups<T>>::mutate(&owner, |group| {
-                group.whitelist.insert(who.clone());
+                group.allowlist.insert(who.clone());
             });
 
             // 4. Emit event
-            Self::deposit_event(RawEvent::AddIntoWhitelistSuccess(owner, who));
+            Self::deposit_event(RawEvent::AddIntoAllowlistSuccess(owner, who));
 
             Ok(())
         }
 
         #[weight = T::WeightInfo::create_group()]
-        pub fn remove_member_from_whitelist(
+        pub fn remove_member_from_allowlist(
             origin,
             target: <T::Lookup as StaticLookup>::Source
         ) -> DispatchResult {
@@ -619,13 +619,13 @@ decl_module! {
             // 1. Ensure owner's group exist
             ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
-            // 2. Add who into whitelist
+            // 2. Add who into allowlist
             <Groups<T>>::mutate(&owner, |group| {
-                group.whitelist.remove(&who);
+                group.allowlist.remove(&who);
             });
 
             // 3. Emit event
-            Self::deposit_event(RawEvent::RemoveFromWhitelistSuccess(owner, who));
+            Self::deposit_event(RawEvent::RemoveFromAllowlistSuccess(owner, who));
 
             Ok(())
         }
@@ -654,8 +654,8 @@ decl_module! {
             // TODO: remove this check after onboarding benifits module
             ensure!(Self::groups(&owner).members.len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedGroupLimit);
 
-            // 5. Ensure who is in the whitelist
-            ensure!(Self::groups(&owner).whitelist.contains(&who), Error::<T>::NotInWhitelist);
+            // 5. Ensure who is in the allowlist
+            ensure!(Self::groups(&owner).allowlist.contains(&who), Error::<T>::NotInAllowlist);
 
             // 6. Ensure who's wr's used is zero
             ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
@@ -663,7 +663,7 @@ decl_module! {
             // 7. Join the group
             <Groups<T>>::mutate(&owner, |group| {
                 group.members.insert(who.clone());
-                group.whitelist.remove(&who);
+                group.allowlist.remove(&who);
             });
 
             // 8. Mark the group owner
@@ -1168,9 +1168,9 @@ decl_event!(
         KickOutSuccess(AccountId),
         /// Cancel the punishment success.
         CancelPunishmentSuccess(AccountId),
-        /// Add who into whitelist success.
-        AddIntoWhitelistSuccess(AccountId, AccountId),
-        /// Remove who from whitelist success.
-        RemoveFromWhitelistSuccess(AccountId, AccountId),
+        /// Add who into allowlist success.
+        AddIntoAllowlistSuccess(AccountId, AccountId),
+        /// Remove who from allowlist success.
+        RemoveFromAllowlistSuccess(AccountId, AccountId),
     }
 );

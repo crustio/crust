@@ -363,11 +363,12 @@ benchmarks! {
             wr.files_root,
             wr.sig
         ).expect("Something wrong during reporting works");
+        swork::Module::<T>::add_member_into_allowlist(RawOrigin::Signed(owner.clone()).into(), T::Lookup::unlookup(member.clone())).expect("Something wrong during adding into allowlist");
     }: {
         swork::Module::<T>::join_group(RawOrigin::Signed(member.clone()).into(), T::Lookup::unlookup(owner.clone())).expect("Something wrong during joining group");
     } verify {
         assert_eq!(<swork::Groups<T>>::contains_key(&owner), true);
-        assert_eq!(swork::Module::<T>::groups(&owner), BTreeSet::from_iter(vec![member.clone()].into_iter()))
+        assert_eq!(swork::Module::<T>::groups(&owner).members, BTreeSet::from_iter(vec![member.clone()].into_iter()))
     }
 }
 

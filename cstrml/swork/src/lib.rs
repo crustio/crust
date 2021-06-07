@@ -101,6 +101,13 @@ pub struct Identity<AccountId> {
     pub group: Option<AccountId>
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct Group<AccountId: Ord + PartialOrd> {
+    pub members: BTreeSet<AccountId>,
+    pub whitelist: BTreeSet<AccountId>,
+}
+
 /// An event handler for reporting works
 pub trait Works<AccountId> {
     fn report_works(workload_map: BTreeMap<AccountId, u128>, total_workload: u128);
@@ -188,7 +195,7 @@ decl_storage! {
 
         /// The group information
         pub Groups get(fn groups):
-            map hasher(blake2_128_concat) T::AccountId => BTreeSet<T::AccountId>;
+            map hasher(blake2_128_concat) T::AccountId => Group<T::AccountId>;
 
         /// Node's work report, mapping from sWorker anchor to an optional work report.
         /// WorkReport only been replaced, it won't get removed cause we need to check the
@@ -266,7 +273,11 @@ decl_error! {
         /// Exceed the limit of members number in one group.
         ExceedGroupLimit,
         /// Cannot extend the valid duration for an existed enclave code.
-        InvalidExpiredBlock
+        InvalidExpiredBlock,
+        /// Who is not in the whitelist. Please ask owner to add you into the whitelist before you join the group.
+        NotInWhitelist,
+        /// Exceed the limit of whitelist number in one group.
+        ExceedWhitelistLimit
     }
 }
 
@@ -561,10 +572,60 @@ decl_module! {
             ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupAlreadyExist);
 
             // 3. Create the group
-            <Groups<T>>::insert(&who, <BTreeSet<T::AccountId>>::new());
+            <Groups<T>>::insert(&who, Group::<T::AccountId>::default());
 
             // 4. Emit event
             Self::deposit_event(RawEvent::CreateGroupSuccess(who));
+
+            Ok(())
+        }
+
+        #[weight = T::WeightInfo::create_group()]
+        pub fn add_member_into_whitelist(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let owner = ensure_signed(origin)?;
+            let who = T::Lookup::lookup(target)?;
+
+            // 1. Ensure owner's group exist
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
+
+            // 2. Ensure who doesn't in any group right now
+            ensure!(Self::identities(&who).is_none() || Self::identities(&who).unwrap().group.is_none(), Error::<T>::AlreadyJoint);
+
+            // 3. Ensure whitelist has the space
+            ensure!(Self::groups(&owner).whitelist.len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedWhitelistLimit);
+
+            // 3. Add who into whitelist
+            <Groups<T>>::mutate(&owner, |group| {
+                group.whitelist.insert(who.clone());
+            });
+
+            // 4. Emit event
+            Self::deposit_event(RawEvent::AddIntoWhitelistSuccess(owner, who));
+
+            Ok(())
+        }
+
+        #[weight = T::WeightInfo::create_group()]
+        pub fn remove_member_from_whitelist(
+            origin,
+            target: <T::Lookup as StaticLookup>::Source
+        ) -> DispatchResult {
+            let owner = ensure_signed(origin)?;
+            let who = T::Lookup::lookup(target)?;
+
+            // 1. Ensure owner's group exist
+            ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
+
+            // 2. Add who into whitelist
+            <Groups<T>>::mutate(&owner, |group| {
+                group.whitelist.remove(&who);
+            });
+
+            // 3. Emit event
+            Self::deposit_event(RawEvent::RemoveFromWhitelistSuccess(owner, who));
 
             Ok(())
         }
@@ -590,23 +651,28 @@ decl_module! {
             ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
             // 4. Ensure owner's group has space
-            ensure!(Self::groups(&owner).len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedGroupLimit);
+            // TODO: remove this check after onboarding benifits module
+            ensure!(Self::groups(&owner).members.len() < T::MaxGroupSize::get() as usize, Error::<T>::ExceedGroupLimit);
 
-            // 5. Ensure who's wr's used is zero
+            // 5. Ensure who is in the whitelist
+            ensure!(Self::groups(&owner).whitelist.contains(&who), Error::<T>::NotInWhitelist);
+
+            // 6. Ensure who's wr's used is zero
             ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
 
-            // 6. Join the group
-            <Groups<T>>::mutate(&owner, |members| {
-                members.insert(who.clone());
+            // 7. Join the group
+            <Groups<T>>::mutate(&owner, |group| {
+                group.members.insert(who.clone());
+                group.whitelist.remove(&who);
             });
 
-            // 7. Mark the group owner
+            // 8. Mark the group owner
             <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
                 Some(Identity { ref mut group, .. }) => *group = Some(owner.clone()),
                 None => {},
             });
 
-            // 8. Emit event
+            // 9. Emit event
             Self::deposit_event(RawEvent::JoinGroupSuccess(who, owner));
 
             Ok(())
@@ -637,8 +703,8 @@ decl_module! {
             });
 
             // 5. Quit the group
-            <Groups<T>>::mutate(&owner, |members| {
-                members.remove(&who);
+            <Groups<T>>::mutate(&owner, |group| {
+                group.members.remove(&who);
             });
 
             // 6. Emit event
@@ -659,18 +725,25 @@ decl_module! {
             // 1. Ensure who is a group owner right now
             ensure!(<Groups<T>>::contains_key(&owner), Error::<T>::NotOwner);
 
-            // 2. Remove the group owner
+            // 2. Ensure who has identity information
+            ensure!(Self::identities(&member).is_some(), Error::<T>::IdentityNotExist);
+            let identity = Self::identities(&member).unwrap();
+
+            // 3. Ensure member is in the right group
+            ensure!(identity.group.is_some() && owner == identity.group.unwrap(), Error::<T>::NotJoint);
+
+            // 4. Remove the group owner
             <Identities<T>>::mutate(&member, |maybe_i| match *maybe_i {
                 Some(Identity { ref mut group, .. }) => *group = None,
                 None => {},
             });
 
-            // 3. Quit the group
-            <Groups<T>>::mutate(&owner, |members| {
-                members.remove(&member);
+            // 5. Quit the group
+            <Groups<T>>::mutate(&owner, |group| {
+                group.members.remove(&member);
             });
 
-            // 4. Emit event
+            // 6. Emit event
             Self::deposit_event(RawEvent::KickOutSuccess(member));
 
             Ok(())
@@ -866,7 +939,7 @@ impl<T: Config> Module<T> {
                 let mut members = None;
                 if let Some(identity) = Self::identities(reporter) {
                     if let Some(owner) = identity.group {
-                        members= Some(Self::groups(owner));
+                        members= Some(Self::groups(owner).members);
                     }
                 };
                 Some((cid.clone(), T::MarketInterface::upsert_replica(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members), *valid_at))
@@ -1095,5 +1168,9 @@ decl_event!(
         KickOutSuccess(AccountId),
         /// Cancel the punishment success.
         CancelPunishmentSuccess(AccountId),
+        /// Add who into whitelist success.
+        AddIntoWhitelistSuccess(AccountId, AccountId),
+        /// Remove who from whitelist success.
+        RemoveFromWhitelistSuccess(AccountId, AccountId),
     }
 );

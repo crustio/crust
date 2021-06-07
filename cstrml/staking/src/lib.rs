@@ -2077,7 +2077,7 @@ impl<T: Config> Module<T> {
                 total_payout = total_payout.saturating_sub(used_fee);
 
                 // 5. Split the payout for staking and authoring
-                let num_of_validators = points.individual.len();
+                let num_of_validators = Self::current_elected().len();
                 let total_authoring_payout = Self::get_authoring_and_staking_reward_ratio(num_of_validators as u32) * total_payout;
                 let total_staking_payout = total_payout.saturating_sub(total_authoring_payout);
 

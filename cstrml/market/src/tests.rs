@@ -361,7 +361,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1800,
                 calculated_at: 800,
-                amount: 72111,
+                amount: 72275,
                 prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {

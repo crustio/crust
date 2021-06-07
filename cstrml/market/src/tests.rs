@@ -4112,11 +4112,18 @@ fn max_replicas_and_groups_should_work() {
 
         run_to_block(303);
 
-        for index in 0..512 {
+        for index in 0..200 {
             let who = AccountId32::new([index as u8; 32]);
             let pk = hex::decode(format!("{:04}", index)).unwrap();
             add_who_into_replica(&cid, file_size, who, pk, Some(303u32), None);
         }
+
+        for index in 200..512 {
+            let who = AccountId32::new([index as u8; 32]);
+            let pk = hex::decode(format!("{:04}", index)).unwrap();
+            assert_eq!(add_who_into_replica(&cid, file_size, who, pk, Some(303u32), None), 0);
+        }
+
         assert_eq!(Market::files(&cid).unwrap_or_default().1.reported_group_count, 200);
         assert_eq!(Market::files(&cid).unwrap_or_default().1.used_size, file_size * 2);
         assert_eq!(Market::files(&cid).unwrap_or_default().1.groups.len(), 200); // Only store the first 200 candidates

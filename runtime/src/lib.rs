@@ -806,6 +806,7 @@ impl benefits::Config for Runtime {
     type BenefitReportWorkCost = BenefitReportWorkCost;
     type BenefitsLimitRatio = BenefitsLimitRatio;
     type BenefitMarketCostRatio = BenefitMarketCostRatio;
+    type BondingDuration = BondingDuration;
 }
 
 parameter_types! {

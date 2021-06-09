@@ -74,13 +74,13 @@ Add ```RUST_LOG=debug RUST_BACKTRACE=1``` if you want see more details
  - run the first parachain collator
 
  ```sh
-./target/release/crust-collator --tmp --chain ./crust-collator/res/2002.json --parachain-id 2002 --port 40343 --ws-port 9953 --rpc-cors all --validator -lruntime=debug  -- --chain ../polkadot/rococo-custom.json
+./target/release/crust-collator --tmp --chain ./crust-collator/res/2012.json --parachain-id 2012 --port 40343 --ws-port 9953 --rpc-cors all --validator -lruntime=debug  -- --chain ../polkadot/rococo-custom.json
 ```
 
  - run the second parachain collator for the same parachain
 
  ```sh
-./target/release/crust-collator --tmp --chain ./crust-collator/res/2001.json --parachain-id 2001 --port 40342 --ws-port 9952 --rpc-cors all --validator -lruntime=debug  -- --chain ../polkadot/rococo-custom.json
+./target/release/crust-collator --tmp --chain ./crust-collator/res/2008.json --parachain-id 2008 --port 40342 --ws-port 9952 --rpc-cors all --validator -lruntime=debug  -- --chain ../polkadot/rococo-custom.json
 ```
 
 ## Step4 Register your parachain into rococo local test

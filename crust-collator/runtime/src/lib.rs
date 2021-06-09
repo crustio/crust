@@ -316,8 +316,8 @@ pub struct AllowedList;
 impl AllowedList {
 	fn is_allowed(id: u32) -> bool {
 		match id {
-			2001 => true, // Local testnet
-			2002 => true, // Local testnet
+			2008 => true, // Local testnet
+			2012 => true, // Local testnet
 			2000 => true, // Acala
 			2004 => true, // Phala
 			2003 => true, // Reserved
@@ -350,15 +350,15 @@ pub type XcmOriginToTransactDispatchOrigin = (
 );
 
 parameter_types! {
-	// One XCM operation is 1_000_000 weight - almost certainly a conservative estimate.
-	pub UnitWeightCost: Weight = 1_000_000;
+	// One XCM operation is 1_000_000_000 weight - almost certainly a conservative estimate.
+	pub UnitWeightCost: Weight = 1_000_000_000;
 	// One ROC buys 1 second of weight.
 	pub const WeightPrice: (MultiLocation, u128) = (X1(Parent), ROC);
 }
 
 match_type! {
 	pub type ParentOrParentsUnitPlurality: impl Contains<MultiLocation> = {
-		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. }) | X2(Parent, Parachain(2002)) | X2(Parent, Parachain(2001))
+		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. }) | X2(Parent, Parachain(2012)) | X2(Parent, Parachain(2008))
 	};
 }
 
@@ -579,7 +579,7 @@ construct_runtime! {
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Call, Storage},
-		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>, ValidateUnsigned},
+		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>, ValidateUnsigned, Config},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config, Call},
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},

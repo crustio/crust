@@ -9,7 +9,7 @@ homepage = "https://crust.network"
 repository = "https://github.com/crustio/crust/"
 
 [build-dependencies]
-substrate-wasm-builder = '3.0.0'
+substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.4" }
 
 [dependencies]
 # third party dependencies

@@ -90,7 +90,7 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 		ChainType::Local,
 		move || {
 			testnet_genesis(
-				hex!["34fa27d1b49e7b3cce25502fb23a504855976da933a7fcf9fe606770c7485b69"].into(),
+				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				vec![(
 					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").into(),
 					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").unchecked_into()
@@ -109,7 +109,18 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 				),
 			],
 				vec![
-					hex!["34fa27d1b49e7b3cce25502fb23a504855976da933a7fcf9fe606770c7485b69"].into(),
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					get_account_id_from_seed::<sr25519::Public>("Bob"),
+					get_account_id_from_seed::<sr25519::Public>("Charlie"),
+					get_account_id_from_seed::<sr25519::Public>("Dave"),
+					get_account_id_from_seed::<sr25519::Public>("Eve"),
+					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+					get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+					get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+					get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+					get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+					get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
+					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 					hex!["0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a"].into(),
 					hex!["7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348"].into(),
 					hex!["869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c"].into(),
@@ -123,7 +134,7 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 		None,
 		None,
 		Extensions {
-			relay_chain: "kusama".into(),
+			relay_chain: "westend-dev".into(),
 			para_id: id.into(),
 		},
 	)
@@ -136,7 +147,7 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 		ChainType::Live,
 		move || {
 			testnet_genesis(
-				hex!["34fa27d1b49e7b3cce25502fb23a504855976da933a7fcf9fe606770c7485b69"].into(),
+				hex!["9ed7705e3c7da027ba0583a22a3212042f7e715d3c168ba14f1424e2bc111d00"].into(),
 				vec![(
 					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").into(),
 					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").unchecked_into()
@@ -155,7 +166,7 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 				),
 			],
 				vec![
-					hex!["34fa27d1b49e7b3cce25502fb23a504855976da933a7fcf9fe606770c7485b69"].into(),
+					hex!["9ed7705e3c7da027ba0583a22a3212042f7e715d3c168ba14f1424e2bc111d00"].into(),
 					hex!["0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a"].into(),
 					hex!["7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348"].into(),
 					hex!["869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c"].into(),
@@ -169,7 +180,7 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 		None,
 		None,
 		Extensions {
-			relay_chain: "kusama".into(),
+			relay_chain: "westend-dev".into(),
 			para_id: id.into(),
 		},
 	)
@@ -192,7 +203,7 @@ fn testnet_genesis(
 			balances: endowed_accounts
 				.iter()
 				.cloned()
-				.map(|k| (k, 100_000_000_000_000))
+				.map(|k| (k, 1 << 60))
 				.collect(),
 		},
 		market: parachain_runtime::MarketConfig { },

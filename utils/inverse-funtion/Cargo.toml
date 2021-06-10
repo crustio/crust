@@ -1,0 +1,10 @@
+[package]
+name = "inverse-funtion"
+version = "0.1.0"
+authors = ["crustio"]
+edition = "2018"
+license = "Apache-2.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
+
+[dependencies]

@@ -5104,30 +5104,65 @@ fn update_stage_two_stake_limit_according_to_mpow_should_work() {
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
             let mut workload_map = BTreeMap::new();
-            workload_map.insert(1, 300_000_000_000_000);
-            workload_map.insert(3, 200_000_000_000_000);
-            workload_map.insert(5, 500_000_000_000_000);
+            workload_map.insert(1, 300_000_000_000);
+            workload_map.insert(3, 200_000_000_000);
+            workload_map.insert(5, 500_000_000_000);
             let total_issuance = Balances::total_issuance();
             <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(20) * total_issuance);
-            Staking::report_works(workload_map.clone(), 1_000_000_000_000_000);
-            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 24240000136497);
-            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 16160000090998);
-            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 40400000227495);
+            Staking::report_works(workload_map.clone(), 1_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 30425300760600);
+            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 20283533840400);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 50708834601001);
             assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
 
-            assert_ok!(Staking::set_stake_limit_ratio_limit(Origin::root(), Perbill::from_percent(70)));
-            assert_eq!(Staking::stake_limit_ratio_limit(), Perbill::from_percent(70));
-            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(30) * total_issuance);
-            Staking::report_works(workload_map.clone(), 1_000_000_000_000_000);
-            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 21210000013385);
-            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 14140000008923);
-            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 35350000022308);
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(10) * total_issuance);
+            Staking::report_works(workload_map.clone(), 1_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 80797462345188);
+            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 53864974896792);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 134662437241981);
             assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
             assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
 
-            assert_ok!(Staking::set_effective_staking_ratio_lower_limit(Origin::root(), Perbill::from_percent(20)));
-            assert_eq!(Staking::effective_staking_ratio_lower_limit(), Perbill::from_percent(20));
+            // back to stage 1
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(1) * total_issuance);
+            Staking::report_works(workload_map.clone(), 1_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&1).unwrap_or_default(), 750_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&3).unwrap_or_default(), 500_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&5).unwrap_or_default(), 1_250_000_000_000_000);
+            assert_eq!(Staking::stake_limit(&7).unwrap_or_default(), 0);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 0);
+        });
+}
+
+#[test]
+fn check_inverse_function_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // 0.1300 => 0.1305 = 1.878735632
+            let x = Permill::from_fraction(0.13);
+            let (integer, frac) = inverse::inverse_function(x);
+            assert_eq!(integer, 1);
+            assert_eq!(frac, Perbill::from_fraction(0.878735632));
+
+            // 0.2307 => 0.2305 = 1.781670281
+            let x = Permill::from_fraction(0.2307);
+            let (integer, frac) = inverse::inverse_function(x);
+            assert_eq!(integer, 0);
+            assert_eq!(frac, Perbill::from_fraction(0.781670281));
+
+            // 0.0269 => 0.0265 = 1.802830188
+            let x = Permill::from_fraction(0.0269);
+            let (integer, frac) = inverse::inverse_function(x);
+            assert_eq!(integer, 11);
+            assert_eq!(frac, Perbill::from_fraction(0.802830188));
+
+            // 0.4 => 0.35
+            let x = Permill::from_fraction(0.4);
+            let (integer, frac) = inverse::inverse_function(x);
+            assert_eq!(integer, 0);
+            assert_eq!(frac, Perbill::from_fraction(0.35));
         });
 }
 

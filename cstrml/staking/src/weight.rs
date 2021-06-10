@@ -86,10 +86,4 @@ impl crate::WeightInfo for WeightInfo {
 			.saturating_add(DbWeight::get().reads((1 as Weight).saturating_mul(m as Weight)))
 			.saturating_add(DbWeight::get().writes((270 as Weight).saturating_mul(v as Weight)))
 	}
-	fn recharge_staking_pot() -> Weight {
-		(64_828_000 as Weight)
-			.saturating_add(DbWeight::get().reads(1 as Weight))
-			.saturating_add(DbWeight::get().writes(1 as Weight))
-
-	}
 }

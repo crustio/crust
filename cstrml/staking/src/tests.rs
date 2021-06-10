@@ -5142,25 +5142,25 @@ fn check_inverse_function_work() {
         .execute_with(|| {
             // 0.1300 => 0.1305 = 1.878735632
             let x = Permill::from_fraction(0.13);
-            let (integer, frac) = inverse::inverse_function(x);
+            let (integer, frac) = total_stake_limit_ratio(x);
             assert_eq!(integer, 1);
             assert_eq!(frac, Perbill::from_fraction(0.878735632));
 
             // 0.2307 => 0.2305 = 1.781670281
             let x = Permill::from_fraction(0.2307);
-            let (integer, frac) = inverse::inverse_function(x);
+            let (integer, frac) = total_stake_limit_ratio(x);
             assert_eq!(integer, 0);
             assert_eq!(frac, Perbill::from_fraction(0.781670281));
 
             // 0.0269 => 0.0265 = 1.802830188
             let x = Permill::from_fraction(0.0269);
-            let (integer, frac) = inverse::inverse_function(x);
+            let (integer, frac) = total_stake_limit_ratio(x);
             assert_eq!(integer, 11);
             assert_eq!(frac, Perbill::from_fraction(0.802830188));
 
             // 0.4 => 0.35
             let x = Permill::from_fraction(0.4);
-            let (integer, frac) = inverse::inverse_function(x);
+            let (integer, frac) = total_stake_limit_ratio(x);
             assert_eq!(integer, 0);
             assert_eq!(frac, Perbill::from_fraction(0.35));
         });

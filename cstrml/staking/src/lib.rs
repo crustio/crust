@@ -11,11 +11,12 @@ mod mock;
 pub mod benchmarking;
 
 mod slashing;
-pub mod inverse;
+pub mod total_stake_limit_ratio;
 #[cfg(test)]
 mod tests;
 
 use codec::{Decode, Encode, HasCompact};
+use total_stake_limit_ratio::total_stake_limit_ratio;
 use frame_support::{
     decl_module, decl_event, decl_storage, ensure, decl_error,
     storage::IterableStorageMap,
@@ -1580,15 +1581,22 @@ impl<T: Config> Module<T> {
     }
 
     pub fn limit_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> (BalanceOf<T>, Perbill) {
+        let maybe_effective_stake_ratio = Self::maybe_get_effective_staking_ratio(total_issuance);
+        if let Some(effective_stake_ratio) = maybe_effective_stake_ratio {
+            let (integer, frac) = total_stake_limit_ratio(effective_stake_ratio);
+            return (integer.into(), frac);
+        }
+        return (0u32.into(), Perbill::zero());
+    }
+
+    fn maybe_get_effective_staking_ratio(total_issuance: BalanceOf<T>) -> Option<Permill> {
         let to_num =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
         if let Some(active_era) = Self::active_era() {
             let total_effective_stake = <ErasTotalStakes<T>>::get(&active_era.index);
-            let effective_stake_ratio = Permill::from_rational_approximation(to_num(total_effective_stake), to_num(total_issuance));
-            let (integer, frac) = inverse::inverse_function(effective_stake_ratio);
-            return (integer.into(), frac);
+            return Some(Permill::from_rational_approximation(to_num(total_effective_stake), to_num(total_issuance)));
         }
-        return (0u32.into(), Perbill::zero());
+        None
     }
 
     fn calculate_total_stake_limit() -> u128 {

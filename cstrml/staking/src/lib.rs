@@ -2073,9 +2073,25 @@ impl<T: Config> Module<T> {
             }
             maybe_rewards_this_year = maybe_rewards_this_year * 88 / 100;
         }
+
+        if maybe_rewards_this_year <= total_issuance / 5 {
+            maybe_rewards_this_year = Self::supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year, total_issuance.clone());
+        }
+
         let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
 
         reward_this_era.try_into().ok().unwrap()
+    }
+
+    fn supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year: BalanceOf<T>, total_issuance: BalanceOf<T>) -> BalanceOf<T> {
+        let maybe_effective_staking_ratio = Self::maybe_get_effective_staking_ratio(total_issuance.clone());
+        if let Some(effective_staking_ratio) = maybe_effective_staking_ratio {
+            if effective_staking_ratio <= Permill::from_percent(30) {
+                let extra_rewards_this_year = total_issuance * 8 / 10 - effective_staking_ratio * total_issuance * 8 / 3;
+                return maybe_rewards_this_year + extra_rewards_this_year;
+            }
+        }
+        return maybe_rewards_this_year;
     }
 
     //     // Milliseconds per year for the Julian year (365.25 days).

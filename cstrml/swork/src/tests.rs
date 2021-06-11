@@ -2996,3 +2996,88 @@ fn remove_reported_in_slot_should_work() {
             assert_eq!(<self::ReportedInSlot>::contains_key(legal_pk.clone(), 300), false);
         });
 }
+
+#[test]
+fn basic_check_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter = Sr25519Keyring::Alice.to_account_id();
+            let mut legal_wr_info = legal_work_report_with_added_files();
+            // Exceed the max srd size
+            legal_wr_info.free = 2_251_799_813_685_248;
+            assert_noop!(
+                Swork::report_works(
+                    Origin::signed(reporter.clone()),
+                    legal_wr_info.curr_pk,
+                    legal_wr_info.prev_pk,
+                    legal_wr_info.block_number,
+                    legal_wr_info.block_hash,
+                    legal_wr_info.free,
+                    legal_wr_info.used,
+                    legal_wr_info.added_files,
+                    legal_wr_info.deleted_files,
+                    legal_wr_info.srd_root,
+                    legal_wr_info.files_root,
+                    legal_wr_info.sig
+                ),
+                DispatchError::Module {
+                    index: 2,
+                    error: 19,
+                    message: Some("IllegalWorkReport"),
+                }
+            );
+
+            let mut legal_wr_info = legal_work_report_with_added_files();
+            // Exceed the max files size
+            legal_wr_info.used = 9_007_199_254_740_992;
+            assert_noop!(
+                Swork::report_works(
+                    Origin::signed(reporter.clone()),
+                    legal_wr_info.curr_pk,
+                    legal_wr_info.prev_pk,
+                    legal_wr_info.block_number,
+                    legal_wr_info.block_hash,
+                    legal_wr_info.free,
+                    legal_wr_info.used,
+                    legal_wr_info.added_files,
+                    legal_wr_info.deleted_files,
+                    legal_wr_info.srd_root,
+                    legal_wr_info.files_root,
+                    legal_wr_info.sig
+                ),
+                DispatchError::Module {
+                    index: 2,
+                    error: 19,
+                    message: Some("IllegalWorkReport"),
+                }
+            );
+
+            let mut legal_wr_info = legal_work_report_with_added_files();
+            // Exceed the max files count
+            for index in 0..5000 {
+                legal_wr_info.added_files.push((format!("{:04}", index).as_bytes().to_vec(), 0, 0));
+            }
+            assert_noop!(
+                Swork::report_works(
+                    Origin::signed(reporter),
+                    legal_wr_info.curr_pk,
+                    legal_wr_info.prev_pk,
+                    legal_wr_info.block_number,
+                    legal_wr_info.block_hash,
+                    legal_wr_info.free,
+                    legal_wr_info.used,
+                    legal_wr_info.added_files,
+                    legal_wr_info.deleted_files,
+                    legal_wr_info.srd_root,
+                    legal_wr_info.files_root,
+                    legal_wr_info.sig
+                ),
+                DispatchError::Module {
+                    index: 2,
+                    error: 19,
+                    message: Some("IllegalWorkReport"),
+                }
+            );
+        });
+}

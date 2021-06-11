@@ -47,6 +47,9 @@ pub type BalanceOf<T> =
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 pub(crate) const LOG_TARGET: &'static str = "swork";
+const SRD_LIMIT: u64 = 2_251_799_813_685_248; // 2 PB <-> 2 * 1024 * 1024 * 1024 * 1024 * 1024.
+const FILES_LIMIT: u64 = 9_007_199_254_740_992; // 8 PB <-> 8 * 1024 * 1024 * 1024 * 1024 * 1024.
+const FILES_COUNT_LIMIT: usize = 5000; // 5000 files for now.
 
 #[macro_export]
 macro_rules! log {
@@ -277,7 +280,9 @@ decl_error! {
         /// Who is not in the allowlist. Please ask owner to add you into the allowlist before you join the group.
         NotInAllowlist,
         /// Exceed the limit of allowlist number in one group.
-        ExceedAllowlistLimit
+        ExceedAllowlistLimit,
+        /// Illegal work report. This should never happen.
+        IllegalWorkReport
     }
 }
 
@@ -409,26 +414,29 @@ decl_module! {
             let reporter = ensure_signed(origin)?;
             let mut prev_pk = curr_pk.clone();
 
-            // 1. Ensure reporter is registered
+            // 1. Basic check
+            ensure!(reported_srd_size < SRD_LIMIT && reported_files_size < FILES_LIMIT && added_files.len() < FILES_COUNT_LIMIT, Error::<T>::IllegalWorkReport);
+
+            // 2. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
 
-            // 2. Ensure who cannot be group owner
+            // 3. Ensure who cannot be group owner
             ensure!(!<Groups<T>>::contains_key(&reporter), Error::<T>::GroupOwnerForbidden);
             
-            // 3. Ensure reporter's code is legal
+            // 4. Ensure reporter's code is legal
             ensure!(Self::reporter_code_check(&curr_pk, slot), Error::<T>::OutdatedReporter);
 
-            // 4. Decide which scenario
+            // 5. Decide which scenario
             let maybe_anchor = Self::pub_keys(&curr_pk).anchor;
             let is_ab_upgrade = maybe_anchor.is_none() && !ab_upgrade_pk.is_empty();
             let is_first_report = maybe_anchor.is_none() && ab_upgrade_pk.is_empty();
 
-            // 5. Unique Check for normal report work for curr pk
+            // 6. Unique Check for normal report work for curr pk
             if let Some(anchor) = maybe_anchor {
                 // Normally report works.
-                // 5.1 Ensure Identity's anchor be same with current pk's anchor
+                // 6.1 Ensure Identity's anchor be same with current pk's anchor
                 ensure!(Self::identities(&reporter).unwrap_or_default().anchor == anchor, Error::<T>::IllegalReporter);
-                // 5.2 Already reported with same pub key in the same slot, return immediately
+                // 6.2 Already reported with same pub key in the same slot, return immediately
                 if Self::reported_in_slot(&anchor, slot) {
                     log!(
                         trace,
@@ -441,10 +449,10 @@ decl_module! {
                 }
             }
 
-            // 6. Timing check
+            // 7. Timing check
             ensure!(Self::work_report_timing_check(slot, &slot_hash).is_ok(), Error::<T>::InvalidReportTime);
 
-            // 7. Ensure sig is legal
+            // 8. Ensure sig is legal
             ensure!(
                 Self::work_report_sig_check(
                     &curr_pk,
@@ -462,15 +470,15 @@ decl_module! {
                 Error::<T>::IllegalWorkReportSig
             );
 
-            // 8. Files storage status transition check
+            // 9. Files storage status transition check
             if is_ab_upgrade {
-                // 8.1 Previous pk should already reported works
+                // 9.1 Previous pk should already reported works
                 ensure!(PubKeys::contains_key(&ab_upgrade_pk), Error::<T>::ABUpgradeFailed);
                 // unwrap_or_default is a small tricky solution
                 let maybe_prev_wr = Self::work_reports(&Self::pub_keys(&ab_upgrade_pk).anchor.unwrap_or_default());
                 ensure!(maybe_prev_wr.is_some(), Error::<T>::ABUpgradeFailed);
 
-                // 8.2 Current work report should NOT be changed at all
+                // 9.2 Current work report should NOT be changed at all
                 let prev_wr = maybe_prev_wr.unwrap();
                 ensure!(added_files.is_empty() &&
                     deleted_files.is_empty() &&
@@ -478,7 +486,7 @@ decl_module! {
                     prev_wr.reported_srd_root == reported_srd_root,
                     Error::<T>::ABUpgradeFailed);
 
-                // 8.3 Set the real previous public key(contains work report);
+                // 9.3 Set the real previous public key(contains work report);
                 prev_pk = ab_upgrade_pk.clone();
             } else {
                 ensure!(
@@ -493,9 +501,9 @@ decl_module! {
                 );
             }
 
-            // 9. Finish register
+            // 10. Finish register
             if is_ab_upgrade {
-                // 9.1 Transfer A's status to B and delete old A's storage status
+                // 10.1 Transfer A's status to B and delete old A's storage status
                 let prev_pk_info = Self::pub_keys(&prev_pk);
                 PubKeys::mutate(&curr_pk, |curr_pk_info| {
                     curr_pk_info.anchor = prev_pk_info.anchor;
@@ -505,14 +513,14 @@ decl_module! {
             } else if is_first_report {
                 let mut pk_info = Self::pub_keys(&curr_pk);
                 match Self::identities(&reporter) {
-                    // 9.2 re-register scenario
+                    // 10.2 re-register scenario
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
                         identity.punishment_deadline = slot;
                         <Identities<T>>::insert(&reporter, identity);
                     },
-                    // 9.3 first register scenario
+                    // 10.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),
@@ -526,7 +534,7 @@ decl_module! {
                 PubKeys::insert(&curr_pk, pk_info);
             }
 
-            // 10. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
+            // 11. 🏋🏻 ‍️Merge work report and update corresponding storages, contains:
             // a. Upsert work report
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
@@ -545,10 +553,10 @@ decl_module! {
                 slot,
             );
 
-            // 11. Emit work report event
+            // 12. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
-            // 12. Try to free count limitation
+            // 13. Try to free count limitation
             let id = Self::identities(&reporter).unwrap_or_default();
             let owner = if let Some(group) = id.group { group } else { reporter };
             if T::BenefitInterface::maybe_free_count(&owner) {

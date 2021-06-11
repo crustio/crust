@@ -317,7 +317,6 @@ pub struct ExtBuilder {
     invulnerables: Vec<u128>,
     own_workload: u128,
     total_workload: u128,
-    staking_pot: Balance,
     dsm_staking_payout: Balance,
     mock_used_fee: Balance,
     start_reward_era: u32
@@ -337,7 +336,6 @@ impl Default for ExtBuilder {
             invulnerables: vec![],
             own_workload: 3000,
             total_workload: 3000,
-            staking_pot: 1_000_000_000_000_000_000,
             dsm_staking_payout: 0,
             mock_used_fee: 0,
             start_reward_era: 0
@@ -388,10 +386,6 @@ impl ExtBuilder {
     }
     pub fn invulnerables(mut self, invulnerables: Vec<u128>) -> Self {
         self.invulnerables = invulnerables;
-        self
-    }
-    pub fn staking_pot(mut self, amount: Balance) -> Self {
-        self.staking_pot = amount;
         self
     }
     pub fn dsm_staking_payout(mut self, amount: Balance) -> Self {
@@ -451,8 +445,7 @@ impl ExtBuilder {
                 (100, 2000 * balance_factor),
                 (101, 2000 * balance_factor),
                 // This allow us to have a total_payout different from 0.
-                (999, 1_000_000_000_000),
-                (Staking::staking_pot(), self.staking_pot)
+                (999, 1_000_000_000_000)
             ],
         }.assimilate_storage(&mut storage);
 

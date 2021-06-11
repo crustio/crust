@@ -11,10 +11,12 @@ mod mock;
 pub mod benchmarking;
 
 mod slashing;
+pub mod total_stake_limit_ratio;
 #[cfg(test)]
 mod tests;
 
 use codec::{Decode, Encode, HasCompact};
+use total_stake_limit_ratio::total_stake_limit_ratio;
 use frame_support::{
     decl_module, decl_event, decl_storage, ensure, decl_error,
     storage::IterableStorageMap,
@@ -27,7 +29,7 @@ use frame_support::{
 };
 use pallet_session::historical;
 use sp_runtime::{
-    Perbill, RuntimeDebug, SaturatedConversion, ModuleId,
+    Perbill, Permill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
         CheckedAdd, AccountIdConversion, CheckedSub, AtLeast32BitUnsigned
@@ -500,12 +502,6 @@ decl_storage! {
 
         /// Start era for reward curve
         StartRewardEra get(fn start_reward_era) config(): EraIndex = 100000;
-
-        /// Base stake limit ratio limit for the stage two
-        StakeLimitRatioLimit get(fn stake_limit_ratio_limit): Perbill = Perbill::from_percent(60);
-
-        /// The effective staking lower limit which trigger the extra stake limit ratio limit
-        EffectiveStakingRatioLowerLimit get(fn effective_staking_ratio_lower_limit): Perbill = Perbill::from_percent(25);
 
         /// Map from all locked "stash" accounts to the controller account.
         pub Bonded get(fn bonded): map hasher(twox_64_concat) T::AccountId => Option<T::AccountId>;
@@ -1499,20 +1495,6 @@ decl_module! {
             ensure_root(origin)?;
             StartRewardEra::put(start_reward_era);
         }
-
-        /// Set the base stake limit ratio limit
-        #[weight = 1000]
-        fn set_stake_limit_ratio_limit(origin, stake_limit_ratio_limit: Perbill) {
-            ensure_root(origin)?;
-            StakeLimitRatioLimit::put(stake_limit_ratio_limit);
-        }
-
-        /// Set the effective staking ratio lower limit
-        #[weight = 1000]
-        fn set_effective_staking_ratio_lower_limit(origin, effective_staking_ratio_lower_limit: Perbill) {
-            ensure_root(origin)?;
-            EffectiveStakingRatioLowerLimit::put(effective_staking_ratio_lower_limit);
-        }
     }
 }
 
@@ -1598,36 +1580,33 @@ impl<T: Config> Module<T> {
         }
     }
 
-    pub fn extra_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> Perbill {
+    pub fn limit_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> (u128, Perbill) {
+        let maybe_effective_stake_ratio = Self::maybe_get_effective_staking_ratio(total_issuance);
+        if let Some(effective_stake_ratio) = maybe_effective_stake_ratio {
+            let (integer, frac) = total_stake_limit_ratio(effective_stake_ratio);
+            return (integer.into(), frac);
+        }
+        return (0u128, Perbill::zero());
+    }
+
+    fn maybe_get_effective_staking_ratio(total_issuance: BalanceOf<T>) -> Option<Permill> {
         let to_num =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
-        // TODO: Confirm the real function with Bova and change it
-        // Multiple the percent by four, maximum value is 100%
-        let mul_four = |percent: Perbill| {
-            let mut init_percent = Perbill::zero();
-            for _ in 0..4 {
-                init_percent = init_percent.saturating_add(percent.clone());
-            }
-            init_percent
-        };
         if let Some(active_era) = Self::active_era() {
             let total_effective_stake = <ErasTotalStakes<T>>::get(&active_era.index);
-            let effective_stake_ratio = Perbill::from_rational_approximation(to_num(total_effective_stake), to_num(total_issuance));
-            if effective_stake_ratio > Self::effective_staking_ratio_lower_limit() {
-                return Perbill::zero();
-            }
-            return mul_four(Self::effective_staking_ratio_lower_limit().saturating_sub(effective_stake_ratio));
+            return Some(Permill::from_rational_approximation(to_num(total_effective_stake), to_num(total_issuance)));
         }
-        return Perbill::zero();
+        None
     }
 
     fn calculate_total_stake_limit() -> u128 {
         let total_issuance = T::Currency::total_issuance();
-        let stake_limit_ratio_limit = Self::stake_limit_ratio_limit();
         // If effective staking ratio is smaller than some value, we should increase the total stake limit
-        let extra_stake_limit_ratio_limit = Self::extra_ratio_according_to_effective_staking(total_issuance.clone());
+        let (integer, frac) = Self::limit_ratio_according_to_effective_staking(total_issuance.clone());
+        let frac = frac * total_issuance;
+        let integer = BalanceOf::<T>::saturated_from(integer).saturating_mul(total_issuance);
         // This value can be larger than total issuance.
-        let total_stake_limit = TryInto::<u128>::try_into((stake_limit_ratio_limit * total_issuance).saturating_add(extra_stake_limit_ratio_limit * total_issuance))
+        let total_stake_limit = TryInto::<u128>::try_into(integer.saturating_add(frac))
             .ok()
             .unwrap();
         total_stake_limit

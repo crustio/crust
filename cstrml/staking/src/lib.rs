@@ -23,7 +23,7 @@ use frame_support::{
     weights::{Weight, constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS}},
     traits::{
         Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
-        UnixTime, EnsureOrigin, Randomness, ExistenceRequirement::{KeepAlive, AllowDeath}
+        UnixTime, EnsureOrigin, Randomness
     },
     dispatch::{DispatchResult, DispatchResultWithPostInfo}
 };
@@ -32,7 +32,7 @@ use sp_runtime::{
     Perbill, Permill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, AccountIdConversion, CheckedSub, AtLeast32BitUnsigned
+        CheckedAdd, CheckedSub, AtLeast32BitUnsigned
     },
 };
 use sp_staking::{
@@ -2002,7 +2002,7 @@ impl<T: Config> Module<T> {
             if !era_duration.is_zero() {
                 let active_era_index = active_era.index.clone();
                 let points = <ErasRewardPoints<T>>::get(&active_era_index);
-                let mut gpos_total_payout = Self::total_rewards_in_era(active_era_index);
+                let gpos_total_payout = Self::total_rewards_in_era(active_era_index);
 
                 // 1. Market's staking payout
                 let market_total_payout = Self::calculate_market_payout(active_era_index);
@@ -2074,8 +2074,8 @@ impl<T: Config> Module<T> {
             maybe_rewards_this_year = maybe_rewards_this_year * 88 / 100;
         }
 
-        if maybe_rewards_this_year <= total_issuance / 5 {
-            maybe_rewards_this_year = Self::supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year, total_issuance.clone());
+        if year_num >= 4 {
+            maybe_rewards_this_year = Self::supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year, total_issuance);
         }
 
         let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
@@ -2083,8 +2083,8 @@ impl<T: Config> Module<T> {
         reward_this_era.try_into().ok().unwrap()
     }
 
-    fn supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year: BalanceOf<T>, total_issuance: BalanceOf<T>) -> BalanceOf<T> {
-        let maybe_effective_staking_ratio = Self::maybe_get_effective_staking_ratio(total_issuance.clone());
+    fn supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year: u128, total_issuance: u128) -> u128 {
+        let maybe_effective_staking_ratio = Self::maybe_get_effective_staking_ratio(BalanceOf::<T>::saturated_from(total_issuance));
         if let Some(effective_staking_ratio) = maybe_effective_staking_ratio {
             if effective_staking_ratio <= Permill::from_percent(30) {
                 let extra_rewards_this_year = total_issuance * 8 / 10 - effective_staking_ratio * total_issuance * 8 / 3;

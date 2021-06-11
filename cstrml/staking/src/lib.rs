@@ -1580,13 +1580,13 @@ impl<T: Config> Module<T> {
         }
     }
 
-    pub fn limit_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> (BalanceOf<T>, Perbill) {
+    pub fn limit_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> (u128, Perbill) {
         let maybe_effective_stake_ratio = Self::maybe_get_effective_staking_ratio(total_issuance);
         if let Some(effective_stake_ratio) = maybe_effective_stake_ratio {
             let (integer, frac) = total_stake_limit_ratio(effective_stake_ratio);
             return (integer.into(), frac);
         }
-        return (0u32.into(), Perbill::zero());
+        return (0u128, Perbill::zero());
     }
 
     fn maybe_get_effective_staking_ratio(total_issuance: BalanceOf<T>) -> Option<Permill> {
@@ -1604,7 +1604,7 @@ impl<T: Config> Module<T> {
         // If effective staking ratio is smaller than some value, we should increase the total stake limit
         let (integer, frac) = Self::limit_ratio_according_to_effective_staking(total_issuance.clone());
         let frac = frac * total_issuance;
-        let integer = integer.saturating_mul(total_issuance);
+        let integer = BalanceOf::<T>::saturated_from(integer).saturating_mul(total_issuance);
         // This value can be larger than total issuance.
         let total_stake_limit = TryInto::<u128>::try_into(integer.saturating_add(frac))
             .ok()

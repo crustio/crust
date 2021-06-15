@@ -32,7 +32,7 @@ use sp_runtime::{
     Perbill, Permill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, CheckedSub, AtLeast32BitUnsigned
+        CheckedAdd, CheckedSub, AtLeast32BitUnsigned, Bounded
     },
 };
 use sp_staking::{
@@ -416,7 +416,7 @@ pub trait Config: frame_system::Config {
     /// TODO: [Substrate]substrate#1377
     /// The backward convert should be removed as the new Phragmen API returns ratio.
     /// The post-processing needs it but will be moved to off-chain. TODO: #2908
-    type CurrencyToVote: Convert<BalanceOf<Self>, u64> + Convert<u128, BalanceOf<Self>>;
+    type CurrencyToVote: Convert<u128, BalanceOf<Self>> + Convert<BalanceOf<Self>, u128>;
 
     /// Tokens have been minted and are unused for validator-reward.
     type RewardRemainder: OnUnbalanced<NegativeImbalanceOf<Self>>;
@@ -1504,7 +1504,7 @@ impl<T: Config> Module<T> {
         if let Some(storage_stakes) = own_workloads.checked_mul(T::SPowerRatio::get()) {
             storage_stakes.try_into().ok().unwrap()
         } else {
-            (u64::max_value() as u128).try_into().ok().unwrap()
+            BalanceOf::<T>::max_value().try_into().ok().unwrap()
         }
     }
 
@@ -1566,7 +1566,7 @@ impl<T: Config> Module<T> {
 
     fn maybe_get_effective_staking_ratio(total_issuance: BalanceOf<T>) -> Option<Permill> {
         let to_num =
-            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
+            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u128>>::convert(b);
         if let Some(active_era) = Self::active_era() {
             let total_effective_stake = <ErasTotalStakes<T>>::get(&active_era.index);
             return Some(Permill::from_rational_approximation(to_num(total_effective_stake), to_num(total_issuance)));
@@ -1823,7 +1823,7 @@ impl<T: Config> Module<T> {
         }
 
         let to_num =
-        |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b);
+        |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u128>>::convert(b);
 
         // 3. Retrieve total stakes and total staking reward
         let era_total_stakes = <ErasTotalStakes<T>>::get(&era);
@@ -2064,11 +2064,11 @@ impl<T: Config> Module<T> {
         const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
         // 1 Julian year = (365.25d * 24h * 3600s * 1000ms) / (millisecs_in_era = block_time * blocks_num_in_era)
         let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
-        let year_num = active_era as u64 / year_in_eras;
+        let year_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / year_in_eras;
         for _ in 0..year_num {
             // If inflation <= 2.8%, stop reduce
-            if maybe_rewards_this_year <= total_issuance * 28 / 1000 {
-                maybe_rewards_this_year = total_issuance * 28 / 1000;
+            if maybe_rewards_this_year <= total_issuance / 1000 * 28 {
+                maybe_rewards_this_year = total_issuance / 1000 * 28;
                 break;
             }
             maybe_rewards_this_year = maybe_rewards_this_year * 88 / 100;
@@ -2086,9 +2086,10 @@ impl<T: Config> Module<T> {
     fn supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year: u128, total_issuance: u128) -> u128 {
         let maybe_effective_staking_ratio = Self::maybe_get_effective_staking_ratio(BalanceOf::<T>::saturated_from(total_issuance));
         if let Some(effective_staking_ratio) = maybe_effective_staking_ratio {
-            if effective_staking_ratio <= Permill::from_percent(30) {
-                let extra_rewards_this_year = total_issuance * 8 / 10 - effective_staking_ratio * total_issuance * 8 / 3;
-                return maybe_rewards_this_year + extra_rewards_this_year;
+            if effective_staking_ratio < Permill::from_percent(30) {
+                // (1 - sr / 0.3) * 0.08 * total_issuance = total_issuance * 8 / 100 - sr * total_issuance * 8 / 30
+                let extra_rewards_this_year = total_issuance / 100 * 8 - effective_staking_ratio * total_issuance / 30 * 8;
+                return maybe_rewards_this_year.saturating_add(extra_rewards_this_year);
             }
         }
         return maybe_rewards_this_year;
@@ -2149,7 +2150,7 @@ impl<T: Config> Module<T> {
         }
 
         let to_votes =
-            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
+            |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u128>>::convert(b);
         let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
         // II. Construct and fill in the V/G graph

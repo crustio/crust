@@ -2066,12 +2066,13 @@ impl<T: Config> Module<T> {
         let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
         let year_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / year_in_eras;
         for _ in 0..year_num {
+            maybe_rewards_this_year = maybe_rewards_this_year * 88 / 100;
+
             // If inflation <= 2.8%, stop reduce
             if maybe_rewards_this_year <= total_issuance / 1000 * 28 {
                 maybe_rewards_this_year = total_issuance / 1000 * 28;
                 break;
             }
-            maybe_rewards_this_year = maybe_rewards_this_year * 88 / 100;
         }
 
         if year_num >= 4 {

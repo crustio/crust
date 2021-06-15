@@ -1509,6 +1509,40 @@ fn staking_and_authoring_reward_change_work() {
 }
 
 #[test]
+fn extra_reward_should_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .start_reward_era(10000)
+        .build()
+        .execute_with(|| {
+            // should be zero
+            assert_eq!(staking_rewards_in_era(4381), 0);
+            assert_eq!(staking_rewards_in_era(8382), 0);
+            let decimals: u128 = 1000000000000000000000000000;
+            // Make 1 account be max balance
+            let _ = Balances::make_free_balance_be(&11, Balance::max_value() / 8);
+            // year 2, inflation rate will reduce less than 2.8%, then it should be 2.8%
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(35) * Balances::total_issuance());
+            assert_eq!(Staking::total_rewards_in_era(45064), Perbill::from_fraction(0.028) * Balances::total_issuance() / 17532);
+            // year 2 => no extra reward
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(10) * Balances::total_issuance());
+            assert_eq!(Staking::total_rewards_in_era(45064), Perbill::from_fraction(0.028) * Balances::total_issuance() / 17532);
+            // end of year 4 and no extra reward
+            assert_eq!(Staking::total_rewards_in_era(80127), Perbill::from_fraction(0.028) * Balances::total_issuance() / 17532);
+            // begin of year 5 and no extra reward
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(35) * Balances::total_issuance());
+            assert_eq!(Staking::total_rewards_in_era(80128), Perbill::from_fraction(0.028) * Balances::total_issuance() / 17532);
+
+            // begin of year 5 and should have 8% extra reward
+            <ErasTotalStakes<Test>>::insert(0, 0);
+            assert_eq!(Staking::total_rewards_in_era(80128), Perbill::from_fraction(0.108) * Balances::total_issuance() / 17532);
+
+            <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(15) * Balances::total_issuance());
+            assert_eq!(Staking::total_rewards_in_era(80128) / decimals, Perbill::from_fraction(0.068) * Balances::total_issuance() / 17532 / decimals);
+        })
+}
+
+#[test]
 fn validator_payment_prefs_work() {
     // Test that validator preferences are correctly honored
     // Note: unstake threshold is being directly tested in slashing tests.

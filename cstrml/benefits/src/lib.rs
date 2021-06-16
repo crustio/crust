@@ -59,11 +59,15 @@ decl_event!(
         /// Add benefit funds success.
         /// The first item is the account.
         /// The second item is the added benefit amount.
-        AddBenefitFundsSuccess(AccountId, Balance),
+        AddBenefitFundsSuccess(AccountId, Balance, FundsType),
         /// Cut benefit funds success
         /// The first item is the account.
         /// The second item is the decreased benefit amount.
-        CutBenefitFundsSuccess(AccountId, Balance),
+        CutBenefitFundsSuccess(AccountId, Balance, FundsType),
+        /// Rebond benefit funds success
+        /// The first item is the account.
+        /// The second item is the rebonded benefit amount.
+        RebondBenefitFundsSuccess(AccountId, Balance, FundsType),
         /// Withdraw benefit funds success
         /// The first item is the account.
         /// The second item is the withdrawed benefit amount.
@@ -309,7 +313,7 @@ decl_module! {
             }
 
             // 3. Emit success
-            Self::deposit_event(RawEvent::AddBenefitFundsSuccess(who.clone(), value));
+            Self::deposit_event(RawEvent::AddBenefitFundsSuccess(who.clone(), value, funds_type));
 
             Ok(())
         }
@@ -383,7 +387,7 @@ decl_module! {
                 }
             };
             // 6. Send event
-            Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), value));
+            Self::deposit_event(RawEvent::CutBenefitFundsSuccess(who.clone(), value, funds_type));
             Ok(())
         }
 
@@ -449,34 +453,40 @@ decl_module! {
         pub fn rebond_benefit_funds(origin, #[compact] value: BalanceOf<T>, funds_type: FundsType) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // 1. Get benefit
             match funds_type {
                 FundsType::SWORK => {
+                    // 1. Get benefit
                     ensure!(<SworkBenefits<T>>::contains_key(&who), Error::<T>::InvalidTarget);
                     let mut benefit = Self::swork_benefits(&who);
                     ensure!(!benefit.unlocking_funds.is_empty(), Error::<T>::NoUnlockChunk);
 
+                    // 2. Rebond benefit
                     benefit = benefit.rebond(value);
 
                     ensure!(benefit.active_funds >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
+                    // 3. Update total fee reduction count according to active funds
                     benefit.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&benefit.active_funds);
                     <SworkBenefits<T>>::insert(&who, benefit);
                 },
                 FundsType::MARKET => {
+                    // 1. Get benefit
                     ensure!(<MarketBenefits<T>>::contains_key(&who), Error::<T>::InvalidTarget);
                     let mut benefit = Self::market_benefits(&who);
                     let old_active_funds = benefit.active_funds;
                     ensure!(!benefit.unlocking_funds.is_empty(), Error::<T>::NoUnlockChunk);
 
+                    // 2. Rebond benefit
                     benefit = benefit.rebond(value);
 
                     ensure!(benefit.active_funds >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
                     let new_active_funds = benefit.active_funds;
                     <MarketBenefits<T>>::insert(&who, benefit);
+                    // 3. Update current benefits
                     <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_market_active_funds = benefits.total_market_active_funds.saturating_add(new_active_funds).saturating_sub(old_active_funds);});
                 }
             };
-
+            // 4. Send event
+            Self::deposit_event(RawEvent::RebondBenefitFundsSuccess(who.clone(), value, funds_type));
             Ok(())
         }
     }

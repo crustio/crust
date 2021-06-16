@@ -392,6 +392,7 @@ decl_module! {
         }
 
         /// Withdraw benefit funds
+        // TODO: Refine this weight
         #[weight = 1000]
         pub fn withdraw_benefit_funds(origin) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -449,6 +450,7 @@ decl_module! {
         }
 
         /// Withdraw benefit funds
+        // TODO: Refine this weight
         #[weight = 1000]
         pub fn rebond_benefit_funds(origin, #[compact] value: BalanceOf<T>, funds_type: FundsType) -> DispatchResult {
             let who = ensure_signed(origin)?;

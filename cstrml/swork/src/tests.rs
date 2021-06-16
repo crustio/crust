@@ -307,6 +307,37 @@ fn register_should_failed_with_wrong_code() {
         });
 }
 
+#[test]
+fn register_should_failed_with_outdated_code() {
+    ExtBuilder::default()
+        .expired_bn(1000)
+        .build()
+        .execute_with(|| {
+
+            run_to_block(1303);
+            let applier: AccountId =
+                AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                    .expect("valid ss58 address");
+            let register_info = legal_register_info();
+
+            assert_noop!(
+                Swork::register(
+                    Origin::signed(applier.clone()),
+                    register_info.ias_sig,
+                    register_info.ias_cert,
+                    register_info.account_id,
+                    register_info.isv_body,
+                    register_info.sig
+                ),
+                DispatchError::Module {
+                    index: 2,
+                    error: 1,
+                    message: Some("IllegalIdentity"),
+                }
+            );
+        });
+}
+
 /// Report works test cases
 #[test]
 fn report_works_should_work() {

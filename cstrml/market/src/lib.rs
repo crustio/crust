@@ -1317,21 +1317,18 @@ impl<T: Config> Module<T> {
         let total_capacity = T::SworkerInterface::get_total_capacity();
         let (numerator, denominator) = T::StorageReferenceRatio::get();
         let files_size = Self::files_size();
-        let mut file_price = Self::file_price();
-        if files_size != 0 {
-            // Too much supply => decrease the price
-            if files_size.saturating_mul(denominator) < total_capacity.saturating_mul(numerator) {
-                let gap = T::StorageDecreaseRatio::get() * file_price;
-                file_price = file_price.saturating_sub(gap);
-            } else {
-                let gap = (T::StorageIncreaseRatio::get() * file_price).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
-                file_price = file_price.saturating_add(gap);
-            }
+        // Too much supply => decrease the price
+        if files_size.saturating_mul(denominator) <= total_capacity.saturating_mul(numerator) {
+            <FilePrice<T>>::mutate(|file_price| {
+                let gap = T::StorageDecreaseRatio::get() * file_price.clone();
+                *file_price = file_price.saturating_sub(gap);
+            });
         } else {
-            let gap = T::StorageDecreaseRatio::get() * file_price;
-            file_price = file_price.saturating_sub(gap);
+            <FilePrice<T>>::mutate(|file_price| {
+                let gap = (T::StorageIncreaseRatio::get() * file_price.clone()).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
+                *file_price = file_price.saturating_add(gap);
+            });
         }
-        <FilePrice<T>>::put(file_price);
     }
 
     // Calculate file's amount

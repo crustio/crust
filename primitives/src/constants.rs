@@ -57,3 +57,7 @@ pub mod swork {
 
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64 * 3;
 }
+
+pub mod market {
+    pub const PRICE_UPDATE_SLOT: u64 = 11;
+}

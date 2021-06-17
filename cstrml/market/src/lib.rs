@@ -36,6 +36,7 @@ pub mod benchmarking;
 
 use primitives::{
     MerkleRoot, BlockNumber, SworkerAnchor,
+    constants::market::*,
     traits::{
         UsableCurrency, MarketInterface,
         SworkerInterface
@@ -379,6 +380,9 @@ decl_storage! {
         /// The init amount in the free account for transaction fee
         pub FreeFee get(fn free_fee): BalanceOf<T> = Zero::zero();
 
+        /// New order in the past blocks
+        NewOrder get(fn new_order): bool = false;
+
         FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
     }
     add_extra_genesis {
@@ -476,6 +480,17 @@ decl_module! {
 
         /// The max file size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
+
+
+        /// Called when a block is initialized. Will call update_identities to update file price
+        fn on_initialize(now: T::BlockNumber) -> Weight {
+            if (now % <T as frame_system::Config>::BlockNumber::from(PRICE_UPDATE_SLOT as u32)).is_zero() && Self::new_order(){
+                Self::update_file_price();
+                NewOrder::put(false);
+            }
+            // TODO: Recalculate this weight
+            0
+        }
 
         /// Bond the origin to the owner
         #[weight = 1000]
@@ -643,9 +658,8 @@ decl_module! {
             // 8. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 9. Update storage price.
-            #[cfg(not(test))]
-            Self::update_file_price();
+            // 9. Update new order status.
+            NewOrder::put(true);
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
@@ -1261,8 +1275,8 @@ impl<T: Config> Module<T> {
                 }
                 <Files<T>>::insert(cid, (file_info, used_info));
 
-                #[cfg(not(test))]
-                Self::update_file_price();
+                // 5. Update new order status.
+                NewOrder::put(true);
 
                 Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
             }

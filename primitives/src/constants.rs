@@ -59,5 +59,6 @@ pub mod swork {
 }
 
 pub mod market {
-    pub const PRICE_UPDATE_SLOT: u64 = 11;
+    pub const PRICE_UPDATE_SLOT: u32 = 10;
+    pub const PRICE_UPDATE_OFFSET: u32 = 3;
 }

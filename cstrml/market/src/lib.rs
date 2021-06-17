@@ -484,7 +484,8 @@ decl_module! {
 
         /// Called when a block is initialized. Will call update_identities to update file price
         fn on_initialize(now: T::BlockNumber) -> Weight {
-            if (now % <T as frame_system::Config>::BlockNumber::from(PRICE_UPDATE_SLOT as u32)).is_zero() && Self::new_order(){
+            let now = TryInto::<u32>::try_into(now).ok().unwrap();
+            if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::new_order(){
                 Self::update_file_price();
                 NewOrder::put(false);
             }

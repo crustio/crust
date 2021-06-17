@@ -2103,27 +2103,27 @@ fn update_price_per_blocks_should_work() {
             file_size, 0
         ));
 
-        // 10 % 11 is not zero
-        Market::on_initialize(10);
+        // 6 + 3 % 10 is not zero
+        Market::on_initialize(6);
         assert_eq!(Market::file_price(), 1000);
         // update file price
-        Market::on_initialize(11);
+        Market::on_initialize(7);
         assert_eq!(Market::file_price(), 990);
         <swork::Free>::put(10000);
         <swork::ReportedFilesSize>::put(10000);
         assert_eq!(Swork::get_total_capacity(), 20000);
         // no new order => don't update
-        Market::on_initialize(22);
+        Market::on_initialize(17);
         assert_eq!(Market::file_price(), 990);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0
         ));
-        // 10 % 11 is not zero
-        Market::on_initialize(30);
+        // 26 + 3 % 10 is not zero
+        Market::on_initialize(26);
         assert_eq!(Market::file_price(), 990);
         // update file price
-        Market::on_initialize(33);
+        Market::on_initialize(27);
         assert_eq!(Market::file_price(), 980);
     });
 }

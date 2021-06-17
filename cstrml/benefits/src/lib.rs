@@ -14,6 +14,8 @@ use frame_support::{
 };
 use frame_system::ensure_signed;
 use codec::{Encode, Decode};
+#[cfg(feature = "std")]
+use serde::{self, Serialize, Deserialize};
 use sp_runtime::DispatchError;
 
 use sp_runtime::{
@@ -92,6 +94,7 @@ decl_error! {
 
 /// Just a Balance/BlockNumber tuple to encode when a chunk of funds will be unlocked.
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct FundsUnlockChunk<Balance: HasCompact> {
     /// Amount of funds to be unlocked.
     #[codec(compact)]
@@ -102,6 +105,7 @@ pub struct FundsUnlockChunk<Balance: HasCompact> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct EraBenefits<Balance: HasCompact> {
     /// The total fee reduction quota in one era
     #[codec(compact)]
@@ -118,6 +122,7 @@ pub struct EraBenefits<Balance: HasCompact> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct MarketBenefit<Balance: HasCompact> {
     /// It's total funds value
     #[codec(compact)]
@@ -136,6 +141,7 @@ pub struct MarketBenefit<Balance: HasCompact> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct SworkBenefit<Balance: HasCompact> {
     /// It's total funds value
     #[codec(compact)]
@@ -342,7 +348,7 @@ decl_module! {
                     if !value.is_zero() {
                         benefit.active_funds -= value;
 
-                        // 4. Avoid there being a dust balance left in the csm locking system.
+                        // 4. Avoid there being a dust balance left in the benefit system.
                         if benefit.active_funds < T::Currency::minimum_balance() {
                             value += benefit.active_funds;
                             benefit.active_funds = Zero::zero();
@@ -372,7 +378,7 @@ decl_module! {
                     if !value.is_zero() {
                         benefit.active_funds -= value;
 
-                        // 4. Avoid there being a dust balance left in the csm locking system.
+                        // 4. Avoid there being a dust balance left in the benefit system.
                         if benefit.active_funds < T::Currency::minimum_balance() {
                             value += benefit.active_funds;
                             benefit.active_funds = Zero::zero();
@@ -573,16 +579,17 @@ impl<T: Config> Module<T> {
     }
 
     fn check_and_update_swork_funds(who: &T::AccountId) {
-        let mut benefit = Self::swork_benefits(&who);
+        let benefit = Self::swork_benefits(&who);
         let reserved_value = T::Currency::reserved_balance(who);
         let old_total_funds = benefit.total_funds;
         if old_total_funds <= reserved_value {
             return;
         }
-        benefit.total_funds = old_total_funds.min(reserved_value);
-        benefit.active_funds = benefit.active_funds.saturating_add(reserved_value).saturating_sub(old_total_funds);
-        benefit.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&benefit.active_funds);
-        <SworkBenefits<T>>::insert(&who, benefit);
+        <SworkBenefits<T>>::mutate(&who, |benefit| {
+            benefit.total_funds = old_total_funds.min(reserved_value);
+            benefit.active_funds = benefit.active_funds.saturating_add(reserved_value).saturating_sub(old_total_funds);
+            benefit.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&benefit.active_funds);
+        });
     }
 
     fn check_and_update_market_funds(who: &T::AccountId) {

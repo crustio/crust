@@ -917,7 +917,7 @@ decl_module! {
                 total_free_fee,
                 WithdrawReasons::TRANSFER
             );
-            // 6.2 Decrease the total free fee limit
+            // 6.2 Decrease the totoal free fee limit
             <TotalFreeFeeLimit<T>>::mutate(|value| {*value = value.saturating_sub(total_free_fee.clone())});
             // 6.3 Add into free order accounts
             <FreeOrderAccounts<T>>::insert(&new_account, free_counts);

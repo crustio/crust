@@ -3954,7 +3954,7 @@ fn free_space_scenario_should_work() {
         assert_ok!(Market::set_free_fee(Origin::root(), 1000));
 
         let source = MERCHANT;
-        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2));
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2, true));
         assert_eq!(Balances::free_balance(&free_order_pot), 19_997_999);
         assert_eq!(Balances::free_balance(&source), 2_001);
         assert_eq!(Market::total_free_fee_limit(), 1_999);
@@ -3988,7 +3988,7 @@ fn free_space_scenario_should_work() {
         assert_eq!(Market::free_order_accounts(&source), Some(1));
 
         assert_noop!(
-        Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2),
+        Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2, true),
         DispatchError::Module {
             index: 3,
             error: 11,
@@ -4020,7 +4020,7 @@ fn free_space_scenario_should_work() {
         assert_eq!(Balances::free_balance(&free_order_pot), 19_737_999);
         assert_eq!(Balances::free_balance(&source), 0);
         assert_noop!(
-        Market::add_into_free_order_accounts(Origin::signed(alice.clone()), source.clone(), 2),
+        Market::add_into_free_order_accounts(Origin::signed(alice.clone()), source.clone(), 2, true),
         DispatchError::Module {
             index: 3,
             error: 10,
@@ -4028,14 +4028,14 @@ fn free_space_scenario_should_work() {
         });
 
         assert_ok!(Market::set_total_free_fee_limit(Origin::root(), 4000));
-        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2));
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2, true));
         assert_ok!(Market::remove_from_free_order_accounts(Origin::signed(bob.clone()), source.clone()));
         assert_eq!(Market::free_order_accounts(&source).is_none(), true);
         assert_eq!(Balances::locks(&source).len(), 0);
 
 
         assert_noop!(
-            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000, true),
             DispatchError::Module {
                 index: 3,
                 error: 12,
@@ -4046,7 +4046,7 @@ fn free_space_scenario_should_work() {
 
         // Pass the above check
         assert_noop!(
-            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000),
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2000, true),
             DispatchError::Module {
                 index: 3,
                 error: 13,
@@ -4056,15 +4056,20 @@ fn free_space_scenario_should_work() {
         let _ = Balances::make_free_balance_be(&free_order_pot, 1000);
         // Transfer the money would fail
         assert_noop!(
-            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1),
+            Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1, true),
             DispatchError::Module {
                 index: 1,
                 error: 3,
                 message: Some("InsufficientBalance")
             });
         let _ = Balances::make_free_balance_be(&free_order_pot, 2000);
-        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1));
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1, true));
         assert_eq!(Market::free_order_accounts(&source), Some(1));
+        assert_eq!(Balances::free_balance(&free_order_pot), 999);
+        // Only add the free counts without free fee
+        assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 2, false));
+        assert_eq!(Market::free_order_accounts(&source), Some(3));
+        assert_eq!(Balances::free_balance(&free_order_pot), 999);
     });
 }
 

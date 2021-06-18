@@ -783,6 +783,7 @@ decl_module! {
             origin,
             target: <T::Lookup as StaticLookup>::Source,
             free_counts: u32,
+            with_extrinsic_fee: bool
         ) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_free_order_admin = Self::free_order_admin();
@@ -795,29 +796,36 @@ decl_module! {
 
             let new_account = T::Lookup::lookup(target)?;
 
-            // 3. Ensure it's a new account not in free accounts
-            ensure!(Self::free_order_accounts(&new_account).is_none(), Error::<T>::AlreadyInFreeAccounts);
-
-            // 4. Ensure free count does not exceed the upper limit and is reasonable
+            // 3. Ensure free count does not exceed the upper limit and is reasonable
             ensure!(free_counts <= Self::free_counts_limit(), Error::<T>::ExceedFreeCountsLimit);
 
-            // 5. Ensure the total free fee is not exceeded
-            let total_free_fee = Self::free_fee().saturating_mul(<BalanceOf<T>>::from(free_counts)).saturating_add(T::Currency::minimum_balance());
-            ensure!(total_free_fee <= Self::total_free_fee_limit(), Error::<T>::ExceedTotalFreeFeeLimit);
+            if with_extrinsic_fee {
+                // 4. Ensure it's a new account not in free accounts
+                ensure!(Self::free_order_accounts(&new_account).is_none(), Error::<T>::AlreadyInFreeAccounts);
 
-            // 6. Add this account into free space list
-            // 6.1 Transfer the money first since it might fail
-            T::Currency::transfer(&Self::free_order_pot(), &new_account, total_free_fee.clone(), KeepAlive)?;
-            T::Currency::set_lock(
-                MARKET_LOCK_ID,
-                &new_account,
-                total_free_fee,
-                WithdrawReasons::TRANSFER
-            );
-            // 6.2 Decrease the totoal free fee limit
-            <TotalFreeFeeLimit<T>>::mutate(|value| {*value = value.saturating_sub(total_free_fee.clone())});
+                // 5. Ensure the total free fee is not exceeded
+                let total_free_fee = Self::free_fee().saturating_mul(<BalanceOf<T>>::from(free_counts)).saturating_add(T::Currency::minimum_balance());
+                ensure!(total_free_fee <= Self::total_free_fee_limit(), Error::<T>::ExceedTotalFreeFeeLimit);
+
+                // 6. Add this account into free space list
+                // 6.1 Transfer the money first since it might fail
+                T::Currency::transfer(&Self::free_order_pot(), &new_account, total_free_fee.clone(), KeepAlive)?;
+                T::Currency::set_lock(
+                    MARKET_LOCK_ID,
+                    &new_account,
+                    total_free_fee,
+                    WithdrawReasons::TRANSFER
+                );
+
+                // 6.2 Decrease the total free fee limit
+                <TotalFreeFeeLimit<T>>::mutate(|value| {*value = value.saturating_sub(total_free_fee.clone())});
+            }
+
             // 6.3 Add into free order accounts
-            <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
+            <FreeOrderAccounts<T>>::mutate_exists(&new_account, |maybe_counts| match *maybe_counts {
+                Some(counts) => *maybe_counts = Some(counts + free_counts),
+                None => *maybe_counts = Some(free_counts)
+            });
 
             Self::deposit_event(RawEvent::NewFreeAccount(new_account));
             Ok(())

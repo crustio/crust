@@ -1956,6 +1956,7 @@ fn clear_trash_should_work() {
             add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
         }
 
+        update_used_info();
         for cid in file_lists.clone().iter() {
             assert_eq!(Market::files(&cid).unwrap_or_default(), (
                 FileInfo {
@@ -1973,7 +1974,7 @@ fn clear_trash_should_work() {
                     }]
                 },
                 UsedInfo {
-                    used_size: file_size * 2,
+                    used_size: Market::calculate_used_size(file_size, 1),
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
                 })
@@ -1985,28 +1986,28 @@ fn clear_trash_should_work() {
         // close files one by one
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid1.clone()));
         assert_eq!(Market::used_trash_i(&cid1).unwrap_or_default(), UsedInfo {
-            used_size: file_size * 2,
+            used_size: Market::calculate_used_size(file_size, 1),
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid2.clone()));
         assert_eq!(Market::used_trash_i(&cid2).unwrap_or_default(), UsedInfo {
-            used_size: file_size * 2,
+            used_size: Market::calculate_used_size(file_size, 1),
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid3.clone()));
         assert_eq!(Market::used_trash_ii(&cid3).unwrap_or_default(), UsedInfo {
-            used_size: file_size * 2,
+            used_size: Market::calculate_used_size(file_size, 1),
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid4.clone()));
         assert_eq!(Market::used_trash_ii(&cid4).unwrap_or_default(), UsedInfo {
-            used_size: file_size * 2,
+            used_size: Market::calculate_used_size(file_size, 1),
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
@@ -2015,14 +2016,14 @@ fn clear_trash_should_work() {
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid5.clone()));
         assert_eq!(Market::used_trash_i(&cid5).unwrap_or_default(), UsedInfo {
-            used_size: file_size * 2,
+            used_size: Market::calculate_used_size(file_size, 1),
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
 
         assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid6.clone()));
         assert_eq!(Market::used_trash_i(&cid6).unwrap_or_default(), UsedInfo {
-            used_size: file_size * 2,
+            used_size: Market::calculate_used_size(file_size, 1),
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
         });
@@ -3526,7 +3527,7 @@ fn change_base_fee_should_work() {
         ));
 
         assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 200_000));
-
+        update_used_info();
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
@@ -3543,7 +3544,7 @@ fn change_base_fee_should_work() {
                 }]
             },
             UsedInfo {
-                used_size: file_size * 2,
+                used_size: Market::calculate_used_size(file_size, 1),
                 reported_group_count: 1,
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })

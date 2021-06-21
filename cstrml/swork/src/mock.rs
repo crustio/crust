@@ -752,3 +752,7 @@ fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: B
 
     <market::Files<Test>>::insert(f_id, (file_info, used_info));
 }
+
+pub fn update_used_info() {
+    Market::on_initialize(93);
+}

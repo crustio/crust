@@ -352,7 +352,7 @@ fn report_works_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
-                used: legal_wr_info.used * 2,
+                used: Market::calculate_used_size(legal_wr_info.added_files[0].1, 1) + Market::calculate_used_size(legal_wr_info.added_files[1].1, 1),
                 free: legal_wr_info.free,
                 reported_files_size: legal_wr_info.used,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
@@ -382,11 +382,12 @@ fn report_works_should_work() {
             ));
 
             // Check work report
+            update_used_info();
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 402868224 * 2);
+            assert_eq!(Swork::used(), 402868224 + 402868224 / 20);
             assert_eq!(Swork::reported_files_size(), 402868224);
             assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
 
@@ -2258,7 +2259,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 eve_wr_info.files_root,
                 eve_wr_info.sig
             ));
-
+            update_used_info();
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
                 FileInfo {
                     file_size: 37,
@@ -2377,7 +2378,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 alice_wr_info.sig
             ));
 
-
+            update_used_info();
             // delete won't call calculate payout anymore and won't close the file
             assert_eq!(Market::files(&file_a).is_some(), true);
             assert_eq!(Market::files(&file_b).is_some(), true);

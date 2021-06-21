@@ -1184,7 +1184,7 @@ impl<T: Config> Module<T> {
             }
         }
         <Files<T>>::remove(&cid);
-        FilesCount::mutate(|number| *number = number.saturating_sub(1));
+        FilesCount::mutate(|count| *count = count.saturating_sub(1));
     }
 
     fn dump_used_trash_i() {
@@ -1411,12 +1411,12 @@ impl<T: Config> Module<T> {
         }
     }
 
-    pub fn update_file_number_price() {
+    pub fn update_files_count_price() {
         let files_count = Self::files_count();
         if files_count > FILES_COUNT_REFERENCE {
             // TODO: Independent mechanism
             <FilesCountPrice<T>>::mutate(|price| {
-                let gap = (T::StorageIncreaseRatio::get() * price.clone()).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
+                let gap = (T::StorageIncreaseRatio::get() * price.clone()).max(BalanceOf::<T>::saturated_from(1u32));
                 *price = price.saturating_add(gap);
             })
         } else {

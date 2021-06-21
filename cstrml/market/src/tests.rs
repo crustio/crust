@@ -2138,7 +2138,7 @@ fn update_files_count_price_per_blocks_should_work() {
         assert_eq!(Market::files_count_price(), 980);
 
         // price is 40 and cannot decrease
-        <FileNumberPrice<Test>>::put(40);
+        <FilesCountPrice<Test>>::put(40);
         FilesCount::put(20_000_000);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),

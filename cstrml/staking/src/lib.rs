@@ -2090,7 +2090,7 @@ impl<T: Config> Module<T> {
         if let Some(effective_staking_ratio) = maybe_effective_staking_ratio {
             if effective_staking_ratio < Permill::from_percent(30) {
                 // (1 - sr / 0.3) * 0.08 * total_issuance = total_issuance * 8 / 100 - sr * total_issuance * 8 / 30
-                return total_issuance / 100 * 8 - effective_staking_ratio * total_issuance / 30 * 8;
+                return (total_issuance / 100 * 8).saturating_sub(effective_staking_ratio * total_issuance / 30 * 8);
             }
         }
         return 0;

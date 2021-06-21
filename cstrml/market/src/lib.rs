@@ -18,7 +18,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed, ensure_root};
-use sp_runtime::{Perbill, ModuleId, traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
+use sp_runtime::{SaturatedConversion, Perbill, ModuleId, traits::{Zero, CheckedMul, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,7 @@ pub mod benchmarking;
 
 use primitives::{
     MerkleRoot, BlockNumber, SworkerAnchor,
+    constants::market::*,
     traits::{
         UsableCurrency, MarketInterface,
         SworkerInterface
@@ -259,9 +260,6 @@ pub trait Config: system::Config {
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId> + UsableCurrency<Self::AccountId> + LockableCurrency<Self::AccountId>;
 
-    /// Converter from Currency<u64> to Balance.
-    type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
-
     /// used to check work report
     type SworkerInterface: SworkerInterface<Self::AccountId>;
 
@@ -379,6 +377,9 @@ decl_storage! {
         /// The init amount in the free account for transaction fee
         pub FreeFee get(fn free_fee): BalanceOf<T> = Zero::zero();
 
+        /// New order in the past blocks
+        NewOrder get(fn new_order): bool = false;
+
         FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
     }
     add_extra_genesis {
@@ -476,6 +477,18 @@ decl_module! {
 
         /// The max file size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
+
+
+        /// Called when a block is initialized. Will call update_identities to update file price
+        fn on_initialize(now: T::BlockNumber) -> Weight {
+            let now = TryInto::<u32>::try_into(now).ok().unwrap();
+            if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::new_order(){
+                Self::update_file_price();
+                NewOrder::put(false);
+            }
+            // TODO: Recalculate this weight
+            0
+        }
 
         /// Bond the origin to the owner
         #[weight = 1000]
@@ -643,9 +656,8 @@ decl_module! {
             // 8. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 9. Update storage price.
-            #[cfg(not(test))]
-            Self::update_file_price();
+            // 9. Update new order status.
+            NewOrder::put(true);
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
@@ -1261,8 +1273,8 @@ impl<T: Config> Module<T> {
                 }
                 <Files<T>>::insert(cid, (file_info, used_info));
 
-                #[cfg(not(test))]
-                Self::update_file_price();
+                // 5. Update new order status.
+                NewOrder::put(true);
 
                 Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
             }
@@ -1302,21 +1314,18 @@ impl<T: Config> Module<T> {
         let total_capacity = T::SworkerInterface::get_total_capacity();
         let (numerator, denominator) = T::StorageReferenceRatio::get();
         let files_size = Self::files_size();
-        let mut file_price = Self::file_price();
-        if files_size != 0 {
-            // Too much supply => decrease the price
-            if files_size.saturating_mul(denominator) < total_capacity.saturating_mul(numerator) {
-                let gap = T::StorageDecreaseRatio::get() * file_price;
-                file_price = file_price.saturating_sub(gap);
-            } else {
-                let gap = (T::StorageIncreaseRatio::get() * file_price).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
-                file_price = file_price.saturating_add(gap);
-            }
+        // Too much supply => decrease the price
+        if files_size.saturating_mul(denominator) <= total_capacity.saturating_mul(numerator) {
+            <FilePrice<T>>::mutate(|file_price| {
+                let gap = T::StorageDecreaseRatio::get() * file_price.clone();
+                *file_price = file_price.saturating_sub(gap);
+            });
         } else {
-            let gap = T::StorageDecreaseRatio::get() * file_price;
-            file_price = file_price.saturating_sub(gap);
+            <FilePrice<T>>::mutate(|file_price| {
+                let gap = (T::StorageIncreaseRatio::get() * file_price.clone()).max(BalanceOf::<T>::saturated_from(1u32));
+                *file_price = file_price.saturating_add(gap);
+            });
         }
-        <FilePrice<T>>::put(file_price);
     }
 
     // Calculate file's amount
@@ -1328,7 +1337,7 @@ impl<T: Config> Module<T> {
         }
         let price = Self::file_price();
         // Convert file size into `Currency`
-        let amount = price.checked_mul(&<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(rounded_file_size));
+        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
         match amount {
             Some(value) => value,
             None => Zero::zero(),

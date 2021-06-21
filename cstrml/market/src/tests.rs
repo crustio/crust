@@ -7,6 +7,7 @@ use crate::mock::*;
 use frame_support::{
     assert_noop, assert_ok,
     dispatch::DispatchError,
+    traits::OnInitialize
 };
 use hex;
 use crate::MerchantLedger;
@@ -2085,6 +2086,45 @@ fn update_price_should_work() {
         FilesSize::put(20000);
         Market::update_file_price();
         assert_eq!(Market::file_price(), 41);
+    });
+}
+
+#[test]
+fn update_price_per_blocks_should_work() {
+    new_test_ext().execute_with(|| {
+        let source = ALICE;
+        let cid =
+            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let file_size = 100; // should less than
+        let _ = Balances::make_free_balance_be(&source, 20000);
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+
+        // 6 + 3 % 10 is not zero
+        Market::on_initialize(6);
+        assert_eq!(Market::file_price(), 1000);
+        // update file price
+        Market::on_initialize(7);
+        assert_eq!(Market::file_price(), 990);
+        <swork::Free>::put(10000);
+        <swork::ReportedFilesSize>::put(10000);
+        assert_eq!(Swork::get_total_capacity(), 20000);
+        // no new order => don't update
+        Market::on_initialize(17);
+        assert_eq!(Market::file_price(), 990);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        // 26 + 3 % 10 is not zero
+        Market::on_initialize(26);
+        assert_eq!(Market::file_price(), 990);
+        // update file price
+        Market::on_initialize(27);
+        assert_eq!(Market::file_price(), 980);
     });
 }
 

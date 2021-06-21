@@ -2723,7 +2723,7 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
     ExtBuilder::default()
         .validator_count(3)
         .guarantee(false)
-        .own_workload(u128::max_value())
+        .own_workload(u64::max_value().into())
         .minimum_validator_count(1)
         .build()
         .execute_with(|| {
@@ -4730,7 +4730,6 @@ fn chill_stash_should_work() {
 fn double_claim_rewards_should_fail() {
     ExtBuilder::default()
         .guarantee(false)
-        .own_workload(u128::max_value())
         .build()
         .execute_with(|| {
             let init_balance_10 = Balances::total_balance(&10);
@@ -4807,7 +4806,6 @@ fn double_claim_rewards_should_fail() {
 fn era_clean_should_work() {
     ExtBuilder::default()
         .guarantee(false)
-        .own_workload(u128::max_value())
         .build()
         .execute_with(|| {
             // Set payee to controller
@@ -4835,7 +4833,7 @@ fn era_clean_should_work() {
 
 #[test]
 fn payout_to_any_account_works() {
-    ExtBuilder::default().own_workload(u128::max_value()).build()
+    ExtBuilder::default().build()
         .execute_with(|| {
         let balance = 1000;
         // Create a validator:

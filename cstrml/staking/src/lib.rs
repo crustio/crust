@@ -32,7 +32,7 @@ use sp_runtime::{
     Perbill, Permill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, CheckedSub, AtLeast32BitUnsigned, Bounded
+        CheckedAdd, CheckedSub, AtLeast32BitUnsigned
     },
 };
 use sp_staking::{
@@ -52,7 +52,7 @@ pub mod weight;
 use swork;
 use primitives::{
     EraIndex,
-    constants::{currency::*, time::*},
+    constants::{currency::*, time::*, staking::*},
     traits::{UsableCurrency, MarketInterface, BenefitInterface}
 };
 
@@ -1504,7 +1504,7 @@ impl<T: Config> Module<T> {
         if let Some(storage_stakes) = own_workloads.checked_mul(T::SPowerRatio::get()) {
             storage_stakes.try_into().ok().unwrap()
         } else {
-            BalanceOf::<T>::max_value().try_into().ok().unwrap()
+            Zero::zero()
         }
     }
 
@@ -2066,17 +2066,18 @@ impl<T: Config> Module<T> {
         let year_in_eras = MILLISECONDS_PER_YEAR / MILLISECS_PER_BLOCK / (EPOCH_DURATION_IN_BLOCKS * T::SessionsPerEra::get()) as u64;
         let year_num = active_era.saturating_sub(Self::start_reward_era()) as u64 / year_in_eras;
         for _ in 0..year_num {
-            maybe_rewards_this_year = maybe_rewards_this_year * 88 / 100;
+            maybe_rewards_this_year = maybe_rewards_this_year * REWARD_DECREASE_RATIO.0 / REWARD_DECREASE_RATIO.1;
 
-            // If inflation <= 2.8%, stop reduce
-            if maybe_rewards_this_year <= total_issuance / 1000 * 28 {
-                maybe_rewards_this_year = total_issuance / 1000 * 28;
+            // If reward inflation <= 2.8%, stop reduce
+            let min_rewards_this_year = total_issuance / MIN_REWARD_RATIO.1 * MIN_REWARD_RATIO.0;
+            if maybe_rewards_this_year <= min_rewards_this_year {
+                maybe_rewards_this_year = min_rewards_this_year;
                 break;
             }
         }
 
-        if year_num >= 4 {
-            maybe_rewards_this_year = Self::supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year, total_issuance);
+        if year_num >= EXTRA_REWARD_START_YEAR {
+            maybe_rewards_this_year = maybe_rewards_this_year.saturating_add(Self::supply_extra_rewards_due_to_low_effective_staking_ratio(total_issuance));
         }
 
         let reward_this_era = maybe_rewards_this_year / year_in_eras as u128;
@@ -2084,16 +2085,15 @@ impl<T: Config> Module<T> {
         reward_this_era.try_into().ok().unwrap()
     }
 
-    fn supply_extra_rewards_due_to_low_effective_staking_ratio(maybe_rewards_this_year: u128, total_issuance: u128) -> u128 {
+    fn supply_extra_rewards_due_to_low_effective_staking_ratio(total_issuance: u128) -> u128 {
         let maybe_effective_staking_ratio = Self::maybe_get_effective_staking_ratio(BalanceOf::<T>::saturated_from(total_issuance));
         if let Some(effective_staking_ratio) = maybe_effective_staking_ratio {
             if effective_staking_ratio < Permill::from_percent(30) {
                 // (1 - sr / 0.3) * 0.08 * total_issuance = total_issuance * 8 / 100 - sr * total_issuance * 8 / 30
-                let extra_rewards_this_year = total_issuance / 100 * 8 - effective_staking_ratio * total_issuance / 30 * 8;
-                return maybe_rewards_this_year.saturating_add(extra_rewards_this_year);
+                return total_issuance / 100 * 8 - effective_staking_ratio * total_issuance / 30 * 8;
             }
         }
-        return maybe_rewards_this_year;
+        return 0;
     }
 
     //     // Milliseconds per year for the Julian year (365.25 days).

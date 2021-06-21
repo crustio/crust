@@ -47,6 +47,16 @@ pub mod fee {
     pub const TARGET_BLOCK_FULLNESS: Perbill = Perbill::from_percent(25);
 }
 
+pub mod staking {
+    use crate::Balance;
+    // The reward decrease ratio per year
+    pub const REWARD_DECREASE_RATIO: (Balance, Balance) = (88, 100);
+    // The minimal reward ratio
+    pub const MIN_REWARD_RATIO: (Balance, Balance) = (28, 1000);
+    // The start year for extra reward
+    pub const EXTRA_REWARD_START_YEAR: u64 = 4;
+}
+
 pub mod swork {
     use super::time::*;
 

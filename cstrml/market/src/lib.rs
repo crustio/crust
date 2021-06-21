@@ -1466,8 +1466,8 @@ impl<T: Config> Module<T> {
                     total_decreased_used += prev_used_size as u128;
                     total_increased_used += new_used_size as u128;
                 };
-                T::SworkerInterface::update_total_used(total_decreased_used, total_increased_used);
             }
+            T::SworkerInterface::update_total_used(total_decreased_used, total_increased_used);
         }
         used_info.used_size = new_used_size;
     }

@@ -10,13 +10,8 @@ pub mod currency {
     pub const CENTS: Balance = DOLLARS / 100;
     pub const MILLICENTS: Balance = CENTS / 1_000;
 
-    pub const INITIAL_ISSUANCE: Balance = 15_000_000 * CRUS;
-    // Staking rewards in the first year
+    // GPoS rewards in the first year
     pub const FIRST_YEAR_REWARDS: Balance = 5_000_000 * CRUS;
-    // Block authoring rewards per year
-    pub const BLOCK_AUTHORING_REWARDS: Balance = 100_000 * CRUS;
-    // GPoS rewards in the first quarter
-    pub const FIRST_QUARTER_TOTAL_REWARDS: Balance = 270_000 * CRUS;
 }
 
 /// Time and blocks.
@@ -50,6 +45,16 @@ pub mod fee {
 
     /// The block saturation level. Fees will be updates based on this value.
     pub const TARGET_BLOCK_FULLNESS: Perbill = Perbill::from_percent(25);
+}
+
+pub mod staking {
+    use crate::Balance;
+    // The reward decrease ratio per year
+    pub const REWARD_DECREASE_RATIO: (Balance, Balance) = (88, 100);
+    // The minimal reward ratio
+    pub const MIN_REWARD_RATIO: (Balance, Balance) = (28, 1000);
+    // The start year for extra reward
+    pub const EXTRA_REWARD_START_YEAR: u64 = 4;
 }
 
 pub mod swork {

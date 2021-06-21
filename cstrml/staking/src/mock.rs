@@ -27,7 +27,7 @@ use primitives::{traits::{MarketInterface, BenefitInterface}, MerkleRoot, Sworke
 /// The AccountId alias in this test module.
 pub type AccountId = u128;
 pub type BlockNumber = u64;
-pub type Balance = u64;
+pub type Balance = u128;
 
 /// Simple structure that exposes how u64 currency can be represented as... u64.
 pub struct CurrencyToVoteHandler;
@@ -41,10 +41,20 @@ impl Convert<u128, u64> for CurrencyToVoteHandler {
         x.saturated_into()
     }
 }
+impl Convert<u64, u128> for CurrencyToVoteHandler {
+    fn convert(x: u64) -> u128 {
+        x as u128
+    }
+}
+impl Convert<u128, u128> for CurrencyToVoteHandler {
+    fn convert(x: u128) -> u128 {
+        x
+    }
+}
 
 thread_local! {
     static SESSION: RefCell<(Vec<AccountId>, HashSet<AccountId>)> = RefCell::new(Default::default());
-    static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
+    static EXISTENTIAL_DEPOSIT: RefCell<u128> = RefCell::new(0);
     static SLASH_DEFER_DURATION: RefCell<EraIndex> = RefCell::new(0);
     static OWN_WORKLOAD: RefCell<u128> = RefCell::new(0);
     static TOTAL_WORKLOAD: RefCell<u128> = RefCell::new(0);
@@ -90,8 +100,8 @@ pub fn is_disabled(controller: AccountId) -> bool {
 }
 
 pub struct ExistentialDeposit;
-impl Get<u64> for ExistentialDeposit {
-    fn get() -> u64 {
+impl Get<u128> for ExistentialDeposit {
+    fn get() -> u128 {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
     }
 }
@@ -135,7 +145,7 @@ impl frame_system::Config for Test {
     type DbWeight = RocksDbWeight;
     type Version = ();
     type PalletInfo = PalletInfo;
-    type AccountData = AccountData<u64>;
+    type AccountData = AccountData<u128>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
@@ -306,7 +316,7 @@ frame_support::construct_runtime!(
 );
 
 pub struct ExtBuilder {
-    existential_deposit: u64,
+    existential_deposit: u128,
     validator_pool: bool,
     guarantee: bool,
     validator_count: u32,
@@ -317,7 +327,6 @@ pub struct ExtBuilder {
     invulnerables: Vec<u128>,
     own_workload: u128,
     total_workload: u128,
-    staking_pot: Balance,
     dsm_staking_payout: Balance,
     mock_used_fee: Balance,
     start_reward_era: u32
@@ -337,7 +346,6 @@ impl Default for ExtBuilder {
             invulnerables: vec![],
             own_workload: 3000,
             total_workload: 3000,
-            staking_pot: 1_000_000_000_000_000_000,
             dsm_staking_payout: 0,
             mock_used_fee: 0,
             start_reward_era: 0
@@ -346,7 +354,7 @@ impl Default for ExtBuilder {
 }
 
 impl ExtBuilder {
-    pub fn existential_deposit(mut self, existential_deposit: u64) -> Self {
+    pub fn existential_deposit(mut self, existential_deposit: u128) -> Self {
         self.existential_deposit = existential_deposit;
         self
     }
@@ -388,10 +396,6 @@ impl ExtBuilder {
     }
     pub fn invulnerables(mut self, invulnerables: Vec<u128>) -> Self {
         self.invulnerables = invulnerables;
-        self
-    }
-    pub fn staking_pot(mut self, amount: Balance) -> Self {
-        self.staking_pot = amount;
         self
     }
     pub fn dsm_staking_payout(mut self, amount: Balance) -> Self {
@@ -451,8 +455,7 @@ impl ExtBuilder {
                 (100, 2000 * balance_factor),
                 (101, 2000 * balance_factor),
                 // This allow us to have a total_payout different from 0.
-                (999, 1_000_000_000_000),
-                (Staking::staking_pot(), self.staking_pot)
+                (999, 1_000_000_000_000)
             ],
         }.assimilate_storage(&mut storage);
 
@@ -589,7 +592,7 @@ pub fn assert_ledger_consistent(stash: u128) {
     assert_eq!(real_total, ledger.total);
 }
 
-pub fn bond_validator(acc: u128, val: u64) {
+pub fn bond_validator(acc: u128, val: Balance) {
     // a = controller
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
@@ -599,11 +602,11 @@ pub fn bond_validator(acc: u128, val: u64) {
         val,
         RewardDestination::Controller
     ));
-    Staking::upsert_stake_limit(&(acc + 1), u64::max_value());
+    Staking::upsert_stake_limit(&(acc + 1), u128::max_value());
     assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
 }
 
-pub fn bond_guarantor(acc: u128, val: u64, targets: Vec<(u128, u64)>) {
+pub fn bond_guarantor(acc: u128, val: Balance, targets: Vec<(u128, Balance)>) {
     // a = controller
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);

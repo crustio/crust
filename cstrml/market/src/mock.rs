@@ -13,7 +13,7 @@ use frame_support::{
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
     testing::Header, DispatchError,
-    traits::{BlakeTwo256, IdentityLookup, SaturatedConversion},
+    traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
 pub use std::{cell::RefCell, iter::FromIterator};
@@ -42,30 +42,6 @@ pub struct ExistentialDeposit;
 impl Get<u64> for ExistentialDeposit {
     fn get() -> u64 {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
-    }
-}
-
-pub struct CurrencyToVoteHandler;
-impl Convert<u64, u64> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u64 {
-        x
-    }
-}
-impl Convert<u128, u64> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u64 {
-        x.saturated_into()
-    }
-}
-
-impl Convert<u128, u128> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u128 {
-        x
-    }
-}
-
-impl Convert<u64, u128> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u128 {
-        x as u128
     }
 }
 
@@ -182,7 +158,6 @@ parameter_types! {
 impl Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
-    type CurrencyToBalance = CurrencyToVoteHandler;
     type SworkerInterface = Swork;
     type Event = ();
     type FileDuration = FileDuration;

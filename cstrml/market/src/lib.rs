@@ -18,7 +18,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed, ensure_root};
-use sp_runtime::{Perbill, ModuleId, traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
+use sp_runtime::{SaturatedConversion, Perbill, ModuleId, traits::{Zero, CheckedMul, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -259,9 +259,6 @@ pub trait Config: system::Config {
 
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId> + UsableCurrency<Self::AccountId> + LockableCurrency<Self::AccountId>;
-
-    /// Converter from Currency<u64> to Balance.
-    type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
 
     /// used to check work report
     type SworkerInterface: SworkerInterface<Self::AccountId>;
@@ -1325,7 +1322,7 @@ impl<T: Config> Module<T> {
             });
         } else {
             <FilePrice<T>>::mutate(|file_price| {
-                let gap = (T::StorageIncreaseRatio::get() * file_price.clone()).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
+                let gap = (T::StorageIncreaseRatio::get() * file_price.clone()).max(BalanceOf::<T>::saturated_from(1u32));
                 *file_price = file_price.saturating_add(gap);
             });
         }
@@ -1340,7 +1337,7 @@ impl<T: Config> Module<T> {
         }
         let price = Self::file_price();
         // Convert file size into `Currency`
-        let amount = price.checked_mul(&<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(rounded_file_size));
+        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
         match amount {
             Some(value) => value,
             None => Zero::zero(),

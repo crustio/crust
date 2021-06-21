@@ -774,7 +774,6 @@ impl market::Config for Runtime {
     /// The market's module id, used for deriving its sovereign account ID.
     type ModuleId = MarketModuleId;
     type Currency = Balances;
-    type CurrencyToBalance = CurrencyToVoteHandler;
     type SworkerInterface = Swork;
     type Event = Event;
     /// File duration.

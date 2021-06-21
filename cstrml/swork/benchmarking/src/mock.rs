@@ -99,7 +99,6 @@ parameter_types! {
 impl market::Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
-    type CurrencyToBalance = ();
     type SworkerInterface = Swork;
     type Event = ();
     /// File duration.

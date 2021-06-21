@@ -388,7 +388,7 @@ decl_storage! {
         NewOrder get(fn new_order): bool = false;
 
         /// Wait for updating used size for all replicas
-        pub WaitingFiles get(fn waiting_files): Vec<MerkleRoot>;
+        pub WaitingFiles get(fn waiting_files): BTreeSet<MerkleRoot>;
 
         FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
     }
@@ -1483,7 +1483,7 @@ impl<T: Config> Module<T> {
     fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64, cid: &MerkleRoot) -> u64 {
         used_info.reported_group_count += 1;
         WaitingFiles::mutate(|files| {
-            files.push(cid.clone());
+            files.insert(cid.clone());
         });
         used_info.groups.insert(anchor.clone(), true);
         used_info.used_size
@@ -1504,7 +1504,7 @@ impl<T: Config> Module<T> {
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
                         WaitingFiles::mutate(|files| {
-                            files.push(cid.clone());
+                            files.insert(cid.clone());
                         });
                     }
                 }
@@ -1585,6 +1585,7 @@ impl<T: Config> Module<T> {
 
     pub fn calculate_used_size(file_size: u64, reported_group_count: u32) -> u64 {
         let (integer, numerator, denominator): (u64, u64, u64) = match reported_group_count {
+            0 => (0, 0, 1),
             1..=8 => (1, 1, 20),
             9..=16 => (1, 1, 5),
             17..=24 => (1, 1, 2),
@@ -1604,7 +1605,7 @@ impl<T: Config> Module<T> {
             158..=167 => (9, 3, 5),
             168..=182 => (9, 4, 5),
             183..=200 => (10, 0, 1),
-            _ => (0, 0, 1),
+            _ => (10, 0, 1), // larger than 200 => 200
         };
 
         integer * file_size + file_size / denominator * numerator

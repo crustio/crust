@@ -1106,18 +1106,22 @@ impl<T: Config> Module<T> {
     }
 
     fn dump_used_trash_i() {
+        let mut total_decreased_used = 0;
         for (anchor, used) in UsedTrashMappingI::iter() {
-            T::SworkerInterface::update_used(&anchor, used, 0);
+            if T::SworkerInterface::update_used(&anchor, used, 0) { total_decreased_used += used as u128 };
         }
+        T::SworkerInterface::update_total_used(total_decreased_used, 0);
         remove_storage_prefix(UsedTrashMappingI::module_prefix(), UsedTrashMappingI::storage_prefix(), &[]);
         remove_storage_prefix(UsedTrashI::module_prefix(), UsedTrashI::storage_prefix(), &[]);
         UsedTrashSizeI::mutate(|value| {*value = 0;});
     }
 
     fn dump_used_trash_ii() {
+        let mut total_decreased_used = 0;
         for (anchor, used) in UsedTrashMappingII::iter() {
-            T::SworkerInterface::update_used(&anchor, used, 0);
+            if T::SworkerInterface::update_used(&anchor, used, 0) { total_decreased_used += used as u128 };
         }
+        T::SworkerInterface::update_total_used(total_decreased_used, 0);
         remove_storage_prefix(UsedTrashMappingII::module_prefix(), UsedTrashMappingII::storage_prefix(), &[]);
         remove_storage_prefix(UsedTrashII::module_prefix(), UsedTrashII::storage_prefix(), &[]);
         UsedTrashSizeII::mutate(|value| {*value = 0;});
@@ -1128,12 +1132,14 @@ impl<T: Config> Module<T> {
         UsedTrashI::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
                 Some(ref mut used_info) => {
+                    let mut total_decreased_used = 0;
                     for anchor in used_info.groups.keys() {
                         UsedTrashMappingI::mutate(anchor, |value| {
                             *value -= used_info.used_size;
                         });
-                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                        if T::SworkerInterface::update_used(anchor, used_info.used_size, 0) { total_decreased_used += used_info.used_size as u128 };
                     }
+                    T::SworkerInterface::update_total_used(total_decreased_used, 0);
                     UsedTrashSizeI::mutate(|value| {*value -= 1;});
                 },
                 None => {}
@@ -1147,12 +1153,14 @@ impl<T: Config> Module<T> {
         UsedTrashII::mutate_exists(cid, |maybe_used| {
             match *maybe_used {
                 Some(ref mut used_info) => {
+                    let mut total_decreased_used = 0;
                     for anchor in used_info.groups.keys() {
                         UsedTrashMappingII::mutate(anchor, |value| {
                             *value -= used_info.used_size;
                         });
-                        T::SworkerInterface::update_used(anchor, used_info.used_size, 0);
+                        if T::SworkerInterface::update_used(anchor, used_info.used_size, 0) { total_decreased_used += used_info.used_size as u128 };
                     }
+                    T::SworkerInterface::update_total_used(total_decreased_used, 0);
                     UsedTrashSizeII::mutate(|value| {*value -= 1;});
                 },
                 None => {}
@@ -1451,8 +1459,14 @@ impl<T: Config> Module<T> {
         let new_used_size = Self::calculate_used_size(file_size, used_info.reported_group_count);
         let prev_used_size = used_info.used_size;
         if prev_used_size != new_used_size {
+            let mut total_decreased_used = 0;
+            let mut total_increased_used = 0;
             for anchor in used_info.groups.keys() {
-                T::SworkerInterface::update_used(anchor, prev_used_size, new_used_size);
+                if T::SworkerInterface::update_used(anchor, prev_used_size, new_used_size) {
+                    total_decreased_used += prev_used_size as u128;
+                    total_increased_used += new_used_size as u128;
+                };
+                T::SworkerInterface::update_total_used(total_decreased_used, total_increased_used);
             }
         }
         used_info.used_size = new_used_size;

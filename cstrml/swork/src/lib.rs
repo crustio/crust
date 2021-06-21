@@ -130,11 +130,24 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     }
 
     /// update the used value due to deleted files, dump trash or calculate_payout
-    fn update_used(anchor: &SworkerAnchor, anchor_decrease_used: u64, anchor_increase_used: u64) {
+    fn update_used(anchor: &SworkerAnchor, anchor_decrease_used: u64, anchor_increase_used: u64) -> bool {
         WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
-            Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_decrease_used).saturating_add(anchor_increase_used),
-            ref mut i => *i = None,
-        });
+            Some(WorkReport { ref mut used, .. }) => {
+                *used = used.saturating_sub(anchor_decrease_used).saturating_add(anchor_increase_used);
+                true
+            },
+            ref mut i => {
+                *i = None;
+                false
+            },
+        })
+    }
+
+    // Update the total used
+    fn update_total_used(decreased_used: u128, increased_used: u128) {
+        Used::mutate(|used| {
+            *used = used.saturating_add(increased_used).saturating_sub(decreased_used);
+        })
     }
 
     /// check whether the account id and the anchor is valid or not

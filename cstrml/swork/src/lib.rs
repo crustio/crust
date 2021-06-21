@@ -1028,7 +1028,16 @@ impl<T: Config> Module<T> {
         isv_body: &ISVBody,
         sig: &SworkerSignature
     ) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
-        let legal_codes = <Codes<T>>::iter().map(|(key, _)| key).collect();
+        let curr_bn = <system::Module<T>>::block_number();
+        let legal_codes = <Codes<T>>::iter().filter_map(
+            |(key, bn)| {
+                if bn > curr_bn {
+                    Some(key)
+                } else {
+                    None
+                }
+            }
+        ).collect();
         let applier = account_id.encode();
 
         utils::verify_identity(

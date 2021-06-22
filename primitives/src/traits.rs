@@ -19,7 +19,7 @@ pub trait SworkerInterface<AccountId> {
 	fn update_used(anchor: &SworkerAnchor, decreased_used: u64, increased_used: u64) -> bool;
 	// Update the total used
 	fn update_total_used(decreased_used: u128, increased_used: u128);
-    // Check whether the who and anchor is consistent with current status
+	// Check whether the who and anchor is consistent with current status
 	fn check_anchor(who: &AccountId, anchor: &SworkerAnchor) -> bool;
 	// Get total used and free space
 	fn get_total_capacity() -> u128;

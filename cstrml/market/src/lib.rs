@@ -278,7 +278,7 @@ pub trait Config: system::Config {
     /// File Base Price.
     type FileInitPrice: Get<BalanceOf<Self>>;
 
-    /// Storage reference ratio. files_size / total_capacity
+    /// Storage reference ratio. reported_files_size / total_capacity
     type StorageReferenceRatio: Get<(u128, u128)>;
 
     /// Storage increase ratio.
@@ -335,9 +335,6 @@ decl_storage! {
         /// The file price per MB.
         /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
         pub FilePrice get(fn file_price): BalanceOf<T> = T::FileInitPrice::get();
-
-        /// The total files size in Byte.
-        pub FilesSize get(fn files_size): u128 = 0;
 
         /// The first file trash to store overdue files for a while
         pub UsedTrashI get(fn used_trash_i):
@@ -970,7 +967,7 @@ impl<T: Config> Module<T> {
 
     /// Calculate reward from file's replica
     /// This function will calculate the file's reward, update replicas
-    /// and (maybe) insert file's status(files_size and delete file)
+    /// and (maybe) insert file's status(delete file)
     /// input:
     ///     cid: MerkleRoot
     ///     curr_bn: BlockNumber
@@ -985,11 +982,9 @@ impl<T: Config> Module<T> {
         // 3. File already expired
         if file_info.expired_on <= file_info.calculated_at { return; }
 
-        // 4. Update used_info and files_size
-        let prev_reported_group_count = used_info.reported_group_count;
+        // 4. Update used_info
         used_info.reported_group_count = Self::count_reported_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
         Self::update_groups_used_info(file_info.file_size, &mut used_info);
-        Self::update_files_size(file_info.file_size, prev_reported_group_count, used_info.reported_group_count);
 
         let calculated_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(T::FileReplica::get() as usize) as u32;
@@ -1048,19 +1043,11 @@ impl<T: Config> Module<T> {
         <Files<T>>::insert(cid, (file_info, used_info));
     }
 
-    /// Update the first class storage's size
-    fn update_files_size(file_size: u64, prev_count: u32, curr_count: u32) {
-        FilesSize::mutate(|size| {
-            *size = size.saturating_sub((file_size * (prev_count as u64)) as u128).saturating_add((file_size * (curr_count as u64)) as u128);
-        });
-    }
-
     /// Close file, maybe move into trash
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) -> DispatchResult {
         if let Some((file_info, used_info)) = <Files<T>>::get(cid) {
             // If it's already expired.
             if file_info.expired_on <= curr_bn && file_info.expired_on == file_info.calculated_at {
-                Self::update_files_size(file_info.file_size, used_info.reported_group_count, 0);
                 let total_amount = file_info.amount.saturating_add(file_info.prepaid);
                 T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive)?;
                 Self::move_into_trash(cid, used_info, file_info.file_size);
@@ -1319,9 +1306,9 @@ impl<T: Config> Module<T> {
     }
 
     pub fn update_file_price() {
-        let total_capacity = T::SworkerInterface::get_total_capacity();
+        let (files_size, free) = T::SworkerInterface::get_files_size_and_free_space();
+        let total_capacity = files_size.saturating_add(free);
         let (numerator, denominator) = T::StorageReferenceRatio::get();
-        let files_size = Self::files_size();
         // Too much supply => decrease the price
         if files_size.saturating_mul(denominator) <= total_capacity.saturating_mul(numerator) {
             <FilePrice<T>>::mutate(|file_price| {
@@ -1380,7 +1367,6 @@ impl<T: Config> Module<T> {
     fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
         used_info.reported_group_count += 1;
         Self::update_groups_used_info(file_size, used_info);
-        Self::update_files_size(file_size, 0, 1);
         used_info.groups.insert(anchor.clone(), true);
         used_info.used_size
     }
@@ -1400,7 +1386,6 @@ impl<T: Config> Module<T> {
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
                         Self::update_groups_used_info(file_info.file_size, used_info);
-                        Self::update_files_size(file_info.file_size, 1, 0);
                     }
                 }
             },

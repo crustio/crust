@@ -180,7 +180,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
             // 4. Update used_info
             if is_counted {
-                used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size, cid); // need to add the used_size after the update
+                used_size = Self::add_used_group(&mut used_info, anchor, cid); // need to add the used_size after the update
             };
 
             // 5. The first join the replicas and file become live(expired_on > calculated_at)
@@ -1480,7 +1480,7 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64, cid: &MerkleRoot) -> u64 {
+    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, cid: &MerkleRoot) -> u64 {
         used_info.reported_group_count += 1;
         WaitingFiles::mutate(|files| {
             files.insert(cid.clone());
@@ -1494,7 +1494,7 @@ impl<T: Config> Module<T> {
         
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
-            Some((ref file_info, ref mut used_info)) => {
+            Some((_, ref mut used_info)) => {
                 if let Some(is_calculated_as_reported_group_count) = used_info.groups.remove(anchor) {
                     // need to delete the used_size before the update.
                     // we should always return the used_size no matter `is_calculated_as_reported_group_count` is true of false.

@@ -146,8 +146,8 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     }
 
     /// get total reported files size and free space
-    fn get_total_capacity() -> u128 {
-        return Self::reported_files_size().saturating_add(Self::free());
+    fn get_files_size_and_free_space() -> (u128, u128) {
+        (Self::reported_files_size(), Self::free())
     }
 }
 

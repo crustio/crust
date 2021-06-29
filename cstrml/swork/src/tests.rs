@@ -3150,3 +3150,70 @@ fn basic_check_should_work() {
             );
         });
 }
+
+#[test]
+fn do_one_iter_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+        // generate 50 blocks first
+            run_to_block(50);
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let bob = Sr25519Keyring::Bob.to_account_id();
+            let charlie = Sr25519Keyring::Charlie.to_account_id();
+            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+
+            let alice_identity = Identity {
+                anchor: hex::decode("11").unwrap(),
+                punishment_deadline: 11,
+                group: None
+            };
+            let bob_identity = Identity {
+                anchor: hex::decode("22").unwrap(),
+                punishment_deadline: 22,
+                group: None
+            };
+            let charlie_identity = Identity {
+                anchor: hex::decode("33").unwrap(),
+                punishment_deadline: 33,
+                group: None
+            };
+            let ferdie_identity = Identity {
+                anchor: hex::decode("44").unwrap(),
+                punishment_deadline: 44,
+                group: None
+            };
+            <Identities<Test>>::insert(alice.clone(), alice_identity.clone());
+            <Identities<Test>>::insert(bob.clone(), bob_identity.clone());
+            <Identities<Test>>::insert(charlie.clone(), charlie_identity.clone());
+            <Identities<Test>>::insert(ferdie.clone(), ferdie_identity.clone());
+
+            // Loop one iteration
+            assert_eq!(Swork::do_one_iter().unwrap(), (ferdie.clone(), ferdie_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (bob.clone(), bob_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (charlie.clone(), charlie_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (alice.clone(), alice_identity.clone()));
+            assert_eq!(Swork::do_one_iter().is_none(), true);
+
+            // Loop one iteration
+            assert_eq!(Swork::do_one_iter().unwrap(), (ferdie.clone(), ferdie_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (bob.clone(), bob_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (charlie.clone(), charlie_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (alice.clone(), alice_identity.clone()));
+            assert_eq!(Swork::do_one_iter().is_none(), true);
+
+            assert_eq!(Swork::do_one_iter().unwrap(), (ferdie.clone(), ferdie_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (bob.clone(), bob_identity.clone()));
+            <Identities<Test>>::remove(charlie.clone());
+            assert_eq!(Swork::do_one_iter().unwrap(), (alice.clone(), alice_identity.clone()));
+            assert_eq!(Swork::do_one_iter().is_none(), true);
+
+            assert_eq!(Swork::do_one_iter().unwrap(), (ferdie.clone(), ferdie_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (bob.clone(), bob_identity.clone()));
+            <Identities<Test>>::insert(charlie.clone(), charlie_identity.clone());
+            assert_eq!(Swork::do_one_iter().unwrap(), (charlie.clone(), charlie_identity.clone()));
+            assert_eq!(Swork::do_one_iter().unwrap(), (alice.clone(), alice_identity.clone()));
+            assert_eq!(Swork::do_one_iter().is_none(), true);
+
+    });
+}

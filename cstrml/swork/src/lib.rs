@@ -8,12 +8,14 @@ use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error, ensure,
     dispatch::{DispatchResult, DispatchResultWithPostInfo},
-    storage::IterableStorageMap,
+    storage::{IterableStorageMap, generator::StorageMap, unhashed},
     traits::{Currency, ReservableCurrency, Get},
+    ReversibleStorageHasher,
     weights::{
         Weight, DispatchClass, Pays
     }
 };
+pub use frame_support::storage::PrefixIterator;
 use sp_runtime::traits::{StaticLookup, Zero};
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_root, ensure_signed};
@@ -47,6 +49,7 @@ pub type BalanceOf<T> =
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 pub(crate) const LOG_TARGET: &'static str = "swork";
+const IDENTITY_UPDATE_LENGTH: usize = 500; // Loop 500 identities per block
 const SRD_LIMIT: u64 = 2_251_799_813_685_248; // 2 PB <-> 2 * 1024 * 1024 * 1024 * 1024 * 1024.
 const FILES_LIMIT: u64 = 9_007_199_254_740_992; // 8 PB <-> 8 * 1024 * 1024 * 1024 * 1024 * 1024.
 const FILES_COUNT_LIMIT: usize = 5000; // 5000 files for now.
@@ -192,6 +195,12 @@ decl_storage! {
         pub Identities get(fn identities):
             map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
+        /// The previous key used to iterate identities
+        pub IdentityPreviousKey get(fn identity_previous_key): Option<Vec<u8>>;
+
+        /// The workload information
+        pub Workload get(fn workload): Option<(BTreeMap<T::AccountId, u128>, u128, u128, u128)>;
+
         /// The pub key information, mapping from sWorker public key to an pubkey information, including the sworker enclave code and option anchor.
         pub PubKeys get(fn pub_keys):
             map hasher(twox_64_concat) SworkerPubKey => PKInfo;
@@ -306,8 +315,36 @@ decl_module! {
 
         /// Called when a block is initialized. Will call update_identities to update stake limit
         fn on_initialize(now: T::BlockNumber) -> Weight {
-            if (now % <T as frame_system::Config>::BlockNumber::from(REPORT_SLOT as u32)).is_zero()  {
-			    Self::update_identities();
+            let now = TryInto::<u32>::try_into(now).ok().unwrap();
+            // At REPORT_SLOT - UPDATE_OFFSET blocks, updating process would start
+            // IdentityPreviousKey is used as the switch as well
+            if ((now + (UPDATE_OFFSET as u32)) % (REPORT_SLOT as u32)).is_zero()  {
+                let prefix = <Identities<T>>::prefix_hash();
+                IdentityPreviousKey::put(prefix);
+                <Workload<T>>::put((BTreeMap::<T::AccountId, u128>::new(), 0u128, 0u128, 0u128));
+            }
+            // If it's not timeout and not finished yet, continue updating process
+            if !(now % (REPORT_SLOT as u32)).is_zero() && Self::identity_previous_key().is_some() {
+                let previous_key = Self::identity_previous_key().unwrap();
+                // Update the workload map in one batch iter, might kill the IdentityPreviousKey
+                // which means updating process is finished.
+                Self::update_one_identities_batch(previous_key);
+            } else {
+                if let Some((workload_map, total_free, total_used, total_reported_files_size)) = Self::workload() {
+                    // Update Free, Used, ReportedFilesSize and CurrentReportSlot
+                    Free::put(total_free);
+                    Used::put(total_used);
+                    ReportedFilesSize::put(total_reported_files_size);
+                    CurrentReportSlot::mutate(|crs| *crs += REPORT_SLOT);
+
+                    // Invoke report works to update stake limit
+                    let total_workload = total_used.saturating_add(total_free);
+                    T::Works::report_works(workload_map, total_workload);
+
+                    // Kill the IdentityPreviousKey and Workload
+                    IdentityPreviousKey::kill();
+                    <Workload<T>>::kill();
+                }
             }
             // TODO: Recalculate this weight
             0
@@ -815,59 +852,60 @@ impl<T: Config> Module<T> {
     ///
     /// TC = O(2n)
     /// DB try is 2n+5+Works_DB_try
-    pub fn update_identities() {
-        // Ideally, reported_rs should be current_rs + 1
-        let reported_rs = Self::get_current_reported_slot();
+    fn update_one_identities_batch(previous_key: Vec<u8>) {
+        let prefix = <Identities<T>>::prefix_hash();
         let current_rs = Self::current_report_slot();
-
-        // 1. Report slot did not change, it should not trigger updating
-        if current_rs == reported_rs {
-            return;
-        }
-
-        let mut total_used = 0u128;
-        let mut total_free = 0u128;
-        let mut total_reported_files_size = 0u128;
-
-        log!(
-            trace,
-            "🔒 Loop all identities and update the workload map for slot {:?}",
-            reported_rs
-        );
-        // 2. Loop all identities and get the workload map
-        let mut workload_map= BTreeMap::new();
-        // TODO: add check when we launch mainnet
-        let to_removed_slot = current_rs.saturating_sub(Self::history_slot_depth());
+        let mut previous_key = previous_key;
+        let maybe_to_removed_slot = current_rs.checked_sub(Self::history_slot_depth());
         let enable_punishment = Self::enable_punishment();
-        for (reporter, mut id) in <Identities<T>>::iter() {
-            let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs, enable_punishment);
-            total_used = total_used.saturating_add(used);
-            total_free = total_free.saturating_add(free);
-            total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
-            let mut owner = reporter;
-            if let Some(group) = id.group {
-                owner = group;
+        if let Some((mut workload_map, mut total_free, mut total_used, mut total_reported_files_size)) = Self::workload() {
+            for _ in 0..IDENTITY_UPDATE_LENGTH {
+                if let Some((reporter, mut id)) = Self::next_identity(&prefix, &mut previous_key) {
+                    let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs, enable_punishment);
+                    total_used = total_used.saturating_add(used);
+                    total_free = total_free.saturating_add(free);
+                    total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
+                    let mut owner = reporter;
+                    if let Some(group) = id.group {
+                        owner = group;
+                    }
+                    // TODO: we may need to deal with free and used seperately in the future
+                    let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(used).saturating_add(free);
+                    workload_map.insert(owner, workload);
+                    if let Some(to_removed_slot) = maybe_to_removed_slot {
+                        ReportedInSlot::remove(&id.anchor, to_removed_slot);
+                    }
+                } else {
+                    IdentityPreviousKey::kill();
+                    <Workload<T>>::put((workload_map, total_free, total_used, total_reported_files_size));
+                    return;
+                }
             }
-            // TODO: we may need to deal with free and used seperately in the future
-            let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(used).saturating_add(free);
-            workload_map.insert(owner, workload);
-            ReportedInSlot::remove(&id.anchor, to_removed_slot);
+            IdentityPreviousKey::put(previous_key);
+            <Workload<T>>::put((workload_map, total_free, total_used, total_reported_files_size));
         }
+    }
 
-        Used::put(total_used);
-        Free::put(total_free);
-        ReportedFilesSize::put(total_reported_files_size);
-        let total_workload = total_used.saturating_add(total_free);
-
-        // 3. Update current report slot
-        CurrentReportSlot::mutate(|crs| *crs = reported_rs);
-
-        // 4. Update stake limit for every reporter
-        log!(
-            trace,
-            "🔒 Update stake limit for all reporters."
-        );
-        T::Works::report_works(workload_map, total_workload);
+    fn next_identity(prefix: &Vec<u8>, previous_key: &mut Vec<u8>) -> Option<(T::AccountId, Identity<T::AccountId>)> {
+        let maybe_next = sp_io::storage::next_key(previous_key).filter(|n| n.starts_with(prefix));
+        match maybe_next {
+            Some(next) => {
+                *previous_key = next;
+                match unhashed::get::<Identity<T::AccountId>>(&previous_key) {
+                    Some(value) => {
+                        let mut key_material = <Identities<T> as StorageMap<T::AccountId, Identity<T::AccountId>>>::Hasher::reverse(&previous_key[prefix.len()..]);
+                        match T::AccountId::decode(&mut key_material) {
+                            Ok(key) => Some((key, value)),
+                            Err(_) => None,
+                        }
+                    }
+                    None => None,
+                }
+            }
+            None => {
+                None
+            },
+        }
     }
 
     // PRIVATE MUTABLES

@@ -271,6 +271,9 @@ pub trait Config: system::Config {
     /// File Base Price.
     type FileInitPrice: Get<BalanceOf<Self>>;
 
+    /// Files Count Init Price.
+    type FilesCountInitPrice: Get<BalanceOf<Self>>;
+
     /// Storage reference ratio. reported_files_size / total_capacity
     type StorageReferenceRatio: Get<(u128, u128)>;
 
@@ -314,9 +317,16 @@ decl_storage! {
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)>;
 
+        /// Files count
+        pub FilesCount get(fn files_count): u32 = 0;
+
         /// The file price per MB.
         /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
         pub FilePrice get(fn file_price): BalanceOf<T> = T::FileInitPrice::get();
+
+        /// The file price by keys
+        /// It's dynamically adjusted and would change according to the total keys in files
+        pub FilesCountPrice get(fn files_count_price): BalanceOf<T> = T::FilesCountInitPrice::get();
 
         /// The first file trash to store overdue files for a while
         pub UsedTrashI get(fn used_trash_i):
@@ -467,6 +477,7 @@ decl_module! {
             let now = TryInto::<u32>::try_into(now).ok().unwrap();
             if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::new_order(){
                 Self::update_file_price();
+                Self::update_files_count_price();
                 NewOrder::put(false);
             }
             // TODO: Recalculate this weight
@@ -1173,6 +1184,7 @@ impl<T: Config> Module<T> {
             }
         }
         <Files<T>>::remove(&cid);
+        FilesCount::mutate(|count| *count = count.saturating_sub(1));
     }
 
     fn dump_used_trash_i() {
@@ -1316,6 +1328,7 @@ impl<T: Config> Module<T> {
                 groups: <BTreeMap<SworkerAnchor, bool>>::new()
             };
             <Files<T>>::insert(cid, (file_info, used_info));
+            FilesCount::mutate(|count| *count = count.saturating_add(1));
         }
     }
 
@@ -1395,6 +1408,22 @@ impl<T: Config> Module<T> {
                 let gap = (T::StorageIncreaseRatio::get() * file_price.clone()).max(BalanceOf::<T>::saturated_from(1u32));
                 *file_price = file_price.saturating_add(gap);
             });
+        }
+    }
+
+    pub fn update_files_count_price() {
+        let files_count = Self::files_count();
+        if files_count > FILES_COUNT_REFERENCE {
+            // TODO: Independent mechanism
+            <FilesCountPrice<T>>::mutate(|price| {
+                let gap = (T::StorageIncreaseRatio::get() * price.clone()).max(BalanceOf::<T>::saturated_from(1u32));
+                *price = price.saturating_add(gap);
+            })
+        } else {
+            <FilesCountPrice<T>>::mutate(|price| {
+                let gap = T::StorageDecreaseRatio::get() * price.clone();
+                *price = price.saturating_sub(gap);
+            })
         }
     }
 
@@ -1494,6 +1523,7 @@ impl<T: Config> Module<T> {
                         let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
                     }
                     <Files<T>>::remove(cid);
+                    FilesCount::mutate(|count| *count = count.saturating_sub(1));
                     Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
                 }
             }

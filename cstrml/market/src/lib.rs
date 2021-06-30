@@ -427,7 +427,9 @@ decl_error! {
         /// The free count exceed the upper limit
         ExceedFreeCountsLimit,
         /// The total free fee limit is exceeded
-        ExceedTotalFreeFeeLimit
+        ExceedTotalFreeFeeLimit,
+        /// Free account cannot assign tips
+        InvalidTip
     }
 }
 
@@ -636,14 +638,20 @@ decl_module! {
                     Err(())
                 }
             }).is_ok();
-            let (payer, adjusted_tips) = if is_free { (Self::free_order_pot(), Zero::zero()) } else { (who.clone(), tips) };
+
+            let payer = if is_free {
+                ensure!(tips.is_zero(), Error::<T>::InvalidTip);
+                Self::free_order_pot()
+            } else {
+                who.clone()
+            };
             let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size);
 
             // 5. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&payer) >= amount + adjusted_tips, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&payer) >= amount + tips, Error::<T>::InsufficientCurrency);
 
             // 6. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), adjusted_tips, AllowDeath)?;
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), tips, AllowDeath)?;
 
             let curr_bn = Self::get_current_block_number();
 

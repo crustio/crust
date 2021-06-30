@@ -763,7 +763,7 @@ decl_module! {
             let curr_bn = Self::get_current_block_number();
 
             // 2. File should be live right now and calculate reward should be after expired_on
-            ensure!(file_info.expired_on != 0 && curr_bn >= file_info.expired_on, Error::<T>::NotInRewardPeriod);
+            ensure!(file_info.expired_on != 0, Error::<T>::NotInRewardPeriod);
 
             // 3. Maybe reward liquidator when he try to close outdated file
             Self::maybe_reward_liquidator(&cid, curr_bn, &liquidator)?;

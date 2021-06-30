@@ -838,8 +838,9 @@ impl<T: Config> Module<T> {
         let mut workload_map= BTreeMap::new();
         // TODO: add check when we launch mainnet
         let to_removed_slot = current_rs.saturating_sub(Self::history_slot_depth());
+        let enable_punishment = Self::enable_punishment();
         for (reporter, mut id) in <Identities<T>>::iter() {
-            let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);
+            let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs, enable_punishment);
             total_used = total_used.saturating_add(used);
             total_free = total_free.saturating_add(free);
             total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
@@ -984,10 +985,10 @@ impl<T: Config> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128, u128) {
+    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> (u128, u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(&id.anchor) {
-            if Self::is_fully_reported(reporter, id, current_rs) {
+            if Self::is_fully_reported(reporter, id, current_rs, enable_punishment) {
                 return (wr.free as u128, wr.used as u128, wr.reported_files_size as u128)
             }
         }
@@ -1001,10 +1002,10 @@ impl<T: Config> Module<T> {
         (0, 0, 0)
     }
 
-    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {
+    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> bool {
         // If punishment is disable
         // check whether it's reported in the last report slot
-        if !Self::enable_punishment() {
+        if !enable_punishment {
             return Self::reported_in_slot(&id.anchor, current_rs);
         }
         if !Self::reported_in_slot(&id.anchor, current_rs) {

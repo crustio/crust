@@ -145,7 +145,7 @@ parameter_types! {
     pub const LiquidityDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
-    pub const FilesCountInitPrice: Balance = 1000;
+    pub const FilesCountInitPrice: Balance = 0;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);

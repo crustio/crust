@@ -2103,6 +2103,61 @@ fn update_price_per_blocks_should_work() {
     });
 }
 
+#[test]
+fn update_files_count_price_per_blocks_should_work() {
+    new_test_ext().execute_with(|| {
+        let source = ALICE;
+        let cid =
+            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let file_size = 100; // should less than
+        let _ = Balances::make_free_balance_be(&source, 20000);
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+
+        // 6 + 3 % 10 is not zero
+        Market::on_initialize(6);
+        assert_eq!(Market::files_count_price(), 1000);
+        // update file price
+        Market::on_initialize(7);
+        assert_eq!(Market::files_count_price(), 990);
+        // no new order => don't update
+        Market::on_initialize(17);
+        assert_eq!(Market::files_count_price(), 990);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        // 26 + 3 % 10 is not zero
+        Market::on_initialize(26);
+        assert_eq!(Market::files_count_price(), 990);
+        // update file price
+        Market::on_initialize(27);
+        assert_eq!(Market::files_count_price(), 980);
+
+        // price is 40 and cannot decrease
+        <FilesCountPrice<Test>>::put(40);
+        FilesCount::put(20_000_000);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        Market::on_initialize(37);
+        assert_eq!(Market::files_count_price(), 40);
+
+        // price is 40 and will increase by 1
+        FilesCount::put(20_000_001);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        Market::on_initialize(37);
+        assert_eq!(Market::files_count_price(), 41);
+    });
+}
+
 /// Withdraw staking pot should work
 #[test]
 fn withdraw_staking_pot_should_work() {

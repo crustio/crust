@@ -228,6 +228,9 @@ decl_storage! {
         /// The free workload, used for calculating stake limit in the end of each report slot.
         /// The default value is 0.
         pub Free get(fn free): u128 = 0;
+
+        /// Enable punishment, the default behavior will have punishment.
+        pub EnablePunishment get(fn enable_punishment): bool = true;
     }
     add_extra_genesis {
         config(init_codes):
@@ -782,6 +785,20 @@ decl_module! {
             Ok(())
         }
 
+        /// Set the punishment flag
+        #[weight = 1000]
+        pub fn set_punishment(
+            origin,
+            is_enabled: bool
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+
+            EnablePunishment::put(is_enabled);
+
+            Self::deposit_event(RawEvent::SetPunishmentSuccess(is_enabled));
+            Ok(())
+        }
+
         // TODO: chill anchor, identity and pk
 
     }
@@ -821,8 +838,9 @@ impl<T: Config> Module<T> {
         let mut workload_map= BTreeMap::new();
         // TODO: add check when we launch mainnet
         let to_removed_slot = current_rs.saturating_sub(Self::history_slot_depth());
+        let enable_punishment = Self::enable_punishment();
         for (reporter, mut id) in <Identities<T>>::iter() {
-            let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs);
+            let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs, enable_punishment);
             total_used = total_used.saturating_add(used);
             total_free = total_free.saturating_add(free);
             total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
@@ -967,10 +985,10 @@ impl<T: Config> Module<T> {
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
     /// 2. return the (reserved, used) storage of this reporter account
-    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> (u128, u128, u128) {
+    fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> (u128, u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(&id.anchor) {
-            if Self::is_fully_reported(reporter, id, current_rs) {
+            if Self::is_fully_reported(reporter, id, current_rs, enable_punishment) {
                 return (wr.free as u128, wr.used as u128, wr.reported_files_size as u128)
             }
         }
@@ -984,7 +1002,12 @@ impl<T: Config> Module<T> {
         (0, 0, 0)
     }
 
-    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64) -> bool {
+    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> bool {
+        // If punishment is disable
+        // check whether it's reported in the last report slot
+        if !enable_punishment {
+            return Self::reported_in_slot(&id.anchor, current_rs);
+        }
         if !Self::reported_in_slot(&id.anchor, current_rs) {
             // should have wr, otherwise punish it again and refresh the deadline.
             id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
@@ -1189,5 +1212,7 @@ decl_event!(
         AddIntoAllowlistSuccess(AccountId, AccountId),
         /// Remove who from allowlist success.
         RemoveFromAllowlistSuccess(AccountId, AccountId),
+        /// Enable the punishment or disable it.
+        SetPunishmentSuccess(bool),
     }
 );

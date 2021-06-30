@@ -744,7 +744,6 @@ decl_module! {
             Ok(())
         }
 
-
         /// Add prepaid amount of currency for this file.
         /// If this file has prepaid value and enough for a new storage order, it can be renewed by anyone.
         #[weight = T::WeightInfo::place_storage_order()]

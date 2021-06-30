@@ -3118,13 +3118,14 @@ fn reward_liquidator_should_work() {
                 legal_wr_info.sig
         ));
 
-        assert_noop!(
-            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
-            DispatchError::Module {
-                index: 3,
-                error: 6,
-                message: Some("NotInRewardPeriod")
-        });
+        // // Calculate reward cannot work in the middle of the file
+        // assert_noop!(
+        //     Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+        //     DispatchError::Module {
+        //         index: 3,
+        //         error: 6,
+        //         message: Some("NotInRewardPeriod")
+        // });
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie

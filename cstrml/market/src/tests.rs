@@ -3118,13 +3118,14 @@ fn reward_liquidator_should_work() {
                 legal_wr_info.sig
         ));
 
-        assert_noop!(
-            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
-            DispatchError::Module {
-                index: 3,
-                error: 6,
-                message: Some("NotInRewardPeriod")
-        });
+        // // Calculate reward cannot work in the middle of the file
+        // assert_noop!(
+        //     Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+        //     DispatchError::Module {
+        //         index: 3,
+        //         error: 6,
+        //         message: Some("NotInRewardPeriod")
+        // });
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
@@ -3922,6 +3923,16 @@ fn free_space_scenario_should_work() {
         let _ = Balances::make_free_balance_be(&free_order_pot, 2000);
         assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1));
         assert_eq!(Market::free_order_accounts(&source), Some(1));
+
+        assert_eq!(
+            Market::place_storage_order(Origin::signed(source.clone()), cid.clone(), file_size, 100).unwrap_err(),
+            DispatchError::Module {
+                index: 3,
+                error: 14,
+                message: Some("InvalidTip")
+            }
+        );
+        assert_eq!(Market::free_order_accounts(&source).is_none(), true);
     });
 }
 

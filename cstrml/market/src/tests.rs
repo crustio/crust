@@ -110,23 +110,23 @@ fn place_storage_order_should_work() {
         let staking_pot = Market::staking_pot();
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&staking_pot), 0);
-        let _ = Balances::make_free_balance_be(&source, 2000);
+        let _ = Balances::make_free_balance_be(&source, 4000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
         assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60));
 
+        <FilesCountPrice<Test>>::put(1000);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
             file_size, 0
         ));
-
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
             FileInfo {
                 file_size,
                 expired_on: 0,
                 calculated_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 540, // ( 1000 + 1000 * 1 + 0 + 1000 ) * 0.18
                 prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -137,9 +137,9 @@ fn place_storage_order_should_work() {
                 groups: BTreeMap::new()
             })
         );
-        assert_eq!(Balances::free_balance(reserved_pot), 200);
-        assert_eq!(Balances::free_balance(staking_pot), 1440);
-        assert_eq!(Balances::free_balance(storage_pot), 360);
+        assert_eq!(Balances::free_balance(reserved_pot), 300);
+        assert_eq!(Balances::free_balance(staking_pot), 2160);
+        assert_eq!(Balances::free_balance(storage_pot), 540);
     });
 }
 
@@ -2118,6 +2118,7 @@ fn update_files_count_price_per_blocks_should_work() {
         ));
 
         // 6 + 3 % 10 is not zero
+        <FilesCountPrice<Test>>::put(1000);
         Market::on_initialize(6);
         assert_eq!(Market::files_count_price(), 1000);
         // update file price

@@ -411,7 +411,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 file_size,
                 expired_on: 1800,
                 calculated_at: 800,
-                amount: 72111,
+                amount: 72275,
                 prepaid: 0,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -3714,5 +3714,15 @@ fn free_space_scenario_should_work() {
         let _ = Balances::make_free_balance_be(&free_order_pot, 2000);
         assert_ok!(Market::add_into_free_order_accounts(Origin::signed(bob.clone()), source.clone(), 1));
         assert_eq!(Market::free_order_accounts(&source), Some(1));
+
+        assert_eq!(
+            Market::place_storage_order(Origin::signed(source.clone()), cid.clone(), file_size, 100).unwrap_err(),
+            DispatchError::Module {
+                index: 3,
+                error: 14,
+                message: Some("InvalidTip")
+            }
+        );
+        assert_eq!(Market::free_order_accounts(&source).is_none(), true);
     });
 }

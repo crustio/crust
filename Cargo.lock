@@ -1364,6 +1364,7 @@ dependencies = [
  "cumulus-pallet-xcmp-queue",
  "cumulus-ping",
  "cumulus-primitives-core",
+ "cumulus-primitives-timestamp",
  "cumulus-primitives-utility",
  "frame-executive 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.7)",
  "frame-support 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.7)",
@@ -2036,6 +2037,16 @@ dependencies = [
  "sp-std 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.7)",
  "sp-trie 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.7)",
  "tracing",
+]
+
+[[package]]
+name = "cumulus-primitives-timestamp"
+version = "0.1.0"
+dependencies = [
+ "cumulus-primitives-core",
+ "sp-inherents 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.7)",
+ "sp-std 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.7)",
+ "sp-timestamp 3.0.0 (git+https://github.com/paritytech/substrate?branch=polkadot-v0.9.7)",
 ]
 
 [[package]]

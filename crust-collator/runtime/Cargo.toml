@@ -45,6 +45,7 @@ pallet-authorship = { git = "https://github.com/paritytech/substrate", default-f
 cumulus-pallet-aura-ext = { path = "../../cumulus/pallets/aura-ext", default-features = false }
 cumulus-pallet-parachain-system = { path = "../../cumulus/pallets/parachain-system", default-features = false }
 cumulus-primitives-core = { path = "../../cumulus/primitives/core", default-features = false }
+cumulus-primitives-timestamp = { path = "../../cumulus/primitives/timestamp", default-features = false }
 cumulus-primitives-utility = { path = "../../cumulus/primitives/utility", default-features = false }
 cumulus-pallet-xcmp-queue = { path = "../../cumulus/pallets/xcmp-queue", default-features = false }
 cumulus-pallet-dmp-queue = { path = "../../cumulus/pallets/dmp-queue", default-features = false }
@@ -95,6 +96,7 @@ std = [
 	"cumulus-pallet-dmp-queue/std",
 	"cumulus-pallet-xcm/std",
 	"cumulus-primitives-core/std",
+	"cumulus-primitives-timestamp/std",
 	"cumulus-primitives-utility/std",
 	"cumulus-ping/std",
 	"xcm/std",

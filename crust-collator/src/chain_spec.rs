@@ -193,13 +193,13 @@ fn testnet_genesis(
 	id: ParaId,
 ) -> parachain_runtime::GenesisConfig {
 	parachain_runtime::GenesisConfig {
-		frame_system: parachain_runtime::SystemConfig {
+		system: parachain_runtime::SystemConfig {
 			code: parachain_runtime::WASM_BINARY
 				.expect("WASM binary was not build, please build it!")
 				.to_vec(),
 			changes_trie_config: Default::default(),
 		},
-		pallet_balances: parachain_runtime::BalancesConfig {
+		balances: parachain_runtime::BalancesConfig {
 			balances: endowed_accounts
 				.iter()
 				.cloned()
@@ -207,14 +207,14 @@ fn testnet_genesis(
 				.collect(),
 		},
 		market: parachain_runtime::MarketConfig { },
-		pallet_sudo: parachain_runtime::SudoConfig { key: root_key },
+		sudo: parachain_runtime::SudoConfig { key: root_key },
 		parachain_info: parachain_runtime::ParachainInfoConfig { parachain_id: id },
-		pallet_collator_selection: parachain_runtime::CollatorSelectionConfig {
+		collator_selection: parachain_runtime::CollatorSelectionConfig {
 			invulnerables: invulnerables.iter().cloned().map(|(acc, _)| acc).collect(),
 			candidacy_bond: SHADOW_ED * 16,
 			..Default::default()
 		},
-		pallet_session: parachain_runtime::SessionConfig {
+		session: parachain_runtime::SessionConfig {
 			keys: invulnerables.iter().cloned().map(|(acc, aura)| (
 				acc.clone(), // account id
 				acc.clone(), // validator id
@@ -223,8 +223,8 @@ fn testnet_genesis(
 		},
 		// no need to pass anything to aura, in fact it will panic if we do. Session will take care
 		// of this.
-		pallet_aura: Default::default(),
-		cumulus_pallet_aura_ext: Default::default(),
-		cumulus_pallet_parachain_system: Default::default()
+		aura: Default::default(),
+		aura_ext: Default::default(),
+		parachain_system: Default::default()
 	}
 }

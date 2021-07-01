@@ -3719,7 +3719,7 @@ fn free_space_scenario_should_work() {
             Market::place_storage_order(Origin::signed(source.clone()), cid.clone(), file_size, 100).unwrap_err(),
             DispatchError::Module {
                 index: 3,
-                error: 14,
+                error: 17,
                 message: Some("InvalidTip")
             }
         );

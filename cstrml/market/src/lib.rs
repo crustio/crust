@@ -642,7 +642,7 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size);
+            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + Self::files_count_price();
 
             // 5. Check client can afford the sorder
             ensure!(T::Currency::usable_balance(&payer) >= amount + tips, Error::<T>::InsufficientCurrency);
@@ -718,7 +718,7 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size);
+            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + Self::files_count_price();
 
             // 5. Check client can afford the sorder
             ensure!(T::Currency::usable_balance(&payer) >= amount + tips, Error::<T>::InsufficientCurrency);

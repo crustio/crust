@@ -636,8 +636,9 @@ decl_module! {
             // 8. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 9. Update new order status.
-            NewOrder::put(true);
+            // 9. Update storage price.
+            #[cfg(not(test))]
+            Self::update_file_price();
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
 

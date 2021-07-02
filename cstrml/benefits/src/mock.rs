@@ -62,6 +62,7 @@ parameter_types! {
     pub const BenefitReportWorkCost: Balance = 50;
     pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
     pub const BenefitMarketCostRatio: Perbill = Perbill::from_percent(95);
+    pub const BondingDuration: EraIndex = 2;
 }
 
 impl Config for Test {
@@ -70,6 +71,7 @@ impl Config for Test {
     type BenefitReportWorkCost = BenefitReportWorkCost;
     type BenefitsLimitRatio = BenefitsLimitRatio;
     type BenefitMarketCostRatio = BenefitMarketCostRatio;
+    type BondingDuration = BondingDuration;
 }
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;

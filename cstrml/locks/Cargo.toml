@@ -26,6 +26,7 @@ frame-benchmarking = { default-features = false, optional = true, version = "3.0
 
 [dev-dependencies]
 balances = { path = "../balances", package = "cstrml-balances" }
+primitives = { package = "cst-primitives", path = "../../primitives", features = ["dev"] }
 hex-literal = "0.3.1"
 frame-benchmarking = "3.0.0"
 

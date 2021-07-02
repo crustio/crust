@@ -35,6 +35,7 @@ primitives = { package = "cst-primitives", path = "../../primitives", default-fe
 [dev-dependencies]
 sp-core = "3.0.0"
 balances = { package = "cstrml-balances", path = "../balances" }
+primitives = { package = "cst-primitives", path = "../../primitives", features = ["dev"] }
 pallet-timestamp = "3.0.0"
 frame-benchmarking = "3.0.0"
 

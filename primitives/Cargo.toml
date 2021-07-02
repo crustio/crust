@@ -28,3 +28,4 @@ std = [
 	"frame-support/std",
 	"serde",
 ]
+dev = []

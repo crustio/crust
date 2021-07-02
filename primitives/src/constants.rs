@@ -23,12 +23,11 @@ pub mod time {
     // Testnet
     //	pub const MILLISECS_PER_BLOCK: Moment = 1000;
     pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
-    // Alpha
-    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 10 * MINUTES;
     // Mainnet
-    //	pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 4 * HOURS;
-    // Testnet
-    //	pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 10 * MINUTES;
+    #[cfg(feature = "dev")]
+    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 10 * MINUTES;
+    #[cfg(not(feature = "dev"))]
+    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 1 * HOURS;
 
     // These time units are defined in number of blocks.
     pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
@@ -60,7 +59,12 @@ pub mod staking {
 pub mod swork {
     use super::time::*;
 
+    // Mainnet
+    #[cfg(feature = "dev")]
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64 * 3;
+    #[cfg(not(feature = "dev"))]
+    pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
+
     pub const UPDATE_OFFSET: u32 = (REPORT_SLOT / 3) as u32;
     pub const END_OFFSET: u32 = 1;
 }

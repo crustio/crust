@@ -579,10 +579,11 @@ impl<T: Config> Module<T> {
     fn check_and_update_swork_funds(who: &T::AccountId) {
         let mut swork_benefit = Self::swork_benefits(&who);
         let reserved_value = T::Currency::reserved_balance(who);
-        let old_total_funds = swork_benefit.total_funds;
-        if old_total_funds <= reserved_value {
+        if swork_benefit.total_funds <= reserved_value {
             return;
         }
+        // Something wrong, fix it
+        let old_total_funds = swork_benefit.total_funds;
         swork_benefit.total_funds = reserved_value;
         swork_benefit.active_funds = swork_benefit.active_funds.saturating_add(swork_benefit.total_funds).saturating_sub(old_total_funds);
         swork_benefit.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&swork_benefit.active_funds);
@@ -592,10 +593,11 @@ impl<T: Config> Module<T> {
     fn check_and_update_market_funds(who: &T::AccountId) {
         let mut market_benefit = Self::market_benefits(&who);
         let reserved_value = T::Currency::reserved_balance(who);
-        let old_total_funds = market_benefit.total_funds;
-        if old_total_funds <= reserved_value {
+        if market_benefit.total_funds <= reserved_value {
             return;
         }
+        // Something wrong, fix it
+        let old_total_funds = market_benefit.total_funds;
         let old_active_funds = market_benefit.active_funds;
         market_benefit.total_funds = reserved_value;
         market_benefit.active_funds = market_benefit.active_funds.saturating_add(market_benefit.total_funds).saturating_sub(old_total_funds);

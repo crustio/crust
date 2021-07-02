@@ -388,7 +388,7 @@ decl_storage! {
         NewOrder get(fn new_order): bool = false;
 
         /// Wait for updating used size for all replicas
-        pub WaitingFiles get(fn waiting_files): BTreeSet<MerkleRoot>;
+        pub PendingFiles get(fn pending_files): BTreeSet<MerkleRoot>;
 
         FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
     }
@@ -499,9 +499,9 @@ decl_module! {
                 Self::update_files_count_price();
                 NewOrder::put(false);
             }
-            if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::waiting_files().len() > MAX_WAITING_FILES {
-                let waiting_files = WaitingFiles::take();
-                for cid in waiting_files {
+            if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::pending_files().len() > MAX_PENDING_FILES {
+                let pending_files = PendingFiles::take();
+                for cid in pending_files {
                     if let Some((file_info, mut used_info)) = Self::files(&cid) {
                         Self::update_groups_used_info(file_info.file_size, &mut used_info);
                         <Files<T>>::insert(cid, (file_info, used_info));
@@ -1482,7 +1482,7 @@ impl<T: Config> Module<T> {
 
     fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, cid: &MerkleRoot) -> u64 {
         used_info.reported_group_count += 1;
-        WaitingFiles::mutate(|files| {
+        PendingFiles::mutate(|files| {
             files.insert(cid.clone());
         });
         used_info.groups.insert(anchor.clone(), true);
@@ -1503,7 +1503,7 @@ impl<T: Config> Module<T> {
                     used_size = used_info.used_size;
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
-                        WaitingFiles::mutate(|files| {
+                        PendingFiles::mutate(|files| {
                             files.insert(cid.clone());
                         });
                     }

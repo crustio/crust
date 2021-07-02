@@ -4124,9 +4124,9 @@ fn update_used_info_should_work() {
             add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
         }
 
-        assert_eq!(Market::waiting_files().len(), files_number);
+        assert_eq!(Market::pending_files().len(), files_number);
         update_used_info();
-        assert_eq!(Market::waiting_files().len(), 0);
+        assert_eq!(Market::pending_files().len(), 0);
 
         for cid in file_lists.clone().iter() {
             assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -4156,9 +4156,9 @@ fn update_used_info_should_work() {
         for cid in file_lists.clone().iter() {
             add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk2.clone(), None, None);
         }
-        assert_eq!(Market::waiting_files().len(), files_number);
+        assert_eq!(Market::pending_files().len(), files_number);
         Market::on_initialize(105);
-        assert_eq!(Market::waiting_files().len(), 0);
+        assert_eq!(Market::pending_files().len(), 0);
 
         for cid in file_lists.clone().iter() {
             assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -4194,9 +4194,9 @@ fn update_used_info_should_work() {
             Market::delete_replica(&merchant, &cid, &legal_pk);
             Market::delete_replica(&merchant, &cid, &legal_pk2);
         }
-        assert_eq!(Market::waiting_files().len(), files_number);
+        assert_eq!(Market::pending_files().len(), files_number);
         Market::on_initialize(105);
-        assert_eq!(Market::waiting_files().len(), 0);
+        assert_eq!(Market::pending_files().len(), 0);
 
         for cid in file_lists.clone().iter() {
             assert_eq!(Market::files(&cid).unwrap_or_default(), (

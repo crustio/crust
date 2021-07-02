@@ -520,9 +520,9 @@ impl<T: Config> Module<T> {
     }
 
     pub fn maybe_do_free_count(who: &T::AccountId) -> bool {
-        let current_benefits = Self::current_benefits();
+        let active_era = Self::current_benefits().active_era;
         let mut swork_benefit = Self::swork_benefits(who);
-        Self::maybe_refresh_swork_benefits(&current_benefits, &mut swork_benefit);
+        Self::maybe_refresh_swork_benefits(active_era, &mut swork_benefit);
         // won't update reduction detail if it has no staking
         // to save db writing time
         if swork_benefit.used_fee_reduction_count < swork_benefit.total_fee_reduction_count {
@@ -537,7 +537,7 @@ impl<T: Config> Module<T> {
         let mut current_benefits = Self::current_benefits();
         let mut market_benefit = Self::market_benefits(who);
         // Refresh the reduction
-        Self::maybe_refresh_market_benefit(&current_benefits, &mut market_benefit);
+        Self::maybe_refresh_market_benefit(current_benefits.active_era, &mut market_benefit);
         // Calculate the own reduction limit
         let fee_reduction_benefits_quota = Self::calculate_fee_reduction_quota(market_benefit.active_funds,
                                                                                current_benefits.total_market_active_funds,
@@ -547,8 +547,6 @@ impl<T: Config> Module<T> {
         let fee_reduction_benefit_cost = T::BenefitMarketCostRatio::get() * fee;
         let (charged_fee, used_fee_reduction) = if market_benefit.used_fee_reduction_quota + fee_reduction_benefit_cost <= fee_reduction_benefits_quota && current_benefits.used_fee_reduction_quota + fee_reduction_benefit_cost <= current_benefits.total_fee_reduction_quota {
             // it's ok to free this fee
-            // charged fee is 5%
-            // fee reduction is 95%
             (fee - fee_reduction_benefit_cost, fee_reduction_benefit_cost)
         } else {
             // it's not ok to free this fee
@@ -567,7 +565,7 @@ impl<T: Config> Module<T> {
                     market_benefit.used_fee_reduction_quota += used_fee_reduction;
                     <MarketBenefits<T>>::insert(&who, market_benefit);
                     <CurrentBenefits<T>>::put(current_benefits);
-                    // issue the 95% fee
+                    // issue the free fee
                     let new_issued = T::Currency::issue(used_fee_reduction.clone());
                     imbalance.subsume(new_issued);
                 }
@@ -579,17 +577,16 @@ impl<T: Config> Module<T> {
     }
 
     fn check_and_update_swork_funds(who: &T::AccountId) {
-        let benefit = Self::swork_benefits(&who);
+        let mut swork_benefit = Self::swork_benefits(&who);
         let reserved_value = T::Currency::reserved_balance(who);
-        let old_total_funds = benefit.total_funds;
+        let old_total_funds = swork_benefit.total_funds;
         if old_total_funds <= reserved_value {
             return;
         }
-        <SworkBenefits<T>>::mutate(&who, |benefit| {
-            benefit.total_funds = old_total_funds.min(reserved_value);
-            benefit.active_funds = benefit.active_funds.saturating_add(reserved_value).saturating_sub(old_total_funds);
-            benefit.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&benefit.active_funds);
-        });
+        swork_benefit.total_funds = reserved_value;
+        swork_benefit.active_funds = swork_benefit.active_funds.saturating_add(swork_benefit.total_funds).saturating_sub(old_total_funds);
+        swork_benefit.total_fee_reduction_count = Self::calculate_total_fee_reduction_count(&swork_benefit.active_funds);
+        <SworkBenefits<T>>::insert(&who, swork_benefit);
     }
 
     fn check_and_update_market_funds(who: &T::AccountId) {
@@ -600,11 +597,10 @@ impl<T: Config> Module<T> {
             return;
         }
         let old_active_funds = market_benefit.active_funds;
-        market_benefit.total_funds = old_total_funds.min(reserved_value);
-        market_benefit.active_funds = market_benefit.active_funds.saturating_add(reserved_value).saturating_sub(old_total_funds);
-        let new_active_funds = market_benefit.active_funds;
+        market_benefit.total_funds = reserved_value;
+        market_benefit.active_funds = market_benefit.active_funds.saturating_add(market_benefit.total_funds).saturating_sub(old_total_funds);
+        <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_market_active_funds = benefits.total_market_active_funds.saturating_add(market_benefit.active_funds).saturating_sub(old_active_funds);});
         <MarketBenefits<T>>::insert(&who, market_benefit);
-        <CurrentBenefits<T>>::mutate(|benefits| { benefits.total_market_active_funds = benefits.total_market_active_funds.saturating_add(new_active_funds).saturating_sub(old_active_funds);});
     }
 
     pub fn calculate_fee_reduction_quota(market_active_funds: BalanceOf<T>, total_market_active_funds: BalanceOf<T>, total_fee_reduction_quota: BalanceOf<T>) -> BalanceOf<T> {
@@ -615,16 +611,16 @@ impl<T: Config> Module<T> {
         (*active_funds / T::BenefitReportWorkCost::get()).saturated_into()
     }
 
-    pub fn maybe_refresh_market_benefit(current_benefits: &EraBenefits<BalanceOf<T>>, market_benefit: &mut MarketBenefit<BalanceOf<T>>) {
-        if market_benefit.refreshed_at < current_benefits.active_era {
-            market_benefit.refreshed_at = current_benefits.active_era;
+    pub fn maybe_refresh_market_benefit(latest_active_era: EraIndex, market_benefit: &mut MarketBenefit<BalanceOf<T>>) {
+        if market_benefit.refreshed_at < latest_active_era {
+            market_benefit.refreshed_at = latest_active_era;
             market_benefit.used_fee_reduction_quota = Zero::zero();
         }
     }
 
-    pub fn maybe_refresh_swork_benefits(current_benefits: &EraBenefits<BalanceOf<T>>, swork_benefit: &mut SworkBenefit<BalanceOf<T>>) {
-        if swork_benefit.refreshed_at < current_benefits.active_era {
-            swork_benefit.refreshed_at = current_benefits.active_era;
+    pub fn maybe_refresh_swork_benefits(latest_active_era: EraIndex, swork_benefit: &mut SworkBenefit<BalanceOf<T>>) {
+        if swork_benefit.refreshed_at < latest_active_era {
+            swork_benefit.refreshed_at = latest_active_era;
             swork_benefit.used_fee_reduction_count = 0;
         }
     }

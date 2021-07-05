@@ -776,6 +776,7 @@ impl market::Config for Runtime {
     type ModuleId = MarketModuleId;
     type Currency = Balances;
     type SworkerInterface = Swork;
+    type BenefitInterface = Benefits;
     type Event = Event;
     /// File duration.
     type FileDuration = FileDuration;

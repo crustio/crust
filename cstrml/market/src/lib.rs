@@ -39,7 +39,7 @@ use primitives::{
     constants::market::*,
     traits::{
         UsableCurrency, MarketInterface,
-        SworkerInterface
+        SworkerInterface, BenefitInterface
     }
 };
 
@@ -124,10 +124,9 @@ pub struct MerchantLedger<Balance> {
     pub collateral: Balance
 }
 
-type BalanceOf<T> =
-    <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
-type PositiveImbalanceOf<T> =
-    <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance;
+type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
+type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
+type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::NegativeImbalance;
 
 impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> for Module<T>
 {
@@ -263,6 +262,9 @@ pub trait Config: system::Config {
     /// used to check work report
     type SworkerInterface: SworkerInterface<Self::AccountId>;
 
+    /// used for reward and discount
+    type BenefitInterface: BenefitInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
+
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
 
@@ -318,13 +320,6 @@ decl_storage! {
         /// The file information and used information iterated by ipfs cid.
         /// It includes file related info such as file size, expired date and reported replica count.
         pub MerchantLedgers get(fn merchant_ledgers):
-        map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
-
-        /// Merchant Ledger V2
-        /// The file information and used information iterated by ipfs cid.
-        /// It includes file related info such as file size, expired date and reported replica count.
-        // TODO: Remove this V2 in MainNet
-        pub MerchantLedgersV2 get(fn merchant_ledgers_v2):
         map hasher(blake2_128_concat) T::AccountId => MerchantLedger<BalanceOf<T>>;
 
         /// Bonding Information
@@ -524,35 +519,6 @@ decl_module! {
             Ok(())
         }
 
-        /// Add collateral amount of currency to accept storage order.
-        ///
-        /// # <weight>
-        /// Complexity: O(logP)
-        /// - Read: Collateral
-        /// - Write: Collateral
-        /// # </weight>
-        #[weight = T::WeightInfo::add_collateral()]
-        pub fn add_collateral(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // 1. Reject a collateral which is considered to be _dust_.
-            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
-
-            // 2. Ensure merchant has enough currency.
-            ensure!(value <= T::Currency::usable_balance(&who), Error::<T>::InsufficientCurrency);
-
-            // 3. Reserve the collateral.
-            T::Currency::reserve(&who, value.clone())?;
-
-            // 4. Upgrade collateral.
-            <MerchantLedgersV2<T>>::mutate(&who, |ledger| { ledger.collateral += value.clone();});
-
-            // 5. Emit success
-            Self::deposit_event(RawEvent::AddCollateralSuccess(who.clone(), value));
-
-            Ok(())
-        }
-
         /// Retrieve old collateral
         ///
         /// # <weight>
@@ -577,43 +543,6 @@ decl_module! {
 
             // 4. Emit success
             Self::deposit_event(RawEvent::CutCollateralSuccess(who, merchant_ledger.collateral));
-
-            Ok(())
-        }
-
-        /// Decrease extra collateral amount of currency to accept storage order.
-        ///
-        /// # <weight>
-        /// Complexity: O(logP)
-        /// - Read: Collateral
-        /// - Write: Collateral
-        /// # </weight>
-        #[weight = T::WeightInfo::cut_collateral()]
-        pub fn cut_collateral(origin, #[compact] value: BalanceOf<T>) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // 1. Reject a collateral which is considered to be _dust_.
-            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
-
-            // 2. Check if merchant has collateral or not
-            ensure!(<MerchantLedgersV2<T>>::contains_key(&who), Error::<T>::NotRegister);
-
-            let mut ledger = Self::merchant_ledgers_v2(&who);
-
-            // 3. Fix the weird situation.
-            let reserved_value = T::Currency::reserved_balance(&who);
-            ledger.collateral = ledger.collateral.min(reserved_value);
-
-            // 4. Update ledger
-            let to_unreserve_value = value.min(ledger.collateral);
-            ledger.collateral -= to_unreserve_value.clone();
-            Self::update_merchant_ledger(&who, ledger.clone());
-
-            // 5. Unreserve the collateral from the account.
-            T::Currency::unreserve(&who, to_unreserve_value.clone());
-
-            // 6. Emit success
-            Self::deposit_event(RawEvent::CutCollateralSuccess(who, to_unreserve_value));
 
             Ok(())
         }
@@ -834,21 +763,15 @@ decl_module! {
         ) -> DispatchResult {
             let merchant = ensure_signed(origin)?;
 
-            // 1. Ensure merchant registered before
-            ensure!(<MerchantLedgersV2<T>>::contains_key(&merchant), Error::<T>::NotRegister);
+            // 1. Ensure reward is larger than some value
+            let (_, reward) = T::BenefitInterface::get_collateral_and_reward(&merchant);
+            ensure!(reward > Zero::zero(), Error::<T>::NotEnoughReward);
 
-            // 2. Fetch ledger information
-            let mut merchant_ledger = Self::merchant_ledgers_v2(&merchant);
+            // 2. Transfer the money
+            T::Currency::transfer(&Self::storage_pot(), &merchant, reward, KeepAlive)?;
 
-            // 3. Ensure reward is larger than some value
-            ensure!(merchant_ledger.reward > Zero::zero(), Error::<T>::NotEnoughReward);
-
-            // 4. Transfer the money
-            T::Currency::transfer(&Self::storage_pot(), &merchant, merchant_ledger.reward, KeepAlive)?;
-
-            // 5. Set the reward to zero and push it back
-            merchant_ledger.reward = Zero::zero();
-            Self::update_merchant_ledger(&merchant, merchant_ledger);
+            // 3. Set the reward to zero and push it back
+            T::BenefitInterface::update_reward(&merchant, Zero::zero());
 
             Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
             Ok(())
@@ -929,7 +852,7 @@ decl_module! {
                 total_free_fee,
                 WithdrawReasons::TRANSFER
             );
-            // 6.2 Decrease the totoal free fee limit
+            // 6.2 Decrease the total free fee limit
             <TotalFreeFeeLimit<T>>::mutate(|value| {*value = value.saturating_sub(total_free_fee.clone())});
             // 6.3 Add into free order accounts
             <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
@@ -1400,9 +1323,12 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn has_enough_collateral(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
-        let ledger = Self::merchant_ledgers_v2(who);
-        (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.collateral
+    fn has_enough_collateral(who: &T::AccountId, value: &BalanceOf<T>) -> Option<BalanceOf<T>> {
+        let (collateral, reward) = T::BenefitInterface::get_collateral_and_reward(who);
+        if (reward + *value).saturating_mul(10u32.into()) <= collateral {
+            return Some(reward + *value);
+        }
+        None
     }
 
     pub fn update_file_price() {
@@ -1551,10 +1477,8 @@ impl<T: Config> Module<T> {
             return false;
         }
         if let Some(owner) = Self::bonded(who) {
-            if Self::has_enough_collateral(&owner, amount) {
-                <MerchantLedgersV2<T>>::mutate(&owner, |ledger| {
-                    ledger.reward += amount.clone();
-                });
+            if let Some(new_reward) = Self::has_enough_collateral(&owner, amount) {
+                T::BenefitInterface::update_reward(&owner, new_reward);
                 return true;
             }
         }
@@ -1631,15 +1555,6 @@ impl<T: Config> Module<T> {
             PendingFiles::put(pending_files);
         }
         files_to_update
-    }
-
-    fn update_merchant_ledger(who: &T::AccountId, merchant_ledger: MerchantLedger<BalanceOf<T>>)
-    {
-        if merchant_ledger.reward.is_zero() && merchant_ledger.collateral.is_zero() {
-            <MerchantLedgersV2<T>>::remove(who);
-        } else {
-            <MerchantLedgersV2<T>>::insert(who, merchant_ledger);
-        }
     }
 }
 

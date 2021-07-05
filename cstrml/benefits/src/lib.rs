@@ -133,6 +133,9 @@ pub struct MarketBenefit<Balance: HasCompact> {
     /// The used reduction for fee
     #[codec(compact)]
     pub used_fee_reduction_quota: Balance,
+    /// The file reward for market
+    #[codec(compact)]
+    pub file_reward: Balance,
     /// The latest refreshed active era index
     #[codec(compact)]
     pub refreshed_at: EraIndex,
@@ -264,6 +267,17 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
 
     fn maybe_free_count(who: &<T as frame_system::Config>::AccountId) -> bool {
         Self::maybe_do_free_count(who)
+    }
+
+    fn get_collateral_and_reward(who: &<T as frame_system::Config>::AccountId) -> (BalanceOf<T>, BalanceOf<T>) {
+        let market_benefits = Self::market_benefits(who);
+        (market_benefits.active_funds, market_benefits.file_reward)
+    }
+
+    fn update_reward(who: &<T as frame_system::Config>::AccountId, value: BalanceOf<T>) {
+        <MarketBenefits<T>>::mutate(who, |market_benefits| {
+            market_benefits.file_reward = value;
+        });
     }
 }
 

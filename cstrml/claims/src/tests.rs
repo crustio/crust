@@ -191,12 +191,3 @@ fn claim_limit_should_work() {
         assert_eq!(CrustClaims::claim_limit(), 0);
     });
 }
-
-#[test]
-fn bond_eth_should_work() {
-    new_test_ext().execute_with(|| {
-        let eth_addr = get_legal_eth_addr();
-        assert_ok!(CrustClaims::bond_eth(Origin::signed(1), eth_addr.clone()));
-        assert_eq!(CrustClaims::bonded_eth(1), Some(eth_addr));
-    });
-}

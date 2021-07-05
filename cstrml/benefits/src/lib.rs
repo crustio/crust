@@ -275,9 +275,15 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
     }
 
     fn update_reward(who: &<T as frame_system::Config>::AccountId, value: BalanceOf<T>) {
-        <MarketBenefits<T>>::mutate(who, |market_benefits| {
-            market_benefits.file_reward = value;
-        });
+        let mut market_benefit = Self::market_benefits(who);
+        market_benefit.file_reward = value;
+
+        // Remove the dead benefit
+        if market_benefit.unlocking_funds.is_empty() && market_benefit.active_funds.is_zero() && market_benefit.file_reward.is_zero() {
+            <MarketBenefits<T>>::remove(&who);
+        } else {
+            <MarketBenefits<T>>::insert(&who, market_benefit);
+        }
     }
 }
 
@@ -454,7 +460,7 @@ decl_module! {
                 T::Currency::unreserve(&who, to_unreserved_value);
 
                 // 4. Update or remove the who's fee reduction benefits for report works
-                if benefit.unlocking_funds.is_empty() && benefit.active_funds.is_zero() {
+                if benefit.unlocking_funds.is_empty() && benefit.active_funds.is_zero() && benefit.file_reward.is_zero() {
                     <MarketBenefits<T>>::remove(&who);
                 } else {
                     <MarketBenefits<T>>::insert(&who, benefit);

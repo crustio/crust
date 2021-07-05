@@ -16,10 +16,10 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use std::{cell::RefCell, iter::FromIterator};
 use balances::{AccountData, NegativeImbalance};
 pub use primitives::{traits::BenefitInterface, *};
 use swork::{PKInfo, Identity, NegativeImbalanceOf};
+pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
 
 pub type AccountId = AccountId32;
 pub type Balance = u64;
@@ -33,15 +33,52 @@ pub const DAVE: AccountId32 = AccountId32::new([6u8; 32]);
 pub const FERDIE: AccountId32 = AccountId32::new([7u8; 32]);
 pub const ZIKUN: AccountId32 = AccountId32::new([8u8; 32]);
 
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+pub struct MockMerchantLedger {
+    pub collateral: Balance,
+    pub reward: Balance
+}
+
 thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(1);
     static LEGAL_CODE: Vec<u8> = hex::decode("781b537d3dcef39dec7b8bce6fdfcd032d8d846640e9b5598b4a9f627188a908").unwrap();
+    static MERCHANT_LEDGERS: RefCell<HashMap<AccountId, MockMerchantLedger>> = RefCell::new(Default::default());
 }
 
 pub struct ExistentialDeposit;
 impl Get<u64> for ExistentialDeposit {
     fn get() -> u64 {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
+    }
+}
+
+pub struct MerchantLedgers;
+impl Get<HashMap<AccountId, MockMerchantLedger>> for MerchantLedgers {
+    fn get() -> HashMap<AccountId, MockMerchantLedger> {
+        MERCHANT_LEDGERS.with(|map| map.borrow().clone())
+    }
+}
+impl MerchantLedgers {
+    fn set_reward(who: &AccountId, reward: Balance) {
+        let collateral = MERCHANT_LEDGERS.with(|map_ref| {
+            let map = map_ref.borrow();
+            (map.get(who).unwrap_or(&mut MockMerchantLedger { collateral: 0, reward: 0})).collateral
+        });
+        MERCHANT_LEDGERS.with(|map_ref| {
+            let mut map = map_ref.borrow_mut();
+            map.insert(who.clone(), MockMerchantLedger { collateral, reward});
+        })
+    }
+
+    fn set_collateral(who: &AccountId, collateral: Balance) {
+        let reward = MERCHANT_LEDGERS.with(|map_ref| {
+            let map = map_ref.borrow();
+            (map.get(who).unwrap_or(&mut MockMerchantLedger { collateral: 0, reward: 0})).reward
+        });
+        MERCHANT_LEDGERS.with(|map_ref| {
+            let mut map = map_ref.borrow_mut();
+            map.insert(who.clone(), MockMerchantLedger { collateral, reward});
+        })
     }
 }
 
@@ -107,19 +144,28 @@ impl balances::Config for Test {
 
 pub struct TestBenefitInterface;
 
-impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestBenefitInterface {
+impl BenefitInterface<AccountId, BalanceOf<Test>, NegativeImbalanceOf<Test>> for TestBenefitInterface {
     fn update_era_benefit(_: EraIndex, _: BalanceOf<Test>) -> BalanceOf<Test> {
         Zero::zero()
     }
 
-    fn maybe_reduce_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
+    fn maybe_reduce_fee(_: &AccountId, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
         Ok(NegativeImbalance::new(0))
     }
 
-    fn maybe_free_count(_: &AID) -> bool {
+    fn maybe_free_count(_: &AccountId) -> bool {
         return true;
     }
 
+    fn get_collateral_and_reward(who: &AccountId) -> (BalanceOf<Test>, BalanceOf<Test>) {
+        let ledgers = MerchantLedgers::get();
+        let merchant_ledger = ledgers.get(who).unwrap_or( &MockMerchantLedger { collateral: 0, reward: 0});
+        (BalanceOf::<Test>::saturated_from(merchant_ledger.collateral), BalanceOf::<Test>::saturated_from(merchant_ledger.reward))
+    }
+
+    fn update_reward(who: &AccountId, value: BalanceOf<Test>) {
+        MerchantLedgers::set_reward(who, value);
+    }
 }
 
 parameter_types! {
@@ -160,6 +206,7 @@ impl Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
     type SworkerInterface = Swork;
+    type BenefitInterface = TestBenefitInterface;
     type Event = ();
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
@@ -279,6 +326,18 @@ pub fn register(pk: &SworkerPubKey, code: SworkerCode) {
         code: code,
         anchor: None
     });
+}
+
+pub fn add_collateral(who: &AccountId, collateral: Balance) {
+    MerchantLedgers::set_collateral(who, collateral);
+}
+
+pub fn add_reward(who: &AccountId, reward: Balance) {
+    MerchantLedgers::set_reward(who, reward);
+}
+
+pub fn merchant_ledgers(who: &AccountId) -> MockMerchantLedger {
+    MerchantLedgers::get().get(who).unwrap().clone()
 }
 
 /// Run until a particular block.

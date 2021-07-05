@@ -247,6 +247,11 @@ impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for 
         return true;
     }
 
+    fn get_collateral_and_reward(_: &AID) -> (BalanceOf<Test>, BalanceOf<Test>) {
+        (Zero::zero(), Zero::zero())
+    }
+
+    fn update_reward(_: &AID, _: BalanceOf<Test>) { }
 }
 
 parameter_types! {

@@ -101,6 +101,7 @@ impl market::Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
     type SworkerInterface = Swork;
+    type BenefitInterface = TestBenefitInterface;
     type Event = ();
     /// File duration.
     type FileDuration = FileDuration;
@@ -139,6 +140,12 @@ impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for 
     fn maybe_free_count(_: &AID) -> bool {
         return true;
     }
+
+    fn get_collateral_and_reward(_: &AID) -> (BalanceOf<Test>, BalanceOf<Test>) {
+        (Zero::zero(), Zero::zero())
+    }
+
+    fn update_reward(_: &AID, _: BalanceOf<Test>) { }
 
 }
 

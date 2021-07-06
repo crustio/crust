@@ -499,9 +499,9 @@ decl_module! {
                 Self::update_files_count_price();
                 NewOrder::put(false);
             }
-            if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::pending_files().len() > MAX_PENDING_FILES {
-                let pending_files = PendingFiles::take();
-                for cid in pending_files {
+            if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::pending_files().len() >= MAX_PENDING_FILES {
+                let files = Self::get_files_to_update();
+                for cid in files {
                     if let Some((file_info, mut used_info)) = Self::files(&cid) {
                         Self::update_groups_used_info(file_info.file_size, &mut used_info);
                         <Files<T>>::insert(cid, (file_info, used_info));
@@ -1609,6 +1609,29 @@ impl<T: Config> Module<T> {
         };
 
         integer * file_size + file_size / denominator * numerator
+    }
+
+    fn get_files_to_update() -> Vec<MerkleRoot> {
+        let mut pending_files = PendingFiles::take();
+        let mut files_to_update = Vec::<MerkleRoot>::new();
+        let mut count = 0;
+        // Loop the MAX_PENDING_FILES files
+        for cid in &pending_files {
+            if count >= MAX_PENDING_FILES {
+                break;
+            }
+            files_to_update.push(cid.clone());
+            count += 1;
+        }
+        // Remove the MAX_PENDING_FILES files from pending files
+        for cid in files_to_update.clone() {
+            pending_files.remove(&cid);
+        }
+        // If there are pending files
+        if pending_files.len() != 0 {
+            PendingFiles::put(pending_files);
+        }
+        files_to_update
     }
 
     fn update_merchant_ledger(who: &T::AccountId, merchant_ledger: MerchantLedger<BalanceOf<T>>)

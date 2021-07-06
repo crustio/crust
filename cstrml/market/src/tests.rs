@@ -4125,6 +4125,8 @@ fn update_used_info_should_work() {
         }
 
         assert_eq!(Market::pending_files().len(), files_number);
+        Market::on_initialize(105);
+        assert_eq!(Market::pending_files().len(), files_number - MAX_PENDING_FILES);
         update_used_info();
         assert_eq!(Market::pending_files().len(), 0);
 
@@ -4158,6 +4160,8 @@ fn update_used_info_should_work() {
         }
         assert_eq!(Market::pending_files().len(), files_number);
         Market::on_initialize(105);
+        assert_eq!(Market::pending_files().len(), files_number - MAX_PENDING_FILES);
+        update_used_info();
         assert_eq!(Market::pending_files().len(), 0);
 
         for cid in file_lists.clone().iter() {
@@ -4196,6 +4200,8 @@ fn update_used_info_should_work() {
         }
         assert_eq!(Market::pending_files().len(), files_number);
         Market::on_initialize(105);
+        assert_eq!(Market::pending_files().len(), files_number - MAX_PENDING_FILES);
+        update_used_info();
         assert_eq!(Market::pending_files().len(), 0);
 
         for cid in file_lists.clone().iter() {

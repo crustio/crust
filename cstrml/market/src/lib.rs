@@ -1624,11 +1624,10 @@ impl<T: Config> Module<T> {
             count += 1;
         }
         // Remove the MAX_PENDING_FILES files from pending files
-        for cid in files_to_update.clone() {
-            pending_files.remove(&cid);
-        }
-        // If there are pending files
-        if pending_files.len() != 0 {
+        if files_to_update.len() != pending_files.len() {
+            for cid in files_to_update.clone() {
+                pending_files.remove(&cid);
+            }
             PendingFiles::put(pending_files);
         }
         files_to_update

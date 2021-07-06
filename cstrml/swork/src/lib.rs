@@ -332,7 +332,7 @@ decl_module! {
                 let previous_key = Self::identity_previous_key().unwrap();
                 // Update the workload map in one batch iter, might kill the IdentityPreviousKey
                 // which means updating process is finished.
-                Self::update_one_identities_batch(previous_key);
+                Self::patial_update_identities(previous_key);
             } else {
                 if let Some((workload_map, total_free, total_used, total_reported_files_size)) = Self::workload() {
                     // Update Free, Used, ReportedFilesSize and CurrentReportSlot
@@ -856,7 +856,7 @@ impl<T: Config> Module<T> {
     ///
     /// TC = O(2n)
     /// DB try is 2n+5+Works_DB_try
-    fn update_one_identities_batch(previous_key: Vec<u8>) {
+    fn patial_update_identities(previous_key: Vec<u8>) {
         let prefix = <Identities<T>>::prefix_hash();
         let current_rs = Self::current_report_slot();
         let mut previous_key = previous_key;
@@ -890,7 +890,7 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn next_identity(prefix: &Vec<u8>, previous_key: &mut Vec<u8>) -> Option<(T::AccountId, Identity<T::AccountId>)> {
+    pub fn next_identity(prefix: &Vec<u8>, previous_key: &mut Vec<u8>) -> Option<(T::AccountId, Identity<T::AccountId>)> {
         let maybe_next = sp_io::storage::next_key(previous_key).filter(|n| n.starts_with(prefix));
         match maybe_next {
             Some(next) => {

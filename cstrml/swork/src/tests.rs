@@ -3222,5 +3222,118 @@ fn update_identities_timeline_should_work() {
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
             assert_eq!(Swork::current_report_slot(), 300);
+
+            run_to_block(800);
+            // Start update identity, report_in_slot is false => no workload
+            Swork::on_initialize(800);
+            assert_eq!(Swork::workload().is_some(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
+            assert_eq!(Swork::current_report_slot(), 300);
+            Swork::on_initialize(899);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 0u128);
+            assert_eq!(Swork::current_report_slot(), 600);
     });
+}
+
+
+#[test]
+fn next_identity_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let bob = Sr25519Keyring::Bob.to_account_id();
+            let charlie = Sr25519Keyring::Charlie.to_account_id();
+            let dave = Sr25519Keyring::Dave.to_account_id();
+            let eve = Sr25519Keyring::Eve.to_account_id();
+            let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+            <self::Identities<Test>>::insert(alice.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 100,
+                group: None
+            });
+
+            <self::Identities<Test>>::insert(bob.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 200,
+                group: None
+            });
+
+            <self::Identities<Test>>::insert(charlie.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 300,
+                group: None
+            });
+
+            <self::Identities<Test>>::insert(dave.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 400,
+                group: None
+            });
+            <self::Identities<Test>>::insert(eve.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 500,
+                group: None
+            });
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 100);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            <self::Identities<Test>>::remove(alice.clone());
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            <self::Identities<Test>>::insert(alice.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 100,
+                group: None
+            });
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 100);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            <self::Identities<Test>>::remove(alice.clone());
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            <self::Identities<Test>>::insert(alice.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 100,
+                group: None
+            });
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 100);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+        });
 }

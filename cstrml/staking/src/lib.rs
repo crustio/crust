@@ -734,7 +734,7 @@ decl_event!(
         /// An account has been chilled from its stash
         ChillSuccess(AccountId, AccountId),
         /// Update the identities success. The stake limit of each identity would be updated.
-        UpdateStakeLimitSuccess,
+        UpdateStakeLimitSuccess(u32),
     }
 );
 
@@ -2455,6 +2455,7 @@ impl<T: Config> swork::Works<T::AccountId> for Module<T> {
     fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
         // 1. Calculate total stake limit
         let total_stake_limit = Self::calculate_total_stake_limit();
+        let group_counts = workload_map.len() as u32;
 
         // 2. total_workload * SPowerRatio < total_stake_limit => stage one
         if total_workload.saturating_mul(T::SPowerRatio::get()) < total_stake_limit {
@@ -2462,7 +2463,7 @@ impl<T: Config> swork::Works<T::AccountId> for Module<T> {
         } else {
             Self::update_stage_two_stake_limit(workload_map, total_workload, total_stake_limit);
         }
-        Self::deposit_event(RawEvent::UpdateStakeLimitSuccess);
+        Self::deposit_event(RawEvent::UpdateStakeLimitSuccess(group_counts));
     }
 }
 

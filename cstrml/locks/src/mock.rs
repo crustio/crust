@@ -60,6 +60,7 @@ impl Config for Test {
     type Event = ();
     type Currency = Balances;
     type UnlockPeriod = UnlockPeriod;
+    type WeightInfo = weight::WeightInfo<Test>;
 }
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;

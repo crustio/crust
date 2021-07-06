@@ -39,7 +39,6 @@ pub mod weight;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
 const LOCKING_ID: LockIdentifier = *b"csm-lock";
 
-// TODO: Rerun the benchmarking to get the accurate weight
 pub trait WeightInfo {
     fn bond() -> Weight;
     fn unbond() -> Weight;

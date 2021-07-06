@@ -808,6 +808,7 @@ impl benefits::Config for Runtime {
     type BenefitsLimitRatio = BenefitsLimitRatio;
     type BenefitMarketCostRatio = BenefitMarketCostRatio;
     type BondingDuration = BondingDuration;
+    type WeightInfo = benefits::weight::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -818,6 +819,7 @@ impl locks::Config for Runtime {
     type Event = Event;
     type Currency = Balances;
     type UnlockPeriod = UnlockPeriod;
+    type WeightInfo = locks::weight::WeightInfo<Runtime>;
 }
 
 parameter_types! {

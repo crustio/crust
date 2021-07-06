@@ -7,6 +7,7 @@
 use sp_std::{prelude::*, convert::TryInto};
 use frame_support::{
     decl_event, decl_storage, decl_module, decl_error, ensure,
+    weights::{Weight},
     traits::{LockableCurrency, Get, Currency, WithdrawReasons, LockIdentifier}
 };
 use frame_system::{ensure_signed, ensure_root};
@@ -29,7 +30,13 @@ mod tests;
 #[cfg(any(feature = "runtime-benchmarks", test))]
 pub mod benchmarking;
 
+pub mod weight;
+
 const CRU_LOCK_ID: LockIdentifier = *b"crulock ";
+
+pub trait WeightInfo {
+    fn unlock() -> Weight;
+}
 
 /// The balance type of this module.
 pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -40,6 +47,8 @@ pub trait Config: frame_system::Config {
     type Currency: LockableCurrency<Self::AccountId>;
     /// One unlock period.
     type UnlockPeriod: Get<BlockNumber>;
+    /// Weight information for extrinsics in this pallet.
+    type WeightInfo: WeightInfo;
 }
 
 #[derive(Copy, Clone, Encode, Decode, Default, RuntimeDebug)]
@@ -146,8 +155,7 @@ decl_module! {
         }
 
         /// Unlock the CRU18 or CRU24 one period
-        // TODO: Refine this weight
-        #[weight = 1000]
+        #[weight = T::WeightInfo::unlock()]
         fn unlock(origin) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let curr_bn = Self::get_current_block_number();

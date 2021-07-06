@@ -45,4 +45,6 @@ pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {
 	fn get_collateral_and_reward(who: &AccountId) -> (Balance, Balance);
 
 	fn update_reward(who: &AccountId, value: Balance);
+
+	fn get_active_funds_and_total_funds(who: &AccountId) -> (Balance, Balance);
 }

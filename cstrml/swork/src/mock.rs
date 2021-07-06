@@ -202,6 +202,9 @@ impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for 
 
     fn update_reward(_: &AID, _: BalanceOf<Test>) { }
 
+    fn get_active_funds_and_total_funds(_: &AID) -> (BalanceOf<Test>, BalanceOf<Test>) {
+        (Zero::zero(), Zero::zero())
+    }
 }
 
 parameter_types! {

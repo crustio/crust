@@ -285,6 +285,15 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
             <MarketBenefits<T>>::insert(&who, market_benefit);
         }
     }
+
+    fn get_active_funds_and_total_funds(who: &<T as frame_system::Config>::AccountId) -> (BalanceOf<T>, BalanceOf<T>) {
+        let market_benefit = Self::market_benefits(who);
+        let mut total_funds = Zero::zero();
+        if !market_benefit.active_funds.is_zero() {
+            total_funds = Self::current_benefits().total_market_active_funds;
+        }
+        (market_benefit.active_funds, total_funds)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]

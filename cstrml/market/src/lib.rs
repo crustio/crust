@@ -1395,6 +1395,11 @@ impl<T: Config> Module<T> {
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;
 
+        // Check the discount for the reserved amount
+        let (active_funds, total_funds) = T::BenefitInterface::get_active_funds_and_total_funds(who);
+        let discount_amount = if !active_funds.is_zero() { Perbill::from_rational_approximation(active_funds, total_funds) * value } else { Zero::zero() };
+        let reserved_amount = reserved_amount.saturating_sub(discount_amount);
+
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, liveness)?;
         T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), liveness)?;

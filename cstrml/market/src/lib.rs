@@ -1395,6 +1395,10 @@ impl<T: Config> Module<T> {
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;
 
+        // Check the discount for the reserved amount, reserved_amount = max(0, reserved_amount - discount_amount)
+        let discount_amount = T::BenefitInterface::get_market_funds_ratio(who) * value;
+        let reserved_amount = reserved_amount.saturating_sub(discount_amount);
+
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, liveness)?;
         T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), liveness)?;

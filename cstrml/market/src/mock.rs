@@ -43,12 +43,20 @@ thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(1);
     static LEGAL_CODE: Vec<u8> = hex::decode("781b537d3dcef39dec7b8bce6fdfcd032d8d846640e9b5598b4a9f627188a908").unwrap();
     static MERCHANT_LEDGERS: RefCell<HashMap<AccountId, MockMerchantLedger>> = RefCell::new(Default::default());
+    static DISCOUNT_RATIO: RefCell<(u64, u64)> = RefCell::new((0, 0));
 }
 
 pub struct ExistentialDeposit;
 impl Get<u64> for ExistentialDeposit {
     fn get() -> u64 {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
+    }
+}
+
+pub struct DiscountRatio;
+impl Get<(u64, u64)> for DiscountRatio {
+    fn get() -> (u64, u64) {
+        DISCOUNT_RATIO.with(|v| *v.borrow())
     }
 }
 
@@ -149,6 +157,10 @@ impl BenefitInterface<AccountId, BalanceOf<Test>, NegativeImbalanceOf<Test>> for
         Zero::zero()
     }
 
+    fn update_reward(who: &AccountId, value: BalanceOf<Test>) {
+        MerchantLedgers::set_reward(who, value);
+    }
+
     fn maybe_reduce_fee(_: &AccountId, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
         Ok(NegativeImbalance::new(0))
     }
@@ -163,8 +175,9 @@ impl BenefitInterface<AccountId, BalanceOf<Test>, NegativeImbalanceOf<Test>> for
         (BalanceOf::<Test>::saturated_from(merchant_ledger.collateral), BalanceOf::<Test>::saturated_from(merchant_ledger.reward))
     }
 
-    fn update_reward(who: &AccountId, value: BalanceOf<Test>) {
-        MerchantLedgers::set_reward(who, value);
+    fn get_market_funds_ratio(_: &AccountId) -> Perbill {
+        let (active_funds, total_funds) = DiscountRatio::get();
+        Perbill::from_rational_approximation(active_funds, total_funds)
     }
 }
 
@@ -257,6 +270,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     });
 
     ext
+}
+
+pub fn set_discount_ratio(active_funds: Balance, total_funds: Balance) {
+    DISCOUNT_RATIO.with(|v| *v.borrow_mut() = (active_funds, total_funds));
 }
 
 pub fn init_swork_setup() {

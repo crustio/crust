@@ -261,6 +261,18 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
         Self::do_update_era_benefit(next_era, T::BenefitsLimitRatio::get() * total_reward)
     }
 
+    fn update_reward(who: &<T as frame_system::Config>::AccountId, value: BalanceOf<T>) {
+        let mut market_benefit = Self::market_benefits(who);
+        market_benefit.file_reward = value;
+
+        // Remove the dead benefit
+        if market_benefit.unlocking_funds.is_empty() && market_benefit.active_funds.is_zero() && market_benefit.file_reward.is_zero() {
+            <MarketBenefits<T>>::remove(&who);
+        } else {
+            <MarketBenefits<T>>::insert(&who, market_benefit);
+        }
+    }
+
     fn maybe_reduce_fee(who: &<T as frame_system::Config>::AccountId, fee: BalanceOf<T>, reasons: WithdrawReasons) -> Result<NegativeImbalanceOf<T>, DispatchError> {
         Self::maybe_do_reduce_fee(who, fee, reasons)
     }
@@ -274,16 +286,12 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
         (market_benefits.active_funds, market_benefits.file_reward)
     }
 
-    fn update_reward(who: &<T as frame_system::Config>::AccountId, value: BalanceOf<T>) {
-        let mut market_benefit = Self::market_benefits(who);
-        market_benefit.file_reward = value;
-
-        // Remove the dead benefit
-        if market_benefit.unlocking_funds.is_empty() && market_benefit.active_funds.is_zero() && market_benefit.file_reward.is_zero() {
-            <MarketBenefits<T>>::remove(&who);
-        } else {
-            <MarketBenefits<T>>::insert(&who, market_benefit);
+    fn get_market_funds_ratio(who: &<T as frame_system::Config>::AccountId) -> Perbill {
+        let market_benefit = Self::market_benefits(who);
+        if !market_benefit.active_funds.is_zero() {
+            return Perbill::from_rational_approximation(market_benefit.active_funds, Self::current_benefits().total_market_active_funds);
         }
+        return Perbill::zero();
     }
 }
 

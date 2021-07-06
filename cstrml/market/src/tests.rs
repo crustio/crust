@@ -4113,3 +4113,81 @@ fn update_used_info_should_work() {
         }
     });
 }
+
+/// Place storage order test cases
+#[test]
+fn place_storage_order_with_discount_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+        set_discount_ratio(1, 20); // 5% discount
+
+        let source = ALICE;
+        let merchant = MERCHANT;
+
+        let cid =
+            hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
+        let file_size = 100; // should less than
+        let reserved_pot = Market::reserved_pot();
+        let staking_pot = Market::staking_pot();
+        let storage_pot = Market::storage_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 10000);
+        let _ = Balances::make_free_balance_be(&merchant, 200);
+
+        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+
+        <FilesCountPrice<Test>>::put(1000);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                calculated_at: 50,
+                amount: 540, // ( 1000 + 1000 * 1 + 0 + 1000 ) * 0.18
+                prepaid: 0,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+        assert_eq!(Balances::free_balance(&reserved_pot), 150);
+        assert_eq!(Balances::free_balance(&staking_pot), 2160);
+        assert_eq!(Balances::free_balance(&storage_pot), 540);
+        assert_eq!(Balances::free_balance(&source), 7150);
+
+        set_discount_ratio(1, 10); // 10% discount
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0
+        ));
+        assert_eq!(Market::files(&cid).unwrap_or_default(), (
+            FileInfo {
+                file_size,
+                expired_on: 0,
+                calculated_at: 50,
+                amount: 1080, // ( 1000 + 1000 * 1 + 0 + 1000 ) * 0.18
+                prepaid: 0,
+                reported_replica_count: 0,
+                replicas: vec![]
+            },
+            UsedInfo {
+                used_size: 0,
+                reported_group_count: 0,
+                groups: BTreeMap::new()
+            })
+        );
+        assert_eq!(Balances::free_balance(reserved_pot), 150); // 150 + 0
+        assert_eq!(Balances::free_balance(staking_pot), 4320);
+        assert_eq!(Balances::free_balance(storage_pot), 1080);
+        assert_eq!(Balances::free_balance(&source), 4450);
+    });
+}

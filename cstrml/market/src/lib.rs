@@ -60,8 +60,6 @@ macro_rules! log {
 
 pub trait WeightInfo {
     fn bond() -> Weight;
-    fn add_collateral() -> Weight;
-    fn cut_collateral() -> Weight;
     fn place_storage_order() -> Weight;
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
@@ -508,7 +506,7 @@ decl_module! {
         }
 
         /// Bond the origin to the owner
-        #[weight = 1000]
+        #[weight = T::WeightInfo::bond()]
         pub fn bond(
             origin,
             owner: <T::Lookup as StaticLookup>::Source
@@ -526,7 +524,7 @@ decl_module! {
         /// - Read: Collateral
         /// - Write: Collateral
         /// # </weight>
-        #[weight = T::WeightInfo::cut_collateral()]
+        #[weight = T::WeightInfo::place_storage_order()]
         pub fn retrieve_old_collateral(origin) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -778,7 +776,7 @@ decl_module! {
         }
 
         /// Set the global switch
-        #[weight = T::WeightInfo::reward_merchant()]
+        #[weight = 1000]
         pub fn set_market_switch(
             origin,
             is_enabled: bool

@@ -35,16 +35,6 @@ impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 		(7_000_000 as Weight)
 			.saturating_add(T::DbWeight::get().writes(1 as Weight))
 	}
-	fn add_collateral() -> Weight {
-		(137_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(8 as Weight))
-			.saturating_add(T::DbWeight::get().writes(5 as Weight))
-	}
-	fn cut_collateral() -> Weight {
-		(128_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(7 as Weight))
-			.saturating_add(T::DbWeight::get().writes(5 as Weight))
-	}
 	fn place_storage_order() -> Weight {
 		(2_811_000_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(16 as Weight))
@@ -64,6 +54,5 @@ impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 		(64_828_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(1 as Weight))
 			.saturating_add(T::DbWeight::get().writes(1 as Weight))
-
 	}
 }

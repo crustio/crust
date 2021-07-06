@@ -292,3 +292,7 @@ pub fn run_to_block(n: u64) {
         System::on_initialize(System::block_number());
     }
 }
+
+pub fn update_used_info() {
+    Market::on_initialize(93);
+}

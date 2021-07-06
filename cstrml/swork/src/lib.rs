@@ -862,11 +862,9 @@ impl<T: Config> Module<T> {
         WorkReports::insert(anchor, wr);
 
         // 6. Update workload
-        let total_used = Self::used().saturating_sub(old_used as u128).saturating_add(used as u128);
         let total_free = Self::free().saturating_sub(old_free as u128).saturating_add(reported_srd_size as u128);
         let total_reported_files_size = Self::reported_files_size().saturating_sub(old_reported_files_size as u128).saturating_add(reported_files_size as u128);
 
-        Used::put(total_used);
         Free::put(total_free);
         ReportedFilesSize::put(total_reported_files_size);
     }

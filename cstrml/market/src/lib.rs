@@ -1325,7 +1325,7 @@ impl<T: Config> Module<T> {
 
     fn has_enough_collateral(who: &T::AccountId, value: &BalanceOf<T>) -> Option<BalanceOf<T>> {
         let (collateral, reward) = T::BenefitInterface::get_collateral_and_reward(who);
-        if (reward + *value).saturating_mul(10u32.into()) <= collateral {
+        if (reward + *value).saturating_mul(COLLATERAL_RATIO.into()) <= collateral {
             return Some(reward + *value);
         }
         None

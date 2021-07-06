@@ -3996,7 +3996,7 @@ fn update_used_info_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 200000);
 
         assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60000));
+        add_collateral(&merchant, 60000);
 
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(

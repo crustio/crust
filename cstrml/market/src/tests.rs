@@ -4122,6 +4122,9 @@ fn place_storage_order_with_discount_should_work() {
         run_to_block(50);
         set_discount_ratio(1, 20); // 5% discount
 
+        let source = ALICE;
+        let merchant = MERCHANT;
+
         let cid =
             hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let file_size = 100; // should less than
@@ -4158,11 +4161,12 @@ fn place_storage_order_with_discount_should_work() {
         assert_eq!(Balances::free_balance(&reserved_pot), 150);
         assert_eq!(Balances::free_balance(&staking_pot), 2160);
         assert_eq!(Balances::free_balance(&storage_pot), 540);
+        assert_eq!(Balances::free_balance(&source), 7150);
 
         set_discount_ratio(1, 10); // 10% discount
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            Origin::signed(source.clone()), cid.clone(),
             file_size, 0
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(), (
@@ -4184,5 +4188,6 @@ fn place_storage_order_with_discount_should_work() {
         assert_eq!(Balances::free_balance(reserved_pot), 150); // 150 + 0
         assert_eq!(Balances::free_balance(staking_pot), 4320);
         assert_eq!(Balances::free_balance(storage_pot), 1080);
+        assert_eq!(Balances::free_balance(&source), 4450);
     });
 }

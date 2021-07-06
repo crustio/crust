@@ -3150,3 +3150,77 @@ fn basic_check_should_work() {
             );
         });
 }
+
+#[test]
+fn update_identities_timeline_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_pk = LegalPK::get();
+
+            register(&legal_pk, LegalCode::get());
+            register_identity(&reporter, &legal_pk, &legal_pk);
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 0,
+                used: 2,
+                free: 0,
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            add_live_files(&reporter, &legal_pk);
+
+            run_to_block(202);
+            // Start update identity
+            Swork::on_initialize(200);
+            assert_eq!(Swork::workload().is_some(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(WorkloadMap::get().borrow().get(&reporter).is_none(), true);
+
+            Swork::on_initialize(201);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+
+            run_to_block(280);
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 0,
+                used: 4,
+                free: 0,
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            run_to_block(450);
+            // Don't do anything
+            Swork::on_initialize(300);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+
+            Swork::on_initialize(350);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+
+            Swork::on_initialize(499);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+            // Start update identity
+            Swork::on_initialize(500);
+            assert_eq!(Swork::workload().is_some(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+            Swork::on_initialize(500);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
+            assert_eq!(Swork::current_report_slot(), 300);
+    });
+}

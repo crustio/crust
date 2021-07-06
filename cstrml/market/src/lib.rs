@@ -180,7 +180,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
             // 4. Update used_info
             if is_counted {
-                used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the used_size after the update
+                used_size = Self::add_used_group(&mut used_info, anchor, cid); // need to add the used_size after the update
             };
 
             // 5. The first join the replicas and file become live(expired_on > calculated_at)
@@ -387,6 +387,9 @@ decl_storage! {
         /// New order in the past blocks
         NewOrder get(fn new_order): bool = false;
 
+        /// Wait for updating used size for all replicas
+        pub PendingFiles get(fn pending_files): BTreeSet<MerkleRoot>;
+
         FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
     }
     add_extra_genesis {
@@ -495,6 +498,15 @@ decl_module! {
                 Self::update_file_price();
                 Self::update_files_count_price();
                 NewOrder::put(false);
+            }
+            if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::pending_files().len() >= MAX_PENDING_FILES {
+                let files = Self::get_files_to_update();
+                for cid in files {
+                    if let Some((file_info, mut used_info)) = Self::files(&cid) {
+                        Self::update_groups_used_info(file_info.file_size, &mut used_info);
+                        <Files<T>>::insert(cid, (file_info, used_info));
+                    }
+                }
             }
             // TODO: Recalculate this weight
             0
@@ -1468,9 +1480,11 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
+    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, cid: &MerkleRoot) -> u64 {
         used_info.reported_group_count += 1;
-        Self::update_groups_used_info(file_size, used_info);
+        PendingFiles::mutate(|files| {
+            files.insert(cid.clone());
+        });
         used_info.groups.insert(anchor.clone(), true);
         used_info.used_size
     }
@@ -1480,7 +1494,7 @@ impl<T: Config> Module<T> {
         
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
-            Some((ref file_info, ref mut used_info)) => {
+            Some((_, ref mut used_info)) => {
                 if let Some(is_calculated_as_reported_group_count) = used_info.groups.remove(anchor) {
                     // need to delete the used_size before the update.
                     // we should always return the used_size no matter `is_calculated_as_reported_group_count` is true of false.
@@ -1489,7 +1503,9 @@ impl<T: Config> Module<T> {
                     used_size = used_info.used_size;
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
-                        Self::update_groups_used_info(file_info.file_size, used_info);
+                        PendingFiles::mutate(|files| {
+                            files.insert(cid.clone());
+                        });
                     }
                 }
             },
@@ -1567,21 +1583,54 @@ impl<T: Config> Module<T> {
         return count;
     }
 
-    fn calculate_used_size(file_size: u64, reported_group_count: u32) -> u64 {
-        let used_ratio: u64 = match reported_group_count {
-            1..=10 => 2,
-            11..=20 => 4,
-            21..=30 => 6,
-            31..=40 => 8,
-            41..=70 => 10,
-            71..=80 => 8,
-            81..=90 => 6,
-            91..=100 => 4,
-            101..=200 => 2,
-            _ => return 0,
+    pub fn calculate_used_size(file_size: u64, reported_group_count: u32) -> u64 {
+        let (integer, numerator, denominator): (u64, u64, u64) = match reported_group_count {
+            0 => (0, 0, 1),
+            1..=8 => (1, 1, 20),
+            9..=16 => (1, 1, 5),
+            17..=24 => (1, 1, 2),
+            25..=32 => (2, 0, 1),
+            33..=40 => (2, 3, 5),
+            41..=48 => (3, 3, 10),
+            49..=55 => (4, 0, 1),
+            56..=65 => (5, 0, 1),
+            66..=74 => (6, 0, 1),
+            75..=83 => (7, 0, 1),
+            84..=92 => (8, 0, 1),
+            93..=100 => (8, 1, 2),
+            101..=115 => (8, 4, 5),
+            116..=127 => (9, 0, 1),
+            128..=142 => (9, 1, 5),
+            143..=157 => (9, 2, 5),
+            158..=167 => (9, 3, 5),
+            168..=182 => (9, 4, 5),
+            183..=200 => (10, 0, 1),
+            _ => (10, 0, 1), // larger than 200 => 200
         };
 
-        used_ratio * file_size
+        integer * file_size + file_size / denominator * numerator
+    }
+
+    fn get_files_to_update() -> Vec<MerkleRoot> {
+        let mut pending_files = PendingFiles::take();
+        let mut files_to_update = Vec::<MerkleRoot>::new();
+        let mut count = 0;
+        // Loop the MAX_PENDING_FILES files
+        for cid in &pending_files {
+            if count >= MAX_PENDING_FILES {
+                break;
+            }
+            files_to_update.push(cid.clone());
+            count += 1;
+        }
+        // Remove the MAX_PENDING_FILES files from pending files
+        if files_to_update.len() < pending_files.len() {
+            for cid in files_to_update.clone() {
+                pending_files.remove(&cid);
+            }
+            PendingFiles::put(pending_files);
+        }
+        files_to_update
     }
 
     fn update_merchant_ledger(who: &T::AccountId, merchant_ledger: MerchantLedger<BalanceOf<T>>)

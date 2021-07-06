@@ -157,6 +157,10 @@ impl BenefitInterface<AccountId, BalanceOf<Test>, NegativeImbalanceOf<Test>> for
         Zero::zero()
     }
 
+    fn update_reward(who: &AccountId, value: BalanceOf<Test>) {
+        MerchantLedgers::set_reward(who, value);
+    }
+
     fn maybe_reduce_fee(_: &AccountId, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
         Ok(NegativeImbalance::new(0))
     }
@@ -171,12 +175,9 @@ impl BenefitInterface<AccountId, BalanceOf<Test>, NegativeImbalanceOf<Test>> for
         (BalanceOf::<Test>::saturated_from(merchant_ledger.collateral), BalanceOf::<Test>::saturated_from(merchant_ledger.reward))
     }
 
-    fn update_reward(who: &AccountId, value: BalanceOf<Test>) {
-        MerchantLedgers::set_reward(who, value);
-    }
-
-    fn get_active_funds_and_total_funds(_: &AccountId) -> (BalanceOf<Test>, BalanceOf<Test>) {
-        DiscountRatio::get()
+    fn get_market_funds_ratio(_: &AccountId) -> Perbill {
+        let (active_funds, total_funds) = DiscountRatio::get();
+        Perbill::from_rational_approximation(active_funds, total_funds)
     }
 }
 

@@ -4,7 +4,7 @@
 use frame_support::traits::{LockableCurrency, WithdrawReasons};
 use crate::{SworkerAnchor, MerkleRoot, BlockNumber, EraIndex};
 use sp_std::collections::btree_set::BTreeSet;
-use sp_runtime::DispatchError;
+use sp_runtime::{DispatchError, Perbill};
 
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
@@ -38,13 +38,13 @@ pub trait MarketInterface<AccountId, Balance> {
 pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {
 	fn update_era_benefit(next_era: EraIndex, total_benefits: Balance) -> Balance;
 
+	fn update_reward(who: &AccountId, value: Balance);
+
 	fn maybe_reduce_fee(who: &AccountId, fee: Balance, reasons: WithdrawReasons) -> Result<NegativeImbalance, DispatchError>;
 
 	fn maybe_free_count(who: &AccountId) -> bool;
 
 	fn get_collateral_and_reward(who: &AccountId) -> (Balance, Balance);
 
-	fn update_reward(who: &AccountId, value: Balance);
-
-	fn get_active_funds_and_total_funds(who: &AccountId) -> (Balance, Balance);
+	fn get_market_funds_ratio(who: &AccountId) -> Perbill;
 }

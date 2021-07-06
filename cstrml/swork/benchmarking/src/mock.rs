@@ -133,6 +133,8 @@ impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for 
         Zero::zero()
     }
 
+    fn update_reward(_: &AID, _: BalanceOf<Test>) { }
+
     fn maybe_reduce_fee(_: &AID, _: BalanceOf<Test>, _: WithdrawReasons) -> Result<NegativeImbalance<Test>, DispatchError> {
         Ok(NegativeImbalance::new(0))
     }
@@ -145,10 +147,8 @@ impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for 
         (Zero::zero(), Zero::zero())
     }
 
-    fn update_reward(_: &AID, _: BalanceOf<Test>) { }
-
-    fn get_active_funds_and_total_funds(_: &AID) -> (BalanceOf<Test>, BalanceOf<Test>) {
-        (Zero::zero(), Zero::zero())
+    fn get_market_funds_ratio(_: &AID) -> Perbill {
+        Perbill::zero()
     }
 }
 

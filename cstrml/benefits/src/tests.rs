@@ -859,7 +859,7 @@ fn test_collateral_and_reward_interface() {
 fn test_active_funds_and_total_funds_interface() {
     new_test_ext().execute_with(|| {
         let _ = Balances::make_free_balance_be(&ALICE, 200);
-        assert_eq!(Benefits::get_active_funds_and_total_funds(&ALICE), (0, 0));
+        assert_eq!(Benefits::get_market_funds_ratio(&ALICE), Perbill::zero());
         assert_ok!(Benefits::add_benefit_funds(Origin::signed(ALICE.clone()), 100, FundsType::MARKET));
         assert_eq!(Benefits::market_benefits(&ALICE), MarketBenefit {
             total_funds: 100,
@@ -869,7 +869,7 @@ fn test_active_funds_and_total_funds_interface() {
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
-        assert_eq!(Benefits::get_active_funds_and_total_funds(&ALICE), (100, 100));
-        assert_eq!(Benefits::get_active_funds_and_total_funds(&BOB), (0, 0));
+        assert_eq!(Benefits::get_market_funds_ratio(&ALICE), Perbill::one());
+        assert_eq!(Benefits::get_market_funds_ratio(&BOB), Perbill::zero());
     });
 }

@@ -318,7 +318,11 @@ decl_module! {
             let now = TryInto::<u32>::try_into(now).ok().unwrap();
             // At REPORT_SLOT - UPDATE_OFFSET blocks, updating process would start
             // IdentityPreviousKey is used as the switch as well
-            if ((now + (UPDATE_OFFSET as u32)) % (REPORT_SLOT as u32)).is_zero()  {
+            // There are three status
+            // 1. identity_previous_key is none and workload is none => not started
+            // 2. identity_previous_key is some and workload is some => calculating
+            // 3. identity_previous_key is none and workload is some => calculation is done and will send workload to staking module
+            if ((now + (UPDATE_OFFSET as u32)) % (REPORT_SLOT as u32)).is_zero() && Self::workload().is_none() && Self::identity_previous_key().is_none()  {
                 let prefix = <Identities<T>>::prefix_hash();
                 IdentityPreviousKey::put(prefix);
                 <Workload<T>>::put((BTreeMap::<T::AccountId, u128>::new(), 0u128, 0u128, 0u128));
@@ -335,7 +339,7 @@ decl_module! {
                     Free::put(total_free);
                     Used::put(total_used);
                     ReportedFilesSize::put(total_reported_files_size);
-                    CurrentReportSlot::mutate(|crs| *crs += REPORT_SLOT);
+                    CurrentReportSlot::mutate(|crs| *crs = Self::get_current_reported_slot());
 
                     // Invoke report works to update stake limit
                     let total_workload = total_used.saturating_add(total_free);

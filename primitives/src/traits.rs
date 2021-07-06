@@ -41,4 +41,8 @@ pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {
 	fn maybe_reduce_fee(who: &AccountId, fee: Balance, reasons: WithdrawReasons) -> Result<NegativeImbalance, DispatchError>;
 
 	fn maybe_free_count(who: &AccountId) -> bool;
+
+	fn get_collateral_and_reward(who: &AccountId) -> (Balance, Balance);
+
+	fn update_reward(who: &AccountId, value: Balance);
 }

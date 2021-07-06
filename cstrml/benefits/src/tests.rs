@@ -44,6 +44,7 @@ fn add_benefit_funds_should_work() {
             total_funds: 0,
             active_funds: 0,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
@@ -68,6 +69,7 @@ fn add_benefit_funds_should_work() {
             total_funds: 100,
             active_funds: 100,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
@@ -100,6 +102,7 @@ fn cut_benefit_funds_should_work() {
             total_funds: 0,
             active_funds: 0,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
@@ -140,6 +143,7 @@ fn cut_benefit_funds_should_work() {
             total_funds: 100,
             active_funds: 50,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 50, era: 12}]
         });
@@ -155,6 +159,7 @@ fn cut_benefit_funds_should_work() {
             total_funds: 100,
             active_funds: 0,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 50, era: 12}, FundsUnlockChunk { value: 50, era: 12}]
         });
@@ -269,6 +274,7 @@ fn maybe_reduce_fee_should_work() {
             total_funds: 0,
             active_funds: 0,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
@@ -280,6 +286,7 @@ fn maybe_reduce_fee_should_work() {
             total_funds: 105,
             active_funds: 105,
             used_fee_reduction_quota: 19,
+            file_reward: 0,
             refreshed_at: 10,
             unlocking_funds: vec![]
         });
@@ -306,6 +313,7 @@ fn update_overall_info_should_return_used_fee() {
             total_funds: 105,
             active_funds: 105,
             used_fee_reduction_quota: 19,
+            file_reward: 0,
             refreshed_at: 10,
             unlocking_funds: vec![]
         });
@@ -346,6 +354,7 @@ fn free_fee_limit_should_work() {
             total_funds: 100,
             active_funds: 100,
             used_fee_reduction_quota: 38,
+            file_reward: 0,
             refreshed_at: 10,
             unlocking_funds: vec![]
         });
@@ -364,6 +373,7 @@ fn free_fee_limit_should_work() {
             total_funds: 100,
             active_funds: 100,
             used_fee_reduction_quota: 38,
+            file_reward: 0,
             refreshed_at: 10,
             unlocking_funds: vec![]
         });
@@ -389,6 +399,7 @@ fn free_fee_limit_should_work() {
             total_funds: 100,
             active_funds: 100,
             used_fee_reduction_quota: 76,
+            file_reward: 0,
             refreshed_at: 10,
             unlocking_funds: vec![]
         });
@@ -408,6 +419,7 @@ fn free_fee_limit_should_work() {
             total_funds: 200,
             active_funds: 100,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 100, era: 12}]
         });
@@ -498,6 +510,7 @@ fn withdraw_benefits_funds_should_work() {
             total_funds: 75,
             active_funds: 70,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 5, era: 14}]
         });
@@ -508,6 +521,7 @@ fn withdraw_benefits_funds_should_work() {
             total_funds: 70,
             active_funds: 55,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 15, era: 15}]
         });
@@ -517,9 +531,25 @@ fn withdraw_benefits_funds_should_work() {
             total_funds: 55,
             active_funds: 55,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
+
+        assert_ok!(Benefits::cut_benefit_funds(Origin::signed(ALICE.clone()), 55, FundsType::MARKET));
+        Benefits::update_era_benefit(17u32.into(), 100);
+        Benefits::update_reward(&ALICE, 100);
+        assert_ok!(Benefits::withdraw_benefit_funds(Origin::signed(ALICE.clone())));
+        assert_eq!(Benefits::market_benefits(&ALICE), MarketBenefit {
+            total_funds: 0,
+            active_funds: 0,
+            used_fee_reduction_quota: 0,
+            file_reward: 100,
+            refreshed_at: 0,
+            unlocking_funds: vec![]
+        });
+        Benefits::update_reward(&ALICE, 0);
+        assert_eq!(<MarketBenefits<Test>>::contains_key(&ALICE), false);
     });
 }
 
@@ -549,6 +579,7 @@ fn rebond_market_benefits_funds_should_work() {
             total_funds: 100,
             active_funds: 65,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 15, era: 12},
                                   FundsUnlockChunk { value: 10, era: 13},
@@ -567,6 +598,7 @@ fn rebond_market_benefits_funds_should_work() {
             total_funds: 100,
             active_funds: 75,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 15, era: 12},
                                   FundsUnlockChunk { value: 10, era: 13}]
@@ -584,6 +616,7 @@ fn rebond_market_benefits_funds_should_work() {
             total_funds: 100,
             active_funds: 100,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
@@ -670,6 +703,7 @@ fn withdraw_market_benefits_funds_in_weird_situation() {
             total_funds: 100,
             active_funds: 100,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
@@ -684,6 +718,7 @@ fn withdraw_market_benefits_funds_in_weird_situation() {
             total_funds: 100,
             active_funds: 0,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![FundsUnlockChunk { value: 100, era: 12}]
         });
@@ -719,6 +754,7 @@ fn withdraw_market_benefits_funds_in_weird_situation() {
             total_funds: 50,
             active_funds: 50,
             used_fee_reduction_quota: 0,
+            file_reward: 0,
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
@@ -790,5 +826,31 @@ fn withdraw_swork_benefits_funds_in_weird_situation() {
             refreshed_at: 0,
             unlocking_funds: vec![]
         });
+    });
+}
+
+#[test]
+fn test_collateral_and_reward_interface() {
+    new_test_ext().execute_with(|| {
+        let _ = Balances::make_free_balance_be(&ALICE, 200);
+        assert_ok!(Benefits::add_benefit_funds(Origin::signed(ALICE.clone()), 100, FundsType::MARKET));
+        assert_eq!(Benefits::market_benefits(&ALICE), MarketBenefit {
+            total_funds: 100,
+            active_funds: 100,
+            used_fee_reduction_quota: 0,
+            file_reward: 0,
+            refreshed_at: 0,
+            unlocking_funds: vec![]
+        });
+        Benefits::update_reward(&ALICE, 100);
+        assert_eq!(Benefits::market_benefits(&ALICE), MarketBenefit {
+            total_funds: 100,
+            active_funds: 100,
+            used_fee_reduction_quota: 0,
+            file_reward: 100,
+            refreshed_at: 0,
+            unlocking_funds: vec![]
+        });
+        assert_eq!(Benefits::get_collateral_and_reward(&ALICE), (100, 100));
     });
 }

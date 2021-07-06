@@ -71,4 +71,6 @@ pub mod market {
     pub const USED_UPDATE_SLOT: u32 = 100;
     pub const USED_UPDATE_OFFSET: u32 = 7;
     pub const MAX_PENDING_FILES: usize = 20;
+
+    pub const COLLATERAL_RATIO: u32 = 10;
 }

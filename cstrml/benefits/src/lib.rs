@@ -133,6 +133,9 @@ pub struct MarketBenefit<Balance: HasCompact> {
     /// The used reduction for fee
     #[codec(compact)]
     pub used_fee_reduction_quota: Balance,
+    /// The file reward for market
+    #[codec(compact)]
+    pub file_reward: Balance,
     /// The latest refreshed active era index
     #[codec(compact)]
     pub refreshed_at: EraIndex,
@@ -264,6 +267,23 @@ impl<T: Config> BenefitInterface<<T as frame_system::Config>::AccountId, Balance
 
     fn maybe_free_count(who: &<T as frame_system::Config>::AccountId) -> bool {
         Self::maybe_do_free_count(who)
+    }
+
+    fn get_collateral_and_reward(who: &<T as frame_system::Config>::AccountId) -> (BalanceOf<T>, BalanceOf<T>) {
+        let market_benefits = Self::market_benefits(who);
+        (market_benefits.active_funds, market_benefits.file_reward)
+    }
+
+    fn update_reward(who: &<T as frame_system::Config>::AccountId, value: BalanceOf<T>) {
+        let mut market_benefit = Self::market_benefits(who);
+        market_benefit.file_reward = value;
+
+        // Remove the dead benefit
+        if market_benefit.unlocking_funds.is_empty() && market_benefit.active_funds.is_zero() && market_benefit.file_reward.is_zero() {
+            <MarketBenefits<T>>::remove(&who);
+        } else {
+            <MarketBenefits<T>>::insert(&who, market_benefit);
+        }
     }
 }
 
@@ -440,7 +460,7 @@ decl_module! {
                 T::Currency::unreserve(&who, to_unreserved_value);
 
                 // 4. Update or remove the who's fee reduction benefits for report works
-                if benefit.unlocking_funds.is_empty() && benefit.active_funds.is_zero() {
+                if benefit.unlocking_funds.is_empty() && benefit.active_funds.is_zero() && benefit.file_reward.is_zero() {
                     <MarketBenefits<T>>::remove(&who);
                 } else {
                     <MarketBenefits<T>>::insert(&who, benefit);

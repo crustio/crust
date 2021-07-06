@@ -322,7 +322,7 @@ decl_module! {
             // 1. identity_previous_key is none and workload is none => not started
             // 2. identity_previous_key is some and workload is some => calculating
             // 3. identity_previous_key is none and workload is some => calculation is done and will send workload to staking module
-            if ((now + UPDATE_OFFSET)% (REPORT_SLOT as u32)).is_zero() && Self::workload().is_none() && Self::identity_previous_key().is_none()  {
+            if ((now + UPDATE_OFFSET) % (REPORT_SLOT as u32)).is_zero() && Self::workload().is_none() && Self::identity_previous_key().is_none()  {
                 let prefix = <Identities<T>>::prefix_hash();
                 IdentityPreviousKey::put(prefix);
                 <Workload<T>>::put((BTreeMap::<T::AccountId, u128>::new(), 0u128, 0u128, 0u128));

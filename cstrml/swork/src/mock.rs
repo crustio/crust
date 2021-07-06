@@ -768,6 +768,6 @@ pub fn update_used_info() {
 }
 
 pub fn update_identities() {
-    Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET);
-    Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET);
+    Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET as u64);
+    Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET as u64);
 }

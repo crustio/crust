@@ -1624,7 +1624,7 @@ impl<T: Config> Module<T> {
             count += 1;
         }
         // Remove the MAX_PENDING_FILES files from pending files
-        if files_to_update.len() <= pending_files.len() {
+        if files_to_update.len() < pending_files.len() {
             for cid in files_to_update.clone() {
                 pending_files.remove(&cid);
             }

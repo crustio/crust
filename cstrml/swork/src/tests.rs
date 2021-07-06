@@ -944,7 +944,7 @@ fn update_identities_should_work() {
 
             // 1. Runs to 303 block
             run_to_block(303);
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 2);
@@ -976,7 +976,7 @@ fn update_identities_should_work() {
 
             // 4. Runs to 606
             run_to_block(606);
-            Swork::update_identities();
+            update_identities();
 
             // 5. Free and used should not change, but current_rs should already been updated
             assert_eq!(Swork::free(), 4294967296);
@@ -987,7 +987,7 @@ fn update_identities_should_work() {
 
             // 6. Runs to 909, work report is outdated
             run_to_block(909);
-            Swork::update_identities();
+            update_identities();
 
             // 7. Free and used should goes to 0, and the corresponding storage order should failed
             assert_eq!(Swork::free(), 0);
@@ -1018,9 +1018,9 @@ fn abnormal_era_should_work() {
             });
             add_live_files(&reporter, &legal_pk);
 
-            // 1. Normal new era, runs to 301 block
-            run_to_block(301);
-            Swork::update_identities();
+            // 1. Normal new era, runs to 202 block
+            run_to_block(202);
+            update_identities();
 
             // 2. Everything goes well
             assert_eq!(Swork::free(), 0);
@@ -1029,7 +1029,7 @@ fn abnormal_era_should_work() {
 
             // 4. Abnormal era happened, new era goes like 404
             run_to_block(404);
-            Swork::update_identities();
+            update_identities();
 
             // 5. Free and used should not change
             assert_eq!(Swork::free(), 0);
@@ -1098,7 +1098,7 @@ fn ab_upgrade_should_work() {
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
 
             // 4. Runs to 606, and do sWorker upgrade
-            Swork::update_identities();
+            update_identities();
             run_to_block(606);
             // Fake do upgrade
 
@@ -1167,7 +1167,7 @@ fn ab_upgrade_should_work() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-            Swork::update_identities();
+            update_identities();
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 62);
             assert_eq!(Swork::reported_files_size(), 32);
@@ -2508,7 +2508,7 @@ fn join_group_should_work_for_stake_limit() {
             ));
 
             run_to_block(303);
-            Swork::update_identities();
+            update_identities();
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
@@ -2556,7 +2556,7 @@ fn join_group_should_work_for_stake_limit() {
 
             run_to_block(603);
             update_used_info();
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 12884901888);
             assert_eq!(Swork::used(), 138); // 134 + 0 + 0 + 1 + 2 + 1
@@ -2622,7 +2622,7 @@ fn quit_group_should_work_for_stake_limit() {
             ));
 
             run_to_block(303);
-            Swork::update_identities();
+            update_identities();
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
@@ -2647,7 +2647,7 @@ fn quit_group_should_work_for_stake_limit() {
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
             update_used_info();
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 58); // 7 + 13 + 37 + 0 + 0 + 1
@@ -2720,7 +2720,7 @@ fn kick_out_should_work_for_stake_limit() {
             ));
 
             run_to_block(303);
-            Swork::update_identities();
+            update_identities();
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
@@ -2758,7 +2758,7 @@ fn kick_out_should_work_for_stake_limit() {
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
             update_used_info();
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 58); // 7 + 13 + 37 + 0 + 0 + 1
@@ -2801,7 +2801,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             ));
 
             run_to_block(303);
-            Swork::update_identities();
+            update_identities();
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
@@ -2821,7 +2821,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             run_to_block(603);
             update_used_info();
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 58); // 7 + 13 + 37 + 0 + 0 + 1
@@ -2833,7 +2833,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             run_to_block(903);
             // Punishment happen. Can't find report work at 600 report_slot. punishment deadline would be 1800. Block would be after 2100
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
@@ -2850,13 +2850,13 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             assert_eq!(*map.get(&ferdie).unwrap(), 0);
 
             run_to_block(1203);
-            Swork::update_identities();
+            update_identities();
 
             run_to_block(1503);
-            Swork::update_identities();
+            update_identities();
 
             run_to_block(1803);
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
@@ -2890,7 +2890,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
                 add_wr(&a_pk, &legal_wr);
             }
             run_to_block(3003);
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
@@ -2901,7 +2901,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             assert_eq!(*map.get(&ferdie).unwrap(), 0);
 
             run_to_block(3303);
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::identities(&alice).unwrap_or_default(), Identity {
                 anchor: a_pk.clone(),
@@ -2949,7 +2949,7 @@ fn cancel_punishment_should_work() {
             ));
 
             run_to_block(303);
-            Swork::update_identities();
+            update_identities();
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
@@ -2969,7 +2969,7 @@ fn cancel_punishment_should_work() {
 
             run_to_block(603);
             update_used_info();
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), 58); // 7 + 13 + 37 + 0 + 0 + 1
@@ -2981,7 +2981,7 @@ fn cancel_punishment_should_work() {
 
             run_to_block(903);
             // Punishment happen. Can't find report work at 600 report_slot. punishment deadline would be 1800. Block would be after 2100
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
@@ -2994,7 +2994,7 @@ fn cancel_punishment_should_work() {
             // Check 1200 and would still be punished.
             run_to_block(1600);
 
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 0);
             assert_eq!(Swork::used(), 0);
@@ -3026,7 +3026,7 @@ fn cancel_punishment_should_work() {
                 punishment_deadline: 0,
                 group: Some(ferdie.clone())
             });
-            Swork::update_identities();
+            update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
             assert_eq!(Swork::used(), alice_wr_info.used as u128 * 2);
@@ -3054,13 +3054,13 @@ fn remove_reported_in_slot_should_work() {
             <self::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
             <self::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
             run_to_block(1800);
-            Swork::update_identities();
+            update_identities();
             run_to_block(2100);
-            Swork::update_identities();
+            update_identities();
             assert_eq!(<self::ReportedInSlot>::contains_key(legal_pk.clone(), 0), false);
             assert_eq!(<self::ReportedInSlot>::contains_key(legal_pk.clone(), 300), true);
             run_to_block(2400);
-            Swork::update_identities();
+            update_identities();
             Swork::on_initialize(System::block_number());
             assert_eq!(<self::ReportedInSlot>::contains_key(legal_pk.clone(), 300), false);
         });
@@ -3148,5 +3148,192 @@ fn basic_check_should_work() {
                     message: Some("IllegalWorkReport"),
                 }
             );
+        });
+}
+
+#[test]
+fn update_identities_timeline_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_pk = LegalPK::get();
+
+            register(&legal_pk, LegalCode::get());
+            register_identity(&reporter, &legal_pk, &legal_pk);
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 0,
+                used: 2,
+                free: 0,
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            add_live_files(&reporter, &legal_pk);
+
+            run_to_block(202);
+            // Start update identity
+            Swork::on_initialize(200);
+            assert_eq!(Swork::workload().is_some(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(WorkloadMap::get().borrow().get(&reporter).is_none(), true);
+
+            Swork::on_initialize(201);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+
+            run_to_block(280);
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 0,
+                used: 4,
+                free: 0,
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            run_to_block(450);
+            // Don't do anything
+            Swork::on_initialize(300);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+
+            Swork::on_initialize(350);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+
+            Swork::on_initialize(499);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+            // Start update identity
+            Swork::on_initialize(500);
+            assert_eq!(Swork::workload().is_some(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
+            assert_eq!(Swork::current_report_slot(), 0);
+            Swork::on_initialize(500);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
+            assert_eq!(Swork::current_report_slot(), 300);
+
+            run_to_block(800);
+            // Start update identity, report_in_slot is false => no workload
+            Swork::on_initialize(800);
+            assert_eq!(Swork::workload().is_some(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
+            assert_eq!(Swork::current_report_slot(), 300);
+            Swork::on_initialize(899);
+            assert_eq!(Swork::workload().is_none(), true);
+            assert_eq!(Swork::identity_previous_key().is_none(), true);
+            assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 0u128);
+            assert_eq!(Swork::current_report_slot(), 600);
+    });
+}
+
+
+#[test]
+fn next_identity_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let alice = Sr25519Keyring::Alice.to_account_id();
+            let bob = Sr25519Keyring::Bob.to_account_id();
+            let charlie = Sr25519Keyring::Charlie.to_account_id();
+            let dave = Sr25519Keyring::Dave.to_account_id();
+            let eve = Sr25519Keyring::Eve.to_account_id();
+            let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+            <self::Identities<Test>>::insert(alice.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 100,
+                group: None
+            });
+
+            <self::Identities<Test>>::insert(bob.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 200,
+                group: None
+            });
+
+            <self::Identities<Test>>::insert(charlie.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 300,
+                group: None
+            });
+
+            <self::Identities<Test>>::insert(dave.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 400,
+                group: None
+            });
+            <self::Identities<Test>>::insert(eve.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 500,
+                group: None
+            });
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 100);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            <self::Identities<Test>>::remove(alice.clone());
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            <self::Identities<Test>>::insert(alice.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 100,
+                group: None
+            });
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 100);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            <self::Identities<Test>>::remove(alice.clone());
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            <self::Identities<Test>>::insert(alice.clone(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 100,
+                group: None
+            });
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
+
+            let prefix_hash = <self::Identities<Test>>::prefix_hash();
+            let mut previous_key = prefix_hash.clone();
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 200);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 300);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 100);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 400);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).unwrap().1.punishment_deadline, 500);
+            assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
         });
 }

@@ -766,3 +766,8 @@ fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: B
 pub fn update_used_info() {
     Market::on_initialize(93);
 }
+
+pub fn update_identities() {
+    Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET as u64);
+    Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET as u64);
+}

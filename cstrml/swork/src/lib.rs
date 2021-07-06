@@ -322,13 +322,13 @@ decl_module! {
             // 1. identity_previous_key is none and workload is none => not started
             // 2. identity_previous_key is some and workload is some => calculating
             // 3. identity_previous_key is none and workload is some => calculation is done and will send workload to staking module
-            if ((now + (UPDATE_OFFSET as u32)) % (REPORT_SLOT as u32)).is_zero() && Self::workload().is_none() && Self::identity_previous_key().is_none()  {
+            if ((now + UPDATE_OFFSET)% (REPORT_SLOT as u32)).is_zero() && Self::workload().is_none() && Self::identity_previous_key().is_none()  {
                 let prefix = <Identities<T>>::prefix_hash();
                 IdentityPreviousKey::put(prefix);
                 <Workload<T>>::put((BTreeMap::<T::AccountId, u128>::new(), 0u128, 0u128, 0u128));
             }
             // If it's not timeout and not finished yet, continue updating process
-            if !(now % (REPORT_SLOT as u32)).is_zero() && Self::identity_previous_key().is_some() {
+            if !((now + END_OFFSET) % (REPORT_SLOT as u32)).is_zero() && Self::identity_previous_key().is_some() {
                 let previous_key = Self::identity_previous_key().unwrap();
                 // Update the workload map in one batch iter, might kill the IdentityPreviousKey
                 // which means updating process is finished.

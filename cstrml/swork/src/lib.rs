@@ -116,11 +116,11 @@ pub struct Group<AccountId: Ord + PartialOrd> {
 
 /// An event handler for reporting works
 pub trait Works<AccountId> {
-    fn report_works(workload_map: BTreeMap<AccountId, u128>, total_workload: u128);
+    fn report_works(workload_map: BTreeMap<AccountId, u128>, total_workload: u128) -> Weight;
 }
 
 impl<AId> Works<AId> for () {
-    fn report_works(_: BTreeMap<AId, u128>, _: u128) {}
+    fn report_works(_: BTreeMap<AId, u128>, _: u128) -> Weight { 0 }
 }
 
 /// Implement market's file inspector
@@ -316,6 +316,11 @@ decl_module! {
         /// Called when a block is initialized. Will call update_identities to update stake limit
         fn on_initialize(now: T::BlockNumber) -> Weight {
             let now = TryInto::<u32>::try_into(now).ok().unwrap();
+            let mut consumed_weight: Weight = 0;
+            let mut add_db_reads_writes = |reads, writes, weights| {
+                consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+                consumed_weight += weights;
+            };
             // At REPORT_SLOT - UPDATE_OFFSET blocks, updating process would start
             // IdentityPreviousKey is used as the switch as well
             // There are three status
@@ -326,13 +331,15 @@ decl_module! {
                 let prefix = <Identities<T>>::prefix_hash();
                 IdentityPreviousKey::put(prefix);
                 <Workload<T>>::put((BTreeMap::<T::AccountId, u128>::new(), 0u128, 0u128, 0u128));
+                add_db_reads_writes(0, 2, 0);
             }
+            add_db_reads_writes(2, 0, 0);
             // If it's not timeout and not finished yet, continue updating process
             if !((now + END_OFFSET) % (REPORT_SLOT as u32)).is_zero() && Self::identity_previous_key().is_some() {
                 let previous_key = Self::identity_previous_key().unwrap();
                 // Update the workload map in one batch iter, might kill the IdentityPreviousKey
                 // which means updating process is finished.
-                Self::patial_update_identities(previous_key);
+                add_db_reads_writes(0, 0, Self::patial_update_identities(previous_key));
             } else {
                 if let Some((workload_map, total_free, total_used, total_reported_files_size)) = Self::workload() {
                     // Update Free, Used, ReportedFilesSize and CurrentReportSlot
@@ -341,17 +348,19 @@ decl_module! {
                     ReportedFilesSize::put(total_reported_files_size);
                     CurrentReportSlot::mutate(|crs| *crs = Self::get_current_reported_slot());
 
+                    add_db_reads_writes(0, 4, 0);
+
                     // Invoke report works to update stake limit
                     let total_workload = total_used.saturating_add(total_free);
-                    T::Works::report_works(workload_map, total_workload);
+                    add_db_reads_writes(0, 0, T::Works::report_works(workload_map, total_workload));
 
                     // Kill the IdentityPreviousKey and Workload
                     IdentityPreviousKey::kill();
                     <Workload<T>>::kill();
+                    add_db_reads_writes(0, 2, 0);
                 }
             }
-            // TODO: Recalculate this weight
-            0
+            consumed_weight
         }
 
         /// Set code for AB Upgrade, this should only be called by `root` origin
@@ -856,16 +865,24 @@ impl<T: Config> Module<T> {
     ///
     /// TC = O(2n)
     /// DB try is 2n+5+Works_DB_try
-    fn patial_update_identities(previous_key: Vec<u8>) {
+    fn patial_update_identities(previous_key: Vec<u8>) -> Weight {
+        let mut consumed_weight: Weight = 0;
+        let mut add_db_reads_writes = |reads, writes| {
+            consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+        };
         let prefix = <Identities<T>>::prefix_hash();
         let current_rs = Self::current_report_slot();
         let mut previous_key = previous_key;
         let maybe_to_removed_slot = current_rs.checked_sub(Self::history_slot_depth());
         let enable_punishment = Self::enable_punishment();
         if let Some((mut workload_map, mut total_free, mut total_used, mut total_reported_files_size)) = Self::workload() {
+            // read workload
+            add_db_reads_writes(1, 0);
             for _ in 0..IDENTITY_UPDATE_LENGTH {
                 if let Some((reporter, mut id)) = Self::next_identity(&prefix, &mut previous_key) {
                     let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs, enable_punishment);
+                    // read identity, work_report and report_in_slot, write identity
+                    add_db_reads_writes(3, 1);
                     total_used = total_used.saturating_add(used);
                     total_free = total_free.saturating_add(free);
                     total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
@@ -878,16 +895,23 @@ impl<T: Config> Module<T> {
                     workload_map.insert(owner, workload);
                     if let Some(to_removed_slot) = maybe_to_removed_slot {
                         ReportedInSlot::remove(&id.anchor, to_removed_slot);
+                        // write report_in_slot
+                        add_db_reads_writes(0, 1);
                     }
                 } else {
                     IdentityPreviousKey::kill();
                     <Workload<T>>::put((workload_map, total_free, total_used, total_reported_files_size));
-                    return;
+                    // write workload
+                    add_db_reads_writes(0, 1);
+                    return consumed_weight;
                 }
             }
             IdentityPreviousKey::put(previous_key);
             <Workload<T>>::put((workload_map, total_free, total_used, total_reported_files_size));
+            // write workload
+            add_db_reads_writes(0, 2);
         }
+        return consumed_weight;
     }
 
     pub fn next_identity(prefix: &Vec<u8>, previous_key: &mut Vec<u8>) -> Option<(T::AccountId, Identity<T::AccountId>)> {

@@ -1508,15 +1508,18 @@ impl<T: Config> Module<T> {
         }
     }
 
-    pub fn update_stage_one_stake_limit(workload_map: BTreeMap<T::AccountId, u128>) {
+    pub fn update_stage_one_stake_limit(workload_map: BTreeMap<T::AccountId, u128>) -> u64 {
         // In stage one, state limit / own workload is fixed to T::SPowerRatio
+        let mut validators_count = 0;
         for (v_stash, _) in <Validators<T>>::iter() {
+            validators_count += 1;
             let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
             Self::upsert_stake_limit(
                 &v_stash,
                 Self::stage_one_stake_limit_of(*v_own_workload),
             );
         }
+        validators_count
     }
 
     /// Calculate the stake limit by storage workloads, returns the stake limit value
@@ -1536,8 +1539,8 @@ impl<T: Config> Module<T> {
         }
     }
 
-    pub fn update_stage_two_stake_limit(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128, total_stake_limit: u128) {
-
+    pub fn update_stage_two_stake_limit(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128, total_stake_limit: u128) -> u64 {
+        let mut validators_count = 0;
         let byte_to_kilobyte = |workload_in_byte: u128| {
             workload_in_byte / 1024
         };
@@ -1545,6 +1548,7 @@ impl<T: Config> Module<T> {
         // Decrease the precision to kb to avoid overflow
         let total_workload_in_kb = byte_to_kilobyte(total_workload);
         for (v_stash, _) in <Validators<T>>::iter() {
+            validators_count += 1;
             let v_own_workload = workload_map.get(&v_stash).unwrap_or(&0u128);
             // Decrease the precision to kb to avoid overflow
             let v_own_workload_in_kb = byte_to_kilobyte(*v_own_workload);
@@ -1553,6 +1557,7 @@ impl<T: Config> Module<T> {
                 Self::stage_two_stake_limit_of(v_own_workload_in_kb, total_workload_in_kb, total_stake_limit),
             );
         }
+        validators_count
     }
 
     pub fn limit_ratio_according_to_effective_staking(total_issuance: BalanceOf<T>) -> (u128, Perbill) {
@@ -2452,18 +2457,24 @@ impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, 
 
 
 impl<T: Config> swork::Works<T::AccountId> for Module<T> {
-    fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) {
+    fn report_works(workload_map: BTreeMap<T::AccountId, u128>, total_workload: u128) -> Weight {
+        let mut consumed_weight: Weight = 0;
+        let mut add_db_reads_writes = |reads, writes| {
+            consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+        };
         // 1. Calculate total stake limit
         let total_stake_limit = Self::calculate_total_stake_limit();
         let group_counts = workload_map.len() as u32;
-
+        add_db_reads_writes(3, 0);
         // 2. total_workload * SPowerRatio < total_stake_limit => stage one
-        if total_workload.saturating_mul(T::SPowerRatio::get()) < total_stake_limit {
-            Self::update_stage_one_stake_limit(workload_map);
+        let validators_count: u64 = if total_workload.saturating_mul(T::SPowerRatio::get()) < total_stake_limit {
+            Self::update_stage_one_stake_limit(workload_map)
         } else {
-            Self::update_stage_two_stake_limit(workload_map, total_workload, total_stake_limit);
-        }
+            Self::update_stage_two_stake_limit(workload_map, total_workload, total_stake_limit)
+        };
+        add_db_reads_writes(validators_count, validators_count);
         Self::deposit_event(RawEvent::UpdateStakeLimitSuccess(group_counts));
+        consumed_weight
     }
 }
 

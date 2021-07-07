@@ -1,3 +1,4 @@
+cargo-features = ["resolver"]
 [profile.release]
 panic = 'unwind'
 
@@ -9,6 +10,7 @@ exclude = [
     "utils/serde_derive_no_std",
     "utils/serde_derive_no_std"
 ]
+resolver = "2"
 
 members = [
     'utils/inverse-funtion',

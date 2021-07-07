@@ -28,4 +28,4 @@ std = [
 	"frame-support/std",
 	"serde",
 ]
-dev = []
+test = []

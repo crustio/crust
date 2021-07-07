@@ -26,7 +26,7 @@ primitives = { package = "cst-primitives", path = "../../primitives", default-fe
 sp-io = "3.0.0"
 sp-core = "3.0.0"
 pallet-transaction-payment = "3.0.0"
-primitives = { package = "cst-primitives", path = "../../primitives", features = ["dev"] }
+primitives = { package = "cst-primitives", path = "../../primitives", features = ["test"] }
 
 [features]
 default = ["std"]

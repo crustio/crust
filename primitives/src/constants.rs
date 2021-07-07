@@ -23,10 +23,11 @@ pub mod time {
     // Testnet
     //	pub const MILLISECS_PER_BLOCK: Moment = 1000;
     pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
-    // Mainnet
-    #[cfg(feature = "dev")]
+
+    // Use different settings in the test
+    #[cfg(feature = "test")]
     pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 10 * MINUTES;
-    #[cfg(not(feature = "dev"))]
+    #[cfg(not(feature = "test"))]
     pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 1 * HOURS;
 
     // These time units are defined in number of blocks.
@@ -59,10 +60,10 @@ pub mod staking {
 pub mod swork {
     use super::time::*;
 
-    // Mainnet
-    #[cfg(feature = "dev")]
+    // Use different settings in the test
+    #[cfg(feature = "test")]
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64 * 3;
-    #[cfg(not(feature = "dev"))]
+    #[cfg(not(feature = "test"))]
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
 
     pub const UPDATE_OFFSET: u32 = (REPORT_SLOT / 3) as u32;
@@ -79,9 +80,9 @@ pub mod market {
     pub const MAX_PENDING_FILES: usize = 20;
 
 
-    // Mainnet
-    #[cfg(feature = "dev")]
+    // Use different settings in the test
+    #[cfg(feature = "test")]
     pub const COLLATERAL_RATIO: u32 = 10;
-    #[cfg(not(feature = "dev"))]
+    #[cfg(not(feature = "test"))]
     pub const COLLATERAL_RATIO: u32 = 5;
 }

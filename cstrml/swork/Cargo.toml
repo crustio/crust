@@ -32,7 +32,7 @@ serde_json = { package = "serde_json_no_std", path = "../../utils/serde_json_no_
 [dev-dependencies]
 keyring = { package = "sp-keyring", version = "3.0.0" }
 balances = { package = "cstrml-balances", path = "../balances" }
-primitives = { package = "cst-primitives", path = "../../primitives", features = ["dev"] }
+primitives = { package = "cst-primitives", path = "../../primitives", features = ["test"] }
 market = { package = "cstrml-market", path = "../market" }
 hex = "0.4.2"
 

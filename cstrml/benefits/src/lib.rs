@@ -8,6 +8,7 @@
 use sp_std::prelude::*;
 use frame_support::{
     decl_event, decl_storage, decl_module, decl_error, ensure,
+    weights::{Weight},
     dispatch::HasCompact,
     traits::{Currency, ReservableCurrency, Get,
              WithdrawReasons, ExistenceRequirement, Imbalance}
@@ -34,11 +35,20 @@ mod tests;
 #[cfg(any(feature = "runtime-benchmarks", test))]
 pub mod benchmarking;
 
+pub mod weight;
+
 /// The balance type of this module.
 pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 const MAX_UNLOCKING_CHUNKS: usize = 16;
+
+pub trait WeightInfo {
+    fn add_benefit_funds() -> Weight;
+    fn cut_benefit_funds() -> Weight;
+    fn rebond_benefit_funds() -> Weight;
+    fn withdraw_benefit_funds() -> Weight;
+}
 
 pub trait Config: frame_system::Config {
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
@@ -51,6 +61,8 @@ pub trait Config: frame_system::Config {
     type BenefitMarketCostRatio: Get<Perbill>;
     /// Number of eras that staked funds must remain bonded for.
     type BondingDuration: Get<EraIndex>;
+    /// Weight information for extrinsics in this pallet.
+    type WeightInfo: WeightInfo;
 }
 
 decl_event!(
@@ -320,8 +332,7 @@ decl_module! {
         fn deposit_event() = default;
 
         /// Add benefit funds
-        // TODO: Refine this weight
-        #[weight = 1000]
+        #[weight = T::WeightInfo::add_benefit_funds()]
         pub fn add_benefit_funds(origin, #[compact] value: BalanceOf<T>, funds_type: FundsType) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -353,8 +364,7 @@ decl_module! {
         }
 
         /// Cut benefit funds
-        // TODO: Refine this weight
-        #[weight = 1000]
+        #[weight = T::WeightInfo::cut_benefit_funds()]
         pub fn cut_benefit_funds(origin, #[compact] value: BalanceOf<T>, funds_type: FundsType) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -426,8 +436,7 @@ decl_module! {
         }
 
         /// Withdraw benefit funds
-        // TODO: Refine this weight
-        #[weight = 1000]
+        #[weight = T::WeightInfo::withdraw_benefit_funds()]
         pub fn withdraw_benefit_funds(origin) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -484,8 +493,7 @@ decl_module! {
         }
 
         /// Withdraw benefit funds
-        // TODO: Refine this weight
-        #[weight = 1000]
+        #[weight = T::WeightInfo::rebond_benefit_funds()]
         pub fn rebond_benefit_funds(origin, #[compact] value: BalanceOf<T>, funds_type: FundsType) -> DispatchResult {
             let who = ensure_signed(origin)?;
 

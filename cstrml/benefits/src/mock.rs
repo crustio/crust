@@ -72,6 +72,7 @@ impl Config for Test {
     type BenefitsLimitRatio = BenefitsLimitRatio;
     type BenefitMarketCostRatio = BenefitMarketCostRatio;
     type BondingDuration = BondingDuration;
+    type WeightInfo = weight::WeightInfo<Test>;
 }
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;

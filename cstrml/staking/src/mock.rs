@@ -211,7 +211,7 @@ impl pallet_timestamp::Config for Test {
 }
 pub struct TestStaking;
 impl swork::Works<AccountId> for TestStaking {
-    fn report_works(workload_map: BTreeMap<AccountId, u128>, _total_workload: u128) {
+    fn report_works(workload_map: BTreeMap<AccountId, u128>, _total_workload: u128) -> Weight {
         // Disable work report in mock test
         for (controller, _) in workload_map.iter() {
             if let Some(ledger) = <Ledger<Test>>::get(&controller) {
@@ -221,6 +221,7 @@ impl swork::Works<AccountId> for TestStaking {
                 );
             }
         }
+        0
     }
 }
 

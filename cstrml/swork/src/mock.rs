@@ -173,11 +173,12 @@ impl market::Config for Test {
 pub struct TestWorksInterface;
 
 impl Works<AccountId> for TestWorksInterface {
-    fn report_works(workload_map: BTreeMap<AccountId, u128>, _: u128) {
+    fn report_works(workload_map: BTreeMap<AccountId, u128>, _: u128) -> Weight {
         // Disable work report in mock test
         for (who, own_workload) in workload_map.iter() {
             WorkloadMap::set(who, *own_workload);
         }
+        0
     }
 }
 

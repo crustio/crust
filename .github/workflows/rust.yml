@@ -4,10 +4,12 @@ on:
   push:
     branches: 
       - master
+      - mainnet*
       - feature/*
   pull_request:
     branches:
       - master
+      - mainnet*
       - feature/*
 jobs:
   build_and_test:

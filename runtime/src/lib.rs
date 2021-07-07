@@ -393,12 +393,12 @@ impl pallet_session::historical::Config for Runtime {
 
 parameter_types! {
     pub const StakingModuleId: ModuleId = ModuleId(*b"cstaking");
-    // 36 sessions in an era (6 hours).
-    pub const SessionsPerEra: SessionIndex = 36;
-    // 28 eras for unbonding (14 hours).
-    pub const BondingDuration: EraIndex = 28;
-    // 28 eras in which slashes can be cancelled (14 hours).
-    pub const SlashDeferDuration: EraIndex = 28;
+    // 6 sessions in an era (6 hours).
+    pub const SessionsPerEra: SessionIndex = 6;
+    // 60 eras for unbonding (15 days).
+    pub const BondingDuration: EraIndex = 60;
+    // 28 eras in which slashes can be cancelled (slightly less than 7 days).
+    pub const SlashDeferDuration: EraIndex = 27;
     // 1 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `1`
     pub const SPowerRatio: u128 = 1;
     // 64 guarantors for one validator.
@@ -445,7 +445,7 @@ impl pallet_offences::Config for Runtime {
 }
 
 parameter_types! {
-    pub const ExistentialDeposit: u128 = 1 * CENTS;
+    pub const ExistentialDeposit: u128 = 1 * MILLICENTS;
     pub const MaxLocks: u32 = 50;
 }
 
@@ -501,9 +501,9 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 
 parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
-	pub const ProposalBondMinimum: Balance = 20 * DOLLARS;
+	pub const ProposalBondMinimum: Balance = 10 * DOLLARS;
 	pub const SpendPeriod: BlockNumber = 6 * DAYS;
-	pub const Burn: Permill = Permill::from_perthousand(0);
+	pub const Burn: Permill = Permill::from_perthousand(2);
 	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
 
 	pub const TipCountdown: BlockNumber = 1 * DAYS;
@@ -738,7 +738,7 @@ impl pallet_sudo::Config for Runtime {
 }
 
 parameter_types! {
-    pub const PunishmentSlots: u32 = 24; // 24 report slot == 2 era == 12 hours
+    pub const PunishmentSlots: u32 = 8; // 8 report slot == 8 hours
     pub const MaxGroupSize: u32 = 100;
 }
 
@@ -756,7 +756,7 @@ impl swork::Config for Runtime {
 parameter_types! {
     /// Unit is pico
     pub const MarketModuleId: ModuleId = ModuleId(*b"crmarket");
-    pub const FileDuration: BlockNumber = 15 * DAYS;
+    pub const FileDuration: BlockNumber = 180 * DAYS;
     pub const LiquidityDuration: BlockNumber = 15 * DAYS;
     pub const FileReplica: u32 = 4;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
@@ -796,7 +796,7 @@ impl market::Config for Runtime {
 }
 
 parameter_types! {
-    pub const BenefitReportWorkCost: Balance = 1 * DOLLARS;
+    pub const BenefitReportWorkCost: Balance = 3 * DOLLARS;
     pub const BenefitsLimitRatio: Perbill = Perbill::from_percent(1);
     pub const BenefitMarketCostRatio: Perbill = Perbill::one();
 }

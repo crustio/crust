@@ -78,5 +78,10 @@ pub mod market {
     pub const USED_UPDATE_OFFSET: u32 = 7;
     pub const MAX_PENDING_FILES: usize = 20;
 
+
+    // Mainnet
+    #[cfg(feature = "dev")]
     pub const COLLATERAL_RATIO: u32 = 10;
+    #[cfg(not(feature = "dev"))]
+    pub const COLLATERAL_RATIO: u32 = 5;
 }

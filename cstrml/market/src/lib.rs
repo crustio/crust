@@ -487,22 +487,30 @@ decl_module! {
         /// Called when a block is initialized. Will call update_identities to update file price
         fn on_initialize(now: T::BlockNumber) -> Weight {
             let now = TryInto::<u32>::try_into(now).ok().unwrap();
+            let mut consumed_weight: Weight = 0;
+            let mut add_db_reads_writes = |reads, writes| {
+                consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+            };
             if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::new_order(){
                 Self::update_file_price();
                 Self::update_files_count_price();
                 NewOrder::put(false);
+                add_db_reads_writes(8, 3);
             }
+            add_db_reads_writes(1, 0);
             if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::pending_files().len() >= MAX_PENDING_FILES {
                 let files = Self::get_files_to_update();
                 for cid in files {
                     if let Some((file_info, mut used_info)) = Self::files(&cid) {
-                        Self::update_groups_used_info(file_info.file_size, &mut used_info);
+                        let groups_count = Self::update_groups_used_info(file_info.file_size, &mut used_info);
                         <Files<T>>::insert(cid, (file_info, used_info));
+                        add_db_reads_writes(groups_count, groups_count + 1);
                     }
+                    add_db_reads_writes(1, 0);
                 }
             }
-            // TODO: Recalculate this weight
-            0
+            add_db_reads_writes(1, 0);
+            consumed_weight
         }
 
         /// Bond the origin to the owner
@@ -1011,7 +1019,8 @@ impl<T: Config> Module<T> {
 
         // 4. Update used_info
         used_info.reported_group_count = Self::count_reported_groups(&mut used_info.groups, curr_bn); // use curr_bn here since we want to check the latest status
-        Self::update_groups_used_info(file_info.file_size, &mut used_info);
+        // TODO: add this weight into place_storage_order
+        let _ = Self::update_groups_used_info(file_info.file_size, &mut used_info);
 
         let calculated_block = curr_bn.min(file_info.expired_on);
         let target_reward_count = file_info.replicas.len().min(T::FileReplica::get() as usize) as u32;
@@ -1087,7 +1096,8 @@ impl<T: Config> Module<T> {
     fn move_into_trash(cid: &MerkleRoot, mut used_info: UsedInfo, file_size: u64) {
         // Update used info
         used_info.reported_group_count = 1;
-        Self::update_groups_used_info(file_size, &mut used_info);
+        // TODO: add this weight into place_storage_order
+        let _ = Self::update_groups_used_info(file_size, &mut used_info);
 
         if Self::used_trash_size_i() < T::UsedTrashMaxSize::get() {
             UsedTrashI::insert(cid, used_info.clone());
@@ -1487,15 +1497,18 @@ impl<T: Config> Module<T> {
         false
     }
 
-    fn update_groups_used_info(file_size: u64, used_info: &mut UsedInfo) {
+    fn update_groups_used_info(file_size: u64, used_info: &mut UsedInfo) -> u64 {
         let new_used_size = Self::calculate_used_size(file_size, used_info.reported_group_count);
         let prev_used_size = used_info.used_size;
+        let mut groups_count = 0;
         if prev_used_size != new_used_size {
+            groups_count = used_info.groups.keys().len() as u64;
             for anchor in used_info.groups.keys() {
                 T::SworkerInterface::update_used(anchor, prev_used_size, new_used_size);
             }
         }
         used_info.used_size = new_used_size;
+        groups_count
     }
 
     fn count_reported_groups(groups: &mut BTreeMap<SworkerAnchor, bool>, curr_bn: BlockNumber) -> u32 {

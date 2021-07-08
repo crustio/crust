@@ -1,6 +1,6 @@
 [package]
 name = "cstrml-swork"
-version = "0.12.0"
+version = "1.0.0"
 authors = ["crustio"]
 edition = "2018"
 license = "Apache-2.0"

@@ -2,7 +2,7 @@
 authors = ["crustio"]
 edition = "2018"
 name = "crust-runtime"
-version = "0.12.0"
+version = "1.0.0"
 build = "build.rs"
 license = "Apache-2.0"
 homepage = "https://crust.network"
@@ -72,19 +72,18 @@ frame-system-rpc-runtime-api = { default-features = false, version = "3.0.0" }
 pallet-transaction-payment-rpc-runtime-api = { default-features = false, version = "3.0.0" }
 
 # crust runtime modules
-balances = { package = "cstrml-balances", path = "../cstrml/balances", default-features = false, version = "0.12.0" }
-candy = { package = "cstrml-candy", path = "../cstrml/candy", default-features = false, version = "0.12.0"  }
-claims = { package = "cstrml-claims", path = "../cstrml/claims", default-features = false, version = "0.12.0" }
-market = { package = "cstrml-market", path = "../cstrml/market", default-features = false, version = "0.12.0" }
-primitives = { package = "cst-primitives", path = "../primitives", default-features = false, version = "0.12.0" }
-swork = { package = "cstrml-swork", path = "../cstrml/swork", default-features = false, version = "0.12.0" }
-staking = { package = "cstrml-staking", path = "../cstrml/staking", default-features = false, version = "0.12.0" }
-benefits = { package = "cstrml-benefits", path = "../cstrml/benefits", default-features = false, version = "0.12.0" }
-locks = { package = "cstrml-locks", path = "../cstrml/locks", default-features = false, version = "0.12.0" }
-csm-locking = { package = "cstrml-csm-locking", path = "../cstrml/csm-locking", default-features = false, version = "0.12.0" }
+balances = { package = "cstrml-balances", path = "../cstrml/balances", default-features = false, version = "1.0.0" }
+claims = { package = "cstrml-claims", path = "../cstrml/claims", default-features = false, version = "1.0.0" }
+market = { package = "cstrml-market", path = "../cstrml/market", default-features = false, version = "1.0.0" }
+primitives = { package = "cst-primitives", path = "../primitives", default-features = false, version = "1.0.0" }
+swork = { package = "cstrml-swork", path = "../cstrml/swork", default-features = false, version = "1.0.0" }
+staking = { package = "cstrml-staking", path = "../cstrml/staking", default-features = false, version = "1.0.0" }
+benefits = { package = "cstrml-benefits", path = "../cstrml/benefits", default-features = false, version = "1.0.0" }
+locks = { package = "cstrml-locks", path = "../cstrml/locks", default-features = false, version = "1.0.0" }
+csm-locking = { package = "cstrml-csm-locking", path = "../cstrml/csm-locking", default-features = false, version = "1.0.0" }
 
 # crust benchmark dependencies
-swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "0.12.0" }
+swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "1.0.0" }
 
 [features]
 default = ["std"]
@@ -113,7 +112,6 @@ std = [
     "pallet-babe/std",
     "balances/std",
     "pallet-bounties/std",
-    "candy/std",
     "claims/std",
     "pallet-collective/std",
     "pallet-elections-phragmen/std",

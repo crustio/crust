@@ -17,31 +17,31 @@ use sp_staking::offence::OffenceDetails;
 use substrate_test_utils::assert_eq_uvec;
 use swork::Works;
 
-// #[test]
-// fn force_unstake_works() {
-//     // Verifies initial conditions of mock
-//     ExtBuilder::default().build().execute_with(|| {
-//         // Account 11 is stashed and locked, and account 10 is the controller
-//         assert_eq!(Staking::bonded(&11), Some(10));
-//         // Cant transfer
-//         assert_noop!(
-//             Balances::transfer(Origin::signed(11), 1, 10),
-//             DispatchError::Module {
-//                 index: 2,
-//                 error: 1,
-//                 message: Some("LiquidityRestrictions"),
-//             }
-//         );
-//         // Force unstake requires root.
-//         assert_noop!(Staking::force_unstake(Origin::signed(11), 11), BadOrigin);
-//         // We now force them to unstake
-//         assert_ok!(Staking::force_unstake(Origin::root(), 11));
-//         // No longer bonded.
-//         assert_eq!(Staking::bonded(&11), None);
-//         // Transfer works.
-//         assert_ok!(Balances::transfer(Origin::signed(11), 1, 10));
-//     });
-// }
+#[test]
+fn force_unstake_works() {
+    // Verifies initial conditions of mock
+    ExtBuilder::default().build().execute_with(|| {
+        // Account 11 is stashed and locked, and account 10 is the controller
+        assert_eq!(Staking::bonded(&11), Some(10));
+        // Cant transfer
+        assert_noop!(
+            Balances::transfer(Origin::signed(11), 1, 10),
+            DispatchError::Module {
+                index: 2,
+                error: 1,
+                message: Some("LiquidityRestrictions"),
+            }
+        );
+        // Force unstake requires root.
+        assert_noop!(Staking::force_unstake(Origin::signed(11), 11), BadOrigin);
+        // We now force them to unstake
+        assert_ok!(Staking::force_unstake(Origin::root(), 11));
+        // No longer bonded.
+        assert_eq!(Staking::bonded(&11), None);
+        // Transfer works.
+        assert_ok!(Balances::transfer(Origin::signed(11), 1, 10));
+    });
+}
 
 #[test]
 fn basic_setup_works() {
@@ -1267,64 +1267,64 @@ fn forcing_new_era_works() {
     });
 }
 
-// #[test]
-// fn cannot_transfer_staked_balance() {
-//     // Tests that a stash account cannot transfer funds
-//     ExtBuilder::default()
-//         .guarantee(false)
-//         .build()
-//         .execute_with(|| {
-//             // Confirm account 11 is stashed
-//             assert_eq!(Staking::bonded(&11), Some(10));
-//             // Confirm account 11 has some free balance
-//             assert_eq!(Balances::free_balance(&11), 1000);
-//             // Confirm account 11 (via controller 10) is totally staked
-//             assert_eq!(Staking::eras_stakers(0, &11).total, 1000);
-//             // Confirm account 11 cannot transfer as a result
-//             assert_noop!(
-//                 Balances::transfer(Origin::signed(11), 20, 1),
-//                 DispatchError::Module {
-//                     index: 2,
-//                     error: 1,
-//                     message: Some("LiquidityRestrictions"),
-//                 }
-//             );
-//
-//             // Give account 11 extra free balance
-//             let _ = Balances::make_free_balance_be(&11, 10000);
-//             // Confirm that account 11 can now transfer some balance
-//             assert_ok!(Balances::transfer(Origin::signed(11), 20, 1));
-//         });
-// }
+#[test]
+fn cannot_transfer_staked_balance() {
+    // Tests that a stash account cannot transfer funds
+    ExtBuilder::default()
+        .guarantee(false)
+        .build()
+        .execute_with(|| {
+            // Confirm account 11 is stashed
+            assert_eq!(Staking::bonded(&11), Some(10));
+            // Confirm account 11 has some free balance
+            assert_eq!(Balances::free_balance(&11), 1000);
+            // Confirm account 11 (via controller 10) is totally staked
+            assert_eq!(Staking::eras_stakers(0, &11).total, 1000);
+            // Confirm account 11 cannot transfer as a result
+            assert_noop!(
+                Balances::transfer(Origin::signed(11), 20, 1),
+                DispatchError::Module {
+                    index: 2,
+                    error: 1,
+                    message: Some("LiquidityRestrictions"),
+                }
+            );
 
-// #[test]
-// fn cannot_transfer_staked_balance_2() {
-//     // Tests that a stash account cannot transfer funds
-//     // Same test as above but with 20, and more accurate.
-//     // 21 has 2000 free balance but 1000 at stake
-//     ExtBuilder::default()
-//         .guarantee(false)
-//         .fair(true)
-//         .build()
-//         .execute_with(|| {
-//             // Confirm account 21 is stashed
-//             assert_eq!(Staking::bonded(&21), Some(20));
-//             // Confirm account 21 has some free balance
-//             assert_eq!(Balances::free_balance(&21), 2000);
-//             // Confirm account 21 (via controller 20) is totally staked
-//             assert_eq!(Staking::eras_stakers(0, &21).total, 1000);
-//             // Confirm account 21 can transfer at most 1000
-//             assert_noop!(
-//                 Balances::transfer(Origin::signed(21), 20, 1001),
-//                 DispatchError::Module {
-//                     index: 2,
-//                     error: 1,
-//                     message: Some("LiquidityRestrictions"),
-//                 }
-//             );
-//             assert_ok!(Balances::transfer(Origin::signed(21), 20, 1000));
-//         });
-// }
+            // Give account 11 extra free balance
+            let _ = Balances::make_free_balance_be(&11, 10000);
+            // Confirm that account 11 can now transfer some balance
+            assert_ok!(Balances::transfer(Origin::signed(11), 20, 1));
+        });
+}
+
+#[test]
+fn cannot_transfer_staked_balance_2() {
+    // Tests that a stash account cannot transfer funds
+    // Same test as above but with 20, and more accurate.
+    // 21 has 2000 free balance but 1000 at stake
+    ExtBuilder::default()
+        .guarantee(false)
+        .fair(true)
+        .build()
+        .execute_with(|| {
+            // Confirm account 21 is stashed
+            assert_eq!(Staking::bonded(&21), Some(20));
+            // Confirm account 21 has some free balance
+            assert_eq!(Balances::free_balance(&21), 2000);
+            // Confirm account 21 (via controller 20) is totally staked
+            assert_eq!(Staking::eras_stakers(0, &21).total, 1000);
+            // Confirm account 21 can transfer at most 1000
+            assert_noop!(
+                Balances::transfer(Origin::signed(21), 20, 1001),
+                DispatchError::Module {
+                    index: 2,
+                    error: 1,
+                    message: Some("LiquidityRestrictions"),
+                }
+            );
+            assert_ok!(Balances::transfer(Origin::signed(21), 20, 1000));
+        });
+}
 
 #[test]
 fn cannot_reserve_staked_balance() {

@@ -228,45 +228,44 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
-		/// Transfer some liquid free balance to another account.
-		///
-		/// `transfer` will set the `FreeBalance` of the sender and receiver.
-		/// It will decrease the total issuance of the system by the `TransferFee`.
-		/// If the sender's account is below the existential deposit as a result
-		/// of the transfer, the account will be reaped.
-		///
-		/// The dispatch origin for this call must be `Signed` by the transactor.
-		///
-		/// # <weight>
-		/// - Dependent on arguments but not critical, given proper implementations for
-		///   input config types. See related functions below.
-		/// - It contains a limited number of reads and writes internally and no complex computation.
-		///
-		/// Related functions:
-		///
-		///   - `ensure_can_withdraw` is always called internally but has a bounded complexity.
-		///   - Transferring balances to accounts that did not exist before will cause
-		///      `T::OnNewAccount::on_new_account` to be called.
-		///   - Removing enough funds from an account will trigger `T::DustRemoval::on_unbalanced`.
-		///   - `transfer_keep_alive` works the same way as `transfer`, but has an additional
-		///     check that the transfer will not kill the origin account.
-		/// ---------------------------------
-		/// - Base Weight: 73.64 µs, worst case scenario (account created, account removed)
-		/// - DB Weight: 1 Read and 1 Write to destination account
-		/// - Origin account is already in memory, so no DB operations for them.
-		/// # </weight>
-		#[pallet::weight(T::WeightInfo::transfer())]
-		pub fn transfer(
-			origin: OriginFor<T>,
-			dest: <T::Lookup as StaticLookup>::Source,
-			#[pallet::compact] value: T::Balance,
-		) -> DispatchResultWithPostInfo {
-			let transactor = ensure_signed(origin)?;
-			let dest = T::Lookup::lookup(dest)?;
-			#[cfg(test)]
-			<Self as Currency<_>>::transfer(&transactor, &dest, value, ExistenceRequirement::AllowDeath)?;
-			Ok(().into())
-		}
+		// /// Transfer some liquid free balance to another account.
+		// ///
+		// /// `transfer` will set the `FreeBalance` of the sender and receiver.
+		// /// It will decrease the total issuance of the system by the `TransferFee`.
+		// /// If the sender's account is below the existential deposit as a result
+		// /// of the transfer, the account will be reaped.
+		// ///
+		// /// The dispatch origin for this call must be `Signed` by the transactor.
+		// ///
+		// /// # <weight>
+		// /// - Dependent on arguments but not critical, given proper implementations for
+		// ///   input config types. See related functions below.
+		// /// - It contains a limited number of reads and writes internally and no complex computation.
+		// ///
+		// /// Related functions:
+		// ///
+		// ///   - `ensure_can_withdraw` is always called internally but has a bounded complexity.
+		// ///   - Transferring balances to accounts that did not exist before will cause
+		// ///      `T::OnNewAccount::on_new_account` to be called.
+		// ///   - Removing enough funds from an account will trigger `T::DustRemoval::on_unbalanced`.
+		// ///   - `transfer_keep_alive` works the same way as `transfer`, but has an additional
+		// ///     check that the transfer will not kill the origin account.
+		// /// ---------------------------------
+		// /// - Base Weight: 73.64 µs, worst case scenario (account created, account removed)
+		// /// - DB Weight: 1 Read and 1 Write to destination account
+		// /// - Origin account is already in memory, so no DB operations for them.
+		// /// # </weight>
+		// #[pallet::weight(T::WeightInfo::transfer())]
+		// pub fn transfer(
+		// 	origin: OriginFor<T>,
+		// 	dest: <T::Lookup as StaticLookup>::Source,
+		// 	#[pallet::compact] value: T::Balance,
+		// ) -> DispatchResultWithPostInfo {
+		// 	let transactor = ensure_signed(origin)?;
+		// 	let dest = T::Lookup::lookup(dest)?;
+		// 	<Self as Currency<_>>::transfer(&transactor, &dest, value, ExistenceRequirement::AllowDeath)?;
+		// 	Ok(().into())
+		// }
 
 		/// Set the balances of a given account.
 		///
@@ -346,29 +345,28 @@ pub mod pallet {
 			Ok(().into())
 		}
 
-		/// Same as the [`transfer`] call, but with a check that the transfer will not kill the
-		/// origin account.
-		///
-		/// 99% of the time you want [`transfer`] instead.
-		///
-		/// [`transfer`]: struct.Pallet.html#method.transfer
-		/// # <weight>
-		/// - Cheaper than transfer because account cannot be killed.
-		/// - Base Weight: 51.4 µs
-		/// - DB Weight: 1 Read and 1 Write to dest (sender is in overlay already)
-		/// #</weight>
-		#[pallet::weight(T::WeightInfo::transfer_keep_alive())]
-		pub fn transfer_keep_alive(
-			origin: OriginFor<T>,
-			dest: <T::Lookup as StaticLookup>::Source,
-			#[pallet::compact] value: T::Balance,
-		) -> DispatchResultWithPostInfo {
-			let transactor = ensure_signed(origin)?;
-			let dest = T::Lookup::lookup(dest)?;
-			#[cfg(test)]
-			<Self as Currency<_>>::transfer(&transactor, &dest, value, KeepAlive)?;
-			Ok(().into())
-		}
+		// /// Same as the [`transfer`] call, but with a check that the transfer will not kill the
+		// /// origin account.
+		// ///
+		// /// 99% of the time you want [`transfer`] instead.
+		// ///
+		// /// [`transfer`]: struct.Pallet.html#method.transfer
+		// /// # <weight>
+		// /// - Cheaper than transfer because account cannot be killed.
+		// /// - Base Weight: 51.4 µs
+		// /// - DB Weight: 1 Read and 1 Write to dest (sender is in overlay already)
+		// /// #</weight>
+		// #[pallet::weight(T::WeightInfo::transfer_keep_alive())]
+		// pub fn transfer_keep_alive(
+		// 	origin: OriginFor<T>,
+		// 	dest: <T::Lookup as StaticLookup>::Source,
+		// 	#[pallet::compact] value: T::Balance,
+		// ) -> DispatchResultWithPostInfo {
+		// 	let transactor = ensure_signed(origin)?;
+		// 	let dest = T::Lookup::lookup(dest)?;
+		// 	<Self as Currency<_>>::transfer(&transactor, &dest, value, KeepAlive)?;
+		// 	Ok(().into())
+		// }
 	}
 
 	#[pallet::event]

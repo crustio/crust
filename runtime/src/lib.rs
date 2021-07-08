@@ -827,7 +827,7 @@ construct_runtime! {
         // Governance stuff
         Treasury: pallet_treasury::{Module, Call, Storage, Config, Event<T>},
         // Bounties: pallet_bounties::{Module, Call, Storage, Event<T>},
-		// Tips: pallet_tips::{Module, Call, Storage, Event<T>},
+        // Tips: pallet_tips::{Module, Call, Storage, Event<T>},
         // Treasury: pallet_treasury::{Module, Call, Storage, Config, Event<T>},
         // Council: pallet_collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
         // TechnicalCommittee: pallet_collective::<Instance2>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
@@ -839,10 +839,10 @@ construct_runtime! {
         Scheduler: pallet_scheduler::{Module, Call, Storage, Event<T>},
 
         // Utility module
-		Utility: pallet_utility::{Module, Call, Event},
+        Utility: pallet_utility::{Module, Call, Event},
 
-		// Less simple identity module
-		Identity: pallet_identity::{Module, Call, Storage, Event<T>},
+        // Less simple identity module
+        Identity: pallet_identity::{Module, Call, Storage, Event<T>},
 
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},

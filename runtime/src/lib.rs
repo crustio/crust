@@ -847,14 +847,12 @@ construct_runtime! {
         // Crust modules
         Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
         Market: market::{Module, Call, Storage, Event<T>, Config},
-
-        // Sudo. Last module. Usable initially, but removed once governance enabled.
-        Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
-
-        // Token candy and claims bridge
         Claims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
         Benefits: benefits::{Module, Call, Storage, Event<T>},
         Locks: locks::{Module, Call, Storage, Config<T>, Event<T>},
+
+        // Sudo. Last module. Usable initially, but removed once governance enabled.
+        Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
     }
 }
 
@@ -1098,7 +1096,7 @@ impl_runtime_apis! {
             add_benchmark!(params, batches, market, Market);
             add_benchmark!(params, batches, swork, SworkBench::<Runtime>);
             add_benchmark!(params, batches, benefits, Benefits);
-            add_benchmark!(params, batches, csmlocking, CSMLocking);
+            // add_benchmark!(params, batches, csmlocking, CSMLocking);
             add_benchmark!(params, batches, locks, Locks);
 
             if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }

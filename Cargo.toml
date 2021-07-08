@@ -15,7 +15,6 @@ resolver = "2"
 members = [
     'utils/inverse-funtion',
     'cstrml/balances',
-    'cstrml/candy',
     'cstrml/claims',
     'cstrml/staking',
     'cstrml/swork',

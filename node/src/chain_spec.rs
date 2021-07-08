@@ -187,6 +187,23 @@ pub fn maxwell_staging_config() -> Result<CrustChainSpec, String> {
     ))
 }
 
+/// Crust mainnet staging config
+pub fn mainnet_staging_config() -> Result<CrustChainSpec, String> {
+    let wasm_binary = WASM_BINARY.ok_or("Mainnet wasm not available")?;
+
+    Ok(CrustChainSpec::from_genesis(
+        "Crust",
+        "crust",
+        ChainType::Live,
+        move || mainnet_staging_testnet_config_genesis(wasm_binary),
+        vec![],
+        None,
+        Some(DEFAULT_PROTOCOL_ID),
+        None,
+        Default::default()
+    ))
+}
+
 /// The genesis spec of crust dev/local test network
 fn testnet_genesis(
     wasm_binary: &[u8],
@@ -418,6 +435,101 @@ fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     // Constants
     const ENDOWMENT: u128 = 2_500_000 * CRUS;
     const STASH: u128 = 1_250_000 * CRUS;
+
+    GenesisConfig {
+        pallet_sudo: Some(SudoConfig {
+            key: endowed_accounts[0].clone(),
+        }),
+        frame_system: Some(SystemConfig {
+            code: wasm_binary.to_vec(),
+            changes_trie_config: Default::default(),
+        }),
+        balances_Instance1: Some(BalancesConfig {
+            balances: endowed_accounts
+                .iter()
+                .cloned()
+                .map(|k| (k, ENDOWMENT))
+                .collect(),
+        }),
+        pallet_indices: Some(IndicesConfig {
+            indices: vec![],
+        }),
+        pallet_session: Some(SessionConfig {
+            keys: initial_authorities.iter().map(|x| (
+                x.0.clone(),
+                x.0.clone(),
+                session_keys(x.2.clone(), x.3.clone(), x.4.clone(), x.5.clone()),
+            )).collect::<Vec<_>>(),
+        }),
+        staking: Some(StakingConfig {
+            validator_count: 15,
+            minimum_validator_count: 1,
+            stakers: initial_authorities
+                .iter()
+                .map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
+                .collect(),
+            invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
+            force_era: Forcing::NotForcing,
+            slash_reward_fraction: Perbill::from_percent(10),
+            ..Default::default()
+        }),
+        market: Some(Default::default()),
+        pallet_babe: Some(Default::default()),
+        pallet_grandpa: Some(Default::default()),
+        pallet_im_online: Some(Default::default()),
+        pallet_authority_discovery: Some(AuthorityDiscoveryConfig {
+            keys: vec![]
+        }),
+        swork: Some(SworkConfig {
+            init_codes: vec![]
+        }),
+        locks: Some(LocksConfig {
+            genesis_locks: vec![]
+        }),
+        pallet_treasury: Some(Default::default()),
+    }
+}
+
+/// The genesis spec of crust mainnet test network
+fn mainnet_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
+    // subkey inspect "$SECRET"
+    let endowed_accounts: Vec<AccountId> = vec![
+        // cTMedEiTGjKYJw8U1P9R7wPPS3Fwe5KCbiWy5pAkza7CPKubM
+        hex!["683a26127e98e79c45f1bb08c6941179e2932b416017c6ac6cb0fd5665d7354e"].into(),
+        // cTMKoe6bJL1Wud7w9z2mTW1nQwJFspudz68H7W8K1TSXFzzhw
+        hex!["1c37d81ef1ebfc2953216a566cf490c7d53db3adaa4aeab15acc4ca2d6577a1d"].into(),
+    ];
+
+    // for i in 1; do for j in {stash, controller}; do subkey inspect "$SECRET//$i//$j"; done; done
+    // for i in 1; do for j in grandpa; do subkey --ed25519 inspect "$SECRET//$i//$j"; done; done
+    // for i in 1; do for j in babe; do subkey --sr25519 inspect "$SECRET//$i//$j"; done; done
+    // for i in 1; do for j in im_online; do subkey --sr25519 inspect "$SECRET//$i//$j"; done; done
+    // for i in 1; do for j in authority_discovery; do subkey --sr25519 inspect "$SECRET//$i//$j"; done; done
+    let initial_authorities: Vec<(
+        AccountId,
+        AccountId,
+        GrandpaId,
+        BabeId,
+        ImOnlineId,
+        AuthorityDiscoveryId,
+    )> = vec![(
+        // cTMKoe6bJL1Wud7w9z2mTW1nQwJFspudz68H7W8K1TSXFzzhw
+        hex!["1c37d81ef1ebfc2953216a566cf490c7d53db3adaa4aeab15acc4ca2d6577a1d"].into(),
+        // cTMedEiTGjKYJw8U1P9R7wPPS3Fwe5KCbiWy5pAkza7CPKubM
+        hex!["683a26127e98e79c45f1bb08c6941179e2932b416017c6ac6cb0fd5665d7354e"].into(),
+        // cTMKoe6bJL1Wud7w9z2mTW1nQwJFspudz68H7W8K1TSXFzzhw --ed25519
+        hex!["ad9996dcf1123ea5a1fc134a2124b958f2faeb16dacebf2923192702b33a8a0c"].unchecked_into(),
+        // cTMKoe6bJL1Wud7w9z2mTW1nQwJFspudz68H7W8K1TSXFzzhw --sr25519
+        hex!["1c37d81ef1ebfc2953216a566cf490c7d53db3adaa4aeab15acc4ca2d6577a1d"].unchecked_into(),
+        // cTMKoe6bJL1Wud7w9z2mTW1nQwJFspudz68H7W8K1TSXFzzhw --sr25519
+        hex!["1c37d81ef1ebfc2953216a566cf490c7d53db3adaa4aeab15acc4ca2d6577a1d"].unchecked_into(),
+        // cTMKoe6bJL1Wud7w9z2mTW1nQwJFspudz68H7W8K1TSXFzzhw --sr25519
+        hex!["1c37d81ef1ebfc2953216a566cf490c7d53db3adaa4aeab15acc4ca2d6577a1d"].unchecked_into(),
+    )];
+
+    // Constants
+    const ENDOWMENT: u128 = 10 * CRUS;
+    const STASH: u128 = 10 * CRUS;
 
     GenesisConfig {
         pallet_sudo: Some(SudoConfig {

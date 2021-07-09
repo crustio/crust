@@ -154,6 +154,11 @@ pub fn maxwell_config() -> Result<CrustChainSpec, String> {
     CrustChainSpec::from_json_bytes(&include_bytes!("../res/maxwell.json")[..])
 }
 
+/// Crust mainnet(aka. open testnet) config
+pub fn mainnet_config() -> Result<CrustChainSpec, String> {
+    CrustChainSpec::from_json_bytes(&include_bytes!("../res/mainnet.json")[..])
+}
+
 /// Crust rocky staging config
 pub fn rocky_staging_config() -> Result<CrustChainSpec, String> {
     let wasm_binary = WASM_BINARY.ok_or("Rocky wasm not available")?;

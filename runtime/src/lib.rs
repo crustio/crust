@@ -679,10 +679,12 @@ impl balances::Config<balances::Instance1> for Runtime {
 }
 
 parameter_types! {
+    pub const ClaimsModuleId: ModuleId = ModuleId(*b"crclaims");
 	pub Prefix: &'static [u8] = b"Pay CRUs to the Crust account:";
 }
 
 impl claims::Config for Runtime {
+    type ModuleId = ClaimsModuleId;
     type Event = Event;
     type Currency = Balances;
     type Prefix = Prefix;

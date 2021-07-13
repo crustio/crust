@@ -54,9 +54,11 @@ impl balances::Config for Test {
 }
 
 parameter_types!{
+    pub const ClaimModuleId: ModuleId = ModuleId(*b"crclaims");
     pub Prefix: &'static [u8] = b"Pay RUSTs to the TEST account:";
 }
 impl Config for Test {
+    type ModuleId = ClaimModuleId;
     type Event = ();
     type Currency = Balances;
     type Prefix = Prefix;

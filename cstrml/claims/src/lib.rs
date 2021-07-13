@@ -7,7 +7,7 @@ use sp_std::prelude::*;
 use sp_io::{hashing::keccak_256, crypto::secp256k1_ecdsa_recover};
 use frame_support::{
     decl_event, decl_storage, decl_module, decl_error, ensure,
-    traits::{Currency, Get}
+    traits::{Currency, Get, ExistenceRequirement::AllowDeath}
 };
 use frame_system::{ensure_signed, ensure_root, ensure_none};
 use codec::{Encode, Decode};
@@ -15,12 +15,12 @@ use codec::{Encode, Decode};
 use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
 
 use sp_runtime::{
-    RuntimeDebug, DispatchResult,
+    RuntimeDebug, DispatchResult, ModuleId,
     transaction_validity::{
         TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
     },
     traits::{
-        Zero, StaticLookup, Saturating
+        Zero, StaticLookup, Saturating, AccountIdConversion
     },
 };
 
@@ -34,9 +34,16 @@ mod tests;
 pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 pub trait Config: frame_system::Config {
+    /// The claim's module id, used for deriving its sovereign account ID.
+    type ModuleId: Get<ModuleId>;
+
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+
+    /// The payment balance.
     type Currency: Currency<Self::AccountId>;
+
+    /// The constant used for ethereum signature.
     type Prefix: Get<&'static [u8]>;
 }
 
@@ -128,6 +135,8 @@ decl_event!(
         Balance = BalanceOf<T>,
         AccountId = <T as frame_system::Config>::AccountId
     {
+        /// Init pot success
+        InitPot(AccountId, Balance),
         /// Someone be the new superior
         SuperiorChanged(AccountId),
         /// Someone be the new miner
@@ -171,10 +180,19 @@ decl_storage! {
     // This allows for type-safe usage of the Substrate storage database, so you can
     // keep things around between blocks.
     trait Store for Module<T: Config> as Claims {
+        /// Claim limit determinate how many CRUs can be claimed
         ClaimLimit get(fn claim_limit): BalanceOf<T> = Zero::zero();
+
+        /// The claim transaction mapping relationship in ethereum
         Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
+
+        /// Mark if the claim transaction has already been claimed
         Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
+
+        /// [who] can set the claim limit
         Superior get(fn superior): Option<T::AccountId>;
+
+        /// [who] can mint the claims
         Miner get(fn miner): Option<T::AccountId>;
     }
 }
@@ -183,11 +201,29 @@ decl_module! {
     pub struct Module<T: Config> for enum Call where origin: T::Origin {
         type Error = Error<T>;
 
+        fn deposit_event() = default;
+
         /// The Prefix that is used in signed Ethereum messages for this network
         const Prefix: &[u8] = T::Prefix::get();
 
-        fn deposit_event() = default;
+        /// The claim's module id, used for deriving its sovereign account ID.
+        const ModuleId: ModuleId = T::ModuleId::get();
 
+        /// Init claim pot
+        ///
+        /// This dispatch origin for this call must be _Root_.
+        ///
+        /// Parameter:
+        /// - `amount`: The amount set for the claim pot
+        #[weight = 1000]
+        fn init_pot(origin, amount: BalanceOf<T>) -> DispatchResult {
+            ensure_root(origin)?;
+
+            T::Currency::deposit_creating(&Self::claim_pot(), amount);
+
+            Self::deposit_event(RawEvent::InitPot(Self::claim_pot(), amount));
+            Ok(())
+        }
 
         /// Change superior
         ///
@@ -195,7 +231,7 @@ decl_module! {
         ///
         /// Parameter:
         /// - `new_superior`: The new superior's address
-        #[weight = 0]
+        #[weight = 1000]
         fn change_superior(origin, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
@@ -214,7 +250,7 @@ decl_module! {
         ///
         /// Parameters:
         /// - `new_miner`: The new miner's address
-        #[weight = 0]
+        #[weight = 1000]
         fn change_miner(origin, new_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
@@ -227,7 +263,12 @@ decl_module! {
         }
 
         /// Set claim limit
-        #[weight = 0]
+        ///
+        /// The dispatch origin for this call must be _Superior_.
+        ///
+        /// Parameters:
+        /// - `limit`: The claim CRUs limit
+        #[weight = 1000]
         fn set_claim_limit(origin, limit: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_superior = Self::superior();
@@ -246,7 +287,14 @@ decl_module! {
         }
 
         /// Mint the claim
-        #[weight = 0]
+        ///
+        /// This dispatch origin for this call must be _Miner_.
+        ///
+        /// Parameters:
+        /// - `tx`: The claim ethereum tx hash
+        /// - `who`: The claimer ethereum address
+        /// - `value`: The amount of this tx, should be less than claim_limit
+        #[weight = 1000]
         fn mint_claim(origin, tx: EthereumTxHash, who: EthereumAddress, value: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_miner = Self::miner();
@@ -254,13 +302,13 @@ decl_module! {
             // 1. Check if miner exist
             ensure!(maybe_miner.is_some(), Error::<T>::MinerNotExist);
 
-            // 2. Check if this tx already be mint or be claimed
+            // 2. Check if this tx already be mint
             ensure!(!Claims::<T>::contains_key(&tx), Error::<T>::AlreadyBeMint);
 
             // 3. Check if signer is miner
             ensure!(Some(&signer) == maybe_miner.as_ref(), Error::<T>::IllegalMiner);
 
-            // 4. Check limit
+            // 4. Check claim limit
             ensure!(Self::claim_limit() >= value, Error::<T>::ExceedClaimLimit);
 
             // 5. Save into claims
@@ -305,6 +353,12 @@ fn to_ascii_hex(data: &[u8]) -> Vec<u8> {
 }
 
 impl<T: Config> Module<T> {
+    // The claim pot account
+    fn claim_pot() -> T::AccountId {
+        // "modl" ++ "crclaims" ++ "clai" is 16 bytes
+        T::ModuleId::get().into_sub_account("clai")
+    }
+
     // Constructs the message that Ethereum RPC's `personal_sign` and `eth_sign` would sign.
     fn ethereum_signable_message(what: &[u8], extra: &[u8]) -> Vec<u8> {
         let prefix = T::Prefix::get();
@@ -337,7 +391,7 @@ impl<T: Config> Module<T> {
             ensure!(claimer == signer, Error::<T>::SignatureNotMatch);
 
             // 2. Give money to signer
-            T::Currency::deposit_creating(&dest, amount);
+            T::Currency::transfer(&Self::claim_pot(), &dest, amount, AllowDeath)?;
 
             // 3. Mark it be claimed
             Claimed::insert(tx, true);

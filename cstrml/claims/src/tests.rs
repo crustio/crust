@@ -8,9 +8,10 @@ use frame_support::{assert_noop, assert_ok, dispatch::DispatchError};
 #[test]
 fn happy_pass_should_work() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
+        // 0. Set miner, superior and pot
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
         assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        assert_ok!(CrustClaims::init_pot(Origin::root(), 1000));
 
         // 1. Set claim limit = 100
         assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
@@ -139,9 +140,10 @@ fn double_mint_should_failed() {
 #[test]
 fn double_claim_should_failed() {
     new_test_ext().execute_with(|| {
-        // 0. Set miner and superior
+        // 0. Set miner, superior and pot
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
         assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        assert_ok!(CrustClaims::init_pot(Origin::root(), 1000));
 
         // 1. Set limitation
         assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
@@ -189,5 +191,37 @@ fn claim_limit_should_work() {
         // 3. Claim amount with limitation should be ok
         assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 10));
         assert_eq!(CrustClaims::claim_limit(), 0);
+    });
+}
+
+#[test]
+fn claim_pot_should_work() {
+    new_test_ext().execute_with(|| {
+        // 0. Set miner, superior and pot
+        assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
+        assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
+        assert_ok!(CrustClaims::init_pot(Origin::root(), 10));
+
+        // 1. Set claim limit = 100
+        assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
+        assert_eq!(CrustClaims::claim_limit(), 100);
+
+        // 2. Mint a claim should failed due to the pot's balance is not enough
+        let tx_hash = get_legal_tx_hash1();
+        let eth_addr = get_legal_eth_addr();
+        let sig = get_legal_eth_sig();
+        assert_ok!(CrustClaims::mint_claim(Origin::signed(1), tx_hash.clone(), eth_addr.clone(), 100));
+        assert_noop!(
+            CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone()),
+            DispatchError::Module {
+                index: 1,
+                error: 3,
+                message: Some("InsufficientBalance")
+            }
+        );
+
+        // 3. Set pot again
+        assert_ok!(CrustClaims::init_pot(Origin::root(), 100));
+        assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone())); // 100 should success due to the `AllowDeath`
     });
 }

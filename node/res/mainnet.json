@@ -2,7 +2,11 @@
   "name": "Crust",
   "id": "crust",
   "chainType": "Live",
-  "bootNodes": [],
+  "bootNodes": [
+    "/dns/rpc1.crust.network/tcp/30333/p2p/12D3KooWAzJnjc174fgKnf5xNxZjTBUkj58qsXu1c1saQMNfVRxr",
+    "/dns/rpc2.crust.network/tcp/30333/p2p/12D3KooWJCBUsBZEiQJKYq1Tvfzp38NLzdUxqsTezYxTsv9WkcbV",
+    "/dns/rpc4.crust.network/tcp/30333/p2p/12D3KooWNAXEa8Hb7LB8eCzamQP87KQTReV2uo42kBGpTHr19TB6"
+  ],
   "telemetryEndpoints": [
     [
       "wss://telemetry.polkadot.io/submit/",

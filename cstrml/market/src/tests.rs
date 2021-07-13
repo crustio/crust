@@ -38,23 +38,18 @@ fn place_storage_order_should_work() {
         <FilesCountPrice<Test>>::put(1000);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
-            file_size, 0
+            file_size, 0, vec![]
         ));
-        assert_eq!(Market::files(&cid).unwrap_or_default(), (
-            FileInfo {
+        assert_eq!(Market::files(&cid).unwrap_or_default(), FileInfo {
                 file_size,
+                used_size: file_size,
                 expired_on: 0,
                 calculated_at: 50,
                 amount: 360, // ( 1000 * 1 + 0 + 1000 ) * 0.18
                 prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
-            },
-            UsedInfo {
-                used_size: 0,
-                reported_group_count: 0,
-                groups: BTreeMap::new()
-            })
+            }
         );
         assert_eq!(Balances::free_balance(reserved_pot), 1200);
         assert_eq!(Balances::free_balance(staking_pot), 1440);

@@ -210,7 +210,6 @@ parameter_types! {
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
-    pub const UsedTrashMaxSize: u128 = 2;
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
     pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
@@ -232,7 +231,6 @@ impl Config for Test {
     type StakingRatio = StakingRatio;
     type RenewRewardRatio = RenewRewardRatio;
     type StorageRatio = StorageRatio;
-    type UsedTrashMaxSize = UsedTrashMaxSize;
     type MaximumFileSize = MaximumFileSize;
     type WeightInfo = weight::WeightInfo<Test>;
 }

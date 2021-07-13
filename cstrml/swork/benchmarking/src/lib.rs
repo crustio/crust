@@ -9,9 +9,9 @@ use frame_support::traits::Currency;
 use frame_support::storage::StorageMap;
 use sp_runtime::traits::{StaticLookup, Zero};
 use codec::Decode;
-use market::{UsedInfo, FileInfo, Replica};
+use market::{FileInfo, Replica};
 use primitives::*;
-use sp_std::{vec, prelude::*, collections::{btree_set::BTreeSet, btree_map::BTreeMap}, iter::FromIterator};
+use sp_std::{vec, prelude::*, collections::btree_set::BTreeSet, iter::FromIterator};
 
 const SEED: u32 = 0;
 const EXPIRE_BLOCK_NUMBER: u32 = 2000;
@@ -133,23 +133,20 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
 
 fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::AccountId, pub_key: Vec<u8>) {
     for (file, file_size, _) in files.clone().iter() {
-        let used_info = UsedInfo {
-            used_size: *file_size,
-            reported_group_count: 0,
-            groups: <BTreeMap<SworkerAnchor, bool>>::new()
-        };
         let mut replicas: Vec<Replica<T::AccountId>> = vec![];
         for _ in 0..200 {
             let new_replica = Replica {
                 who: user.clone(),
                 valid_at: 300,
                 anchor: pub_key.clone(),
-                is_reported: true
+                is_reported: true,
+                reported_at: None
             };
             replicas.push(new_replica);
         }
         let file_info = FileInfo {
             file_size: *file_size,
+            used_size: *file_size,
             expired_on: 1000,
             calculated_at: 400,
             amount: <T as market::Config>::Currency::minimum_balance() * 1000000000u32.into(),
@@ -157,7 +154,7 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
             reported_replica_count: 0,
             replicas
         };
-        <market::Files<T>>::insert(file, (file_info, used_info));
+        <market::Files<T>>::insert(file, file_info);
     }
     let storage_value = <T as market::Config>::Currency::minimum_balance() * 10000000u32.into();
     <T as market::Config>::Currency::make_free_balance_be(&market::Module::<T>::storage_pot(), storage_value);

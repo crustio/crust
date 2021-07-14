@@ -1858,7 +1858,7 @@ fn clear_trash_should_work() {
                 file_size,
                 expired_on: 0,
                 calculated_at: 50,
-                amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                amount: 180, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                 prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -1886,7 +1886,7 @@ fn clear_trash_should_work() {
                     file_size,
                     expired_on: 1303,
                     calculated_at: 303,
-                    amount: 360, // ( 1000 + 1000 * 1 + 0 ) * 0.2
+                    amount: 180, // ( 1000 + 1000 * 1 + 0 ) * 0.2
                     prepaid: 0,
                     reported_replica_count: 1,
                     replicas: vec![Replica {
@@ -3434,7 +3434,7 @@ fn change_base_fee_should_work() {
                 file_size,
                 expired_on: 0,
                 calculated_at: 50,
-                amount: 32_220, // ( 50000 + 1000 * 129 + 0 ) * 0.18
+                amount: 23_220, // ( 1000 * 129 + 0 ) * 0.18
                 prepaid: 0,
                 reported_replica_count: 0,
                 replicas: vec![]
@@ -3445,9 +3445,9 @@ fn change_base_fee_should_work() {
                 groups: BTreeMap::new()
             })
         );
-        assert_eq!(Balances::free_balance(reserved_pot), 17900);
-        assert_eq!(Balances::free_balance(staking_pot), 128880);
-        assert_eq!(Balances::free_balance(storage_pot), 32220);
+        assert_eq!(Balances::free_balance(reserved_pot), 62900);
+        assert_eq!(Balances::free_balance(staking_pot), 92880);
+        assert_eq!(Balances::free_balance(storage_pot), 23220);
 
         run_to_block(303);
 
@@ -3478,7 +3478,7 @@ fn change_base_fee_should_work() {
                 file_size,
                 expired_on: 1303,
                 calculated_at: 303,
-                amount: 32_220,
+                amount: 23_220,
                 prepaid: 200_000,
                 reported_replica_count: 1,
                 replicas: vec![Replica {
@@ -3504,7 +3504,7 @@ fn change_base_fee_should_work() {
                 file_size,
                 expired_on: 2303,
                 calculated_at: 1303,
-                amount: 57996, // 32_220 * 0.8 + 32_220
+                amount: 41796, // 23_220 * 0.8 + 23_220
                 prepaid: 12050, // 200000 -187950
                 reported_replica_count: 0,
                 replicas: vec![Replica {

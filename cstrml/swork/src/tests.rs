@@ -392,7 +392,7 @@ fn report_works_should_work() {
 
             assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
                 anchor: legal_pk.clone(),
-                punishment_deadline: 300,
+                punishment_deadline: NEW_IDENTITY,
                 group: None
             });
             assert_eq!(Swork::pub_keys(legal_pk.clone()), PKInfo {
@@ -1357,7 +1357,7 @@ fn create_and_join_group_should_work() {
 
             assert_eq!(Swork::identities(&bob).unwrap_or_default(), Identity {
                 anchor: b_pk.clone(),
-                punishment_deadline: 0,
+                punishment_deadline: NO_PUNISHMENT,
                 group: Some(alice.clone())
             });
         });
@@ -1449,7 +1449,7 @@ fn group_allowlist_should_work() {
 
             assert_eq!(Swork::identities(&bob).unwrap_or_default(), Identity {
                 anchor: b_pk.clone(),
-                punishment_deadline: 0,
+                punishment_deadline: NO_PUNISHMENT,
                 group: Some(alice.clone())
             });
 
@@ -1745,7 +1745,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
 
             assert_eq!(Swork::identities(&bob).unwrap_or_default(), Identity {
                 anchor: b_pk.clone(),
-                punishment_deadline: 0,
+                punishment_deadline: NO_PUNISHMENT,
                 group: Some(alice.clone())
             });
 
@@ -3023,7 +3023,7 @@ fn cancel_punishment_should_work() {
             assert_ok!(Swork::cancel_punishment(Origin::root(), alice.clone()));
             assert_eq!(Swork::identities(alice.clone()).unwrap_or_default(), Identity {
                 anchor: a_pk.clone(),
-                punishment_deadline: 0,
+                punishment_deadline: NO_PUNISHMENT,
                 group: Some(ferdie.clone())
             });
             update_identities();

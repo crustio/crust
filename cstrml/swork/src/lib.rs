@@ -53,6 +53,8 @@ const IDENTITY_UPDATE_LENGTH: usize = 500; // Loop 500 identities per block
 const SRD_LIMIT: u64 = 2_251_799_813_685_248; // 2 PB <-> 2 * 1024 * 1024 * 1024 * 1024 * 1024.
 const FILES_LIMIT: u64 = 9_007_199_254_740_992; // 8 PB <-> 8 * 1024 * 1024 * 1024 * 1024 * 1024.
 const FILES_COUNT_LIMIT: usize = 5000; // 5000 files for now.
+const NEW_IDENTITY: ReportSlot = 1;
+const NO_PUNISHMENT: ReportSlot = 0;
 
 #[macro_export]
 macro_rules! log {
@@ -570,14 +572,14 @@ decl_module! {
                     Some(mut identity) => {
                         Self::chill_anchor(&identity.anchor);
                         identity.anchor = curr_pk.clone();
-                        identity.punishment_deadline = slot;
+                        identity.punishment_deadline = NEW_IDENTITY;
                         <Identities<T>>::insert(&reporter, identity);
                     },
                     // 10.3 first register scenario
                     None => {
                         let identity = Identity {
                             anchor: curr_pk.clone(),
-                            punishment_deadline: slot,
+                            punishment_deadline: NEW_IDENTITY,
                             group: None
                         };
                         <Identities<T>>::insert(&reporter, identity);
@@ -825,7 +827,7 @@ decl_module! {
 
             // 2. Cancel the punishment
             <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
-                Some(Identity { ref mut punishment_deadline, .. }) => *punishment_deadline = 0,
+                Some(Identity { ref mut punishment_deadline, .. }) => *punishment_deadline = NO_PUNISHMENT,
                 None => {},
             });
 
@@ -1073,8 +1075,15 @@ impl<T: Config> Module<T> {
             return Self::reported_in_slot(&id.anchor, current_rs);
         }
         if !Self::reported_in_slot(&id.anchor, current_rs) {
-            // should have wr, otherwise punish it again and refresh the deadline.
-            id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
+            // punishment_deadline == NEW_IDENTITY => It's the first time to check report in slot.
+            // We should ignore it and set punishment_deadline to NO_PUNISHMENT.
+            // Otherwise, it should have wr.
+            // Or punish it again and refresh the deadline.
+            if id.punishment_deadline == NEW_IDENTITY {
+                id.punishment_deadline = NO_PUNISHMENT;
+            } else {
+                id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
+            }
             <Identities<T>>::insert(reporter, id.clone());
         }
         if current_rs < id.punishment_deadline {

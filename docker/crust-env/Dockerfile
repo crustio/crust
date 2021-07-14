@@ -2,7 +2,7 @@
 FROM rust:latest
 
 ARG TOOLCHAIN
-ENV RUSTUP_TOOLCHAIN ${TOOLCHAIN:-nightly-2020-08-10}
+ENV RUSTUP_TOOLCHAIN ${TOOLCHAIN:-nightly-2021-01-11}
 RUN apt-get update
 RUN apt-get -y install lsb-release wget software-properties-common
 RUN wget https://apt.llvm.org/llvm.sh

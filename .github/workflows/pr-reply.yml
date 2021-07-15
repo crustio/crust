@@ -1,0 +1,30 @@
+name: Crust MainNet Upgrade Checker
+
+on:
+  pull_request:
+    branches:
+      - mainnet
+    types: [created, edited]
+
+jobs:
+  mainnet_upgrade_checker:
+    runs-on: ubuntu-latest
+    name: MainNet Upgrade Checker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      
+      - name: CheckList
+        uses: allthatjazzleo/actions-pull-request-add-comment@v1
+        if: >-
+          github.event_name == 'pull_request' && github.event.pull_request.title == '[Runtime] MainNet Upgrade'
+        with:
+          message: '**This checklist should applied every bump version on `mainnet` branch**
+          <br/>0. Spec version
+          <br/>1. Feature in PRs
+          <br/>2. Types change (Will this affect API/sManager/Subscan/Other Services)
+          <br/>3. Storage migration
+          <br/>4. Interface changed(Extrinsic/Chain state/Event changed)
+          <br/>5. WASM building env
+          <br/>6. Announcement'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

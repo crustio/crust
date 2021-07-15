@@ -2920,125 +2920,6 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 }
 
 #[test]
-fn cancel_punishment_should_work() {
-    ExtBuilder::default()
-        .build()
-        .execute_with(|| {
-            let alice = Sr25519Keyring::Alice.to_account_id();
-            let ferdie = Sr25519Keyring::Ferdie.to_account_id();
-
-            let alice_wr_info = group_work_report_alice_300();
-            let a_pk = alice_wr_info.curr_pk.clone();
-
-            register(&a_pk, LegalCode::get());
-            register_identity(&alice, &a_pk, &a_pk);
-
-            // alice join the ferdie's group
-            assert_ok!(Swork::create_group(
-                Origin::signed(ferdie.clone())
-            ));
-
-            assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
-                alice.clone()
-            ));
-
-            assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
-                ferdie.clone()
-            ));
-
-            run_to_block(303);
-            update_identities();
-            add_not_live_files();
-            // A report works in 303
-            assert_ok!(Swork::report_works(
-                Origin::signed(alice.clone()),
-                alice_wr_info.curr_pk,
-                alice_wr_info.prev_pk,
-                alice_wr_info.block_number,
-                alice_wr_info.block_hash,
-                alice_wr_info.free,
-                alice_wr_info.used,
-                alice_wr_info.added_files,
-                alice_wr_info.deleted_files,
-                alice_wr_info.srd_root,
-                alice_wr_info.files_root,
-                alice_wr_info.sig
-            ));
-
-            run_to_block(603);
-            update_used_info();
-            update_identities();
-
-            assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 58); // 7 + 13 + 37 + 0 + 0 + 1
-            assert_eq!(Swork::reported_files_size(), 57);
-            assert_eq!(Swork::current_report_slot(), 600);
-            let map = WorkloadMap::get().borrow().clone();
-            // All workload is counted to alice. bob and eve is None.
-            assert_eq!(*map.get(&ferdie).unwrap(), 4294967354u128);
-
-            run_to_block(903);
-            // Punishment happen. Can't find report work at 600 report_slot. punishment deadline would be 1800. Block would be after 2100
-            update_identities();
-
-            assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
-            assert_eq!(Swork::reported_files_size(), 0);
-            assert_eq!(Swork::current_report_slot(), 900);
-            let map = WorkloadMap::get().borrow().clone();
-            // All workload is counted to alice. bob and eve is None.
-            assert_eq!(*map.get(&ferdie).unwrap(), 0);
-
-            // Check 1200 and would still be punished.
-            run_to_block(1600);
-
-            update_identities();
-
-            assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
-            assert_eq!(Swork::reported_files_size(), 0);
-            assert_eq!(Swork::current_report_slot(), 1500);
-            let map = WorkloadMap::get().borrow().clone();
-            // All workload is counted to alice. bob and eve is None.
-            assert_eq!(*map.get(&ferdie).unwrap(), 0);
-
-
-            let mut alice_wr_info = group_work_report_alice_300();
-            alice_wr_info.block_number = 1500;
-            let a_pk = alice_wr_info.curr_pk.clone();
-            let legal_wr = WorkReport {
-                report_slot: alice_wr_info.block_number,
-                used: alice_wr_info.used * 2,
-                free: alice_wr_info.free,
-                reported_files_size: alice_wr_info.used,
-                reported_srd_root: alice_wr_info.srd_root.clone(),
-                reported_files_root: alice_wr_info.files_root.clone()
-            };
-            add_wr(&a_pk, &legal_wr);
-
-            // Check 1500 and would success since punishment is cancelled
-            run_to_block(2000);
-            assert_ok!(Swork::cancel_punishment(Origin::root(), alice.clone()));
-            assert_eq!(Swork::identities(alice.clone()).unwrap_or_default(), Identity {
-                anchor: a_pk.clone(),
-                punishment_deadline: NO_PUNISHMENT,
-                group: Some(ferdie.clone())
-            });
-            update_identities();
-
-            assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), alice_wr_info.used as u128 * 2);
-            assert_eq!(Swork::reported_files_size(), 57);
-            assert_eq!(Swork::current_report_slot(), 1800);
-            let map = WorkloadMap::get().borrow().clone();
-            // All workload is counted to alice. bob and eve is None.
-            assert_eq!(*map.get(&ferdie).unwrap(), 4294967296u128 + alice_wr_info.used as u128 * 2);
-        });
-}
-
-#[test]
 fn remove_reported_in_slot_should_work() {
     ExtBuilder::default()
         .build()
@@ -3380,6 +3261,77 @@ fn first_time_should_pass_the_punishment() {
             });
 
             run_to_block(1300);
+            update_identities();
+            assert_eq!(Swork::free(), 30);
+            assert_eq!(Swork::used(), 20);
+            assert_eq!(Swork::reported_files_size(), 15);
+            assert_eq!(Swork::current_report_slot(), 1200);
+
+            assert_eq!(Swork::identities(reporter.clone()).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NO_PUNISHMENT,
+                group: None
+            });
+
+            // Punishment works
+            run_to_block(1600);
+            update_identities();
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 1500);
+
+            assert_eq!(Swork::identities(reporter.clone()).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 2400,
+                group: None
+            });
+        });
+}
+
+#[test]
+fn first_time_should_pass_the_punishment_in_weird_situation() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            run_to_block(1100);
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_pk = LegalPK::get();
+
+            <self::CurrentReportSlot>::put(600);
+            assert_eq!(Swork::reported_in_slot(&legal_pk, 600), false);
+
+            update_identities();
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 900);
+
+            register(&legal_pk, LegalCode::get());
+            <self::PubKeys>::mutate(&legal_pk, |pk_info| {
+                pk_info.anchor = Some(legal_pk.clone());
+            });
+            <self::Identities<Test>>::insert(&reporter, Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NEW_IDENTITY,
+                group: None
+            });
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 900,
+                used: 20,
+                free: 30,
+                reported_files_size: 15,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            assert_eq!(Swork::identities(reporter.clone()).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NEW_IDENTITY,
+                group: None
+            });
+
+            run_to_block(1400);
             update_identities();
             assert_eq!(Swork::free(), 30);
             assert_eq!(Swork::used(), 20);

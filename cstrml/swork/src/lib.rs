@@ -812,31 +812,6 @@ decl_module! {
             Ok(())
         }
 
-        /// Cancel punishment for a specific account.
-        /// This can only be done by Root/Democracy.
-        #[weight = 1000]
-        pub fn cancel_punishment(
-            origin,
-            target: <T::Lookup as StaticLookup>::Source
-        ) -> DispatchResult {
-            let _ = ensure_root(origin)?;
-            let who = T::Lookup::lookup(target)?;
-
-            // 1. Ensure who has identity information
-            ensure!(Self::identities(&who).is_some(), Error::<T>::IdentityNotExist);
-
-            // 2. Cancel the punishment
-            <Identities<T>>::mutate(&who, |maybe_i| match *maybe_i {
-                Some(Identity { ref mut punishment_deadline, .. }) => *punishment_deadline = NO_PUNISHMENT,
-                None => {},
-            });
-
-            // 3. Emit event
-            Self::deposit_event(RawEvent::CancelPunishmentSuccess(who));
-
-            Ok(())
-        }
-
         /// Set the punishment flag
         #[weight = 1000]
         pub fn set_punishment(
@@ -1069,21 +1044,21 @@ impl<T: Config> Module<T> {
     }
 
     pub fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> bool {
+        // punishment_deadline == "NEW_IDENTITY" => It's the first time to check report in slot.
+        // We should ignore it and set punishment_deadline to "NO_PUNISHMENT".
+        if id.punishment_deadline == NEW_IDENTITY {
+            id.punishment_deadline = NO_PUNISHMENT;
+            <Identities<T>>::insert(reporter, id.clone());
+            return true;
+        }
         // If punishment is disable
         // check whether it's reported in the last report slot
         if !enable_punishment {
             return Self::reported_in_slot(&id.anchor, current_rs);
         }
         if !Self::reported_in_slot(&id.anchor, current_rs) {
-            // punishment_deadline == "NEW_IDENTITY" => It's the first time to check report in slot.
-            // We should ignore it and set punishment_deadline to "NO_PUNISHMENT".
-            // Otherwise, it should have wr.
-            // Or punish it again and refresh the deadline.
-            if id.punishment_deadline == NEW_IDENTITY {
-                id.punishment_deadline = NO_PUNISHMENT;
-            } else {
-                id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
-            }
+            // it should have wr, otherwise punish it again and refresh the deadline.
+            id.punishment_deadline = current_rs + (T::PunishmentSlots::get() as u64 * REPORT_SLOT);
             <Identities<T>>::insert(reporter, id.clone());
         }
         if current_rs < id.punishment_deadline {

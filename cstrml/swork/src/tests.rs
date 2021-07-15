@@ -3337,3 +3337,73 @@ fn next_identity_should_work() {
             assert_eq!(Swork::next_identity(&prefix_hash, &mut previous_key).is_none(), true);
         });
 }
+
+#[test]
+fn first_time_should_pass_the_punishment() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            run_to_block(1000);
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_pk = LegalPK::get();
+
+            register(&legal_pk, LegalCode::get());
+            <self::PubKeys>::mutate(&legal_pk, |pk_info| {
+                pk_info.anchor = Some(legal_pk.clone());
+            });
+            <self::Identities<Test>>::insert(&reporter, Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NEW_IDENTITY,
+                group: None
+            });
+            add_wr(&legal_pk, &WorkReport {
+                report_slot: 900,
+                used: 20,
+                free: 30,
+                reported_files_size: 15,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+            <self::CurrentReportSlot>::put(600);
+            assert_eq!(Swork::reported_in_slot(&legal_pk, 600), false);
+
+            update_identities();
+            assert_eq!(Swork::free(), 30);
+            assert_eq!(Swork::used(), 20);
+            assert_eq!(Swork::reported_files_size(), 15);
+            assert_eq!(Swork::current_report_slot(), 900);
+
+            assert_eq!(Swork::identities(reporter.clone()).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NO_PUNISHMENT,
+                group: None
+            });
+
+            run_to_block(1300);
+            update_identities();
+            assert_eq!(Swork::free(), 30);
+            assert_eq!(Swork::used(), 20);
+            assert_eq!(Swork::reported_files_size(), 15);
+            assert_eq!(Swork::current_report_slot(), 1200);
+
+            assert_eq!(Swork::identities(reporter.clone()).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NO_PUNISHMENT,
+                group: None
+            });
+
+            // Punishment works
+            run_to_block(1600);
+            update_identities();
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::reported_files_size(), 0);
+            assert_eq!(Swork::current_report_slot(), 1500);
+
+            assert_eq!(Swork::identities(reporter.clone()).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: 2400,
+                group: None
+            });
+        });
+}

@@ -1068,15 +1068,15 @@ impl<T: Config> Module<T> {
         (0, 0, 0)
     }
 
-    fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> bool {
+    pub fn is_fully_reported(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> bool {
         // If punishment is disable
         // check whether it's reported in the last report slot
         if !enable_punishment {
             return Self::reported_in_slot(&id.anchor, current_rs);
         }
         if !Self::reported_in_slot(&id.anchor, current_rs) {
-            // punishment_deadline == NEW_IDENTITY => It's the first time to check report in slot.
-            // We should ignore it and set punishment_deadline to NO_PUNISHMENT.
+            // punishment_deadline == "NEW_IDENTITY" => It's the first time to check report in slot.
+            // We should ignore it and set punishment_deadline to "NO_PUNISHMENT".
             // Otherwise, it should have wr.
             // Or punish it again and refresh the deadline.
             if id.punishment_deadline == NEW_IDENTITY {

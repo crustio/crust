@@ -19,11 +19,11 @@ jobs:
         if: >-
           github.event_name == 'pull_request' && github.event.pull_request.title == '[Runtime] MainNet Upgrade'
         with:
-          message: 'This checklist should applied every bump version on `mainnet` branch
-          <br/>- [ ] Feature in PRs
-          <br/>- [ ] Types change (Will this affect API/sManager/Subscan/Other Services)
-          <br/>- [ ] Storage migration
-          <br/>- [ ] Interface changed(Extrinsic/Chain state/Event changed)
-          <br/>- [ ] WASM building env
-          <br/>- [ ] Announcement'
+          message: '**This checklist should applied every bump version on `mainnet` branch**
+          <br/>1. Feature in PRs
+          <br/>2. Types change (Will this affect API/sManager/Subscan/Other Services)
+          <br/>3. Storage migration
+          <br/>4. Interface changed(Extrinsic/Chain state/Event changed)
+          <br/>5. WASM building env
+          <br/>6. Announcement'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

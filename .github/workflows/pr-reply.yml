@@ -2,6 +2,8 @@ name: Crust MainNet Upgrade Checker
 
 on:
   pull_request:
+    branches:
+      - mainnet
     types: [created, edited]
 
 jobs:

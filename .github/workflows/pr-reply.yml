@@ -20,6 +20,7 @@ jobs:
           github.event_name == 'pull_request' && github.event.pull_request.title == '[Runtime] MainNet Upgrade'
         with:
           message: '**This checklist should applied every bump version on `mainnet` branch**
+          <br/>0. Spec version
           <br/>1. Feature in PRs
           <br/>2. Types change (Will this affect API/sManager/Subscan/Other Services)
           <br/>3. Storage migration

@@ -690,7 +690,7 @@ pub fn register_identity(who: &AccountId, pk: &SworkerPubKey, anchor: &SworkerAn
     });
     <self::Identities<Test>>::insert(who, Identity {
         anchor: anchor.clone(),
-        punishment_deadline: 0,
+        punishment_deadline: NO_PUNISHMENT,
         group: None
     });
 }

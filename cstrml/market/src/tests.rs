@@ -59,6 +59,7 @@ fn place_storage_order_should_work() {
         assert_eq!(Balances::free_balance(reserved_pot), 1200);
         assert_eq!(Balances::free_balance(staking_pot), 1440);
         assert_eq!(Balances::free_balance(storage_pot), 360);
+        assert_eq!(Market::orders_count(), 1);
     });
 }
 
@@ -297,6 +298,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 groups: BTreeMap::from_iter(vec![(legal_pk.clone(), true)].into_iter())
             })
         );
+        assert_eq!(Market::orders_count(), 4);
     });
 }
 
@@ -1986,6 +1988,53 @@ fn update_price_should_work() {
         <swork::ReportedFilesSize>::put(60000);
         Market::update_file_price();
         assert_eq!(Market::file_price(), 41);
+    });
+}
+
+#[test]
+fn update_base_fee_should_work() {
+    new_test_ext().execute_with(|| {
+        assert_eq!(Market::file_base_fee(), 1000);
+
+        // orders count == 0 => decrease 3%
+        <swork::AddedFilesCount>::put(500);
+        OrdersCount::put(0);
+        Market::update_base_fee();
+        assert_eq!(Market::file_base_fee(), 970);
+        assert_eq!(Swork::added_files_count(), 0);
+        assert_eq!(Market::orders_count(), 0);
+
+        // alpha == 50 => keep same
+        <swork::AddedFilesCount>::put(500);
+        OrdersCount::put(10);
+        Market::update_base_fee();
+        assert_eq!(Market::file_base_fee(), 970);
+        assert_eq!(Swork::added_files_count(), 0);
+        assert_eq!(Market::orders_count(), 0);
+
+        // alpha == 0 => increase 30%
+        <swork::AddedFilesCount>::put(0);
+        OrdersCount::put(100);
+        Market::update_base_fee();
+        assert_eq!(Market::file_base_fee(), 1261);
+        assert_eq!(Swork::added_files_count(), 0);
+        assert_eq!(Market::orders_count(), 0);
+
+        // alpha == 11 => increase 13%
+        <swork::AddedFilesCount>::put(110);
+        OrdersCount::put(10);
+        Market::update_base_fee();
+        assert_eq!(Market::file_base_fee(), 1425);
+        assert_eq!(Swork::added_files_count(), 0);
+        assert_eq!(Market::orders_count(), 0);
+
+        // alpha == 150 => decrease 3%
+        <swork::AddedFilesCount>::put(1500);
+        OrdersCount::put(10);
+        Market::update_base_fee();
+        assert_eq!(Market::file_base_fee(), 1382);
+        assert_eq!(Swork::added_files_count(), 0);
+        assert_eq!(Market::orders_count(), 0);
     });
 }
 

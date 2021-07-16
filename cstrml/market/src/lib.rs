@@ -610,8 +610,7 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let file_base_fee = Self::file_base_fee();
-            let amount = Self::get_file_amount(charged_file_size) + Self::files_count_price();
+            let (file_base_fee, amount) = Self::get_file_price(charged_file_size);
 
             // 5. Check client can afford the sorder
             ensure!(T::Currency::usable_balance(&payer) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
@@ -687,8 +686,7 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let file_base_fee = Self::file_base_fee();
-            let amount = Self::get_file_amount(charged_file_size) + Self::files_count_price();
+            let (file_base_fee, amount) = Self::get_file_price(charged_file_size);
 
             // 5. Check client can afford the sorder
             ensure!(T::Currency::usable_balance(&payer) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
@@ -1289,8 +1287,7 @@ impl<T: Config> Module<T> {
     fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             // 1. Calculate total amount
-            let file_base_fee = Self::file_base_fee();
-            let file_amount = Self::get_file_amount(file_info.file_size) + Self::files_count_price();
+            let (file_base_fee, file_amount) = Self::get_file_price(file_info.file_size);
             let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );
             let total_amount = file_base_fee.clone() + file_amount.clone() + renew_reward.clone();
             // 2. Check prepaid pool can afford the price
@@ -1369,6 +1366,31 @@ impl<T: Config> Module<T> {
         }
     }
 
+    /// Calculate file price
+    /// Include the file base fee, file size price and files count price
+    /// return => (file_base_fee, file_size_price + files_count_price)
+    pub fn get_file_price(file_size: u64) -> (BalanceOf<T>, BalanceOf<T>) {
+        // 1. Calculate file size price
+        // Rounded file size from `bytes` to `megabytes`
+        let mut rounded_file_size = file_size / 1_048_576;
+        if file_size % 1_048_576 != 0 {
+            rounded_file_size += 1;
+        }
+        let price = Self::file_price();
+        // Convert file size into `Currency`
+        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
+        let file_size_price = match amount {
+            Some(value) => value,
+            None => Zero::zero(),
+        };
+        // 2. Get file base fee
+        let file_base_fee = Self::file_base_fee();
+        // 3. Get files count price
+        let files_count_price = Self::files_count_price();
+
+        (file_base_fee, file_size_price + files_count_price)
+    }
+
     pub fn update_files_count_price() {
         let files_count = Self::files_count();
         if files_count > FILES_COUNT_REFERENCE {
@@ -1434,22 +1456,6 @@ impl<T: Config> Module<T> {
             },
             // No new order => decrease the price
             None => (true, Perbill::from_percent(3))
-        }
-    }
-
-    // Calculate file's amount
-    fn get_file_amount(file_size: u64) -> BalanceOf<T> {
-        // Rounded file size from `bytes` to `megabytes`
-        let mut rounded_file_size = file_size / 1_048_576;
-        if file_size % 1_048_576 != 0 {
-            rounded_file_size += 1;
-        }
-        let price = Self::file_price();
-        // Convert file size into `Currency`
-        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
-        match amount {
-            Some(value) => value,
-            None => Zero::zero(),
         }
     }
 

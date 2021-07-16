@@ -577,8 +577,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 70_000));
-        add_collateral(&merchant, 60_000);
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60_000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -704,7 +703,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         );
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            collateral: 6_000_000,
+            collateral: 6060000,
             reward: 9950
         });
     });
@@ -2183,7 +2182,6 @@ fn update_price_per_blocks_should_work() {
         assert_eq!(Market::file_price(), 990);
         <swork::Free>::put(10000);
         <swork::ReportedFilesSize>::put(10000);
-        assert_eq!(Swork::get_total_capacity(), 20000);
         // no new order => don't update
         Market::on_initialize(17);
         assert_eq!(Market::file_price(), 990);
@@ -3918,8 +3916,7 @@ fn max_replicas_and_groups_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            assert_ok!(Market::add_collateral(Origin::signed(who.clone()), 6_000_000));
+            assert_ok!(Market::register(Origin::signed(who.clone()), 6_000_000));
         }
 
         assert_ok!(Market::place_storage_order(
@@ -3987,8 +3984,7 @@ fn update_used_info_should_work() {
         let _ = Balances::make_free_balance_be(&source, 200000);
         let _ = Balances::make_free_balance_be(&merchant, 200000);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
-        assert_ok!(Market::add_collateral(Origin::signed(merchant.clone()), 60000));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60000));
 
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(

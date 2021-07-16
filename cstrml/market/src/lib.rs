@@ -488,6 +488,10 @@ decl_module! {
         /// Called when a block is initialized. Will call update_identities to update file price
         fn on_initialize(now: T::BlockNumber) -> Weight {
             let now = TryInto::<u32>::try_into(now).ok().unwrap();
+            let mut consumed_weight: Weight = 0;
+            let mut add_db_reads_writes = |reads, writes| {
+                consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+            };
             if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::new_order(){
                 Self::update_file_price();
                 Self::update_files_count_price();

@@ -376,6 +376,9 @@ decl_storage! {
         /// New order in the past blocks
         NewOrder get(fn new_order): bool = false;
 
+        /// New orders count in the past one period(one hour)
+        OrdersCount get(fn orders_count): u32 = 0;
+
         /// Wait for updating used size for all replicas
         pub PendingFiles get(fn pending_files): BTreeSet<MerkleRoot>;
 
@@ -490,6 +493,11 @@ decl_module! {
                 Self::update_files_count_price();
                 NewOrder::put(false);
             }
+            if ((now + BASE_FEE_UPDATE_OFFSET) % BASE_FEE_UPDATE_SLOT).is_zero() {
+                Self::update_base_fee();
+                add_db_reads_writes(3, 3);
+            }
+            add_db_reads_writes(1, 0);
             if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::pending_files().len() >= MAX_PENDING_FILES {
                 let files = Self::get_files_to_update();
                 for cid in files {
@@ -661,13 +669,13 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + Self::files_count_price();
+            let (file_base_fee, amount) = Self::get_file_price(charged_file_size);
 
             // 5. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&payer) >= amount + tips, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&payer) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
 
             // 6. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), tips, AllowDeath)?;
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), file_base_fee, tips, AllowDeath)?;
 
             let curr_bn = Self::get_current_block_number();
 
@@ -677,9 +685,9 @@ decl_module! {
             // 8. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 9. Update storage price.
-            #[cfg(not(test))]
-            Self::update_file_price();
+            // 9. Update new order status.
+            NewOrder::put(true);
+            OrdersCount::mutate(|count| {*count = count.saturating_add(1)});
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
@@ -737,13 +745,13 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size) + Self::files_count_price();
+            let (file_base_fee, amount) = Self::get_file_price(charged_file_size);
 
             // 5. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&payer) >= amount + tips, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&payer) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
 
             // 6. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), tips, AllowDeath)?;
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), file_base_fee, tips, AllowDeath)?;
 
             let curr_bn = Self::get_current_block_number();
 
@@ -755,6 +763,7 @@ decl_module! {
 
             // 9. Update new order status.
             NewOrder::put(true);
+            OrdersCount::mutate(|count| {*count = count.saturating_add(1)});
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
@@ -1354,16 +1363,16 @@ impl<T: Config> Module<T> {
     fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             // 1. Calculate total amount
-            let file_amount = Self::file_base_fee() + Self::get_file_amount(file_info.file_size);
-            let renew_reward = T::RenewRewardRatio::get() * file_amount.clone();
-            let total_amount = file_amount.clone() + renew_reward.clone();
+            let (file_base_fee, file_amount) = Self::get_file_price(file_info.file_size);
+            let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );
+            let total_amount = file_base_fee.clone() + file_amount.clone() + renew_reward.clone();
             // 2. Check prepaid pool can afford the price
             if file_info.prepaid >= total_amount {
                 file_info.prepaid = file_info.prepaid.saturating_sub(total_amount.clone());
                 // 3. Reward liquidator.
                 T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
                 // 4. Split into reserved, storage and staking account
-                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), Zero::zero(), KeepAlive)?;
+                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), file_base_fee, Zero::zero(), KeepAlive)?;
                 file_info.amount += file_amount;
                 if file_info.replicas.len() == 0 {
                     // turn this file into pending status since replicas.len() is zero
@@ -1430,6 +1439,31 @@ impl<T: Config> Module<T> {
         }
     }
 
+    /// Calculate file price
+    /// Include the file base fee, file size price and files count price
+    /// return => (file_base_fee, file_size_price + files_count_price)
+    pub fn get_file_price(file_size: u64) -> (BalanceOf<T>, BalanceOf<T>) {
+        // 1. Calculate file size price
+        // Rounded file size from `bytes` to `megabytes`
+        let mut rounded_file_size = file_size / 1_048_576;
+        if file_size % 1_048_576 != 0 {
+            rounded_file_size += 1;
+        }
+        let price = Self::file_price();
+        // Convert file size into `Currency`
+        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
+        let file_size_price = match amount {
+            Some(value) => value,
+            None => Zero::zero(),
+        };
+        // 2. Get file base fee
+        let file_base_fee = Self::file_base_fee();
+        // 3. Get files count price
+        let files_count_price = Self::files_count_price();
+
+        (file_base_fee, file_size_price + files_count_price)
+    }
+
     pub fn update_files_count_price() {
         let files_count = Self::files_count();
         if files_count > FILES_COUNT_REFERENCE {
@@ -1446,19 +1480,55 @@ impl<T: Config> Module<T> {
         }
     }
 
-    // Calculate file's amount
-    fn get_file_amount(file_size: u64) -> BalanceOf<T> {
-        // Rounded file size from `bytes` to `megabytes`
-        let mut rounded_file_size = file_size / 1_048_576;
-        if file_size % 1_048_576 != 0 {
-            rounded_file_size += 1;
-        }
-        let price = Self::file_price();
-        // Convert file size into `Currency`
-        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
-        match amount {
-            Some(value) => value,
-            None => Zero::zero(),
+    pub fn update_base_fee() {
+        // get added files count and clear the record
+        let added_files_count = T::SworkerInterface::get_added_files_count_and_clear_record();
+        // get orders count and clear the record
+        let orders_count = Self::orders_count();
+        OrdersCount::put(0);
+        // decide what to do
+        let (is_to_decrease, ratio) = Self::base_fee_ratio(added_files_count.checked_div(orders_count));
+        // update the file base fee
+        <FileBaseFee<T>>::mutate(|price| {
+            let gap = ratio * price.clone();
+            if is_to_decrease {
+                *price = price.saturating_sub(gap);
+            } else {
+                *price = price.saturating_add(gap);
+            }
+        })
+    }
+
+    /// return (bool, ratio)
+    /// true => decrease the price, false => increase the price
+    pub fn base_fee_ratio(maybe_alpha: Option<u32>) -> (bool, Perbill) {
+        match maybe_alpha {
+            // New order => check the alpha
+            Some(alpha) => {
+                match alpha {
+                    0 ..= 5 => (false, Perbill::from_percent(30)),
+                    6 => (false,Perbill::from_percent(25)),
+                    7 => (false,Perbill::from_percent(21)),
+                    8 => (false,Perbill::from_percent(18)),
+                    9 => (false,Perbill::from_percent(16)),
+                    10 => (false,Perbill::from_percent(15)),
+                    11 => (false,Perbill::from_percent(13)),
+                    12 => (false,Perbill::from_percent(12)),
+                    13 => (false,Perbill::from_percent(11)),
+                    14 ..= 15 => (false,Perbill::from_percent(10)),
+                    16 => (false,Perbill::from_percent(9)),
+                    17 ..= 18 => (false,Perbill::from_percent(8)),
+                    19 ..= 21 => (false,Perbill::from_percent(7)),
+                    22 ..= 25 => (false,Perbill::from_percent(6)),
+                    26 ..= 30 => (false,Perbill::from_percent(5)),
+                    31 ..= 37 => (false,Perbill::from_percent(4)),
+                    38 ..= 49 => (false,Perbill::from_percent(3)),
+                    50 ..= 100 => (false,Perbill::zero()),
+                    _ => (true, Perbill::from_percent(3))
+                }
+            },
+            // No new order => decrease the price
+            None => (true, Perbill::from_percent(3))
         }
     }
 
@@ -1467,7 +1537,7 @@ impl<T: Config> Module<T> {
     // 10% into reserved pot
     // 72% into staking pot
     // 18% into storage pot
-    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, tips: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
+    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, base_fee: BalanceOf<T>, tips: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
         // Split the original amount into three parts
         let staking_amount = T::StakingRatio::get() * value;
         let storage_amount = T::StorageRatio::get() * value;
@@ -1475,6 +1545,8 @@ impl<T: Config> Module<T> {
 
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;
+
+        let reserved_amount = reserved_amount.saturating_add(base_fee);
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, liveness)?;

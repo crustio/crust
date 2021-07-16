@@ -102,13 +102,8 @@ fn register_pk_with_another_code_should_work() {
                     20000
                 ),
                 DispatchError::Module {
-<<<<<<< HEAD
                     index: 0,
                     error: 18,
-=======
-                    index: 2,
-                    error: 16,
->>>>>>> ce8596e... [Runtime] Refine docs for storage event extrinsic and error for crust api (#580)
                     message: Some("InvalidExpiredBlock"),
                 }
             );

@@ -254,7 +254,6 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), (wr.used * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 

@@ -62,6 +62,7 @@ pallet-tips = { default-features = false, version = "3.0.0" }
 pallet-transaction-payment = { default-features = false, version = "3.0.0" }
 pallet-treasury = { default-features = false, version = "3.0.0" }
 pallet-utility = { default-features = false, version = "3.0.0" }
+pallet-multisig = { default-features = false, version = "3.0.0" }
 
 # substrate benchmark dependencies
 frame-benchmarking = { default-features = false, optional = true, version = "3.0.0"}
@@ -127,6 +128,7 @@ std = [
     "pallet-randomness-collective-flip/std",
     "pallet-scheduler/std",
     "pallet-session/std",
+    "pallet-multisig/std",
     "staking/std",
     "pallet-sudo/std",
     "swork/std",

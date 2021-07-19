@@ -482,6 +482,24 @@ impl pallet_treasury::Config for Runtime {
     type WeightInfo = weights::pallet_treasury::WeightInfo<Runtime>;
 }
 
+parameter_types! {
+	// One storage item; key size is 32; value is size 4+4+16+32 bytes = 56 bytes.
+	pub const DepositBase: Balance = deposit(1, 88);
+	// Additional storage item size of 32 bytes.
+	pub const DepositFactor: Balance = deposit(0, 32);
+	pub const MaxSignatories: u16 = 100;
+}
+
+impl pallet_multisig::Config for Runtime {
+    type Event = Event;
+    type Call = Call;
+    type Currency = Balances;
+    type DepositBase = DepositBase;
+    type DepositFactor = DepositFactor;
+    type MaxSignatories = MaxSignatories;
+    type WeightInfo = weights::pallet_multisig::WeightInfo<Runtime>;
+}
+
 //parameter_types! {
 // 	pub const CandidacyBond: Balance = 10 * DOLLARS;
 // 	pub const VotingBondBase: Balance = 1 * DOLLARS;
@@ -855,6 +873,8 @@ construct_runtime! {
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
+        // Multisig module. Late addition.
+        Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
     }
 }
 

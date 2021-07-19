@@ -429,6 +429,7 @@ fn report_works_should_work() {
                     is_reported: true
                 }]
             });
+            assert_eq!(Swork::added_files_count(), 2);
         });
 }
 
@@ -1911,6 +1912,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
             );
+            assert_eq!(Swork::added_files_count(), 3);
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 used: 58,
@@ -2040,7 +2042,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
-
+            assert_eq!(Swork::added_files_count(), 6);
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 used: 57,
@@ -2174,6 +2176,7 @@ fn join_group_should_work_for_used_in_work_report() {
             let bob_wr_info = group_work_report_bob_600();
             let eve_wr_info = group_work_report_eve_600();
 
+            assert_eq!(Swork::added_files_count(), 9);
             run_to_block(603);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
@@ -2280,6 +2283,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
+            assert_eq!(Swork::added_files_count(), 9);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -2366,7 +2370,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
-
+            assert_eq!(Swork::added_files_count(), 9);
             run_to_block(1500);
             let alice_wr_info = group_work_report_alice_1500();
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_c.clone()));

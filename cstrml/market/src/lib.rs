@@ -43,7 +43,6 @@ use primitives::{
 };
 
 pub(crate) const LOG_TARGET: &'static str = "market";
-const MARKET_LOCK_ID: LockIdentifier = *b"marklock";
 const MAX_REPLICAS: usize = 200;
 
 #[macro_export]
@@ -619,31 +618,6 @@ decl_module! {
             Ok(())
         }
 
-        /// Add prepaid amount of currency for this file.
-        /// If this file has prepaid value and enough for a new storage order, it can be renewed by anyone.
-        #[weight = T::WeightInfo::place_storage_order()]
-        pub fn add_prepaid(
-            origin,
-            cid: MerkleRoot,
-            #[compact] amount: BalanceOf<T>
-        ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
-
-            if let Some(mut file_info) = Self::files(&cid) {
-                T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath)?;
-                file_info.prepaid += amount;
-                <Files<T>>::insert(&cid, file_info);
-            } else {
-                Err(Error::<T>::FileNotExist)?
-            }
-
-            Self::deposit_event(RawEvent::AddPrepaidSuccess(who, cid, amount));
-
-            Ok(())
-        }
-
         /// Calculate the reward for a file
         #[weight = T::WeightInfo::calculate_reward()]
         pub fn calculate_reward(
@@ -669,10 +643,7 @@ decl_module! {
             // 4. Refresh the status of the file and calculate the reward for merchants
             Self::do_calculate_reward(&cid, curr_bn);
 
-            // 5. Try to renew file if prepaid is not zero
-            Self::try_to_renew_file(&cid, curr_bn, &liquidator)?;
-
-            // 6. Try to close file
+            // 5. Try to close file
             Self::try_to_close_file(&cid, curr_bn)?;
 
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
@@ -1070,41 +1041,6 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
-        if let Some(mut file_info) = <Files<T>>::get(cid) {
-            // 1. Calculate total amount
-            let (file_base_fee, file_amount) = Self::get_file_price(file_info.file_size);
-            let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );
-            let total_amount = file_base_fee.clone() + file_amount.clone() + renew_reward.clone();
-            // 2. Check prepaid pool can afford the price
-            if file_info.prepaid >= total_amount {
-                file_info.prepaid = file_info.prepaid.saturating_sub(total_amount.clone());
-                // 3. Reward liquidator.
-                T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
-                // 4. Split into reserved, storage and staking account
-                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), file_base_fee, Zero::zero(), KeepAlive)?;
-                file_info.amount += file_amount;
-                if file_info.replicas.len() == 0 {
-                    // turn this file into pending status since replicas.len() is zero
-                    // we keep the original amount and expected_replica_count
-                    file_info.expired_on = 0;
-                    file_info.calculated_at = curr_bn;
-                } else {
-                    // Refresh the file to the new file
-                    file_info.expired_on = curr_bn + T::FileDuration::get();
-                    file_info.calculated_at = curr_bn;
-                }
-                <Files<T>>::insert(cid, file_info);
-
-                // 5. Update new order status.
-                NewOrder::put(true);
-
-                Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
-            }
-        }
-        Ok(())
-    }
-
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
         file_info.replicas.push(new_replica);
         file_info.replicas.sort_by_key(|d| d.valid_at);
@@ -1393,11 +1329,6 @@ decl_event!(
         /// The first item is the account who renew the storage order.
         /// The second item is the cid of the file.
         RenewFileSuccess(AccountId, MerkleRoot),
-        /// Add prepaid value for an existed file success.
-        /// The first item is the account who add the prepaid.
-        /// The second item is the cid of the file.
-        /// The third item is the prepaid amount of currency.
-        AddPrepaidSuccess(AccountId, MerkleRoot, Balance),
         /// Register to be a merchant success.
         /// The first item is the account who want to register.
         /// The second item is the collateral amount of currency.

@@ -70,17 +70,18 @@ pub struct FileInfo<AccountId, Balance> {
     pub file_size: u64,
     // The size of used value in MPoW
     pub used_size: u64,
-    // The block number when the file goes invalide
+    // The block number when the file goes invalid
     pub expired_on: BlockNumber,
     // The last block number when the file's amount is calculated
     pub calculated_at: BlockNumber,
     // The file value
     pub amount: Balance,
     // The pre paid pool
+    // TODO: useless field, prepared for the future upgrade
     pub prepaid: Balance,
     // The count of valid replica each report slot
     pub reported_replica_count: u32,
-    // The replica list
+    // The replica list, distinct by group
     pub replicas: Vec<Replica<AccountId>>
 }
 
@@ -95,7 +96,9 @@ pub struct Replica<AccountId> {
     pub anchor: SworkerAnchor,
     // Is reported in the last check
     pub is_reported: bool,
-    // The first time when it's reported
+    // Timestamp which the replica created
+    // None: means who += spower
+    // Some: means who += file_size
     pub reported_at: Option<BlockNumber>
 }
 
@@ -129,7 +132,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         Self::maybe_upsert_file_size(who, cid, reported_file_size);
 
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `used` size is counted by `(who, anchor)`
-        // if the file doesn't exist(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
+        // if the file doesn't exist/exceed-replicas(aka. is_counted == false), return false(doesn't increase used size) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
         let mut used_size: u64 = 0;
         if let Some(mut file_info) = <Files<T>>::get(cid) {
@@ -179,7 +182,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 5. Update files
             <Files<T>>::insert(cid, file_info);
         }
-        return used_size
+        used_size
     }
 
     /// Node who delete the replica
@@ -221,7 +224,6 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             }
             <Files<T>>::insert(cid, file_info);
         }
-
         used_size
     }
 
@@ -1005,10 +1007,10 @@ impl<T: Config> Module<T> {
     fn upsert_new_file_info(cid: &MerkleRoot, amount: &BalanceOf<T>, curr_bn: &BlockNumber, file_size: u64) {
         // Extend expired_on
         if let Some(mut file_info) = Self::files(cid) {
-            // expired_on < calculated_at => file is not live yet. This situation only happen for new file.
-            // expired_on == calculated_at => file is ready to be closed(wait to be put into trash or refreshed).
             // expired_on > calculated_at => file is ongoing.
-            if file_info.expired_on > file_info.calculated_at { //if it's already live.
+            // expired_on == calculated_at => file is ready to be closed(wait to be refreshed).
+            // expired_on < calculated_at => file is not live yet. This situation only happen for new file.
+            if file_info.expired_on > file_info.calculated_at {
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             } else if file_info.expired_on == file_info.calculated_at {
                 if file_info.replicas.len() == 0 {

@@ -1128,6 +1128,7 @@ impl<T: Config> Module<T> {
         let prev_spower = file_info.spower;
         let mut replicas_count = 0;
         for ref mut replica in &mut file_info.replicas {
+            // already begin to use spower
             if replica.created_at.is_none() && prev_spower != new_spower {
                 replicas_count += 1;
                 T::SworkerInterface::update_spower(&replica.anchor, prev_spower, new_spower);
@@ -1139,6 +1140,10 @@ impl<T: Config> Module<T> {
                     T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
                     replica.created_at = None;
                 }
+            } else {
+                // File is to close
+                replicas_count += 1;
+                T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
             }
         }
         file_info.spower = new_spower;

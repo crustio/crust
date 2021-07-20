@@ -15,7 +15,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market::{Replica, FileInfo, UsedInfo};
+pub use market::{Replica, FileInfo};
 use primitives::{traits::BenefitInterface, EraIndex, MerkleRoot};
 use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
@@ -708,12 +708,7 @@ pub fn add_not_live_files() {
     ].to_vec();
 
     for (file, file_size) in files.iter() {
-        let used_info = UsedInfo {
-            spower: 0,
-            reported_group_count: 0,
-            groups: <BTreeMap<SworkerAnchor, bool>>::new()
-        };
-        insert_file(file, 1000, 0, 1000, 0, 0, vec![], *file_size, used_info);
+        insert_file(file, 1000, 0, 1000, 0, 0, vec![], *file_size);
     }
 
     let storage_pot = Market::storage_pot();
@@ -734,21 +729,18 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
         who: who.clone(),
         valid_at: 200,
         anchor: anchor.clone(),
-        is_reported: true
+        is_reported: true,
+        created_at: Some(200)
     };
     for (file, file_size) in files.iter() {
-        let used_info = UsedInfo {
-            spower: *file_size * 2,
-            reported_group_count: 1,
-            groups: BTreeMap::from_iter(vec![(anchor.clone(), true)].into_iter())
-        };
-        insert_file(file, 200, 12000, 1000, 0, 0, vec![replica_info.clone()], *file_size, used_info);
+        insert_file(file, 200, 12000, 1000, 0, 1, vec![replica_info.clone()], *file_size);
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64) {
     let file_info = FileInfo {
         file_size,
+        spower: Market::calculate_spower(file_size, replicas.len() as u32),
         expired_at,
         calculated_at,
         amount,
@@ -757,7 +749,7 @@ fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: B
         replicas
     };
 
-    <market::Files<Test>>::insert(f_id, (file_info, used_info));
+    <market::Files<Test>>::insert(f_id, file_info);
 }
 
 pub fn update_spower_info() {

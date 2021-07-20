@@ -14,10 +14,10 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market::{Replica, FileInfo, UsedInfo};
+pub use market::{Replica, FileInfo};
 use swork::Works;
 use balances::{AccountData, NegativeImbalance};
-pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
+pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator, collections::btree_map::BTreeMap};
 use primitives::{traits::BenefitInterface, EraIndex};
 
 pub type AccountId = AccountId32;

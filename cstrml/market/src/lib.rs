@@ -171,7 +171,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 
             // 4. The first join the replicas and file become live(expired_on > calculated_at)
             let curr_bn = Self::get_current_block_number();
-            if file_info.replicas.len() == 1 {
+            if file_info.expired_on == 0 {
                 file_info.calculated_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
@@ -189,15 +189,17 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         let mut used_size: u64 = 0;
         // 1. Delete replica from file_info
         if let Some(mut file_info) = <Files<T>>::get(cid) {
-            let mut is_to_decreased = false;
+            let mut to_decrease_count = 0;
             let mut is_valid: Option<bool> = None;
             file_info.replicas.retain(|replica| {
-                if replica.who == *who && replica.anchor == *anchor {
-                    // We added it before
-                    if replica.reported_at.is_none() { is_valid = Some(true); } else { is_valid = Some(false); };
+                if replica.who == *who {
+                    if replica.anchor == *anchor {
+                        // We added it before
+                        if replica.reported_at.is_none() { is_valid = Some(true); } else { is_valid = Some(false); };
+                    }
                     if replica.is_reported {
                         // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_calculate_reward`
-                        is_to_decreased = true;
+                        to_decrease_count += 1;
                     }
                 }
                 replica.who != *who
@@ -213,8 +215,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             }
 
             // 3. Decrease the reported_replica_count
-            if is_to_decreased {
-                file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
+            if to_decrease_count != 0 {
+                file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(to_decrease_count);
                 PendingFiles::mutate(|files| {
                     files.insert(cid.clone());
                 });
@@ -1008,27 +1010,28 @@ impl<T: Config> Module<T> {
             // expired_on < calculated_at => file is not live yet. This situation only happen for new file.
             // expired_on == calculated_at => file is ready to be closed(wait to be put into trash or refreshed).
             // expired_on > calculated_at => file is ongoing.
-            if file_info.expired_on > file_info.calculated_at { //if it's already live.
-                file_info.expired_on = curr_bn + T::FileDuration::get();
-            } else if file_info.expired_on == file_info.calculated_at {
-                if file_info.replicas.len() == 0 {
-                    // turn this file into pending status since replicas.len() is zero
-                    // we keep the original amount
-                    file_info.expired_on = 0;
-                    file_info.calculated_at = *curr_bn;
-                } else {
-                    // Refresh the file to the new file
-                    file_info.expired_on = curr_bn + T::FileDuration::get();
-                    file_info.calculated_at = *curr_bn;
-                }
+
+            // If it's ready to be closed, refresh the calculated_at to the current bn
+            if file_info.expired_on == file_info.calculated_at {
+                file_info.calculated_at = *curr_bn;
             }
+
+            if file_info.replicas.len() == 0 {
+                // turn this file into pending status since replicas.len() is zero
+                // we keep the original amount
+                file_info.expired_on = 0;
+            } else {
+                // Refresh the file to be a new file
+                file_info.expired_on = curr_bn + T::FileDuration::get();
+            }
+
             file_info.amount += amount.clone();
             <Files<T>>::insert(cid, file_info);
         } else {
             // New file
             let file_info = FileInfo::<T::AccountId, BalanceOf<T>> {
                 file_size,
-                used_size: file_size,
+                used_size: 0,
                 expired_on: 0,
                 calculated_at: curr_bn.clone(),
                 amount: amount.clone(),
@@ -1245,18 +1248,17 @@ impl<T: Config> Module<T> {
         let new_used_size = Self::calculate_used_size(file_info.file_size, file_info.reported_replica_count);
         let prev_used_size = file_info.used_size;
         let mut replicas_count = 0;
-        if prev_used_size != new_used_size {
-            replicas_count = file_info.replicas.len() as u64;
-            for ref mut replica in &mut file_info.replicas {
-                if replica.reported_at.is_none() {
-                    T::SworkerInterface::update_used(&replica.anchor, prev_used_size, new_used_size);
-                } else if let Some(curr_bn) = curr_bn {
-                    // Make it become valid
-                    let reported_at = replica.reported_at.unwrap();
-                    if reported_at + Self::valid_duration() > curr_bn {
-                        T::SworkerInterface::update_used(&replica.anchor, file_info.file_size, new_used_size);
-                        replica.reported_at = None;
-                    }
+        for ref mut replica in &mut file_info.replicas {
+            if replica.reported_at.is_none() && prev_used_size != new_used_size {
+                replicas_count += 1;
+                T::SworkerInterface::update_used(&replica.anchor, prev_used_size, new_used_size);
+            } else if let Some(curr_bn) = curr_bn {
+                // Make it become valid
+                let reported_at = replica.reported_at.unwrap();
+                if reported_at + Self::valid_duration() < curr_bn {
+                    replicas_count += 1;
+                    T::SworkerInterface::update_used(&replica.anchor, file_info.file_size, new_used_size);
+                    replica.reported_at = None;
                 }
             }
         }

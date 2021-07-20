@@ -15,7 +15,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market::{Replica, FileInfo, UsedInfo};
+pub use market::{Replica, FileInfo};
 use primitives::{traits::BenefitInterface, EraIndex, MerkleRoot};
 use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
@@ -80,7 +80,7 @@ pub struct ReportWorksInfo {
     pub block_number: u64,
     pub block_hash: Vec<u8>,
     pub free: u64,
-    pub used: u64,
+    pub spower: u64,
     pub srd_root: MerkleRoot,
     pub files_root: MerkleRoot,
     pub added_files: Vec<(MerkleRoot, u64, u64)>,
@@ -135,16 +135,14 @@ parameter_types! {
     pub const FileDuration: BlockNumber = 1000;
     pub const LiquidityDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
-    pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
-    pub const FilesCountInitPrice: Balance = 1000;
+    pub const InitFileByteFee: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const InitFileKeysCountFee: Balance = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
-    pub const UsedTrashMaxSize: u128 = 2;
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
-    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl market::Config for Test {
@@ -157,15 +155,13 @@ impl market::Config for Test {
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
-    type FileInitPrice = FileInitPrice;
-    type FilesCountInitPrice = FilesCountInitPrice;
+    type InitFileByteFee = InitFileByteFee;
+    type InitFileKeysCountFee = InitFileKeysCountFee;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
-    type RenewRewardRatio = RenewRewardRatio;
     type StorageRatio = StorageRatio;
-    type UsedTrashMaxSize = UsedTrashMaxSize;
     type MaximumFileSize = MaximumFileSize;
     type WeightInfo = market::weight::WeightInfo<Test>;
 }
@@ -346,7 +342,7 @@ pub fn legal_work_report() -> ReportWorksInfo {
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 2;
+    let spower: u64 = 2;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let files_root = hex::decode("11").unwrap();
@@ -359,7 +355,7 @@ pub fn legal_work_report() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -387,7 +383,7 @@ pub fn continuous_ab_upgrade_work_report() -> ReportWorksInfo {
     legal_wr.block_number = 900;
     legal_wr.added_files = vec![("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(), 37, 903)];
     legal_wr.deleted_files = vec![("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(), 7, 903)];
-    legal_wr.used = 32;
+    legal_wr.spower = 32;
     legal_wr.sig = hex::decode("c5e5ce5a1632afc8c0fb22dc44cb1f25bfa44df8455d6836578c02ffa203480b0a61e465205c893d4cbdcefc9d0742019f075b5c62c7ae0fc580d7d47f3930f5").unwrap();
     legal_wr
 }
@@ -432,7 +428,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 402868224;
+    let spower: u64 = 402868224;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(), 134289408, 303),
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oH".as_bytes().to_vec(), 268578816, 303)
@@ -448,7 +444,7 @@ pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -463,7 +459,7 @@ pub fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 0;
+    let spower: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oI".as_bytes().to_vec(), 1, 303),
@@ -480,7 +476,7 @@ pub fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -495,7 +491,7 @@ pub fn group_work_report_alice_300() -> ReportWorksInfo {
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 57;
+    let spower: u64 = 57;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oA".as_bytes().to_vec(), 13, 303), // A file
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(), 7, 303),  // B file
@@ -512,7 +508,7 @@ pub fn group_work_report_alice_300() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -527,7 +523,7 @@ pub fn group_work_report_alice_1500() -> ReportWorksInfo {
     let block_number: u64 = 1500;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 0;
+    let spower: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oA".as_bytes().to_vec(), 13, 1503), // A file
@@ -544,7 +540,7 @@ pub fn group_work_report_alice_1500() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -559,7 +555,7 @@ pub fn group_work_report_bob_300() -> ReportWorksInfo {
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 99;
+    let spower: u64 = 99;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(), 7, 303),  // B file
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(), 37, 303), // C file
@@ -576,7 +572,7 @@ pub fn group_work_report_bob_300() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -591,7 +587,7 @@ pub fn group_work_report_bob_600() -> ReportWorksInfo {
     let block_number: u64 = 600;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 55;
+    let spower: u64 = 55;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(), 7, 603),  // B file
@@ -607,7 +603,7 @@ pub fn group_work_report_bob_600() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -622,7 +618,7 @@ pub fn group_work_report_eve_300() -> ReportWorksInfo {
     let block_number: u64 = 300;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 114;
+    let spower: u64 = 114;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(), 37, 303), // C file
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oD".as_bytes().to_vec(), 55, 303), // D file
@@ -639,7 +635,7 @@ pub fn group_work_report_eve_300() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -654,7 +650,7 @@ pub fn group_work_report_eve_600() -> ReportWorksInfo {
     let block_number: u64 = 600;
     let block_hash = hex::decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let free: u64 = 4294967296;
-    let used: u64 = 0;
+    let spower: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = [].to_vec();
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(), 37, 303), // C file
@@ -671,7 +667,7 @@ pub fn group_work_report_eve_600() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -712,12 +708,7 @@ pub fn add_not_live_files() {
     ].to_vec();
 
     for (file, file_size) in files.iter() {
-        let used_info = UsedInfo {
-            used_size: 0,
-            reported_group_count: 0,
-            groups: <BTreeMap<SworkerAnchor, bool>>::new()
-        };
-        insert_file(file, 1000, 0, 1000, 0, 0, vec![], *file_size, used_info);
+        insert_file(file, 1000, 0, 1000, 0, 0, vec![], *file_size);
     }
 
     let storage_pot = Market::storage_pot();
@@ -738,22 +729,19 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
         who: who.clone(),
         valid_at: 200,
         anchor: anchor.clone(),
-        is_reported: true
+        is_reported: true,
+        created_at: Some(200)
     };
     for (file, file_size) in files.iter() {
-        let used_info = UsedInfo {
-            used_size: *file_size * 2,
-            reported_group_count: 1,
-            groups: BTreeMap::from_iter(vec![(anchor.clone(), true)].into_iter())
-        };
-        insert_file(file, 200, 12000, 1000, 0, 0, vec![replica_info.clone()], *file_size, used_info);
+        insert_file(file, 200, 12000, 1000, 0, 1, vec![replica_info.clone()], *file_size);
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64) {
     let file_info = FileInfo {
         file_size,
-        expired_on,
+        spower: Market::calculate_spower(file_size, replicas.len() as u32),
+        expired_at,
         calculated_at,
         amount,
         prepaid,
@@ -761,10 +749,10 @@ fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: B
         replicas
     };
 
-    <market::Files<Test>>::insert(f_id, (file_info, used_info));
+    <market::Files<Test>>::insert(f_id, file_info);
 }
 
-pub fn update_used_info() {
+pub fn update_spower_info() {
     Market::on_initialize(93);
 }
 

@@ -21,34 +21,31 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     user
 }
 
-fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, calculated_at: BlockNumber, amount: u32)
-    -> (FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)
+fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_at: BlockNumber, calculated_at: BlockNumber, amount: u32)
+    -> FileInfo<T::AccountId, BalanceOf<T>>
 {
-    let used_info = UsedInfo {
-        used_size: file_size * 2,
-        reported_group_count: 1,
-        groups: <BTreeMap<SworkerAnchor, bool>>::new()
-    };
     let mut replicas: Vec<Replica<T::AccountId>> = vec![];
     for _ in 0..200 {
         let new_replica = Replica {
             who: user.clone(),
             valid_at,
             anchor: pub_key.clone(),
-            is_reported: true
+            is_reported: true,
+            created_at: None
         };
         replicas.push(new_replica);
     }
     let file_info = FileInfo {
         file_size,
-        expired_on,
+        spower: file_size,
+        expired_at,
         calculated_at,
         amount: T::Currency::minimum_balance() * amount.into(),
         prepaid: Zero::zero(),
         reported_replica_count: 0,
         replicas
     };
-    (file_info, used_info)
+    file_info
 }
 
 benchmarks! {
@@ -69,9 +66,9 @@ benchmarks! {
         let pub_key = vec![1];
         <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000));
         system::Module::<T>::set_block_number(600u32.into());
-    }: _(RawOrigin::Signed(user.clone()), cid.clone(), file_size, T::Currency::minimum_balance() * 10u32.into())
+    }: _(RawOrigin::Signed(user.clone()), cid.clone(), file_size, T::Currency::minimum_balance() * 10u32.into(), vec![])
     verify {
-        assert_eq!(Market::<T>::files(&cid).unwrap_or_default().0.calculated_at, 600);
+        assert_eq!(Market::<T>::files(&cid).unwrap_or_default().calculated_at, 600);
     }
 
     calculate_reward {
@@ -84,7 +81,7 @@ benchmarks! {
         <T as crate::Config>::Currency::make_free_balance_be(&crate::Module::<T>::storage_pot(), T::Currency::minimum_balance() * 2000u32.into());
     }: _(RawOrigin::Signed(user.clone()), cid.clone())
     verify {
-        assert_eq!(Market::<T>::used_trash_i(&cid).is_some(), true);
+        assert_eq!(Market::<T>::files(&cid).is_none(), true);
     }
 
 }

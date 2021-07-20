@@ -9,9 +9,9 @@ use frame_support::traits::Currency;
 use frame_support::storage::StorageMap;
 use sp_runtime::traits::{StaticLookup, Zero};
 use codec::Decode;
-use market::{UsedInfo, FileInfo, Replica};
+use market::{FileInfo, Replica};
 use primitives::*;
-use sp_std::{vec, prelude::*, collections::{btree_set::BTreeSet, btree_map::BTreeMap}, iter::FromIterator};
+use sp_std::{vec, prelude::*, collections::btree_set::BTreeSet, iter::FromIterator};
 
 const SEED: u32 = 0;
 const EXPIRE_BLOCK_NUMBER: u32 = 2000;
@@ -29,7 +29,7 @@ struct ReportWorksInfo {
     pub block_number: u64,
     pub block_hash: Vec<u8>,
     pub free: u64,
-    pub used: u64,
+    pub spower: u64,
     pub srd_root: MerkleRoot,
     pub files_root: MerkleRoot,
     pub added_files: Vec<(MerkleRoot, u64, u64)>,
@@ -43,7 +43,7 @@ fn legal_work_report_with_srd() -> ReportWorksInfo {
     let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
-    let used: u64 = 0;
+    let spower: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let files_root: Vec<u8> = vec![17];
@@ -56,7 +56,7 @@ fn legal_work_report_with_srd() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -70,9 +70,9 @@ fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
-    let used: u64 = 1000;
+    let spower: u64 = 1000;
     let mut added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
-    for i in 0..used {
+    for i in 0..spower {
         let a = ((i / 26) / 26 % 26 + 97) as u8;
         let b = ((i / 26) % 26 + 97) as u8;
         let c = ((i % 26) + 97) as u8;
@@ -89,7 +89,7 @@ fn legal_work_report_with_added_files() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -103,7 +103,7 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
     let block_number = 600;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
-    let used: u64 = 0;
+    let spower: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let mut deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     for i in 0..1000 {
@@ -122,7 +122,7 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -133,31 +133,28 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
 
 fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::AccountId, pub_key: Vec<u8>) {
     for (file, file_size, _) in files.clone().iter() {
-        let used_info = UsedInfo {
-            used_size: *file_size,
-            reported_group_count: 0,
-            groups: <BTreeMap<SworkerAnchor, bool>>::new()
-        };
         let mut replicas: Vec<Replica<T::AccountId>> = vec![];
         for _ in 0..200 {
             let new_replica = Replica {
                 who: user.clone(),
                 valid_at: 300,
                 anchor: pub_key.clone(),
-                is_reported: true
+                is_reported: true,
+                created_at: None
             };
             replicas.push(new_replica);
         }
         let file_info = FileInfo {
             file_size: *file_size,
-            expired_on: 1000,
+            spower: *file_size,
+            expired_at: 1000,
             calculated_at: 400,
             amount: <T as market::Config>::Currency::minimum_balance() * 1000000000u32.into(),
             prepaid: Zero::zero(),
             reported_replica_count: 0,
             replicas
         };
-        <market::Files<T>>::insert(file, (file_info, used_info));
+        <market::Files<T>>::insert(file, file_info);
     }
     let storage_value = <T as market::Config>::Currency::minimum_balance() * 10000000u32.into();
     <T as market::Config>::Currency::make_free_balance_be(&market::Module::<T>::storage_pot(), storage_value);
@@ -206,7 +203,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -215,7 +212,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), 0 as u128);
+        assert_eq!(swork::Module::<T>::spower(), 0 as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
@@ -245,7 +242,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -284,7 +281,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -306,7 +303,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -315,7 +312,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), (wr.used * 2) as u128);
+        assert_eq!(swork::Module::<T>::spower(), (wr.spower * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
@@ -355,7 +352,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,

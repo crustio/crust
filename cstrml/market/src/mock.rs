@@ -203,16 +203,14 @@ parameter_types! {
     pub const FileDuration: BlockNumber = 1000;
     pub const LiquidityDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
-    pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
-    pub const FilesCountInitPrice: Balance = 0;
+    pub const InitFileByteFee: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const InitFileKeysCountFee: Balance = 0;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
-    pub const UsedTrashMaxSize: u128 = 2;
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
-    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl Config for Test {
@@ -224,15 +222,13 @@ impl Config for Test {
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
-    type FileInitPrice = FileInitPrice;
-    type FilesCountInitPrice = FilesCountInitPrice;
+    type InitFileByteFee = InitFileByteFee;
+    type InitFileKeysCountFee = InitFileKeysCountFee;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
-    type RenewRewardRatio = RenewRewardRatio;
     type StorageRatio = StorageRatio;
-    type UsedTrashMaxSize = UsedTrashMaxSize;
     type MaximumFileSize = MaximumFileSize;
     type WeightInfo = weight::WeightInfo<Test>;
 }
@@ -293,7 +289,7 @@ pub fn init_swork_setup() {
         });
         <swork::WorkReports>::insert(pk.clone(), swork::WorkReport{
             report_slot: 0,
-            used: 0,
+            spower: 0,
             free: *free,
             reported_files_size: 0,
             reported_srd_root: vec![],
@@ -303,8 +299,8 @@ pub fn init_swork_setup() {
 }
 
 // fake for report_works
-pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>, maybe_members: Option<BTreeSet<AccountId>>) -> u64 {
-    Market::upsert_replica(&who, cid, reported_size, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &maybe_members)
+pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId, anchor: SworkerAnchor, created_at: Option<u32>, maybe_members: Option<BTreeSet<AccountId>>) -> u64 {
+    Market::upsert_replica(&who, cid, reported_size, &anchor, created_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &maybe_members)
 }
 
 pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
@@ -369,6 +365,6 @@ pub fn run_to_block(n: u64) {
     }
 }
 
-pub fn update_used_info() {
+pub fn update_spower_info() {
     Market::on_initialize(93);
 }

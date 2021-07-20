@@ -78,8 +78,8 @@ pub mod market {
     pub const PRICE_UPDATE_OFFSET: u32 = 3;
     pub const FILES_COUNT_REFERENCE: u32 = 20_000_000; // 20_000_000 / 50_000_000 = 40%
 
-    pub const USED_UPDATE_SLOT: u32 = 100;
-    pub const USED_UPDATE_OFFSET: u32 = 7;
+    pub const SPOWER_UPDATE_SLOT: u32 = 100;
+    pub const SPOWER_UPDATE_OFFSET: u32 = 7;
     pub const MAX_PENDING_FILES: usize = 20;
 
 

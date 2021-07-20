@@ -83,7 +83,7 @@ pub struct WorkReport {
     pub report_slot: u64,
 
     /// Storage information
-    pub used: u64, // Real file(mapping with sOrder) size
+    pub spower: u64, // Real file(mapping with sOrder) size
     pub free: u64,
 
     /// Assist judgement
@@ -134,12 +134,14 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         Self::reported_in_slot(&anchor, prev_rs)
     }
 
-    /// update the used value due to deleted files, dump trash or calculate_payout
-    fn update_used(anchor: &SworkerAnchor, anchor_decrease_used: u64, anchor_increase_used: u64) {
-        WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
-            Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_decrease_used).saturating_add(anchor_increase_used),
-            ref mut i => *i = None,
-        });
+    /// update the spower value due to deleted files, dump trash or calculate_payout
+    fn update_spower(anchor: &SworkerAnchor, anchor_decrease_spower: u64, anchor_increase_spower: u64) {
+        if anchor_decrease_spower != anchor_increase_spower {
+            WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
+                Some(WorkReport { ref mut spower, .. }) => *spower = spower.saturating_sub(anchor_decrease_spower).saturating_add(anchor_increase_spower),
+                ref mut i => *i = None,
+            });
+        }
     }
 
     /// check whether the account id and the anchor is valid or not
@@ -204,7 +206,7 @@ decl_storage! {
         pub Identities get(fn identities):
             map hasher(blake2_128_concat) T::AccountId => Option<Identity<T::AccountId>>;
 
-        /// The previous key used to iterate identities
+        /// The previous key spower to iterate identities
         pub IdentityPreviousKey get(fn identity_previous_key): Option<Vec<u8>>;
 
         /// The workload information
@@ -235,9 +237,9 @@ decl_storage! {
         pub ReportedInSlot get(fn reported_in_slot):
             double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => bool = false;
 
-        /// The used workload, used for calculating stake limit in the end of each report slot.
+        /// The spower workload, used for calculating stake limit in the end of each report slot.
         /// The default value is 0.
-        pub Used get(fn used): u128 = 0;
+        pub Spower get(fn spower): u128 = 0;
 
         /// The total reported files workload, used for calculating total_capacity for market module
         /// The default value is 0.
@@ -289,8 +291,8 @@ decl_error! {
         AlreadyJoint,
         /// The target is not a group owner. Please make sure that the target is a group owner.
         NotOwner,
-        /// The used value is not zero and cannot join a group.
-        IllegalUsed,
+        /// The spower value is not zero and cannot join a group.
+        IllegalSpower,
         /// The group already exist.
         GroupAlreadyExist,
         /// The group owner cannot be a sWorker member.
@@ -353,17 +355,17 @@ decl_module! {
                 // which means updating process is finished.
                 add_db_reads_writes(0, 0, Self::patial_update_identities(previous_key));
             } else {
-                if let Some((workload_map, total_free, total_used, total_reported_files_size)) = Self::workload() {
-                    // Update Free, Used, ReportedFilesSize and CurrentReportSlot
+                if let Some((workload_map, total_free, total_spower, total_reported_files_size)) = Self::workload() {
+                    // Update Free, Spower, ReportedFilesSize and CurrentReportSlot
                     Free::put(total_free);
-                    Used::put(total_used);
+                    Spower::put(total_spower);
                     ReportedFilesSize::put(total_reported_files_size);
                     CurrentReportSlot::mutate(|crs| *crs = Self::get_current_reported_slot());
 
                     add_db_reads_writes(0, 4, 0);
 
                     // Invoke report works to update stake limit
-                    let total_workload = total_used.saturating_add(total_free);
+                    let total_workload = total_spower.saturating_add(total_free);
                     add_db_reads_writes(0, 0, T::Works::report_works(workload_map, total_workload));
 
                     // Kill the IdentityPreviousKey and Workload
@@ -604,7 +606,7 @@ decl_module! {
             // b. Judge if it is resuming reporting(recover all sOrders)
             // c. Update sOrders according to `added_files` and `deleted_files`
             // d. Update `report_in_slot`
-            // e. Update total spaces(used and reserved)
+            // e. Update total spaces(spower and reserved)
             let anchor = Self::pub_keys(&curr_pk).anchor.unwrap();
             Self::maybe_upsert_work_report(
                 &reporter,
@@ -703,7 +705,7 @@ decl_module! {
             Ok(())
         }
 
-        /// Join a group. The account should already report works once and cannot have any used value.
+        /// Join a group. The account should already report works once and cannot have any spower value.
         /// The target must be a group owner.
         #[weight = T::WeightInfo::join_group()]
         pub fn join_group(
@@ -730,8 +732,8 @@ decl_module! {
             // 5. Ensure who is in the allowlist
             ensure!(Self::groups(&owner).allowlist.contains(&who), Error::<T>::NotInAllowlist);
 
-            // 6. Ensure who's wr's used is zero
-            ensure!(Self::work_reports(identity.anchor).unwrap_or_default().used == 0, Error::<T>::IllegalUsed);
+            // 6. Ensure who's wr's spower is zero
+            ensure!(Self::work_reports(identity.anchor).unwrap_or_default().spower == 0, Error::<T>::IllegalSpower);
 
             // 7. Join the group
             <Groups<T>>::mutate(&owner, |group| {
@@ -844,9 +846,9 @@ decl_module! {
 impl<T: Config> Module<T> {
     // PUBLIC MUTABLES
     /// This function is for updating all identities, in details:
-    /// 1. call `update_and_get_workload` for every identity, which will return (reserved, used)
+    /// 1. call `update_and_get_workload` for every identity, which will return (reserved, spower)
     /// this also (maybe) remove the `outdated` work report
-    /// 2. re-calculate `Used` and `Free`
+    /// 2. re-calculate `Spower` and `Free`
     /// 3. update `CurrentReportSlot`
     /// 4. call `Works::report_works` interface for every identity
     ///
@@ -862,23 +864,22 @@ impl<T: Config> Module<T> {
         let mut previous_key = previous_key;
         let maybe_to_removed_slot = current_rs.checked_sub(Self::history_slot_depth());
         let enable_punishment = Self::enable_punishment();
-        if let Some((mut workload_map, mut total_free, mut total_used, mut total_reported_files_size)) = Self::workload() {
+        if let Some((mut workload_map, mut total_free, mut total_spower, mut total_reported_files_size)) = Self::workload() {
             // read workload
             add_db_reads_writes(1, 0);
             for _ in 0..IDENTITY_UPDATE_LENGTH {
                 if let Some((reporter, mut id)) = Self::next_identity(&prefix, &mut previous_key) {
-                    let (free, used, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs, enable_punishment);
+                    let (free, spower, reported_files_size) = Self::get_workload(&reporter, &mut id, current_rs, enable_punishment);
                     // read identity, work_report and report_in_slot, write identity
                     add_db_reads_writes(3, 1);
-                    total_used = total_used.saturating_add(used);
+                    total_spower = total_spower.saturating_add(spower);
                     total_free = total_free.saturating_add(free);
                     total_reported_files_size = total_reported_files_size.saturating_add(reported_files_size);
                     let mut owner = reporter;
                     if let Some(group) = id.group {
                         owner = group;
                     }
-                    // TODO: we may need to deal with free and used seperately in the future
-                    let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(used).saturating_add(free);
+                    let workload = workload_map.get(&owner).unwrap_or(&0u128).saturating_add(spower).saturating_add(free);
                     workload_map.insert(owner, workload);
                     if let Some(to_removed_slot) = maybe_to_removed_slot {
                         ReportedInSlot::remove(&id.anchor, to_removed_slot);
@@ -887,14 +888,14 @@ impl<T: Config> Module<T> {
                     }
                 } else {
                     IdentityPreviousKey::kill();
-                    <Workload<T>>::put((workload_map, total_free, total_used, total_reported_files_size));
+                    <Workload<T>>::put((workload_map, total_free, total_spower, total_reported_files_size));
                     // write workload
                     add_db_reads_writes(0, 1);
                     return consumed_weight;
                 }
             }
             IdentityPreviousKey::put(previous_key);
-            <Workload<T>>::put((workload_map, total_free, total_used, total_reported_files_size));
+            <Workload<T>>::put((workload_map, total_free, total_spower, total_reported_files_size));
             // write workload
             add_db_reads_writes(0, 2);
         }
@@ -947,9 +948,9 @@ impl<T: Config> Module<T> {
     }
 
     /// This function will (maybe) update or insert a work report, in details:
-    /// 1. calculate used from reported files
+    /// 1. calculate spower from reported files
     /// 2. set `ReportedInSlot`
-    /// 3. update `Used` and `Free`
+    /// 3. update `Spower` and `Free`
     /// 4. call `Works::report_works` interface
     fn maybe_upsert_work_report(
         reporter: &T::AccountId,
@@ -962,14 +963,14 @@ impl<T: Config> Module<T> {
         reported_files_root: &MerkleRoot,
         report_slot: u64,
     ) {
-        let mut old_used: u64 = 0;
+        let mut old_spower: u64 = 0;
         let mut old_free: u64 = 0;
         let mut old_reported_files_size: u64 = 0;
         // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
 
         // 2. Update sOrder and get changed size
-        // loop added. if not exist, calculate used.
+        // loop added. if not exist, calculate spower.
         // loop deleted, need to check each key whether we should delete it or not
         let added_files = Self::update_files(reporter, added_files, &anchor, true);
         let deleted_files = Self::update_files(reporter, deleted_files, &anchor, false);
@@ -978,16 +979,16 @@ impl<T: Config> Module<T> {
 
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
-            old_used = old_wr.used;
+            old_spower = old_wr.spower;
             old_free = old_wr.free;
             old_reported_files_size = old_wr.reported_files_size;
         }
 
         // 4. Construct work report
-        let used = old_used.saturating_add(added_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size)).saturating_sub(deleted_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size));
+        let spower = old_spower.saturating_add(added_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size)).saturating_sub(deleted_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size));
         let wr = WorkReport {
             report_slot,
-            used,
+            spower,
             free: reported_srd_size,
             reported_files_size,
             reported_srd_root: reported_srd_root.clone(),
@@ -1037,12 +1038,12 @@ impl<T: Config> Module<T> {
     /// otherwise, it will be an void in this recursive loop, it mainly includes:
     /// 1. passive check work report: judge if the work report is outdated
     /// 2. (maybe) set corresponding storage order to failed if wr is outdated
-    /// 2. return the (reserved, used) storage of this reporter account
+    /// 2. return the (reserved, spower) storage of this reporter account
     fn get_workload(reporter: &T::AccountId, id: &mut Identity<T::AccountId>, current_rs: u64, enable_punishment: bool) -> (u128, u128, u128) {
         // Got work report
         if let Some(wr) = Self::work_reports(&id.anchor) {
             if Self::is_fully_reported(reporter, id, current_rs, enable_punishment) {
-                return (wr.free as u128, wr.used as u128, wr.reported_files_size as u128)
+                return (wr.free as u128, wr.spower as u128, wr.reported_files_size as u128)
             }
         }
         // Or nope, idk wtf? 🙂
@@ -1169,7 +1170,7 @@ impl<T: Config> Module<T> {
         block_number: u64,
         block_hash: &Vec<u8>,
         reserved: u64,
-        used: u64,
+        spower: u64,
         srd_root: &MerkleRoot,
         files_root: &MerkleRoot,
         added_files: &Vec<(MerkleRoot, u64, u64)>,
@@ -1179,7 +1180,7 @@ impl<T: Config> Module<T> {
         // 1. Encode
         let block_number_bytes = utils::encode_u64_to_string_to_bytes(block_number);
         let reserved_bytes = utils::encode_u64_to_string_to_bytes(reserved);
-        let used_bytes = utils::encode_u64_to_string_to_bytes(used);
+        let spower_bytes = utils::encode_u64_to_string_to_bytes(spower);
         let added_files_bytes = utils::encode_files(added_files);
         let deleted_files_bytes = utils::encode_files(deleted_files);
 
@@ -1190,9 +1191,9 @@ impl<T: Config> Module<T> {
         //    block_number: u64, -> Vec<u8>
         //    block_hash: Vec<u8>,
         //    free: u64, -> Vec<u8>
-        //    used: u64, -> Vec<u8>
+        //    spower: u64, -> Vec<u8>
         //    free_root: MerkleRoot,
-        //    used_root: MerkleRoot,
+        //    spower_root: MerkleRoot,
         //    added_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>
         //    deleted_files: Vec<(MerkleRoot, u64, u64)>, -> Vec<u8>
         //}
@@ -1202,7 +1203,7 @@ impl<T: Config> Module<T> {
             &block_number_bytes[..],
             &block_hash[..],
             &reserved_bytes[..],
-            &used_bytes[..],
+            &spower_bytes[..],
             &srd_root[..],
             &files_root[..],
             &added_files_bytes[..],

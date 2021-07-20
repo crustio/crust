@@ -350,7 +350,7 @@ decl_storage! {
         /// The global market switch to enable place storage order
         pub MarketSwitch get(fn market_switch): bool = false;
 
-        /// The used size to become valid duration
+        /// The spower become valid duration
         pub SpowerReadyPeriod get(fn spower_ready_period): BlockNumber = 1_296_000; // 3 months
 
         /// The upper limit for free counts
@@ -509,7 +509,7 @@ decl_module! {
                     Err(Error::<T>::FileSizeNotCorrect)?
                 }
             }
-            // 3. charged_file_size should be smaller than 128G
+            // 3. charged_file_size should be smaller than 32G
             ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
 
             // 4. Check whether the account is free or not

@@ -184,12 +184,15 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // 1. Delete replica from file_info
         if let Some(mut file_info) = <Files<T>>::get(cid) {
             let mut to_decrease_count = 0;
-            let mut is_valid: Option<bool> = None;
+            // None => No such file
+            // Some(true) => Already pass the SpowerReadyPeriod, decrease the spower
+            // Some(false) => Still in SpowerReadyPeriod, decrease the file_size
+            let mut is_spower_counted: Option<bool> = None;
             file_info.replicas.retain(|replica| {
                 if replica.who == *who {
                     if replica.anchor == *anchor {
                         // We added it before
-                        if replica.created_at.is_none() { is_valid = Some(true); } else { is_valid = Some(false); };
+                        if replica.created_at.is_none() { is_spower_counted = Some(true); } else { is_spower_counted = Some(false); };
                     }
                     if replica.is_reported {
                         // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_calculate_reward`
@@ -200,8 +203,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             });
 
             // 2. Return the original storage power in wr
-            if let Some(is_valid) = is_valid {
-                if is_valid {
+            if let Some(is_spower_counted) = is_spower_counted {
+                if is_spower_counted {
                     spower = file_info.spower;
                 } else {
                     spower = file_info.file_size;
@@ -348,7 +351,7 @@ decl_storage! {
         pub MarketSwitch get(fn market_switch): bool = false;
 
         /// The used size to become valid duration
-        pub ValidDuration get(fn valid_duration): BlockNumber = 1_296_000; // 3 months
+        pub SpowerReadyPeriod get(fn spower_ready_period): BlockNumber = 1_296_000; // 3 months
 
         /// The upper limit for free counts
         pub FreeCountsLimit get(fn free_counts_limit): u32 = 1000;
@@ -1135,7 +1138,7 @@ impl<T: Config> Module<T> {
             } else if let Some(curr_bn) = curr_bn {
                 // Make it become valid
                 let created_at = replica.created_at.unwrap();
-                if created_at + Self::valid_duration() < curr_bn {
+                if created_at + Self::spower_ready_period() < curr_bn {
                     replicas_count += 1;
                     T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
                     replica.created_at = None;

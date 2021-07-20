@@ -463,7 +463,7 @@ decl_module! {
                 let files = Self::get_files_to_update();
                 for cid in files {
                     if let Some(mut file_info) = Self::files(&cid) {
-                        let groups_count = Self::update_spower_info(&mut file_info, Some(now));
+                        let groups_count = Self::update_replicas_spower(&mut file_info, Some(now));
                         <Files<T>>::insert(cid, file_info);
                         add_db_reads_writes(groups_count, groups_count + 1);
                     }
@@ -843,7 +843,7 @@ impl<T: Config> Module<T> {
 
         // 5. Update spower info
         // TODO: add this weight into place_storage_order
-        let _ = Self::update_spower_info(&mut file_info, Some(curr_bn));
+        let _ = Self::update_replicas_spower(&mut file_info, Some(curr_bn));
 
         // 6. File status might become ready to be closed if calculated_block == expired_at
         file_info.calculated_at = calculated_block;
@@ -862,7 +862,7 @@ impl<T: Config> Module<T> {
                 // Remove all spower from wr
                 file_info.reported_replica_count = 0;
                 // TODO: add this weight into place_storage_order
-                let _ = Self::update_spower_info(&mut file_info, None);
+                let _ = Self::update_replicas_spower(&mut file_info, None);
 
                 // Remove files
                 <Files<T>>::remove(&cid);
@@ -1126,28 +1126,30 @@ impl<T: Config> Module<T> {
         false
     }
 
-    fn update_spower_info(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, curr_bn: Option<BlockNumber>) -> u64 {
+    fn update_replicas_spower(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, curr_bn: Option<BlockNumber>) -> u64 {
         let new_spower = Self::calculate_spower(file_info.file_size, file_info.reported_replica_count);
         let prev_spower = file_info.spower;
         let mut replicas_count = 0;
         for ref mut replica in &mut file_info.replicas {
             // already begin to use spower
-            if replica.created_at.is_none() && prev_spower != new_spower {
+            if replica.created_at.is_none() {
                 replicas_count += 1;
                 T::SworkerInterface::update_spower(&replica.anchor, prev_spower, new_spower);
-            } else if let Some(curr_bn) = curr_bn {
-                // Make it become valid
-                if let Some(created_at) = replica.created_at {
-                    if created_at + Self::spower_ready_period() <= curr_bn {
-                        replicas_count += 1;
-                        T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
-                        replica.created_at = None;
-                    }
-                }
             } else {
-                // File is to close
-                replicas_count += 1;
-                T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+                if let Some(curr_bn) = curr_bn {
+                    // Make it become valid
+                    if let Some(created_at) = replica.created_at {
+                        if created_at + Self::spower_ready_period() <= curr_bn {
+                            replicas_count += 1;
+                            T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+                            replica.created_at = None;
+                        }
+                    }
+                } else {
+                    // File is to close
+                    replicas_count += 1;
+                    T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+                }
             }
         }
         file_info.spower = new_spower;

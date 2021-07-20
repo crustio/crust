@@ -1137,11 +1137,12 @@ impl<T: Config> Module<T> {
                 T::SworkerInterface::update_spower(&replica.anchor, prev_spower, new_spower);
             } else if let Some(curr_bn) = curr_bn {
                 // Make it become valid
-                let created_at = replica.created_at.unwrap();
-                if created_at + Self::spower_ready_period() < curr_bn {
-                    replicas_count += 1;
-                    T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
-                    replica.created_at = None;
+                if let Some(created_at) = replica.created_at {
+                    if created_at + Self::spower_ready_period() <= curr_bn {
+                        replicas_count += 1;
+                        T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+                        replica.created_at = None;
+                    }
                 }
             } else {
                 // File is to close

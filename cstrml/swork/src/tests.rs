@@ -3267,3 +3267,125 @@ fn first_time_should_pass_the_punishment_in_weird_situation() {
             });
         });
 }
+
+/// Report works test cases
+#[test]
+fn spower_delay_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // Generate 303 blocks first
+            run_to_block(303);
+            market::SpowerReadyPeriod::put(300);
+
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+            let legal_wr = WorkReport {
+                report_slot: legal_wr_info.block_number,
+                spower: legal_wr_info.added_files[0].1 + legal_wr_info.added_files[1].1,
+                free: legal_wr_info.free,
+                reported_files_size: legal_wr_info.spower,
+                reported_srd_root: legal_wr_info.srd_root.clone(),
+                reported_files_root: legal_wr_info.files_root.clone()
+            };
+
+            register(&legal_pk, LegalCode::get());
+            add_not_live_files();
+
+            // Check workloads before reporting
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::spower(), 0);
+
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.spower,
+                legal_wr_info.added_files.clone(),
+                legal_wr_info.deleted_files.clone(),
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+            // Check work report
+            update_spower_info();
+            assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
+
+            // Check workloads after work report
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::reported_files_size(), 402868224);
+            assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
+
+            assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NEW_IDENTITY,
+                group: None
+            });
+            assert_eq!(Swork::pub_keys(legal_pk.clone()), PKInfo {
+                code: LegalCode::get(),
+                anchor: Some(legal_pk.clone())
+            });
+
+            // Check same file all been confirmed
+            assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default(), FileInfo {
+                file_size: 134289408,
+                spower: Market::calculate_spower(134289408, 1),
+                expired_at: 1303,
+                calculated_at: 303,
+                amount: 1000,
+                prepaid: 0,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: reporter.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone(),
+                    is_reported: true,
+                    created_at: Some(303)
+                }]
+            });
+            assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default(), FileInfo {
+                file_size: 268578816,
+                spower: Market::calculate_spower(268578816, 1),
+                expired_at: 1303,
+                calculated_at: 303,
+                amount: 1000,
+                prepaid: 0,
+                reported_replica_count: 1,
+                replicas: vec![Replica {
+                    who: reporter.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone(),
+                    is_reported: true,
+                    created_at: Some(303)
+                }]
+            });
+            assert_eq!(Swork::added_files_count(), 2);
+
+            run_to_block(606);
+
+            assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[0].0.clone()));
+            assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {
+                report_slot: 300,
+                spower: Market::calculate_spower(134289408, 1) + 268578816,
+                free: 4294967296,
+                reported_files_size: 402868224,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+
+            assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[1].0.clone()));
+            assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {
+                report_slot: 300,
+                spower: Market::calculate_spower(134289408, 1) + Market::calculate_spower(268578816, 1),
+                free: 4294967296,
+                reported_files_size: 402868224,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
+            });
+        });
+}

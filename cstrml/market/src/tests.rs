@@ -3450,3 +3450,320 @@ fn place_storage_order_with_discount_should_work() {
         assert_eq!(Balances::free_balance(&source), 4300);
     });
 }
+
+#[test]
+fn spower_delay_should_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // should less than merchant
+        let source = ALICE;
+        let merchant = BOB;
+        let charlie = CHARLIE;
+        let dave = DAVE;
+        let eve = EVE;
+        SpowerReadyPeriod::put(300);
+
+        let staking_pot = Market::staking_pot();
+        let reserved_pot = Market::reserved_pot();
+        assert_eq!(Balances::free_balance(&staking_pot), 0);
+        assert_eq!(Balances::free_balance(&reserved_pot), 0);
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            add_collateral(who, 6_000_000);
+        }
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source), cid.clone(),
+            file_size, 0, vec![]
+        ));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: 0,
+               expired_at: 0,
+               calculated_at: 50,
+               amount: 23220,
+               prepaid: 0,
+               reported_replica_count: 0,
+               replicas: vec![]
+           }
+        );
+
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+            Origin::signed(merchant.clone()),
+            legal_wr_info.curr_pk,
+            legal_wr_info.prev_pk,
+            legal_wr_info.block_number,
+            legal_wr_info.block_hash,
+            legal_wr_info.free,
+            legal_wr_info.used,
+            legal_wr_info.added_files,
+            legal_wr_info.deleted_files,
+            legal_wr_info.srd_root,
+            legal_wr_info.files_root,
+            legal_wr_info.sig
+        ));
+
+        update_spower_info();
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 1),
+               expired_at: 1303,
+               calculated_at: 303,
+               amount: 23220,
+               prepaid: 0,
+               reported_replica_count: 1,
+               replicas: vec![Replica {
+                   who: merchant.clone(),
+                   valid_at: 303,
+                   anchor: legal_pk.clone(),
+                   is_reported: true,
+                   created_at: Some(303)
+               }]
+           }
+        );
+
+        run_to_block(503);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 1),
+               expired_at: 1303,
+               calculated_at: 503,
+               amount: 18577,
+               prepaid: 0,
+               reported_replica_count: 1,
+               replicas: vec![Replica {
+                   who: merchant.clone(),
+                   valid_at: 303,
+                   anchor: legal_pk.clone(),
+                   is_reported: true,
+                   created_at: Some(303)
+               }]
+           }
+        );
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 4643
+        });
+
+        add_who_into_replica(&cid, file_size, charlie.clone(), legal_pk.clone(), None, None);
+
+        run_to_block(603);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 1),
+               expired_at: 1303,
+               calculated_at: 603,
+               amount: 16257,
+               prepaid: 0,
+               reported_replica_count: 2,
+               replicas: vec![
+                   Replica {
+                       who: merchant.clone(),
+                       valid_at: 303,
+                       anchor: legal_pk.clone(),
+                       is_reported: true,
+                       created_at: None
+                   },
+                   Replica {
+                       who: charlie.clone(),
+                       valid_at: 503,
+                       anchor: legal_pk.clone(),
+                       is_reported: true,
+                       created_at: Some(503)
+                   }]
+           }
+        );
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 5803
+        });
+        assert_eq!(merchant_ledgers(&charlie), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 1160
+        });
+
+        add_who_into_replica(&cid, file_size, dave.clone(), hex::decode("11").unwrap(), None, None);
+        run_to_block(703);
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 1),
+               expired_at: 1303,
+               calculated_at: 703,
+               amount: 14711,
+               prepaid: 0,
+               reported_replica_count: 2,
+               replicas: vec![
+                   Replica {
+                       who: merchant.clone(),
+                       valid_at: 303,
+                       anchor: legal_pk.clone(),
+                       is_reported: true,
+                       created_at: None
+                   },
+                   Replica {
+                       who: charlie.clone(),
+                       valid_at: 503,
+                       anchor: legal_pk.clone(),
+                       is_reported: true,
+                       created_at: Some(503)
+                   },
+                   Replica {
+                       who: dave.clone(),
+                       valid_at: 703, // did't report. change it to curr bn
+                       anchor: hex::decode("11").unwrap(),
+                       is_reported: false,
+                       created_at: Some(603)
+                   }]
+           }
+        );
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 6576
+        });
+        assert_eq!(merchant_ledgers(&charlie), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 1933
+        });
+
+        run_to_block(903);
+        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 600, true);
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 1),
+               expired_at: 1303,
+               calculated_at: 903,
+               amount: 13077,
+               prepaid: 0,
+               reported_replica_count: 1,
+               replicas: vec![
+                   Replica {
+                       who: dave.clone(),
+                       valid_at: 703,
+                       anchor: hex::decode("11").unwrap(),
+                       is_reported: true,
+                       created_at: None
+                   },
+                   Replica {
+                       who: merchant.clone(),
+                       valid_at: 903, // did't report. change it to curr bn
+                       anchor: legal_pk.clone(),
+                       is_reported: false,
+                       created_at: None
+                   },
+                   Replica {
+                       who: charlie.clone(),
+                       valid_at: 903, // did't report. change it to curr bn
+                       anchor: legal_pk.clone(),
+                       is_reported: false,
+                       created_at: None
+                   }]
+           }
+        );
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 6576
+        });
+        assert_eq!(merchant_ledgers(&charlie), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 1933
+        });
+        assert_eq!(merchant_ledgers(&dave), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 1634
+        });
+
+        run_to_block(1203);
+        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 900, true);
+        <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
+        Market::do_calculate_reward(&cid, System::block_number().try_into().unwrap());
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 1),
+               expired_at: 1303,
+               calculated_at: 1203,
+               amount: 3273,
+               prepaid: 0,
+               reported_replica_count: 3,
+               replicas: vec![
+                   Replica {
+                       who: dave.clone(),
+                       valid_at: 703,
+                       anchor: hex::decode("11").unwrap(),
+                       is_reported: true,
+                       created_at: None
+                   },
+                   Replica {
+                       who: merchant.clone(),
+                       valid_at: 903,
+                       anchor: legal_pk.clone(),
+                       is_reported: true,
+                       created_at: None
+                   },
+                   Replica {
+                       who: charlie.clone(),
+                       valid_at: 903,
+                       anchor: legal_pk.clone(),
+                       is_reported: true,
+                       created_at: None
+                   }]
+           }
+        );
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 9844
+        });
+        assert_eq!(merchant_ledgers(&charlie), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 5201
+        });
+        assert_eq!(merchant_ledgers(&dave), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 4902
+        });
+
+        run_to_block(1803);
+        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 9844
+        });
+        assert_eq!(merchant_ledgers(&charlie), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 5201
+        });
+        assert_eq!(merchant_ledgers(&dave), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 4902
+        });
+        assert_eq!(Balances::free_balance(&reserved_pot), 17173);
+    });
+}

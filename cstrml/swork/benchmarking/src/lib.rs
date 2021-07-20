@@ -140,14 +140,14 @@ fn add_market_files<T: Config>(files: Vec<(MerkleRoot, u64, u64)>, user: T::Acco
                 valid_at: 300,
                 anchor: pub_key.clone(),
                 is_reported: true,
-                reported_at: None
+                created_at: None
             };
             replicas.push(new_replica);
         }
         let file_info = FileInfo {
             file_size: *file_size,
-            used_size: *file_size,
-            expired_on: 1000,
+            spower: *file_size,
+            expired_at: 1000,
             calculated_at: 400,
             amount: <T as market::Config>::Currency::minimum_balance() * 1000000000u32.into(),
             prepaid: Zero::zero(),

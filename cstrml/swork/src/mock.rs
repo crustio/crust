@@ -135,15 +135,14 @@ parameter_types! {
     pub const FileDuration: BlockNumber = 1000;
     pub const LiquidityDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
-    pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
-    pub const FilesCountInitPrice: Balance = 1000;
+    pub const InitFileByteFee: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const InitFileKeysCountFee: Balance = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
-    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl market::Config for Test {
@@ -156,13 +155,12 @@ impl market::Config for Test {
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
-    type FileInitPrice = FileInitPrice;
-    type FilesCountInitPrice = FilesCountInitPrice;
+    type InitFileByteFee = InitFileByteFee;
+    type InitFileKeysCountFee = InitFileKeysCountFee;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
-    type RenewRewardRatio = RenewRewardRatio;
     type StorageRatio = StorageRatio;
     type MaximumFileSize = MaximumFileSize;
     type WeightInfo = market::weight::WeightInfo<Test>;
@@ -711,7 +709,7 @@ pub fn add_not_live_files() {
 
     for (file, file_size) in files.iter() {
         let used_info = UsedInfo {
-            used_size: 0,
+            spower: 0,
             reported_group_count: 0,
             groups: <BTreeMap<SworkerAnchor, bool>>::new()
         };
@@ -740,7 +738,7 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
     };
     for (file, file_size) in files.iter() {
         let used_info = UsedInfo {
-            used_size: *file_size * 2,
+            spower: *file_size * 2,
             reported_group_count: 1,
             groups: BTreeMap::from_iter(vec![(anchor.clone(), true)].into_iter())
         };
@@ -748,10 +746,10 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
+fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64, used_info: UsedInfo) {
     let file_info = FileInfo {
         file_size,
-        expired_on,
+        expired_at,
         calculated_at,
         amount,
         prepaid,
@@ -762,7 +760,7 @@ fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_on: u32, amount: B
     <market::Files<Test>>::insert(f_id, (file_info, used_info));
 }
 
-pub fn update_used_info() {
+pub fn update_spower_info() {
     Market::on_initialize(93);
 }
 

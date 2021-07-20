@@ -85,15 +85,14 @@ parameter_types! {
     pub const FileDuration: BlockNumber = 1000;
     pub const LiquidityDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
-    pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
-    pub const FilesCountInitPrice: Balance = 1000;
+    pub const InitFileByteFee: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const InitFileKeysCountFee: Balance = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
-    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl market::Config for Test {
@@ -106,13 +105,12 @@ impl market::Config for Test {
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
-    type FileInitPrice = FileInitPrice;
-    type FilesCountInitPrice = FilesCountInitPrice;
+    type InitFileByteFee = InitFileByteFee;
+    type InitFileKeysCountFee = InitFileKeysCountFee;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
     type StakingRatio = StakingRatio;
-    type RenewRewardRatio = RenewRewardRatio;
     type StorageRatio = StorageRatio;
     type MaximumFileSize = MaximumFileSize;
     type WeightInfo = market::weight::WeightInfo<Test>;

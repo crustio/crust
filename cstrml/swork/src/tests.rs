@@ -352,7 +352,7 @@ fn report_works_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
-                used: Market::calculate_used_size(legal_wr_info.added_files[0].1, 1) + Market::calculate_used_size(legal_wr_info.added_files[1].1, 1),
+                used: Market::calculate_spower(legal_wr_info.added_files[0].1, 1) + Market::calculate_spower(legal_wr_info.added_files[1].1, 1),
                 free: legal_wr_info.free,
                 reported_files_size: legal_wr_info.used,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
@@ -382,7 +382,7 @@ fn report_works_should_work() {
             ));
 
             // Check work report
-            update_used_info();
+            update_spower_info();
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
             // Check workloads after work report
@@ -403,7 +403,7 @@ fn report_works_should_work() {
             // Check same file all been confirmed
             assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default().0, FileInfo {
                 file_size: 134289408,
-                expired_on: 1303,
+                expired_at: 1303,
                 calculated_at: 303,
                 amount: 1000,
                 prepaid: 0,
@@ -417,7 +417,7 @@ fn report_works_should_work() {
             });
             assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default().0, FileInfo {
                 file_size: 268578816,
-                expired_on: 1303,
+                expired_at: 1303,
                 calculated_at: 303,
                 amount: 1000,
                 prepaid: 0,
@@ -1848,11 +1848,11 @@ fn join_group_should_work_for_used_in_work_report() {
                 alice_wr_info.sig
             ));
 
-            update_used_info();
+            update_spower_info();
             assert_eq!(Market::files(&file_a).unwrap_or_default(), (
                 FileInfo {
                     file_size: 13,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -1865,7 +1865,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 UsedInfo {
-                    used_size: 13 + 0,
+                    spower: 13 + 0,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1873,7 +1873,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_b).unwrap_or_default(), (
                 FileInfo {
                     file_size: 7,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -1886,7 +1886,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 UsedInfo {
-                    used_size: 7 + 0,
+                    spower: 7 + 0,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1894,7 +1894,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
                 FileInfo {
                     file_size: 37,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -1907,7 +1907,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     }]
                 },
                 UsedInfo {
-                    used_size: 37 + 1,
+                    spower: 37 + 1,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1939,7 +1939,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_b).unwrap_or_default(), (
                 FileInfo {
                     file_size: 7,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -1960,7 +1960,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 7 + 0,
+                    spower: 7 + 0,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1968,7 +1968,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
                 FileInfo {
                     file_size: 37,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -1989,7 +1989,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37 + 1,
+                    spower: 37 + 1,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -1998,7 +1998,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
                 FileInfo {
                     file_size: 55,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2013,16 +2013,16 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 0,
+                    spower: 0,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
             );
-            update_used_info();
+            update_spower_info();
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
                 FileInfo {
                     file_size: 55,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2037,7 +2037,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55 + 2,
+                    spower: 55 + 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -2069,7 +2069,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
                 FileInfo {
                     file_size: 37,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2096,7 +2096,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37 + 1,
+                    spower: 37 + 1,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -2104,7 +2104,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
                 FileInfo {
                     file_size: 55,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2125,7 +2125,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55 + 2,
+                    spower: 55 + 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -2134,7 +2134,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_e).unwrap_or_default(), (
                 FileInfo {
                     file_size: 22,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2149,7 +2149,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 0,
+                    spower: 0,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(c_pk.clone(), true)].into_iter())
                 })
@@ -2163,7 +2163,7 @@ fn join_group_should_work_for_used_in_work_report() {
                 reported_files_root: hex::decode("11").unwrap()
             });
 
-            update_used_info();
+            update_spower_info();
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 used: 23,
@@ -2196,7 +2196,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_b).unwrap_or_default(), (
                 FileInfo {
                     file_size: 7,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2211,7 +2211,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 7 + 0,
+                    spower: 7 + 0,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -2219,7 +2219,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
                 FileInfo {
                     file_size: 37,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2240,7 +2240,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37 + 1,
+                    spower: 37 + 1,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -2249,7 +2249,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
                 FileInfo {
                     file_size: 55,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2270,7 +2270,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55 + 2,
+                    spower: 55 + 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -2298,11 +2298,11 @@ fn join_group_should_work_for_used_in_work_report() {
                 eve_wr_info.files_root,
                 eve_wr_info.sig
             ));
-            update_used_info();
+            update_spower_info();
             assert_eq!(Market::files(&file_c).unwrap_or_default(), (
                 FileInfo {
                     file_size: 37,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2317,7 +2317,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 37 + 1,
+                    spower: 37 + 1,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(a_pk.clone(), true)].into_iter())
                 })
@@ -2325,7 +2325,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_d).unwrap_or_default(), (
                 FileInfo {
                     file_size: 55,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2340,7 +2340,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     ]
                 },
                 UsedInfo {
-                    used_size: 55 + 2,
+                    spower: 55 + 2,
                     reported_group_count: 1,
                     groups: BTreeMap::from_iter(vec![(b_pk.clone(), true)].into_iter())
                 })
@@ -2349,7 +2349,7 @@ fn join_group_should_work_for_used_in_work_report() {
             assert_eq!(Market::files(&file_e).unwrap_or_default(), (
                 FileInfo {
                     file_size: 22,
-                    expired_on: 1303,
+                    expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
                     prepaid: 0,
@@ -2357,7 +2357,7 @@ fn join_group_should_work_for_used_in_work_report() {
                     replicas: vec![]
                 },
                 UsedInfo {
-                    used_size: 0,
+                    spower: 0,
                     reported_group_count: 0,
                     groups: BTreeMap::new()
                 })
@@ -2559,7 +2559,7 @@ fn join_group_should_work_for_stake_limit() {
             ));
 
             run_to_block(603);
-            update_used_info();
+            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 12884901888);
@@ -2650,7 +2650,7 @@ fn quit_group_should_work_for_stake_limit() {
                 Origin::signed(alice.clone())
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
-            update_used_info();
+            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
@@ -2761,7 +2761,7 @@ fn kick_out_should_work_for_stake_limit() {
                 alice.clone()
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
-            update_used_info();
+            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
@@ -2824,7 +2824,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             ));
 
             run_to_block(603);
-            update_used_info();
+            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);

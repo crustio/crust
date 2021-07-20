@@ -135,7 +135,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     }
 
     /// update the used value due to deleted files, dump trash or calculate_payout
-    fn update_used(anchor: &SworkerAnchor, anchor_decrease_used: u64, anchor_increase_used: u64) {
+    fn update_spower(anchor: &SworkerAnchor, anchor_decrease_used: u64, anchor_increase_used: u64) {
         if anchor_decrease_used != anchor_increase_used {
             WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
                 Some(WorkReport { ref mut used, .. }) => *used = used.saturating_sub(anchor_decrease_used).saturating_add(anchor_increase_used),

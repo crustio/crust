@@ -21,7 +21,7 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     user
 }
 
-fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_on: BlockNumber, calculated_at: BlockNumber, amount: u32)
+fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_at: BlockNumber, calculated_at: BlockNumber, amount: u32)
     -> FileInfo<T::AccountId, BalanceOf<T>>
 {
     let mut replicas: Vec<Replica<T::AccountId>> = vec![];
@@ -31,14 +31,14 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
             valid_at,
             anchor: pub_key.clone(),
             is_reported: true,
-            reported_at: None
+            created_at: None
         };
         replicas.push(new_replica);
     }
     let file_info = FileInfo {
         file_size,
-        used_size: file_size,
-        expired_on,
+        spower: file_size,
+        expired_at,
         calculated_at,
         amount: T::Currency::minimum_balance() * amount.into(),
         prepaid: Zero::zero(),

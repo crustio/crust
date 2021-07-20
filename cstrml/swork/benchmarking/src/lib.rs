@@ -29,7 +29,7 @@ struct ReportWorksInfo {
     pub block_number: u64,
     pub block_hash: Vec<u8>,
     pub free: u64,
-    pub used: u64,
+    pub spower: u64,
     pub srd_root: MerkleRoot,
     pub files_root: MerkleRoot,
     pub added_files: Vec<(MerkleRoot, u64, u64)>,
@@ -43,7 +43,7 @@ fn legal_work_report_with_srd() -> ReportWorksInfo {
     let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
-    let used: u64 = 0;
+    let spower: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let files_root: Vec<u8> = vec![17];
@@ -56,7 +56,7 @@ fn legal_work_report_with_srd() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -70,9 +70,9 @@ fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
-    let used: u64 = 1000;
+    let spower: u64 = 1000;
     let mut added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
-    for i in 0..used {
+    for i in 0..spower {
         let a = ((i / 26) / 26 % 26 + 97) as u8;
         let b = ((i / 26) % 26 + 97) as u8;
         let c = ((i % 26) + 97) as u8;
@@ -89,7 +89,7 @@ fn legal_work_report_with_added_files() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -103,7 +103,7 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
     let block_number = 600;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
-    let used: u64 = 0;
+    let spower: u64 = 0;
     let added_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     let mut deleted_files: Vec<(Vec<u8>, u64, u64)> = vec![];
     for i in 0..1000 {
@@ -122,7 +122,7 @@ fn legal_work_report_with_deleted_files() -> ReportWorksInfo {
         block_number,
         block_hash,
         free,
-        used,
+        spower,
         srd_root,
         files_root,
         added_files,
@@ -203,7 +203,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -212,7 +212,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), 0 as u128);
+        assert_eq!(swork::Module::<T>::spower(), 0 as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
@@ -242,7 +242,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -281,7 +281,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -303,7 +303,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,
@@ -312,7 +312,7 @@ benchmarks! {
         ).expect("Something wrong during reporting works");
     } verify {
         assert_eq!(swork::Module::<T>::free(), wr.free as u128);
-        assert_eq!(swork::Module::<T>::used(), (wr.used * 2) as u128);
+        assert_eq!(swork::Module::<T>::spower(), (wr.spower * 2) as u128);
         assert_eq!(swork::Module::<T>::reported_in_slot(&wr.curr_pk, wr.block_number), true);
     }
 
@@ -352,7 +352,7 @@ benchmarks! {
             wr.block_number,
             wr.block_hash,
             wr.free,
-            wr.used,
+            wr.spower,
             wr.added_files,
             wr.deleted_files,
             wr.srd_root,

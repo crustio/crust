@@ -352,9 +352,9 @@ fn report_works_should_work() {
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
-                used: legal_wr_info.added_files[0].1 + legal_wr_info.added_files[1].1,
+                spower: legal_wr_info.added_files[0].1 + legal_wr_info.added_files[1].1,
                 free: legal_wr_info.free,
-                reported_files_size: legal_wr_info.used,
+                reported_files_size: legal_wr_info.spower,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
                 reported_files_root: legal_wr_info.files_root.clone()
             };
@@ -364,7 +364,7 @@ fn report_works_should_work() {
 
             // Check workloads before reporting
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
 
             assert_ok!(Swork::report_works(
                 Origin::signed(reporter.clone()),
@@ -373,7 +373,7 @@ fn report_works_should_work() {
                 legal_wr_info.block_number,
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
-                legal_wr_info.used,
+                legal_wr_info.spower,
                 legal_wr_info.added_files.clone(),
                 legal_wr_info.deleted_files.clone(),
                 legal_wr_info.srd_root,
@@ -453,7 +453,7 @@ fn report_works_should_work_without_files() {
 
             // Check workloads before reporting
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
 
             assert_ok!(Swork::report_works(
                 Origin::signed(reporter.clone()),
@@ -462,7 +462,7 @@ fn report_works_should_work_without_files() {
                 legal_wr_info.block_number,
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
-                legal_wr_info.used,
+                legal_wr_info.spower,
                 legal_wr_info.added_files,
                 legal_wr_info.deleted_files,
                 legal_wr_info.srd_root,
@@ -472,7 +472,7 @@ fn report_works_should_work_without_files() {
 
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 402868224);
         });
 }
@@ -498,7 +498,7 @@ fn report_works_should_work_with_added_and_deleted_files() {
                 legal_wr_info.block_number,
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
-                legal_wr_info.used,
+                legal_wr_info.spower,
                 legal_wr_info.added_files,
                 legal_wr_info.deleted_files,
                 legal_wr_info.srd_root,
@@ -520,7 +520,7 @@ fn report_works_should_work_with_added_and_deleted_files() {
                     legal_wr_info_with_added_and_deleted_files.block_number,
                     legal_wr_info_with_added_and_deleted_files.block_hash,
                     legal_wr_info_with_added_and_deleted_files.free,
-                    legal_wr_info_with_added_and_deleted_files.used,
+                    legal_wr_info_with_added_and_deleted_files.spower,
                     legal_wr_info_with_added_and_deleted_files.added_files,
                     legal_wr_info_with_added_and_deleted_files.deleted_files,
                     legal_wr_info_with_added_and_deleted_files.srd_root,
@@ -550,7 +550,7 @@ fn report_works_should_failed_with_not_registered() {
                     legal_wr_info.block_number,
                     legal_wr_info.block_hash,
                     legal_wr_info.free,
-                    legal_wr_info.used,
+                    legal_wr_info.spower,
                     legal_wr_info.added_files,
                     legal_wr_info.deleted_files,
                     legal_wr_info.srd_root,
@@ -590,7 +590,7 @@ fn report_works_should_failed_with_illegal_code() {
                     legal_wr_info.block_number,
                     legal_wr_info.block_hash,
                     legal_wr_info.free,
-                    legal_wr_info.used,
+                    legal_wr_info.spower,
                     legal_wr_info.added_files,
                     legal_wr_info.deleted_files,
                     legal_wr_info.srd_root,
@@ -628,7 +628,7 @@ fn report_works_should_failed_with_wrong_timing() {
                     illegal_wr_info.block_number,
                     illegal_wr_info.block_hash,
                     illegal_wr_info.free,
-                    illegal_wr_info.used,
+                    illegal_wr_info.spower,
                     illegal_wr_info.added_files,
                     illegal_wr_info.deleted_files,
                     illegal_wr_info.srd_root,
@@ -667,7 +667,7 @@ fn report_works_should_failed_with_illegal_sig() {
                     illegal_wr_info.block_number,
                     illegal_wr_info.block_hash,
                     illegal_wr_info.free,
-                    illegal_wr_info.used,
+                    illegal_wr_info.spower,
                     illegal_wr_info.added_files,
                     illegal_wr_info.deleted_files,
                     illegal_wr_info.srd_root,
@@ -701,7 +701,7 @@ fn report_works_should_failed_with_illegal_file_transition() {
             // Add initial work report with `reported_files_size = 5`
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 0,
+                spower: 0,
                 free: 0,
                 reported_files_size: 5,
                 reported_srd_root: vec![],
@@ -716,7 +716,7 @@ fn report_works_should_failed_with_illegal_file_transition() {
                     illegal_wr_info.block_number,
                     illegal_wr_info.block_hash,
                     illegal_wr_info.free,
-                    illegal_wr_info.used,
+                    illegal_wr_info.spower,
                     illegal_wr_info.added_files,
                     illegal_wr_info.deleted_files,
                     illegal_wr_info.srd_root,
@@ -749,7 +749,7 @@ fn incremental_report_should_work_without_change() {
             register_identity(&reporter, &legal_pk, &legal_pk);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -763,7 +763,7 @@ fn incremental_report_should_work_without_change() {
                 legal_wr_info.block_number,
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
-                legal_wr_info.used,
+                legal_wr_info.spower,
                 legal_wr_info.added_files,
                 legal_wr_info.deleted_files,
                 legal_wr_info.srd_root,
@@ -787,9 +787,9 @@ fn incremental_report_should_work_with_files_change() {
 
             let legal_wr = WorkReport {
                 report_slot: legal_wr_info.block_number,
-                used: legal_wr_info.used,
+                spower: legal_wr_info.spower,
                 free: legal_wr_info.free,
-                reported_files_size: legal_wr_info.used,
+                reported_files_size: legal_wr_info.spower,
                 reported_srd_root: legal_wr_info.srd_root.clone(),
                 reported_files_root: legal_wr_info.files_root.clone()
             };
@@ -797,7 +797,7 @@ fn incremental_report_should_work_with_files_change() {
             register(&legal_pk, LegalCode::get());
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 3,
                 reported_srd_root: vec![],
@@ -812,7 +812,7 @@ fn incremental_report_should_work_with_files_change() {
                 legal_wr_info.block_number,
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
-                legal_wr_info.used,
+                legal_wr_info.spower,
                 legal_wr_info.added_files,
                 legal_wr_info.deleted_files,
                 legal_wr_info.srd_root,
@@ -825,7 +825,7 @@ fn incremental_report_should_work_with_files_change() {
 
             // Check workloads after work report
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
         });
 }
@@ -846,7 +846,7 @@ fn incremental_report_should_failed_with_root_change() {
             register_identity(&reporter, &legal_pk, &legal_pk);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: vec![],
@@ -861,7 +861,7 @@ fn incremental_report_should_failed_with_root_change() {
                     illegal_wr_info.block_number,
                     illegal_wr_info.block_hash,
                     illegal_wr_info.free,
-                    illegal_wr_info.used,
+                    illegal_wr_info.spower,
                     illegal_wr_info.added_files,
                     illegal_wr_info.deleted_files,
                     illegal_wr_info.srd_root,
@@ -894,7 +894,7 @@ fn incremental_report_should_failed_with_wrong_file_size_change() {
             register_identity(&reporter, &legal_pk, &legal_pk);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 40,
+                spower: 40,
                 free: 40,
                 reported_files_size: 40,
                 reported_srd_root: vec![],
@@ -909,7 +909,7 @@ fn incremental_report_should_failed_with_wrong_file_size_change() {
                     illegal_wr_info.block_number,
                     illegal_wr_info.block_hash,
                     illegal_wr_info.free,
-                    illegal_wr_info.used,
+                    illegal_wr_info.spower,
                     illegal_wr_info.added_files,
                     illegal_wr_info.deleted_files,
                     illegal_wr_info.srd_root,
@@ -939,7 +939,7 @@ fn update_identities_should_work() {
             register_identity(&reporter, &legal_pk, &legal_pk);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -952,7 +952,7 @@ fn update_identities_should_work() {
             update_identities();
 
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::spower(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 300);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
@@ -965,7 +965,7 @@ fn update_identities_should_work() {
                 legal_wr_info.block_number,
                 legal_wr_info.block_hash,
                 legal_wr_info.free,
-                legal_wr_info.used,
+                legal_wr_info.spower,
                 legal_wr_info.added_files,
                 legal_wr_info.deleted_files,
                 legal_wr_info.srd_root,
@@ -973,9 +973,9 @@ fn update_identities_should_work() {
                 legal_wr_info.sig
             ));
 
-            // 3. Free and used should already been updated
+            // 3. Free and spower should already been updated
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::spower(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
 
@@ -983,9 +983,9 @@ fn update_identities_should_work() {
             run_to_block(606);
             update_identities();
 
-            // 5. Free and used should not change, but current_rs should already been updated
+            // 5. Free and spower should not change, but current_rs should already been updated
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::spower(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::current_report_slot(), 600);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4294967298u128);
@@ -994,9 +994,9 @@ fn update_identities_should_work() {
             run_to_block(909);
             update_identities();
 
-            // 7. Free and used should goes to 0, and the corresponding storage order should failed
+            // 7. Free and spower should goes to 0, and the corresponding storage order should failed
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 0u128);
@@ -1015,7 +1015,7 @@ fn abnormal_era_should_work() {
             register_identity(&reporter, &legal_pk, &legal_pk);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1029,16 +1029,16 @@ fn abnormal_era_should_work() {
 
             // 2. Everything goes well
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::spower(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
 
             // 4. Abnormal era happened, new era goes like 404
             run_to_block(404);
             update_identities();
 
-            // 5. Free and used should not change
+            // 5. Free and spower should not change
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::spower(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
         });
 }
@@ -1061,7 +1061,7 @@ fn ab_upgrade_should_work() {
             register_identity(&reporter, &a_pk, &a_pk);
             add_wr(&a_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1081,7 +1081,7 @@ fn ab_upgrade_should_work() {
                 a_wr_info.block_number,
                 a_wr_info.block_hash,
                 a_wr_info.free,
-                a_wr_info.used,
+                a_wr_info.spower,
                 a_wr_info.added_files,
                 a_wr_info.deleted_files,
                 a_wr_info.srd_root,
@@ -1089,10 +1089,10 @@ fn ab_upgrade_should_work() {
                 a_wr_info.sig
             ));
 
-            // 3. Check A's work report and free & used
+            // 3. Check A's work report and free & spower
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 2,
+                spower: 2,
                 free: 4294967296,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1118,7 +1118,7 @@ fn ab_upgrade_should_work() {
                 b_wr_info_1.block_number,
                 b_wr_info_1.block_hash,
                 b_wr_info_1.free,
-                b_wr_info_1.used,
+                b_wr_info_1.spower,
                 b_wr_info_1.added_files,
                 b_wr_info_1.deleted_files,
                 b_wr_info_1.srd_root,
@@ -1126,17 +1126,17 @@ fn ab_upgrade_should_work() {
                 b_wr_info_1.sig
             ));
 
-            // 7. Check B's work report and free & used
+            // 7. Check B's work report and free & spower
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 2,
+                spower: 2,
                 free: 4294967296,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 2);
+            assert_eq!(Swork::spower(), 2);
             assert_eq!(Swork::reported_files_size(), 2);
             assert_eq!(Swork::reported_in_slot(&a_pk, 300), true);
             assert_eq!(Swork::reported_in_slot(&a_pk, 600), true);
@@ -1155,7 +1155,7 @@ fn ab_upgrade_should_work() {
                 b_wr_info_2.block_number,
                 b_wr_info_2.block_hash,
                 b_wr_info_2.free,
-                b_wr_info_2.used,
+                b_wr_info_2.spower,
                 b_wr_info_2.added_files,
                 b_wr_info_2.deleted_files,
                 b_wr_info_2.srd_root,
@@ -1163,10 +1163,10 @@ fn ab_upgrade_should_work() {
                 b_wr_info_2.sig
             ));
 
-            // 11. Check B's work report and free & used again
+            // 11. Check B's work report and free & spower again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 900,
-                used: 32,
+                spower: 32,
                 free: 4294967296,
                 reported_files_size: 32,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1174,7 +1174,7 @@ fn ab_upgrade_should_work() {
             });
             update_identities();
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 32);
+            assert_eq!(Swork::spower(), 32);
             assert_eq!(Swork::reported_files_size(), 32);
         });
 }
@@ -1195,7 +1195,7 @@ fn ab_upgrade_expire_should_work() {
             register_identity(&reporter, &legal_pk, &legal_pk);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1213,7 +1213,7 @@ fn ab_upgrade_expire_should_work() {
                 wr_info_300.block_number,
                 wr_info_300.block_hash,
                 wr_info_300.free,
-                wr_info_300.used,
+                wr_info_300.spower,
                 wr_info_300.added_files,
                 wr_info_300.deleted_files,
                 wr_info_300.srd_root,
@@ -1233,7 +1233,7 @@ fn ab_upgrade_expire_should_work() {
                     wr_info_600.block_number,
                     wr_info_600.block_hash,
                     wr_info_600.free,
-                    wr_info_600.used,
+                    wr_info_600.spower,
                     wr_info_600.added_files,
                     wr_info_600.deleted_files,
                     wr_info_600.srd_root,
@@ -1264,7 +1264,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
             register(&a_pk, LegalCode::get());
             add_wr(&a_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1280,7 +1280,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
                 a_wr_info.block_number,
                 a_wr_info.block_hash,
                 a_wr_info.free,
-                a_wr_info.used,
+                a_wr_info.spower,
                 a_wr_info.added_files,
                 a_wr_info.deleted_files,
                 a_wr_info.srd_root,
@@ -1304,7 +1304,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
                     b_wr_info.block_number,
                     b_wr_info.block_hash,
                     b_wr_info.free,
-                    b_wr_info.used,
+                    b_wr_info.spower,
                     b_wr_info.added_files,
                     b_wr_info.deleted_files,
                     b_wr_info.srd_root,
@@ -1337,7 +1337,7 @@ fn create_and_join_group_should_work() {
 
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
-                used: 0,
+                spower: 0,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1389,7 +1389,7 @@ fn group_allowlist_should_work() {
 
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
-                used: 0,
+                spower: 0,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1600,7 +1600,7 @@ fn report_works_should_fail_due_to_reporter_is_group_owner() {
                     legal_wr_info.block_number,
                     legal_wr_info.block_hash,
                     legal_wr_info.free,
-                    legal_wr_info.used,
+                    legal_wr_info.spower,
                     legal_wr_info.added_files,
                     legal_wr_info.deleted_files,
                     legal_wr_info.srd_root,
@@ -1649,7 +1649,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
 
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
-                used: 100,
+                spower: 100,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1672,7 +1672,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 Origin::signed(alice.clone())
             ));
 
-            // bob's used is not 0
+            // bob's spower is not 0
             assert_noop!(Swork::join_group(
                 Origin::signed(bob.clone()),
                 alice.clone()
@@ -1688,7 +1688,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 bob.clone()
             ));
 
-            // bob's used is not 0
+            // bob's spower is not 0
             assert_noop!(Swork::join_group(
                 Origin::signed(bob.clone()),
                 alice.clone()
@@ -1696,12 +1696,12 @@ fn join_group_should_fail_due_to_invalid_situations() {
             DispatchError::Module {
                 index: 2,
                 error: 11,
-                message: Some("IllegalUsed"),
+                message: Some("IllegalSpower"),
             });
 
             add_wr(&b_pk, &WorkReport {
                 report_slot: 0,
-                used: 0,
+                spower: 0,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1844,7 +1844,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 alice_wr_info.block_number,
                 alice_wr_info.block_hash,
                 alice_wr_info.free,
-                alice_wr_info.used,
+                alice_wr_info.spower,
                 alice_wr_info.added_files,
                 alice_wr_info.deleted_files,
                 alice_wr_info.srd_root,
@@ -1910,7 +1910,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Swork::added_files_count(), 3);
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 57, // 13 + 7 + 37 Only the file size is counted
+                spower: 57, // 13 + 7 + 37 Only the file size is counted
                 free: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -1923,7 +1923,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 bob_wr_info.block_number,
                 bob_wr_info.block_hash,
                 bob_wr_info.free,
-                bob_wr_info.used,
+                bob_wr_info.spower,
                 bob_wr_info.added_files,
                 bob_wr_info.deleted_files,
                 bob_wr_info.srd_root,
@@ -2016,7 +2016,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Swork::added_files_count(), 6);
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 55,
+                spower: 55,
                 free: 4294967296,
                 reported_files_size: 99,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2029,7 +2029,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 eve_wr_info.block_number,
                 eve_wr_info.block_hash,
                 eve_wr_info.free,
-                eve_wr_info.used,
+                eve_wr_info.spower,
                 eve_wr_info.added_files,
                 eve_wr_info.deleted_files,
                 eve_wr_info.srd_root,
@@ -2100,7 +2100,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 22, // equal to file size
+                spower: 22, // equal to file size
                 free: 4294967296,
                 reported_files_size: 114,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2110,7 +2110,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             update_spower_info();
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 22, // still equal to file size
+                spower: 22, // still equal to file size
                 free: 4294967296,
                 reported_files_size: 114,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2129,7 +2129,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 bob_wr_info.block_number,
                 bob_wr_info.block_hash,
                 bob_wr_info.free,
-                bob_wr_info.used,
+                bob_wr_info.spower,
                 bob_wr_info.added_files,
                 bob_wr_info.deleted_files,
                 bob_wr_info.srd_root,
@@ -2200,7 +2200,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 55,
+                spower: 55,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2214,7 +2214,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 eve_wr_info.block_number,
                 eve_wr_info.block_hash,
                 eve_wr_info.free,
-                eve_wr_info.used,
+                eve_wr_info.spower,
                 eve_wr_info.added_files,
                 eve_wr_info.deleted_files,
                 eve_wr_info.srd_root,
@@ -2277,7 +2277,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 0,
+                spower: 0,
                 free: 4294967296,
                 reported_files_size: 0,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2296,7 +2296,7 @@ fn join_group_should_work_for_spower_in_work_report() {
 
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                used: 20,
+                spower: 20,
                 free: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2305,7 +2305,7 @@ fn join_group_should_work_for_spower_in_work_report() {
 
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 0,
+                spower: 0,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2318,7 +2318,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 alice_wr_info.block_number,
                 alice_wr_info.block_hash,
                 alice_wr_info.free,
-                alice_wr_info.used,
+                alice_wr_info.spower,
                 alice_wr_info.added_files,
                 alice_wr_info.deleted_files,
                 alice_wr_info.srd_root,
@@ -2337,7 +2337,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             // d has gone!
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                used: 0,
+                spower: 0,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2346,7 +2346,7 @@ fn join_group_should_work_for_spower_in_work_report() {
 
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 1500,
-                used: 0,
+                spower: 0,
                 free: 4294967296,
                 reported_files_size: 0,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2426,7 +2426,7 @@ fn join_group_should_work_for_stake_limit() {
                 alice_wr_info.block_number,
                 alice_wr_info.block_hash,
                 alice_wr_info.free,
-                alice_wr_info.used,
+                alice_wr_info.spower,
                 alice_wr_info.added_files,
                 alice_wr_info.deleted_files,
                 alice_wr_info.srd_root,
@@ -2440,7 +2440,7 @@ fn join_group_should_work_for_stake_limit() {
                 bob_wr_info.block_number,
                 bob_wr_info.block_hash,
                 bob_wr_info.free,
-                bob_wr_info.used,
+                bob_wr_info.spower,
                 bob_wr_info.added_files,
                 bob_wr_info.deleted_files,
                 bob_wr_info.srd_root,
@@ -2454,7 +2454,7 @@ fn join_group_should_work_for_stake_limit() {
                 eve_wr_info.block_number,
                 eve_wr_info.block_hash,
                 eve_wr_info.free,
-                eve_wr_info.used,
+                eve_wr_info.spower,
                 eve_wr_info.added_files,
                 eve_wr_info.deleted_files,
                 eve_wr_info.srd_root,
@@ -2467,7 +2467,7 @@ fn join_group_should_work_for_stake_limit() {
             update_identities();
 
             assert_eq!(Swork::free(), 12884901888);
-            assert_eq!(Swork::used(), 134); // 134 + 0 + 0 + 1 + 2 + 1
+            assert_eq!(Swork::spower(), 134); // 134 + 0 + 0 + 1 + 2 + 1
             assert_eq!(Swork::reported_files_size(), 270); // 57 + 99 + 134
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
@@ -2540,7 +2540,7 @@ fn quit_group_should_work_for_stake_limit() {
                 alice_wr_info.block_number,
                 alice_wr_info.block_hash,
                 alice_wr_info.free,
-                alice_wr_info.used,
+                alice_wr_info.spower,
                 alice_wr_info.added_files,
                 alice_wr_info.deleted_files,
                 alice_wr_info.srd_root,
@@ -2558,7 +2558,7 @@ fn quit_group_should_work_for_stake_limit() {
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 57); // 7 + 13 + 37 + 0 + 0 + 1
+            assert_eq!(Swork::spower(), 57); // 7 + 13 + 37 + 0 + 0 + 1
             assert_eq!(Swork::reported_files_size(), 57); // 57
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
@@ -2638,7 +2638,7 @@ fn kick_out_should_work_for_stake_limit() {
                 alice_wr_info.block_number,
                 alice_wr_info.block_hash,
                 alice_wr_info.free,
-                alice_wr_info.used,
+                alice_wr_info.spower,
                 alice_wr_info.added_files,
                 alice_wr_info.deleted_files,
                 alice_wr_info.srd_root,
@@ -2669,7 +2669,7 @@ fn kick_out_should_work_for_stake_limit() {
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 57); // 7 + 13 + 37
+            assert_eq!(Swork::spower(), 57); // 7 + 13 + 37
             assert_eq!(Swork::reported_files_size(), 57); // 57
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
@@ -2719,7 +2719,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
                 alice_wr_info.block_number,
                 alice_wr_info.block_hash,
                 alice_wr_info.free,
-                alice_wr_info.used,
+                alice_wr_info.spower,
                 alice_wr_info.added_files,
                 alice_wr_info.deleted_files,
                 alice_wr_info.srd_root,
@@ -2732,7 +2732,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), 57); // 7 + 13 + 37
+            assert_eq!(Swork::spower(), 57); // 7 + 13 + 37
             assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
@@ -2744,7 +2744,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             update_identities();
 
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
 
@@ -2767,7 +2767,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             update_identities();
 
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 1800);
 
@@ -2789,9 +2789,9 @@ fn punishment_by_offline_should_work_for_stake_limit() {
                 let a_pk = alice_wr_info.curr_pk.clone();
                 let legal_wr = WorkReport {
                     report_slot: alice_wr_info.block_number,
-                    used: alice_wr_info.used,
+                    spower: alice_wr_info.spower,
                     free: alice_wr_info.free,
-                    reported_files_size: alice_wr_info.used,
+                    reported_files_size: alice_wr_info.spower,
                     reported_srd_root: alice_wr_info.srd_root.clone(),
                     reported_files_root: alice_wr_info.files_root.clone()
                 };
@@ -2801,7 +2801,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             update_identities();
 
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 3000);
             let map = WorkloadMap::get().borrow().clone();
@@ -2818,12 +2818,12 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             });
 
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::used(), alice_wr_info.used as u128);
+            assert_eq!(Swork::spower(), alice_wr_info.spower as u128);
             assert_eq!(Swork::reported_files_size(), 57);
             assert_eq!(Swork::current_report_slot(), 3300);
             let map = WorkloadMap::get().borrow().clone();
             // All workload is counted to alice. bob and eve is None.
-            assert_eq!(*map.get(&ferdie).unwrap(), 4294967296u128 + alice_wr_info.used as u128);
+            assert_eq!(*map.get(&ferdie).unwrap(), 4294967296u128 + alice_wr_info.spower as u128);
         });
 }
 
@@ -2872,7 +2872,7 @@ fn basic_check_should_work() {
                     legal_wr_info.block_number,
                     legal_wr_info.block_hash,
                     legal_wr_info.free,
-                    legal_wr_info.used,
+                    legal_wr_info.spower,
                     legal_wr_info.added_files,
                     legal_wr_info.deleted_files,
                     legal_wr_info.srd_root,
@@ -2888,7 +2888,7 @@ fn basic_check_should_work() {
 
             let mut legal_wr_info = legal_work_report_with_added_files();
             // Exceed the max files size
-            legal_wr_info.used = 9_007_199_254_740_992;
+            legal_wr_info.spower = 9_007_199_254_740_992;
             assert_noop!(
                 Swork::report_works(
                     Origin::signed(reporter.clone()),
@@ -2897,7 +2897,7 @@ fn basic_check_should_work() {
                     legal_wr_info.block_number,
                     legal_wr_info.block_hash,
                     legal_wr_info.free,
-                    legal_wr_info.used,
+                    legal_wr_info.spower,
                     legal_wr_info.added_files,
                     legal_wr_info.deleted_files,
                     legal_wr_info.srd_root,
@@ -2924,7 +2924,7 @@ fn basic_check_should_work() {
                     legal_wr_info.block_number,
                     legal_wr_info.block_hash,
                     legal_wr_info.free,
-                    legal_wr_info.used,
+                    legal_wr_info.spower,
                     legal_wr_info.added_files,
                     legal_wr_info.deleted_files,
                     legal_wr_info.srd_root,
@@ -2952,7 +2952,7 @@ fn update_identities_timeline_should_work() {
             register_identity(&reporter, &legal_pk, &legal_pk);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 2,
+                spower: 2,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2975,7 +2975,7 @@ fn update_identities_timeline_should_work() {
             run_to_block(280);
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 0,
-                used: 4,
+                spower: 4,
                 free: 0,
                 reported_files_size: 2,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -3147,7 +3147,7 @@ fn first_time_should_pass_the_punishment() {
             });
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 900,
-                used: 20,
+                spower: 20,
                 free: 30,
                 reported_files_size: 15,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -3158,7 +3158,7 @@ fn first_time_should_pass_the_punishment() {
 
             update_identities();
             assert_eq!(Swork::free(), 30);
-            assert_eq!(Swork::used(), 20);
+            assert_eq!(Swork::spower(), 20);
             assert_eq!(Swork::reported_files_size(), 15);
             assert_eq!(Swork::current_report_slot(), 900);
 
@@ -3171,7 +3171,7 @@ fn first_time_should_pass_the_punishment() {
             run_to_block(1300);
             update_identities();
             assert_eq!(Swork::free(), 30);
-            assert_eq!(Swork::used(), 20);
+            assert_eq!(Swork::spower(), 20);
             assert_eq!(Swork::reported_files_size(), 15);
             assert_eq!(Swork::current_report_slot(), 1200);
 
@@ -3185,7 +3185,7 @@ fn first_time_should_pass_the_punishment() {
             run_to_block(1600);
             update_identities();
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 1500);
 
@@ -3211,7 +3211,7 @@ fn first_time_should_pass_the_punishment_in_weird_situation() {
 
             update_identities();
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 900);
 
@@ -3226,7 +3226,7 @@ fn first_time_should_pass_the_punishment_in_weird_situation() {
             });
             add_wr(&legal_pk, &WorkReport {
                 report_slot: 900,
-                used: 20,
+                spower: 20,
                 free: 30,
                 reported_files_size: 15,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -3242,7 +3242,7 @@ fn first_time_should_pass_the_punishment_in_weird_situation() {
             run_to_block(1400);
             update_identities();
             assert_eq!(Swork::free(), 30);
-            assert_eq!(Swork::used(), 20);
+            assert_eq!(Swork::spower(), 20);
             assert_eq!(Swork::reported_files_size(), 15);
             assert_eq!(Swork::current_report_slot(), 1200);
 
@@ -3256,7 +3256,7 @@ fn first_time_should_pass_the_punishment_in_weird_situation() {
             run_to_block(1600);
             update_identities();
             assert_eq!(Swork::free(), 0);
-            assert_eq!(Swork::used(), 0);
+            assert_eq!(Swork::spower(), 0);
             assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 1500);
 

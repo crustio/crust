@@ -60,7 +60,6 @@ pub trait WeightInfo {
     fn place_storage_order() -> Weight;
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
-    fn recharge_free_order_pot() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -331,10 +330,6 @@ decl_storage! {
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<FileInfo<T::AccountId, BalanceOf<T>>>;
 
-        /// The free space account list
-        pub FreeOrderAccounts get(fn free_order_accounts):
-        map hasher(twox_64_concat) T::AccountId => Option<u32>;
-
         /// Files count
         pub FileKeysCount get(fn files_count): u32 = 0;
 
@@ -353,9 +348,6 @@ decl_storage! {
         /// The spower become valid duration
         pub SpowerReadyPeriod get(fn spower_ready_period): BlockNumber = 1_296_000; // 3 months
 
-        /// The upper limit for free counts
-        pub FreeCountsLimit get(fn free_counts_limit): u32 = 1000;
-
         FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
     }
     add_extra_genesis {
@@ -365,7 +357,6 @@ decl_storage! {
 			<Module<T>>::init_pot(<Module<T>>::storage_pot);
 			<Module<T>>::init_pot(<Module<T>>::staking_pot);
 			<Module<T>>::init_pot(<Module<T>>::reserved_pot);
-			<Module<T>>::init_pot(<Module<T>>::free_order_pot);
 		});
 	}
 }
@@ -512,44 +503,23 @@ decl_module! {
             // 3. charged_file_size should be smaller than 32G
             ensure!(charged_file_size < T::MaximumFileSize::get(), Error::<T>::FileTooLarge);
 
-            // 4. Check whether the account is free or not
-            let is_free = <FreeOrderAccounts<T>>::mutate_exists(&who, |maybe_count| match *maybe_count {
-                Some(count) => {
-                    if count > 1u32 {
-                        *maybe_count = Some(count - 1);
-                    } else {
-                        *maybe_count = None;
-                    }
-                    Ok(())
-                },
-                None => {
-                    Err(())
-                }
-            }).is_ok();
-
-            let payer = if is_free {
-                ensure!(tips.is_zero(), Error::<T>::InvalidTip);
-                Self::free_order_pot()
-            } else {
-                who.clone()
-            };
             let (file_base_fee, amount) = Self::get_file_fee(charged_file_size);
 
-            // 5. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&payer) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
+            // 4. Check client can afford the sorder
+            ensure!(T::Currency::usable_balance(&who) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
 
-            // 6. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), file_base_fee, tips, AllowDeath)?;
+            // 5. Split into reserved, storage and staking account
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&who, amount.clone(), file_base_fee, tips, AllowDeath)?;
 
             let curr_bn = Self::get_current_block_number();
 
-            // 7. do calculate reward. Try to close file and decrease first party storage
+            // 6. do calculate reward. Try to close file and decrease first party storage
             Self::do_calculate_reward(&cid, curr_bn);
 
-            // 8. three scenarios: new file, extend time(refresh time)
+            // 7. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 9. Update new order status.
+            // 8. Update new order status.
             NewOrder::put(true);
             OrdersCount::mutate(|count| {*count = count.saturating_add(1)});
 
@@ -638,106 +608,6 @@ decl_module! {
             Self::deposit_event(RawEvent::SetBaseFeeSuccess(base_fee));
             Ok(())
         }
-
-        /// Recharge the free space pot
-        #[weight = T::WeightInfo::recharge_free_order_pot()]
-        pub fn recharge_free_order_pot(origin, #[compact] value: BalanceOf<T>) {
-            let who = ensure_signed(origin)?;
-            ensure!(value >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
-            ensure!(T::Currency::free_balance(&who) >= value, Error::<T>::InsufficientCurrency);
-            let free_order_pot = Self::free_order_pot();
-            T::Currency::transfer(&who, &free_order_pot, value, AllowDeath)?;
-        }
-
-        /// Add the account into free space list
-        #[weight = 1000]
-        pub fn add_into_free_order_accounts(
-            origin,
-            target: <T::Lookup as StaticLookup>::Source,
-            free_counts: u32,
-        ) -> DispatchResult {
-            let signer = ensure_signed(origin)?;
-            let maybe_free_order_admin = Self::free_order_admin();
-
-            // 1. Check if free_order_admin exist
-            ensure!(maybe_free_order_admin.is_some(), Error::<T>::IllegalFreeOrderAdmin);
-
-            // 2. Check if signer is free_order_admin
-            ensure!(Some(&signer) == maybe_free_order_admin.as_ref(), Error::<T>::IllegalFreeOrderAdmin);
-
-            let new_account = T::Lookup::lookup(target)?;
-
-            // 3. Ensure it's a new account not in free accounts
-            ensure!(Self::free_order_accounts(&new_account).is_none(), Error::<T>::AlreadyInFreeAccounts);
-
-            // 4. Ensure free count does not exceed the upper limit and is reasonable
-            ensure!(free_counts <= Self::free_counts_limit(), Error::<T>::ExceedFreeCountsLimit);
-
-            // 5 Add into free order accounts
-            <FreeOrderAccounts<T>>::insert(&new_account, free_counts);
-
-            Self::deposit_event(RawEvent::NewFreeAccount(new_account));
-            Ok(())
-        }
-
-        /// Remove the account from free space list
-        #[weight = 1000]
-        pub fn remove_from_free_order_accounts(
-            origin,
-            target: <T::Lookup as StaticLookup>::Source
-        ) -> DispatchResult {
-            let signer = ensure_signed(origin)?;
-            let maybe_free_order_admin = Self::free_order_admin();
-
-            // 1. Check if free_order_admin exist
-            ensure!(maybe_free_order_admin.is_some(), Error::<T>::IllegalFreeOrderAdmin);
-
-            // 2. Check if signer is free_order_admin
-            ensure!(Some(&signer) == maybe_free_order_admin.as_ref(), Error::<T>::IllegalFreeOrderAdmin);
-
-            // 3. Remove this account from free space list
-            let old_account = T::Lookup::lookup(target)?;
-            <FreeOrderAccounts<T>>::remove(&old_account);
-
-            Self::deposit_event(RawEvent::FreeAccountRemoved(old_account));
-            Ok(())
-        }
-
-        /// Set free order admin
-        ///
-        /// The dispatch origin for this call must be _Root_.
-        ///
-        /// Parameter:
-        /// - `new_free_order_admin`: The new free_order_admin's address
-        #[weight = 1000]
-        pub fn set_free_order_admin(origin, new_free_order_admin: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
-            ensure_root(origin)?;
-
-            let new_free_order_admin = T::Lookup::lookup(new_free_order_admin)?;
-
-            FreeOrderAdmin::<T>::put(new_free_order_admin.clone());
-
-            Self::deposit_event(RawEvent::SetFreeOrderAdminSuccess(new_free_order_admin));
-
-            Ok(())
-        }
-
-        /// Set free account limit
-        ///
-        /// The dispatch origin for this call must be _Root_.
-        ///
-        /// Parameter:
-        /// - `new_free_count_limit`: The new free count limit
-        #[weight = 1000]
-        pub fn set_free_counts_limit(origin, new_free_count_limit: u32) -> DispatchResult {
-            ensure_root(origin)?;
-
-            FreeCountsLimit::put(new_free_count_limit);
-
-            Self::deposit_event(RawEvent::SetFreeCountsLimitSuccess(new_free_count_limit));
-
-            Ok(())
-        }
     }
 }
 
@@ -764,13 +634,6 @@ impl<T: Config> Module<T> {
     pub fn reserved_pot() -> T::AccountId {
         // "modl" ++ "crmarket" ++ "rese" is 16 bytes
         T::ModuleId::get().into_sub_account("rese")
-    }
-
-    /// The pot of a free space account
-    /// This account pot is allowed to death
-    pub fn free_order_pot() -> T::AccountId {
-        // "modl" ++ "crmarket" ++ "rese" is 16 bytes
-        T::ModuleId::get().into_sub_account("free")
     }
 
     /// Calculate reward from file's replica

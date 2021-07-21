@@ -17,7 +17,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_signed, ensure_root};
-use sp_runtime::{SaturatedConversion, Perbill, ModuleId, traits::{Zero, CheckedMul, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
+use sp_runtime::{SaturatedConversion, Perbill, ModuleId, traits::{Zero, CheckedMul, AccountIdConversion, Saturating}, DispatchError};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -297,6 +297,9 @@ pub trait Config: system::Config {
     /// Storage/Staking ratio.
     type StakingRatio: Get<Perbill>;
 
+    /// Renew reward ratio
+    type RenewRewardRatio: Get<Perbill>;
+
     /// Tax / Storage plus Staking ratio.
     type StorageRatio: Get<Perbill>;
 
@@ -385,7 +388,9 @@ decl_error! {
         /// The free count exceed the upper limit
         ExceedFreeCountsLimit,
         /// Free account cannot assign tips
-        InvalidTip
+        InvalidTip,
+        /// The file does not exist. Please check the cid again.
+        FileNotExist,
     }
 }
 
@@ -426,6 +431,9 @@ decl_module! {
 
         /// The max file size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
+
+        /// The renew reward ratio for liquidator.
+        const RenewRewardRatio: Perbill = T::RenewRewardRatio::get();
 
         /// Called when a block is initialized. Will call update_identities to update file price
         fn on_initialize(now: T::BlockNumber) -> Weight {
@@ -536,7 +544,10 @@ decl_module! {
             // 4. Refresh the status of the file and calculate the reward for merchants
             Self::do_calculate_reward(&cid, curr_bn);
 
-            // 5. Try to close file
+            // 5. Try to renew file if prepaid is not zero
+            Self::try_to_renew_file(&cid, curr_bn, &liquidator)?;
+
+            // 6. Try to close file
             Self::try_to_close_file(&cid, curr_bn)?;
 
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
@@ -589,6 +600,31 @@ decl_module! {
             <FileBaseFee<T>>::put(base_fee);
 
             Self::deposit_event(RawEvent::SetBaseFeeSuccess(base_fee));
+            Ok(())
+        }
+
+        /// Add prepaid amount of currency for this file.
+        /// If this file has prepaid value and enough for a new storage order, it can be renewed by anyone.
+        #[weight = T::WeightInfo::place_storage_order()]
+        pub fn add_prepaid(
+            origin,
+            cid: MerkleRoot,
+            #[compact] amount: BalanceOf<T>
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
+
+            if let Some(mut file_info) = Self::files(&cid) {
+                T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath)?;
+                file_info.prepaid += amount;
+                <Files<T>>::insert(&cid, file_info);
+            } else {
+                Err(Error::<T>::FileNotExist)?
+            }
+
+            Self::deposit_event(RawEvent::AddPrepaidSuccess(who, cid, amount));
+
             Ok(())
         }
     }
@@ -714,6 +750,41 @@ impl<T: Config> Module<T> {
                 <Files<T>>::remove(&cid);
                 FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
             };
+        }
+        Ok(())
+    }
+
+    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
+        if let Some(mut file_info) = <Files<T>>::get(cid) {
+            // 1. Calculate total amount
+            let (file_base_fee, file_amount) = Self::get_file_fee(file_info.file_size);
+            let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );
+            let total_amount = file_base_fee.clone() + file_amount.clone() + renew_reward.clone();
+            // 2. Check prepaid pool can afford the price
+            if file_info.prepaid >= total_amount {
+                file_info.prepaid = file_info.prepaid.saturating_sub(total_amount.clone());
+                // 3. Reward liquidator.
+                T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
+                // 4. Split into reserved, storage and staking account
+                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), file_base_fee, Zero::zero(), KeepAlive)?;
+                file_info.amount += file_amount;
+                if file_info.replicas.len() == 0 {
+                    // turn this file into pending status since replicas.len() is zero
+                    // we keep the original amount and expected_replica_count
+                    file_info.expired_at = 0;
+                    file_info.calculated_at = curr_bn;
+                } else {
+                    // Refresh the file to the new file
+                    file_info.expired_at = curr_bn + T::FileDuration::get();
+                    file_info.calculated_at = curr_bn;
+                }
+                <Files<T>>::insert(cid, file_info);
+
+                // 5. Update new order status.
+                NewOrder::put(true);
+
+                Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
+            }
         }
         Ok(())
     }
@@ -1063,6 +1134,15 @@ decl_event!(
         /// The first item is the account who places the storage order.
         /// The second item is the cid of the file.
         FileSuccess(AccountId, MerkleRoot),
+        /// Renew an existed file success.
+        /// The first item is the account who renew the storage order.
+        /// The second item is the cid of the file.
+        RenewFileSuccess(AccountId, MerkleRoot),
+        /// Add prepaid value for an existed file success.
+        /// The first item is the account who add the prepaid.
+        /// The second item is the cid of the file.
+        /// The third item is the prepaid amount of currency.
+        AddPrepaidSuccess(AccountId, MerkleRoot, Balance),
         /// Calculate the reward for a file success.
         /// The first item is the cid of the file.
         CalculateSuccess(MerkleRoot),

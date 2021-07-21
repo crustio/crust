@@ -143,6 +143,7 @@ parameter_types! {
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
+    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 
 impl market::Config for Test {
@@ -164,6 +165,7 @@ impl market::Config for Test {
     type StorageRatio = StorageRatio;
     type MaximumFileSize = MaximumFileSize;
     type WeightInfo = market::weight::WeightInfo<Test>;
+    type RenewRewardRatio = RenewRewardRatio;
 }
 
 pub struct TestWorksInterface;

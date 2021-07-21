@@ -2715,7 +2715,7 @@ fn set_global_switch_should_work() {
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
-        assert_ok!(Market::enable_market(
+        assert_ok!(Market::set_enable_market(
             Origin::root(),
             false
         ));

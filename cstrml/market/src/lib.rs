@@ -462,7 +462,7 @@ decl_module! {
             cid: MerkleRoot,
             reported_file_size: u64,
             #[compact] tips: BalanceOf<T>,
-            memo: Vec<u8>
+            _memo: Vec<u8>
         ) -> DispatchResult {
             // 1. Service should be available right now.
             ensure!(Self::enable_market(), Error::<T>::PlaceOrderNotAvailable);
@@ -591,7 +591,7 @@ decl_module! {
         ///
         /// The dispatch origin for this call must be _Root_.
         #[weight = 1000]
-        pub fn enable_market(
+        pub fn set_enable_market(
             origin,
             is_enabled: bool
         ) -> DispatchResult {
@@ -863,8 +863,8 @@ impl<T: Config> Module<T> {
     }
 
     /// Calculate file price
-    /// Include the file base fee, file size price and files count price
-    /// return => (file_base_fee, file_size_price + file_keys_count_fee)
+    /// Include the file base fee, file byte price and files count price
+    /// return => (file_base_fee, file_byte_price + file_keys_count_fee)
     pub fn get_file_fee(file_size: u64) -> (BalanceOf<T>, BalanceOf<T>) {
         // 1. Calculate file size price
         // Rounded file size from `bytes` to `megabytes`
@@ -875,7 +875,7 @@ impl<T: Config> Module<T> {
         let price = Self::file_byte_fee();
         // Convert file size into `Currency`
         let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
-        let file_size_price = match amount {
+        let file_bytes_price = match amount {
             Some(value) => value,
             None => Zero::zero(),
         };
@@ -884,7 +884,7 @@ impl<T: Config> Module<T> {
         // 3. Get files count price
         let file_keys_count_fee = Self::file_keys_count_fee();
 
-        (file_base_fee, file_size_price + file_keys_count_fee)
+        (file_base_fee, file_bytes_price + file_keys_count_fee)
     }
 
     pub fn update_file_byte_fee() {

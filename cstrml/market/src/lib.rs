@@ -108,7 +108,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
 {
     /// Upsert new replica
     /// Accept id(who, anchor), reported_file_size, cid, valid_at and maybe_member
-    /// Returns the real storage power of this file
+    /// Returns the real storage power of this file and whether this file is in the market system
     /// storage power is decided by market
     fn upsert_replica(who: &<T as system::Config>::AccountId,
                       cid: &MerkleRoot,
@@ -116,7 +116,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                       anchor: &SworkerAnchor,
                       valid_at: BlockNumber,
                       maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
-    ) -> u64 {
+    ) -> (u64, bool) {
         // Judge if file_info.file_size == reported_file_size or not
         Self::maybe_upsert_file_size(who, cid, reported_file_size);
 
@@ -124,7 +124,9 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // if the file doesn't exist/exceed-replicas(aka. is_counted == false), return false(doesn't increase storage power) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
         let mut spower: u64 = 0;
+        let mut is_valid_cid: bool = false;
         if let Some(mut file_info) = <Files<T>>::get(cid) {
+            is_valid_cid = true;
             // 1. Check if the length of the groups exceed MAX_REPLICAS or not
             let mut is_counted = file_info.replicas.len() < MAX_REPLICAS;
             // 2. Check if the file is stored by other members
@@ -171,16 +173,18 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 5. Update files
             <Files<T>>::insert(cid, file_info);
         }
-        spower
+        (spower, is_valid_cid)
     }
 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
-    /// Returns the real storage power of this file
-    fn delete_replica(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64 {
+    /// Returns the real storage power of this file and whether this file is in the market system
+    fn delete_replica(who: &<T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> (u64, bool) {
         let mut spower: u64 = 0;
+        let mut is_valid_cid: bool = false;
         // 1. Delete replica from file_info
         if let Some(mut file_info) = <Files<T>>::get(cid) {
+            is_valid_cid = true;
             let mut to_decrease_count = 0;
             // None => No such file
             // Some(true) => Already pass the SpowerReadyPeriod, decrease the spower
@@ -218,7 +222,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             }
             <Files<T>>::insert(cid, file_info);
         }
-        spower
+        (spower, is_valid_cid)
     }
 
     /// Withdraw market staking pot for distributing staking reward

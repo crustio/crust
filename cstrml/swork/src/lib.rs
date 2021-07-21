@@ -977,10 +977,10 @@ impl<T: Config> Module<T> {
         // 2. Update sOrder and get changed size
         // loop added. if not exist, calculate spower.
         // loop deleted, need to check each key whether we should delete it or not
-        let added_files = Self::update_files(reporter, added_files, &anchor, true);
-        let deleted_files = Self::update_files(reporter, deleted_files, &anchor, false);
+        let (added_files_size, added_files_count)= Self::update_files(reporter, added_files, &anchor, true);
+        let (deleted_files_size, _) = Self::update_files(reporter, deleted_files, &anchor, false);
 
-        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files.len().try_into().unwrap())});
+        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files_count)});
 
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
@@ -990,7 +990,7 @@ impl<T: Config> Module<T> {
         }
 
         // 4. Construct work report
-        let spower = old_spower.saturating_add(added_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size)).saturating_sub(deleted_files.iter().fold(0, |acc, (_, f_size, _)| acc + *f_size));
+        let spower = old_spower.saturating_add(added_files_size).saturating_sub(deleted_files_size);
         let wr = WorkReport {
             report_slot,
             spower,
@@ -1011,31 +1011,41 @@ impl<T: Config> Module<T> {
         ReportedFilesSize::put(total_reported_files_size);
     }
 
-    /// Update sOrder information based on changed files, return the real changed files
+    /// Update sOrder information based on changed files, return the changed_file_size and changed_file_count
     fn update_files(
         reporter: &T::AccountId,
         changed_files: &Vec<(MerkleRoot, u64, u64)>,
         anchor: &SworkerPubKey,
-        is_added: bool) -> Vec<(MerkleRoot, u64, u64)> {
+        is_added: bool) -> (u64, u32) {
+        let mut changed_files_size: u64 = 0;
+        let mut changed_files_count: u32 = 0;
 
         // 1. Loop changed files
         if is_added {
-            changed_files.iter().filter_map(|(cid, size, valid_at)| {
+            for (cid, size, valid_at) in changed_files {
                 let mut members = None;
                 if let Some(identity) = Self::identities(reporter) {
                     if let Some(owner) = identity.group {
                         members= Some(Self::groups(owner).members);
                     }
                 };
-                Some((cid.clone(), T::MarketInterface::upsert_replica(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members), *valid_at))
-            }).collect()
+                let (added_file_size, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members);
+                changed_files_size = changed_files_size.saturating_add(added_file_size);
+                if is_valid_cid {
+                    changed_files_count += 1;
+                }
+            }
         } else {
-            let curr_bn = Self::get_current_block_number();
-            changed_files.iter().filter_map(|(cid, _, _)| {
+            for (cid, _, _) in changed_files {
                 // 2. If mapping to storage orders
-                Some((cid.clone(), T::MarketInterface::delete_replica(reporter, cid, anchor), curr_bn as u64))
-            }).collect()
+                let (deleted_file_size, is_valid_cid) = T::MarketInterface::delete_replica(reporter, cid, anchor);
+                changed_files_size = changed_files_size.saturating_add(deleted_file_size);
+                if is_valid_cid {
+                    changed_files_count += 1;
+                }
+            }
         }
+        (changed_files_size, changed_files_count)
     }
 
     /// Get workload by reporter account,

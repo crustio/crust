@@ -30,11 +30,11 @@ pub trait SworkerInterface<AccountId> {
 /// Means for interacting with a specialized version of the `market` trait.
 pub trait MarketInterface<AccountId, Balance> {
 	// used for `added_files`
-	// return real used size of this file
-	fn upsert_replica(who: &AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> u64;
+	// return real spower of this file and whether this file is in the market system
+	fn upsert_replica(who: &AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> (u64, bool);
 	// used for `delete_files`
-	// return real used size of this file
-	fn delete_replica(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> u64;
+	// return real spower of this file and whether this file is in the market system
+	fn delete_replica(who: &AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> (u64, bool);
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;
 }

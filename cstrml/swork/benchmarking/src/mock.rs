@@ -81,6 +81,7 @@ parameter_types! {
     pub const LiquidityDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const FilesCountInitPrice: Balance = 1000;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
@@ -94,7 +95,6 @@ parameter_types! {
 impl market::Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
-    type CurrencyToBalance = ();
     type SworkerInterface = Swork;
     type Event = ();
     /// File duration.
@@ -102,6 +102,7 @@ impl market::Config for Test {
     type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
     type FileInitPrice = FileInitPrice;
+    type FilesCountInitPrice = FilesCountInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;

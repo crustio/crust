@@ -18,7 +18,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::{btree_map::BTreeMap, btree_set::BTreeSet}};
 use frame_system::{self as system, ensure_signed, ensure_root};
-use sp_runtime::{Perbill, ModuleId, traits::{Zero, CheckedMul, Convert, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
+use sp_runtime::{SaturatedConversion, Perbill, ModuleId, traits::{Zero, CheckedMul, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,7 @@ pub mod benchmarking;
 
 use primitives::{
     MerkleRoot, BlockNumber, SworkerAnchor,
+    constants::market::*,
     traits::{
         UsableCurrency, MarketInterface,
         SworkerInterface
@@ -44,6 +45,8 @@ use primitives::{
 
 pub(crate) const LOG_TARGET: &'static str = "market";
 const MARKET_LOCK_ID: LockIdentifier = *b"marklock";
+const MAX_REPLICAS: usize = 500;
+const MAX_GROUPS: usize = 200;
 
 #[macro_export]
 macro_rules! log {
@@ -147,42 +150,47 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // if the file exist, is_counted == true, will change it later.
         let mut used_size: u64 = 0;
         if let Some((mut file_info, mut used_info)) = <Files<T>>::get(cid) {
-            let mut is_counted = true;
-            // 1. Check if the file is stored by other members
-            if let Some(members) = maybe_members {
-                for replica in file_info.replicas.iter() {
-                    if used_info.groups.contains_key(&replica.anchor) && members.contains(&replica.who) {
-                        if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
-                            // duplicated in group and set is_counted to false
-                            is_counted = false;
+            // 1. Check if the length of the groups exceed MAX_GROUPS or not
+            let mut is_counted = used_info.groups.len() < MAX_GROUPS;
+            // 2. Check if the file is stored by other members
+            if is_counted {
+                if let Some(members) = maybe_members {
+                    for replica in file_info.replicas.iter() {
+                        if used_info.groups.contains_key(&replica.anchor) && members.contains(&replica.who) {
+                            if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
+                                // duplicated in group and set is_counted to false
+                                is_counted = false;
+                            }
                         }
                     }
                 }
             }
 
-            // 2. Prepare new replica info
-            let new_replica = Replica {
-                who: who.clone(),
-                valid_at,
-                anchor: anchor.clone(),
-                is_reported: true
-            };
-            Self::insert_replica(&mut file_info, new_replica);
-            file_info.reported_replica_count += 1;
+            // 3. Prepare new replica info
+            if file_info.replicas.len() < MAX_REPLICAS {
+                let new_replica = Replica {
+                    who: who.clone(),
+                    valid_at,
+                    anchor: anchor.clone(),
+                    is_reported: true
+                };
+                Self::insert_replica(&mut file_info, new_replica);
+                file_info.reported_replica_count += 1;
+            }
 
-            // 3. Update used_info
+            // 4. Update used_info
             if is_counted {
-                used_size = Self::add_used_group(&mut used_info, anchor, file_info.file_size); // need to add the used_size after the update
+                used_size = Self::add_used_group(&mut used_info, anchor, cid); // need to add the used_size after the update
             };
 
-            // 4. The first join the replicas and file become live(expired_on > calculated_at)
+            // 5. The first join the replicas and file become live(expired_on > calculated_at)
             let curr_bn = Self::get_current_block_number();
             if file_info.replicas.len() == 1 {
                 file_info.calculated_at = curr_bn;
                 file_info.expired_on = curr_bn + T::FileDuration::get();
             }
 
-            // 5. Update files
+            // 6. Update files
             <Files<T>>::insert(cid, (file_info, used_info));
         }
         return used_size
@@ -252,9 +260,6 @@ pub trait Config: system::Config {
     /// The payment balance.
     type Currency: ReservableCurrency<Self::AccountId> + UsableCurrency<Self::AccountId> + LockableCurrency<Self::AccountId>;
 
-    /// Converter from Currency<u64> to Balance.
-    type CurrencyToBalance: Convert<BalanceOf<Self>, u64> + Convert<u64, BalanceOf<Self>>;
-
     /// used to check work report
     type SworkerInterface: SworkerInterface<Self::AccountId>;
 
@@ -272,6 +277,9 @@ pub trait Config: system::Config {
 
     /// File Base Price.
     type FileInitPrice: Get<BalanceOf<Self>>;
+
+    /// Files Count Init Price.
+    type FilesCountInitPrice: Get<BalanceOf<Self>>;
 
     /// Storage reference ratio. reported_files_size / total_capacity
     type StorageReferenceRatio: Get<(u128, u128)>;
@@ -315,8 +323,15 @@ decl_storage! {
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<(FileInfo<T::AccountId, BalanceOf<T>>, UsedInfo)>;
 
+        /// Files count
+        pub FilesCount get(fn files_count): u32 = 0;
+
         /// File price. It would change according to First Party Storage, Total Storage and Storage Base Ratio.
         pub FilePrice get(fn file_price): BalanceOf<T> = T::FileInitPrice::get();
+
+        /// The file price by keys
+        /// It's dynamically adjusted and would change according to the total keys in files
+        pub FilesCountPrice get(fn files_count_price): BalanceOf<T> = T::FilesCountInitPrice::get();
 
         /// The first file trash to store overdue files for a while
         pub UsedTrashI get(fn used_trash_i):
@@ -350,6 +365,15 @@ decl_storage! {
 
         /// The init amount in the free account for transaction fee
         pub FreeFee get(fn free_fee): BalanceOf<T> = Zero::zero();
+
+        /// New order in the past blocks
+        NewOrder get(fn new_order): bool = false;
+
+        /// New orders count in the past one period(one hour)
+        OrdersCount get(fn orders_count): u32 = 0;
+
+        /// Wait for updating used size for all replicas
+        pub PendingFiles get(fn pending_files): BTreeSet<MerkleRoot>;
 
         FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
     }
@@ -451,6 +475,36 @@ decl_module! {
 
         /// Max size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
+
+        /// Called when a block is initialized. Will call update_identities to update file price
+        fn on_initialize(now: T::BlockNumber) -> Weight {
+            let now = TryInto::<u32>::try_into(now).ok().unwrap();
+            let mut consumed_weight: Weight = 0;
+            let mut add_db_reads_writes = |reads, writes| {
+                consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
+            };
+            if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::new_order(){
+                Self::update_file_price();
+                Self::update_files_count_price();
+                NewOrder::put(false);
+            }
+            if ((now + BASE_FEE_UPDATE_OFFSET) % BASE_FEE_UPDATE_SLOT).is_zero() {
+                Self::update_base_fee();
+                add_db_reads_writes(3, 3);
+            }
+            add_db_reads_writes(1, 0);
+            if ((now + USED_UPDATE_OFFSET) % USED_UPDATE_SLOT).is_zero() || Self::pending_files().len() >= MAX_PENDING_FILES {
+                let files = Self::get_files_to_update();
+                for cid in files {
+                    if let Some((file_info, mut used_info)) = Self::files(&cid) {
+                        Self::update_groups_used_info(file_info.file_size, &mut used_info);
+                        <Files<T>>::insert(cid, (file_info, used_info));
+                    }
+                }
+            }
+            // TODO: Recalculate this weight
+            0
+        }
 
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to collateral first, complexity depends on `Collaterals`(P).
@@ -611,13 +665,13 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size);
+            let (file_base_fee, amount) = Self::get_file_price(charged_file_size);
 
             // 5. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&payer) >= amount + tips, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&payer) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
 
             // 6. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), tips, AllowDeath)?;
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), file_base_fee, tips, AllowDeath)?;
 
             let curr_bn = Self::get_current_block_number();
 
@@ -627,9 +681,9 @@ decl_module! {
             // 8. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 9. Update storage price.
-            #[cfg(not(test))]
-            Self::update_file_price();
+            // 9. Update new order status.
+            NewOrder::put(true);
+            OrdersCount::mutate(|count| {*count = count.saturating_add(1)});
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
@@ -687,13 +741,13 @@ decl_module! {
             } else {
                 who.clone()
             };
-            let amount = Self::file_base_fee() + Self::get_file_amount(charged_file_size);
+            let (file_base_fee, amount) = Self::get_file_price(charged_file_size);
 
             // 5. Check client can afford the sorder
-            ensure!(T::Currency::usable_balance(&payer) >= amount + tips, Error::<T>::InsufficientCurrency);
+            ensure!(T::Currency::usable_balance(&payer) >= file_base_fee + amount + tips, Error::<T>::InsufficientCurrency);
 
             // 6. Split into reserved, storage and staking account
-            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), tips, AllowDeath)?;
+            let amount = Self::split_into_reserved_and_storage_and_staking_pot(&payer, amount.clone(), file_base_fee, tips, AllowDeath)?;
 
             let curr_bn = Self::get_current_block_number();
 
@@ -703,9 +757,9 @@ decl_module! {
             // 8. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 9. Update storage price.
-            #[cfg(not(test))]
-            Self::update_file_price();
+            // 9. Update new order status.
+            NewOrder::put(true);
+            OrdersCount::mutate(|count| {*count = count.saturating_add(1)});
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
 
@@ -753,7 +807,7 @@ decl_module! {
             let curr_bn = Self::get_current_block_number();
 
             // 2. File should be live right now and calculate reward should be after expired_on
-            ensure!(file_info.expired_on != 0 && curr_bn >= file_info.expired_on, Error::<T>::NotInRewardPeriod);
+            ensure!(file_info.expired_on != 0, Error::<T>::NotInRewardPeriod);
 
             // 3. Maybe reward liquidator when he try to close outdated file
             Self::maybe_reward_liquidator(&cid, curr_bn, &liquidator)?;
@@ -1153,6 +1207,7 @@ impl<T: Config> Module<T> {
             }
         }
         <Files<T>>::remove(&cid);
+        FilesCount::mutate(|count| *count = count.saturating_sub(1));
     }
 
     fn dump_used_trash_i() {
@@ -1296,22 +1351,23 @@ impl<T: Config> Module<T> {
                 groups: <BTreeMap<SworkerAnchor, bool>>::new()
             };
             <Files<T>>::insert(cid, (file_info, used_info));
+            FilesCount::mutate(|count| *count = count.saturating_add(1));
         }
     }
 
     fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
             // 1. Calculate total amount
-            let file_amount = Self::file_base_fee() + Self::get_file_amount(file_info.file_size);
-            let renew_reward = T::RenewRewardRatio::get() * file_amount.clone();
-            let total_amount = file_amount.clone() + renew_reward.clone();
+            let (file_base_fee, file_amount) = Self::get_file_price(file_info.file_size);
+            let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );
+            let total_amount = file_base_fee.clone() + file_amount.clone() + renew_reward.clone();
             // 2. Check prepaid pool can afford the price
             if file_info.prepaid >= total_amount {
                 file_info.prepaid = file_info.prepaid.saturating_sub(total_amount.clone());
                 // 3. Reward liquidator.
                 T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
                 // 4. Split into reserved, storage and staking account
-                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), Zero::zero(), KeepAlive)?;
+                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), file_base_fee, Zero::zero(), KeepAlive)?;
                 file_info.amount += file_amount;
                 if file_info.replicas.len() == 0 {
                     // turn this file into pending status since replicas.len() is zero
@@ -1323,8 +1379,8 @@ impl<T: Config> Module<T> {
                 }
                 <Files<T>>::insert(cid, (file_info, used_info));
 
-                #[cfg(not(test))]
-                Self::update_file_price();
+                // 5. Update new order status.
+                NewOrder::put(true);
 
                 Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
             }
@@ -1364,25 +1420,25 @@ impl<T: Config> Module<T> {
         let (files_size, free) = T::SworkerInterface::get_files_size_and_free_space();
         let total_capacity = files_size.saturating_add(free);
         let (numerator, denominator) = T::StorageReferenceRatio::get();
-        let mut file_price = Self::file_price();
-        if files_size != 0 {
-            // Too much supply => decrease the price
-            if files_size.saturating_mul(denominator) < total_capacity.saturating_mul(numerator) {
-                let gap = T::StorageDecreaseRatio::get() * file_price;
-                file_price = file_price.saturating_sub(gap);
-            } else {
-                let gap = (T::StorageIncreaseRatio::get() * file_price).max(<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(1));
-                file_price = file_price.saturating_add(gap);
-            }
+        // Too much supply => decrease the price
+        if files_size.saturating_mul(denominator) <= total_capacity.saturating_mul(numerator) {
+            <FilePrice<T>>::mutate(|file_price| {
+                let gap = T::StorageDecreaseRatio::get() * file_price.clone();
+                *file_price = file_price.saturating_sub(gap);
+            });
         } else {
-            let gap = T::StorageDecreaseRatio::get() * file_price;
-            file_price = file_price.saturating_sub(gap);
+            <FilePrice<T>>::mutate(|file_price| {
+                let gap = (T::StorageIncreaseRatio::get() * file_price.clone()).max(BalanceOf::<T>::saturated_from(1u32));
+                *file_price = file_price.saturating_add(gap);
+            });
         }
-        <FilePrice<T>>::put(file_price);
     }
 
-    // Calculate file's amount
-    fn get_file_amount(file_size: u64) -> BalanceOf<T> {
+    /// Calculate file price
+    /// Include the file base fee, file size price and files count price
+    /// return => (file_base_fee, file_size_price + files_count_price)
+    pub fn get_file_price(file_size: u64) -> (BalanceOf<T>, BalanceOf<T>) {
+        // 1. Calculate file size price
         // Rounded file size from `bytes` to `megabytes`
         let mut rounded_file_size = file_size / 1_048_576;
         if file_size % 1_048_576 != 0 {
@@ -1390,10 +1446,84 @@ impl<T: Config> Module<T> {
         }
         let price = Self::file_price();
         // Convert file size into `Currency`
-        let amount = price.checked_mul(&<T::CurrencyToBalance as Convert<u64, BalanceOf<T>>>::convert(rounded_file_size));
-        match amount {
+        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
+        let file_size_price = match amount {
             Some(value) => value,
             None => Zero::zero(),
+        };
+        // 2. Get file base fee
+        let file_base_fee = Self::file_base_fee();
+        // 3. Get files count price
+        let files_count_price = Self::files_count_price();
+
+        (file_base_fee, file_size_price + files_count_price)
+    }
+
+    pub fn update_files_count_price() {
+        let files_count = Self::files_count();
+        if files_count > FILES_COUNT_REFERENCE {
+            // TODO: Independent mechanism
+            <FilesCountPrice<T>>::mutate(|price| {
+                let gap = (T::StorageIncreaseRatio::get() * price.clone()).max(BalanceOf::<T>::saturated_from(1u32));
+                *price = price.saturating_add(gap);
+            })
+        } else {
+            <FilesCountPrice<T>>::mutate(|price| {
+                let gap = T::StorageDecreaseRatio::get() * price.clone();
+                *price = price.saturating_sub(gap);
+            })
+        }
+    }
+
+    pub fn update_base_fee() {
+        // get added files count and clear the record
+        let added_files_count = T::SworkerInterface::get_added_files_count_and_clear_record();
+        // get orders count and clear the record
+        let orders_count = Self::orders_count();
+        OrdersCount::put(0);
+        // decide what to do
+        let (is_to_decrease, ratio) = Self::base_fee_ratio(added_files_count.checked_div(orders_count));
+        // update the file base fee
+        <FileBaseFee<T>>::mutate(|price| {
+            let gap = ratio * price.clone();
+            if is_to_decrease {
+                *price = price.saturating_sub(gap);
+            } else {
+                *price = price.saturating_add(gap);
+            }
+        })
+    }
+
+    /// return (bool, ratio)
+    /// true => decrease the price, false => increase the price
+    pub fn base_fee_ratio(maybe_alpha: Option<u32>) -> (bool, Perbill) {
+        match maybe_alpha {
+            // New order => check the alpha
+            Some(alpha) => {
+                match alpha {
+                    0 ..= 5 => (false, Perbill::from_percent(30)),
+                    6 => (false,Perbill::from_percent(25)),
+                    7 => (false,Perbill::from_percent(21)),
+                    8 => (false,Perbill::from_percent(18)),
+                    9 => (false,Perbill::from_percent(16)),
+                    10 => (false,Perbill::from_percent(15)),
+                    11 => (false,Perbill::from_percent(13)),
+                    12 => (false,Perbill::from_percent(12)),
+                    13 => (false,Perbill::from_percent(11)),
+                    14 ..= 15 => (false,Perbill::from_percent(10)),
+                    16 => (false,Perbill::from_percent(9)),
+                    17 ..= 18 => (false,Perbill::from_percent(8)),
+                    19 ..= 21 => (false,Perbill::from_percent(7)),
+                    22 ..= 25 => (false,Perbill::from_percent(6)),
+                    26 ..= 30 => (false,Perbill::from_percent(5)),
+                    31 ..= 37 => (false,Perbill::from_percent(4)),
+                    38 ..= 49 => (false,Perbill::from_percent(3)),
+                    50 ..= 100 => (false,Perbill::zero()),
+                    _ => (true, Perbill::from_percent(3))
+                }
+            },
+            // No new order => decrease the price
+            None => (true, Perbill::from_percent(3))
         }
     }
 
@@ -1402,7 +1532,7 @@ impl<T: Config> Module<T> {
     // 10% into reserved pot
     // 72% into staking pot
     // 18% into storage pot
-    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, tips: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
+    fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, base_fee: BalanceOf<T>, tips: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
         // Split the original amount into three parts
         let staking_amount = T::StakingRatio::get() * value;
         let storage_amount = T::StorageRatio::get() * value;
@@ -1410,6 +1540,8 @@ impl<T: Config> Module<T> {
 
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;
+
+        let reserved_amount = reserved_amount.saturating_add(base_fee);
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, liveness)?;
@@ -1422,9 +1554,11 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, file_size: u64) -> u64 {
+    fn add_used_group(used_info: &mut UsedInfo, anchor: &SworkerAnchor, cid: &MerkleRoot) -> u64 {
         used_info.reported_group_count += 1;
-        Self::update_groups_used_info(file_size, used_info);
+        PendingFiles::mutate(|files| {
+            files.insert(cid.clone());
+        });
         used_info.groups.insert(anchor.clone(), true);
         used_info.used_size
     }
@@ -1434,7 +1568,7 @@ impl<T: Config> Module<T> {
         
         // 1. Delete files anchor
         <Files<T>>::mutate(cid, |maybe_f| match *maybe_f {
-            Some((ref file_info, ref mut used_info)) => {
+            Some((_, ref mut used_info)) => {
                 if let Some(is_calculated_as_reported_group_count) = used_info.groups.remove(anchor) {
                     // need to delete the used_size before the update.
                     // we should always return the used_size no matter `is_calculated_as_reported_group_count` is true of false.
@@ -1443,7 +1577,9 @@ impl<T: Config> Module<T> {
                     used_size = used_info.used_size;
                     if is_calculated_as_reported_group_count {
                         used_info.reported_group_count = used_info.reported_group_count.saturating_sub(1);
-                        Self::update_groups_used_info(file_info.file_size, used_info);
+                        PendingFiles::mutate(|files| {
+                            files.insert(cid.clone());
+                        });
                     }
                 }
             },
@@ -1477,6 +1613,7 @@ impl<T: Config> Module<T> {
                         let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
                     }
                     <Files<T>>::remove(cid);
+                    FilesCount::mutate(|count| *count = count.saturating_sub(1));
                     Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
                 }
             }
@@ -1518,21 +1655,54 @@ impl<T: Config> Module<T> {
         return count;
     }
 
-    fn calculate_used_size(file_size: u64, reported_group_count: u32) -> u64 {
-        let used_ratio: u64 = match reported_group_count {
-            1..=10 => 2,
-            11..=20 => 4,
-            21..=30 => 6,
-            31..=40 => 8,
-            41..=70 => 10,
-            71..=80 => 8,
-            81..=90 => 6,
-            91..=100 => 4,
-            101..=200 => 2,
-            _ => return 0,
+    pub fn calculate_used_size(file_size: u64, reported_group_count: u32) -> u64 {
+        let (integer, numerator, denominator): (u64, u64, u64) = match reported_group_count {
+            0 => (0, 0, 1),
+            1..=8 => (1, 1, 20),
+            9..=16 => (1, 1, 5),
+            17..=24 => (1, 1, 2),
+            25..=32 => (2, 0, 1),
+            33..=40 => (2, 3, 5),
+            41..=48 => (3, 3, 10),
+            49..=55 => (4, 0, 1),
+            56..=65 => (5, 0, 1),
+            66..=74 => (6, 0, 1),
+            75..=83 => (7, 0, 1),
+            84..=92 => (8, 0, 1),
+            93..=100 => (8, 1, 2),
+            101..=115 => (8, 4, 5),
+            116..=127 => (9, 0, 1),
+            128..=142 => (9, 1, 5),
+            143..=157 => (9, 2, 5),
+            158..=167 => (9, 3, 5),
+            168..=182 => (9, 4, 5),
+            183..=200 => (10, 0, 1),
+            _ => (10, 0, 1), // larger than 200 => 200
         };
 
-        used_ratio * file_size
+        integer * file_size + file_size / denominator * numerator
+    }
+
+    fn get_files_to_update() -> Vec<MerkleRoot> {
+        let mut pending_files = PendingFiles::take();
+        let mut files_to_update = Vec::<MerkleRoot>::new();
+        let mut count = 0;
+        // Loop the MAX_PENDING_FILES files
+        for cid in &pending_files {
+            if count >= MAX_PENDING_FILES {
+                break;
+            }
+            files_to_update.push(cid.clone());
+            count += 1;
+        }
+        // Remove the MAX_PENDING_FILES files from pending files
+        if files_to_update.len() < pending_files.len() {
+            for cid in files_to_update.clone() {
+                pending_files.remove(&cid);
+            }
+            PendingFiles::put(pending_files);
+        }
+        files_to_update
     }
 }
 

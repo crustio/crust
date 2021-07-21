@@ -764,9 +764,10 @@ parameter_types! {
     pub const LiquidityDuration: BlockNumber = 15 * DAYS;
     pub const FileReplica: u32 = 4;
     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
+    pub const FilesCountInitPrice: Balance = MILLICENTS / 10;
     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
-    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
-    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
+    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(6u64, 100000);
+    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 100000);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
     pub const UsedTrashMaxSize: u128 = 1_000;
@@ -778,7 +779,6 @@ impl market::Config for Runtime {
     /// The market's module id, used for deriving its sovereign account ID.
     type ModuleId = MarketModuleId;
     type Currency = Balances;
-    type CurrencyToBalance = CurrencyToVoteHandler;
     type SworkerInterface = Swork;
     type Event = Event;
     /// File duration.
@@ -786,6 +786,7 @@ impl market::Config for Runtime {
     type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
     type FileInitPrice = FileInitPrice;
+    type FilesCountInitPrice = FilesCountInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;

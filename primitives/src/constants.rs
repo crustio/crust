@@ -57,3 +57,16 @@ pub mod swork {
 
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64 * 3;
 }
+
+pub mod market {
+    pub const BASE_FEE_UPDATE_SLOT: u32 = 600;
+    pub const BASE_FEE_UPDATE_OFFSET: u32 = 22;
+
+    pub const PRICE_UPDATE_SLOT: u32 = 10;
+    pub const PRICE_UPDATE_OFFSET: u32 = 3;
+    pub const FILES_COUNT_REFERENCE: u32 = 20_000_000; // 20_000_000 / 50_000_000 = 40%
+
+    pub const USED_UPDATE_SLOT: u32 = 100;
+    pub const USED_UPDATE_OFFSET: u32 = 7;
+    pub const MAX_PENDING_FILES: usize = 20;
+}

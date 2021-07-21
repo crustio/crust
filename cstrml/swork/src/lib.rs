@@ -138,6 +138,13 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     fn get_files_size_and_free_space() -> (u128, u128) {
         (Self::reported_files_size(), Self::free())
     }
+
+    /// Get the added files count in the past one period and clear the record
+    fn get_added_files_count_and_clear_record() -> u32 {
+        let added_files_count = Self::added_files_count();
+        AddedFilesCount::put(0);
+        added_files_count
+    }
 }
 
 /// The module's configuration trait.
@@ -216,6 +223,9 @@ decl_storage! {
 
         /// Enable punishment, the default behavior will have punishment.
         pub EnablePunishment get(fn enable_punishment): bool = true;
+
+        /// Added files count in the past one period(one hour)
+        pub AddedFilesCount get(fn added_files_count): u32 = 0;
     }
     add_extra_genesis {
         config(init_codes):
@@ -822,6 +832,8 @@ impl<T: Config> Module<T> {
         let added_files = Self::update_files(reporter, added_files, &anchor, true);
         let deleted_files = Self::update_files(reporter, deleted_files, &anchor, false);
 
+        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files.len().try_into().unwrap())});
+
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
             old_used = old_wr.used;
@@ -844,11 +856,9 @@ impl<T: Config> Module<T> {
         WorkReports::insert(anchor, wr);
 
         // 6. Update workload
-        let total_used = Self::used().saturating_sub(old_used as u128).saturating_add(used as u128);
         let total_free = Self::free().saturating_sub(old_free as u128).saturating_add(reported_srd_size as u128);
         let total_reported_files_size = Self::reported_files_size().saturating_sub(old_reported_files_size as u128).saturating_add(reported_files_size as u128);
 
-        Used::put(total_used);
         Free::put(total_free);
         ReportedFilesSize::put(total_reported_files_size);
     }

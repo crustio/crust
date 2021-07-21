@@ -20,6 +20,8 @@ pub trait SworkerInterface<AccountId> {
 	fn check_anchor(who: &AccountId, anchor: &SworkerAnchor) -> bool;
 	// Get total used and free space
 	fn get_files_size_and_free_space() -> (u128, u128);
+	// Get the added files count in the past one period and clear the record
+	fn get_added_files_count_and_clear_record() -> u32;
 }
 
 /// Means for interacting with a specialized version of the `market` trait.

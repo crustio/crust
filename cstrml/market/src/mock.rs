@@ -12,7 +12,7 @@ use frame_support::{
 // use sp_core::H256;
 pub use sp_core::{crypto::{AccountId32, Ss58Codec}, H256};
 use sp_runtime::{
-    testing::Header,
+    testing::Header, DispatchError,
     traits::{BlakeTwo256, IdentityLookup, SaturatedConversion},
     Perbill,
 };
@@ -42,30 +42,6 @@ pub struct ExistentialDeposit;
 impl Get<u64> for ExistentialDeposit {
     fn get() -> u64 {
         EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
-    }
-}
-
-pub struct CurrencyToVoteHandler;
-impl Convert<u64, u64> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u64 {
-        x
-    }
-}
-impl Convert<u128, u64> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u64 {
-        x.saturated_into()
-    }
-}
-
-impl Convert<u128, u128> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u128 {
-        x
-    }
-}
-
-impl Convert<u64, u128> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u128 {
-        x as u128
     }
 }
 
@@ -151,6 +127,7 @@ parameter_types! {
     pub const LiquidityDuration: BlockNumber = 1000;
     pub const FileReplica: u32 = 4;
     pub const FileInitPrice: Balance = 1000; // Need align with FileDuration and FileBaseReplica
+    pub const FilesCountInitPrice: Balance = 0;
     pub const StorageReferenceRatio: (u128, u128) = (1, 2);
     pub const StorageIncreaseRatio: Perbill = Perbill::from_percent(1);
     pub const StorageDecreaseRatio: Perbill = Perbill::from_percent(1);
@@ -164,13 +141,13 @@ parameter_types! {
 impl Config for Test {
     type ModuleId = MarketModuleId;
     type Currency = balances::Module<Self>;
-    type CurrencyToBalance = CurrencyToVoteHandler;
     type SworkerInterface = Swork;
     type Event = ();
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
     type FileReplica = FileReplica;
     type FileInitPrice = FileInitPrice;
+    type FilesCountInitPrice = FilesCountInitPrice;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;
@@ -244,8 +221,8 @@ pub fn init_swork_setup() {
 }
 
 // fake for report_works
-pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>, maybe_members: Option<BTreeSet<AccountId>>) {
-    Market::upsert_replica(&who, cid, reported_size, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &maybe_members);
+pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId, anchor: SworkerAnchor, reported_at: Option<u32>, maybe_members: Option<BTreeSet<AccountId>>) -> u64 {
+    Market::upsert_replica(&who, cid, reported_size, &anchor, reported_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap()), &maybe_members)
 }
 
 pub fn legal_work_report_with_added_files() -> ReportWorksInfo {
@@ -296,4 +273,8 @@ pub fn run_to_block(n: u64) {
         System::set_block_number(System::block_number() + 1);
         System::on_initialize(System::block_number());
     }
+}
+
+pub fn update_used_info() {
+    Market::on_initialize(93);
 }

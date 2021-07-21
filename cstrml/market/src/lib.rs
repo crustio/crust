@@ -1357,6 +1357,10 @@ impl<T: Config> Module<T> {
 
     fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some((mut file_info, used_info)) = <Files<T>>::get(cid) {
+            // 0. return if the file is ongoing or pending
+            if file_info.expired_on != file_info.calculated_at {
+                return Ok(());
+            }
             // 1. Calculate total amount
             let (file_base_fee, file_amount) = Self::get_file_price(file_info.file_size);
             let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );

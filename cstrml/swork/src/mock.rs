@@ -275,7 +275,7 @@ impl ExtBuilder {
 
         let mut ext: sp_io::TestExternalities = t.into();
         ext.execute_with(|| {
-            assert_ok!(Market::set_market_switch(Origin::root(), true));
+            assert_ok!(Market::set_enable_market(Origin::root(), true));
             assert_ok!(Market::set_base_fee(Origin::root(), 1000));
         });
 

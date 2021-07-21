@@ -2873,6 +2873,115 @@ fn renew_file_should_work() {
 }
 
 #[test]
+fn renew_onging_file_should_not_work() {
+    new_test_ext().execute_with(|| {
+        // generate 50 blocks first
+        run_to_block(50);
+
+
+        let cid =
+            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
+        let file_size = 134289408; // should less than merchant
+        let source = ALICE;
+        let merchant = BOB;
+        let charlie = CHARLIE;
+
+        let storage_pot = Market::storage_pot();
+        let reserved_pot = Market::reserved_pot();
+        assert_eq!(Balances::free_balance(&storage_pot), 0);
+        assert_eq!(Balances::free_balance(&reserved_pot), 0);
+        let _ = Balances::make_free_balance_be(&storage_pot, 1);
+
+        let _ = Balances::make_free_balance_be(&source, 20_000_000);
+        let merchants = vec![merchant.clone()];
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            mock_bond_owner(&who, &who);
+            add_collateral(who, 6_000_000);
+        }
+
+        assert_noop!(
+            Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
+            DispatchError::Module {
+                index: 3,
+                error: 11,
+                message: Some("FileNotExist")
+        });
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, vec![]
+        ));
+        assert_eq!(Balances::free_balance(&reserved_pot), 13900);
+        run_to_block(303);
+
+        let legal_wr_info = legal_work_report_with_added_files();
+        let legal_pk = legal_wr_info.curr_pk.clone();
+
+        register(&legal_pk, LegalCode::get());
+
+        assert_ok!(Swork::report_works(
+                Origin::signed(merchant.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.used,
+                legal_wr_info.added_files,
+                legal_wr_info.deleted_files,
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+        ));
+
+        assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
+        update_spower_info();
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 1),
+               expired_at: 1303,
+               calculated_at: 303,
+               amount: 23220,
+               prepaid: 400_000,
+               reported_replica_count: 1,
+               replicas: vec![Replica {
+                   who: merchant.clone(),
+                   valid_at: 303,
+                   anchor: legal_pk.clone(),
+                   is_reported: true,
+                   created_at: Some(303)
+               }]
+           }
+        );
+
+        run_to_block(503);
+        // 20% would be rewarded to liquidator charlie
+        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: Market::calculate_spower(file_size, 0),
+               expired_at: 1303,
+               calculated_at: 503,
+               amount: 23220, // 23220 * 0.8 + 23220
+               prepaid: 400_000,
+               reported_replica_count: 0,
+               replicas: vec![Replica {
+                   who: merchant.clone(),
+                   valid_at: 503,
+                   anchor: legal_pk.clone(),
+                   is_reported: false,
+                   created_at: Some(303)
+               }]
+           }
+        );
+    });
+}
+
+#[test]
 fn change_base_fee_should_work() {
     new_test_ext().execute_with(|| {
         // generate 50 blocks first

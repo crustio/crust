@@ -263,7 +263,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut ext: sp_io::TestExternalities = t.into();
     ext.execute_with(|| {
         init_swork_setup();
-        assert_ok!(Market::set_market_switch(Origin::root(), true));
+        assert_ok!(Market::enable_market(Origin::root(), true));
         assert_ok!(Market::set_base_fee(Origin::root(), 1000));
     });
 

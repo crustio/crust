@@ -1413,7 +1413,7 @@ impl<T: Config> Module<T> {
 
     fn has_enough_collateral(who: &T::AccountId, value: &BalanceOf<T>) -> bool {
         let ledger = Self::merchant_ledgers(who);
-        (ledger.reward + *value).saturating_mul(10u32.into()) <= ledger.collateral
+        (ledger.reward + *value) <= ledger.collateral
     }
 
     pub fn update_file_price() {

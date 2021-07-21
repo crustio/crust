@@ -577,7 +577,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::register(Origin::signed(merchant.clone()), 60_000));
+        assert_ok!(Market::register(Origin::signed(merchant.clone()), 6_000));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -670,9 +670,9 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
             })
         );
 
-        // collateral is 7020 * 10 < 70000 reward
+        // collateral is 7020 < 6000 reward
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            collateral: 60_000,
+            collateral: 6_000,
             reward: 0
         });
 
@@ -703,7 +703,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         );
 
         assert_eq!(Market::merchant_ledgers(&merchant), MerchantLedger {
-            collateral: 6060000,
+            collateral: 6006000,
             reward: 9950
         });
     });

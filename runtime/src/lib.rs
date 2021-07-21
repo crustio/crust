@@ -688,7 +688,7 @@ impl OnUnbalanced<NegativeImbalance> for DealWithFees {
 
 impl balances::Config<balances::Instance1> for Runtime {
     type Balance = Balance;
-    type DustRemoval = ();
+    type DustRemoval = Treasury;
     type Event = Event;
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
@@ -759,7 +759,7 @@ parameter_types! {
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 100000);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
-    pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
+    pub const MaximumFileSize: u64 = 34_359_738_368; // 32G = 32 * 1024 * 1024 * 1024
     pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 

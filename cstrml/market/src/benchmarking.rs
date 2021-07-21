@@ -50,7 +50,7 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
 
 benchmarks! {
     place_storage_order {
-        Market::<T>::set_market_switch(RawOrigin::Root.into(), true).expect("Something wrong during set market switch");
+        Market::<T>::set_enable_market(RawOrigin::Root.into(), true).expect("Something wrong during set market switch");
         let user = create_funded_user::<T>("user", 100);
         let cid = vec![0];
         let file_size: u64 = 10;

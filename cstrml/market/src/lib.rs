@@ -17,7 +17,7 @@ use frame_support::{
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
 use frame_system::{self as system, ensure_signed, ensure_root};
-use sp_runtime::{SaturatedConversion, Perbill, ModuleId, traits::{Zero, CheckedMul, AccountIdConversion, Saturating, StaticLookup}, DispatchError};
+use sp_runtime::{SaturatedConversion, Perbill, ModuleId, traits::{Zero, CheckedMul, AccountIdConversion, Saturating}, DispatchError};
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -157,7 +157,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                     files.insert(cid.clone());
                 });
                 file_info.reported_replica_count += 1;
-                // Always return the file size for the first time
+                // Always return the file size for this [who] reported first time
                 spower = file_info.file_size;
             }
 
@@ -221,7 +221,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         spower
     }
 
-    // withdraw market staking pot for distributing staking reward
+    /// Withdraw market staking pot for distributing staking reward
     fn withdraw_staking_pot() -> BalanceOf<T> {
         let staking_pot = Self::staking_pot();
         if T::Currency::free_balance(&staking_pot) < T::Currency::minimum_balance() {
@@ -297,6 +297,9 @@ pub trait Config: system::Config {
     /// Storage/Staking ratio.
     type StakingRatio: Get<Perbill>;
 
+    /// Renew reward ratio
+    type RenewRewardRatio: Get<Perbill>;
+
     /// Tax / Storage plus Staking ratio.
     type StorageRatio: Get<Perbill>;
 
@@ -310,12 +313,18 @@ pub trait Config: system::Config {
 // This module's storage items.
 decl_storage! {
     trait Store for Module<T: Config> as Market {
+        /// New orders count in the past one period(one hour), determinate the FileBaseFee
+        OrdersCount get(fn orders_count): u32 = 0;
+
         /// The file base fee for each storage order.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
         /// The file price per MB.
         /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
         pub FileByteFee get(fn file_byte_fee): BalanceOf<T> = T::InitFileByteFee::get();
+
+        /// Files count, determinate the FileKeysCountFee
+        pub FileKeysCount get(fn files_count): u32 = 0;
 
         /// The file price by keys
         /// It's dynamically adjusted and would change according to the total keys in files
@@ -325,25 +334,17 @@ decl_storage! {
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<FileInfo<T::AccountId, BalanceOf<T>>>;
 
-        /// Files count
-        pub FileKeysCount get(fn files_count): u32 = 0;
-
-        /// New order in the past blocks
-        NewOrder get(fn new_order): bool = false;
-
-        /// New orders count in the past one period(one hour)
-        OrdersCount get(fn orders_count): u32 = 0;
+        /// Has new order in the past blocks, pruning handling of pending files
+        HasNewOrder get(fn has_new_order): bool = false;
 
         /// Wait for updating storage power for all replicas
         pub PendingFiles get(fn pending_files): BTreeSet<MerkleRoot>;
 
-        /// The global market switch to enable place storage order
-        pub MarketSwitch get(fn market_switch): bool = false;
+        /// The global market switch to enable place storage order service
+        pub EnableMarket get(fn enable_market): bool = false;
 
-        /// The spower become valid duration
-        pub SpowerReadyPeriod get(fn spower_ready_period): BlockNumber = 1_296_000; // 3 months
-
-        FreeOrderAdmin get(fn free_order_admin): Option<T::AccountId>;
+        /// The sPower will become valid after this period, default is 3 months
+        pub SpowerReadyPeriod get(fn spower_ready_period): BlockNumber = 1_296_000;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -362,9 +363,6 @@ decl_error! {
         /// Don't have enough currency(CRU) to finish the extrinsic(transaction).
         /// Please transfer some CRU into this account.
         InsufficientCurrency,
-        /// Can not choose the value less than the minimum balance.
-        /// Please increase the value to be larger than the minimu balance.
-        InsufficientValue,
         /// The file size is not correct.
         /// The same file is already on chain and the file size should be same.
         /// Please check the file size again.
@@ -378,14 +376,8 @@ decl_error! {
         FileTooLarge,
         /// Place order is not available right now. Please wait for a while.
         PlaceOrderNotAvailable,
-        /// FreeOrderAdmin not exist or it's illegal.
-        IllegalFreeOrderAdmin,
-        /// The account already in free accounts
-        AlreadyInFreeAccounts,
-        /// The free count exceed the upper limit
-        ExceedFreeCountsLimit,
-        /// Free account cannot assign tips
-        InvalidTip
+        /// The file does not exist. Please check the cid again.
+        FileNotExist,
     }
 }
 
@@ -409,13 +401,13 @@ decl_module! {
         /// The file init price after the chain start.
         const InitFileByteFee: BalanceOf<T> = T::InitFileByteFee::get();
 
-        /// The storage reference ratio to adjust the file price.
+        /// The storage reference ratio to adjust the file byte fee.
         const StorageReferenceRatio: (u128, u128) = T::StorageReferenceRatio::get();
 
-        /// The storage increase ratio for each file price change.
+        /// The storage increase ratio for each file byte&key fee change.
         const StorageIncreaseRatio: Perbill = T::StorageIncreaseRatio::get();
 
-        /// The storage decrease ratio for each file price change.
+        /// The storage decrease ratio for each file byte&key fee change.
         const StorageDecreaseRatio: Perbill = T::StorageDecreaseRatio::get();
 
         /// The staking ratio for how much CRU into staking pot.
@@ -427,6 +419,9 @@ decl_module! {
         /// The max file size of a file
         const MaximumFileSize: u64 = T::MaximumFileSize::get();
 
+        /// The renew reward ratio for liquidator.
+        const RenewRewardRatio: Perbill = T::RenewRewardRatio::get();
+
         /// Called when a block is initialized. Will call update_identities to update file price
         fn on_initialize(now: T::BlockNumber) -> Weight {
             let now = TryInto::<u32>::try_into(now).ok().unwrap();
@@ -434,10 +429,10 @@ decl_module! {
             let mut add_db_reads_writes = |reads, writes| {
                 consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
             };
-            if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::new_order(){
+            if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::has_new_order(){
                 Self::update_file_byte_fee();
                 Self::update_file_keys_count_fee();
-                NewOrder::put(false);
+                HasNewOrder::put(false);
                 add_db_reads_writes(8, 3);
             }
             if ((now + BASE_FEE_UPDATE_OFFSET) % BASE_FEE_UPDATE_SLOT).is_zero() {
@@ -467,10 +462,10 @@ decl_module! {
             cid: MerkleRoot,
             reported_file_size: u64,
             #[compact] tips: BalanceOf<T>,
-            memo: Vec<u8>
+            _memo: Vec<u8>
         ) -> DispatchResult {
             // 1. Service should be available right now.
-            ensure!(Self::market_switch(), Error::<T>::PlaceOrderNotAvailable);
+            ensure!(Self::enable_market(), Error::<T>::PlaceOrderNotAvailable);
             let who = ensure_signed(origin)?;
 
             // 2. Calculate amount.
@@ -503,10 +498,35 @@ decl_module! {
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
             // 8. Update new order status.
-            NewOrder::put(true);
+            HasNewOrder::put(true);
             OrdersCount::mutate(|count| {*count = count.saturating_add(1)});
 
             Self::deposit_event(RawEvent::FileSuccess(who, cid));
+
+            Ok(())
+        }
+
+        /// Add prepaid amount of currency for this file.
+        /// If this file has prepaid value and enough for a new storage order, it can be renewed by anyone.
+        #[weight = T::WeightInfo::place_storage_order()]
+        pub fn add_prepaid(
+            origin,
+            cid: MerkleRoot,
+            #[compact] amount: BalanceOf<T>
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            ensure!(T::Currency::usable_balance(&who) >= amount, Error::<T>::InsufficientCurrency);
+
+            if let Some(mut file_info) = Self::files(&cid) {
+                T::Currency::transfer(&who, &Self::storage_pot(), amount.clone(), AllowDeath)?;
+                file_info.prepaid += amount;
+                <Files<T>>::insert(&cid, file_info);
+            } else {
+                Err(Error::<T>::FileNotExist)?
+            }
+
+            Self::deposit_event(RawEvent::AddPrepaidSuccess(who, cid, amount));
 
             Ok(())
         }
@@ -536,7 +556,10 @@ decl_module! {
             // 4. Refresh the status of the file and calculate the reward for merchants
             Self::do_calculate_reward(&cid, curr_bn);
 
-            // 5. Try to close file
+            // 5. Try to renew file if prepaid is not zero
+            Self::try_to_renew_file(&cid, curr_bn, &liquidator)?;
+
+            // 6. Try to close file
             Self::try_to_close_file(&cid, curr_bn)?;
 
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
@@ -564,21 +587,25 @@ decl_module! {
             Ok(())
         }
 
-        /// Set the global switch
+        /// Open/Close market service
+        ///
+        /// The dispatch origin for this call must be _Root_.
         #[weight = 1000]
-        pub fn set_market_switch(
+        pub fn set_enable_market(
             origin,
             is_enabled: bool
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
 
-            MarketSwitch::put(is_enabled);
+            EnableMarket::put(is_enabled);
 
-            Self::deposit_event(RawEvent::SetMarketSwitchSuccess(is_enabled));
+            Self::deposit_event(RawEvent::SetEnableMarketSuccess(is_enabled));
             Ok(())
         }
 
         /// Set the file base fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
         #[weight = 1000]
         pub fn set_base_fee(
             origin,
@@ -623,8 +650,8 @@ impl<T: Config> Module<T> {
     /// This function will calculate the file's reward, update replicas
     /// and (maybe) insert file's status(delete file)
     /// input:
-    ///     cid: MerkleRoot
-    ///     curr_bn: BlockNumber
+    ///   - cid: MerkleRoot
+    ///   - curr_bn: BlockNumber
     pub fn do_calculate_reward(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
@@ -718,6 +745,45 @@ impl<T: Config> Module<T> {
         Ok(())
     }
 
+    fn try_to_renew_file(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
+        if let Some(mut file_info) = <Files<T>>::get(cid) {
+            // 0. return if the file is ongoing or pending
+            if file_info.expired_at != file_info.calculated_at {
+                return Ok(());
+            }
+            // 1. Calculate total amount
+            let (file_base_fee, file_amount) = Self::get_file_fee(file_info.file_size);
+            let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );
+            let total_amount = file_base_fee.clone() + file_amount.clone() + renew_reward.clone();
+            // 2. Check if prepaid pool can afford the price
+            if file_info.prepaid >= total_amount {
+                file_info.prepaid = file_info.prepaid.saturating_sub(total_amount.clone());
+                // 3. Reward liquidator.
+                T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
+                // 4. Split into reserved, storage and staking account
+                let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), file_base_fee, Zero::zero(), KeepAlive)?;
+                file_info.amount += file_amount;
+                if file_info.replicas.len() == 0 {
+                    // turn this file into pending status since replicas.len() is zero
+                    // we keep the original amount and expected_replica_count
+                    file_info.expired_at = 0;
+                    file_info.calculated_at = curr_bn;
+                } else {
+                    // Refresh the file to the new file
+                    file_info.expired_at = curr_bn + T::FileDuration::get();
+                    file_info.calculated_at = curr_bn;
+                }
+                <Files<T>>::insert(cid, file_info);
+
+                // 5. Update new order status.
+                HasNewOrder::put(true);
+
+                Self::deposit_event(RawEvent::RenewFileSuccess(liquidator.clone(), cid.clone()));
+            }
+        }
+        Ok(())
+    }
+
     fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some(mut file_info) = Self::files(cid) {
             // 1. expired_at <= curr_bn <= expired_at + T::FileDuration::get() => no reward for liquidator
@@ -796,6 +862,31 @@ impl<T: Config> Module<T> {
         None
     }
 
+    /// Calculate file price
+    /// Include the file base fee, file byte price and files count price
+    /// return => (file_base_fee, file_byte_price + file_keys_count_fee)
+    pub fn get_file_fee(file_size: u64) -> (BalanceOf<T>, BalanceOf<T>) {
+        // 1. Calculate file size price
+        // Rounded file size from `bytes` to `megabytes`
+        let mut rounded_file_size = file_size / 1_048_576;
+        if file_size % 1_048_576 != 0 {
+            rounded_file_size += 1;
+        }
+        let price = Self::file_byte_fee();
+        // Convert file size into `Currency`
+        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
+        let file_bytes_price = match amount {
+            Some(value) => value,
+            None => Zero::zero(),
+        };
+        // 2. Get file base fee
+        let file_base_fee = Self::file_base_fee();
+        // 3. Get files count price
+        let file_keys_count_fee = Self::file_keys_count_fee();
+
+        (file_base_fee, file_bytes_price + file_keys_count_fee)
+    }
+
     pub fn update_file_byte_fee() {
         let (files_size, free) = T::SworkerInterface::get_files_size_and_free_space();
         let total_capacity = files_size.saturating_add(free);
@@ -812,31 +903,6 @@ impl<T: Config> Module<T> {
                 *file_byte_fee = file_byte_fee.saturating_add(gap);
             });
         }
-    }
-
-    /// Calculate file price
-    /// Include the file base fee, file size price and files count price
-    /// return => (file_base_fee, file_size_price + file_keys_count_fee)
-    pub fn get_file_fee(file_size: u64) -> (BalanceOf<T>, BalanceOf<T>) {
-        // 1. Calculate file size price
-        // Rounded file size from `bytes` to `megabytes`
-        let mut rounded_file_size = file_size / 1_048_576;
-        if file_size % 1_048_576 != 0 {
-            rounded_file_size += 1;
-        }
-        let price = Self::file_byte_fee();
-        // Convert file size into `Currency`
-        let amount = price.checked_mul(&BalanceOf::<T>::saturated_from(rounded_file_size));
-        let file_size_price = match amount {
-            Some(value) => value,
-            None => Zero::zero(),
-        };
-        // 2. Get file base fee
-        let file_base_fee = Self::file_base_fee();
-        // 3. Get files count price
-        let file_keys_count_fee = Self::file_keys_count_fee();
-
-        (file_base_fee, file_size_price + file_keys_count_fee)
     }
 
     pub fn update_file_keys_count_fee() {
@@ -1063,6 +1129,15 @@ decl_event!(
         /// The first item is the account who places the storage order.
         /// The second item is the cid of the file.
         FileSuccess(AccountId, MerkleRoot),
+        /// Renew an existed file success.
+        /// The first item is the account who renew the storage order.
+        /// The second item is the cid of the file.
+        RenewFileSuccess(AccountId, MerkleRoot),
+        /// Add prepaid value for an existed file success.
+        /// The first item is the account who add the prepaid.
+        /// The second item is the cid of the file.
+        /// The third item is the prepaid amount of currency.
+        AddPrepaidSuccess(AccountId, MerkleRoot, Balance),
         /// Calculate the reward for a file success.
         /// The first item is the cid of the file.
         CalculateSuccess(MerkleRoot),
@@ -1073,16 +1148,8 @@ decl_event!(
         /// The first item is the account of the merchant.
         RewardMerchantSuccess(AccountId),
         /// Set the global market switch success.
-        SetMarketSwitchSuccess(bool),
+        SetEnableMarketSuccess(bool),
         /// Set the file base fee success.
         SetBaseFeeSuccess(Balance),
-        /// Someone be the new Reviewer
-        SetFreeOrderAdminSuccess(AccountId),
-        /// Create a new free account
-        NewFreeAccount(AccountId),
-        /// Remove a free account
-        FreeAccountRemoved(AccountId),
-        /// Set the free counts limit
-        SetFreeCountsLimitSuccess(u32),
     }
 );

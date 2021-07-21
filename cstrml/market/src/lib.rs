@@ -323,7 +323,7 @@ decl_storage! {
         /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
         pub FileByteFee get(fn file_byte_fee): BalanceOf<T> = T::InitFileByteFee::get();
 
-         /// Files count, determinate the FileKeysCountFee
+        /// Files count, determinate the FileKeysCountFee
         pub FileKeysCount get(fn files_count): u32 = 0;
 
         /// The file price by keys

@@ -438,6 +438,69 @@ fn report_works_should_work() {
 }
 
 #[test]
+fn report_works_for_invalid_cids_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // Generate 303 blocks first
+            run_to_block(303);
+
+            let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let legal_wr_info = legal_work_report_with_added_files();
+            let legal_pk = legal_wr_info.curr_pk.clone();
+            let legal_wr = WorkReport {
+                report_slot: legal_wr_info.block_number,
+                spower: 0,
+                free: legal_wr_info.free,
+                reported_files_size: legal_wr_info.spower,
+                reported_srd_root: legal_wr_info.srd_root.clone(),
+                reported_files_root: legal_wr_info.files_root.clone()
+            };
+
+            register(&legal_pk, LegalCode::get());
+
+            // Check workloads before reporting
+            assert_eq!(Swork::free(), 0);
+            assert_eq!(Swork::spower(), 0);
+
+            assert_ok!(Swork::report_works(
+                Origin::signed(reporter.clone()),
+                legal_wr_info.curr_pk,
+                legal_wr_info.prev_pk,
+                legal_wr_info.block_number,
+                legal_wr_info.block_hash,
+                legal_wr_info.free,
+                legal_wr_info.spower,
+                legal_wr_info.added_files.clone(),
+                legal_wr_info.deleted_files.clone(),
+                legal_wr_info.srd_root,
+                legal_wr_info.files_root,
+                legal_wr_info.sig
+            ));
+
+            // Check work report
+            update_spower_info();
+            assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
+
+            // Check workloads after work report
+            assert_eq!(Swork::free(), 4294967296);
+            assert_eq!(Swork::reported_files_size(), 402868224);
+            assert_eq!(Swork::reported_in_slot(&legal_pk, 300), true);
+
+            assert_eq!(Swork::identities(&reporter).unwrap_or_default(), Identity {
+                anchor: legal_pk.clone(),
+                punishment_deadline: NEW_IDENTITY,
+                group: None
+            });
+            assert_eq!(Swork::pub_keys(legal_pk.clone()), PKInfo {
+                code: LegalCode::get(),
+                anchor: Some(legal_pk.clone())
+            });
+            assert_eq!(Swork::added_files_count(), 0);
+        });
+}
+
+#[test]
 fn report_works_should_work_without_files() {
     ExtBuilder::default()
         .build()

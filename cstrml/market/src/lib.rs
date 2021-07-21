@@ -365,9 +365,6 @@ decl_error! {
         /// Don't have enough currency(CRU) to finish the extrinsic(transaction).
         /// Please transfer some CRU into this account.
         InsufficientCurrency,
-        /// Can not choose the value less than the minimum balance.
-        /// Please increase the value to be larger than the minimu balance.
-        InsufficientValue,
         /// The file size is not correct.
         /// The same file is already on chain and the file size should be same.
         /// Please check the file size again.
@@ -381,14 +378,6 @@ decl_error! {
         FileTooLarge,
         /// Place order is not available right now. Please wait for a while.
         PlaceOrderNotAvailable,
-        /// FreeOrderAdmin not exist or it's illegal.
-        IllegalFreeOrderAdmin,
-        /// The account already in free accounts
-        AlreadyInFreeAccounts,
-        /// The free count exceed the upper limit
-        ExceedFreeCountsLimit,
-        /// Free account cannot assign tips
-        InvalidTip,
         /// The file does not exist. Please check the cid again.
         FileNotExist,
     }
@@ -1160,13 +1149,5 @@ decl_event!(
         SetMarketSwitchSuccess(bool),
         /// Set the file base fee success.
         SetBaseFeeSuccess(Balance),
-        /// Someone be the new Reviewer
-        SetFreeOrderAdminSuccess(AccountId),
-        /// Create a new free account
-        NewFreeAccount(AccountId),
-        /// Remove a free account
-        FreeAccountRemoved(AccountId),
-        /// Set the free counts limit
-        SetFreeCountsLimitSuccess(u32),
     }
 );

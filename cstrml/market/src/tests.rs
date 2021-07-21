@@ -85,7 +85,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
         ),
         DispatchError::Module {
             index: 3,
-            error: 5,
+            error: 4,
             message: Some("FileTooLarge")
         });
     });
@@ -1986,7 +1986,7 @@ fn double_place_storage_order_file_size_check_should_work() {
             Origin::signed(source.clone()), cid1.clone(), 80, 0, vec![]),
             DispatchError::Module {
                 index: 3,
-                error: 2,
+                error: 1,
                 message: Some("FileSizeNotCorrect")
             }
         );
@@ -2581,7 +2581,7 @@ fn reward_liquidator_should_work() {
             Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 3,
-                error: 3,
+                error: 2,
                 message: Some("NotInRewardPeriod")
         });
 
@@ -2673,7 +2673,7 @@ fn reward_merchant_should_work() {
             ),
             DispatchError::Module {
                 index: 3,
-                error: 4,
+                error: 3,
                 message: Some("NotEnoughReward")
             }
         );
@@ -2684,7 +2684,7 @@ fn reward_merchant_should_work() {
             ),
             DispatchError::Module {
                 index: 3,
-                error: 4,
+                error: 3,
                 message: Some("NotEnoughReward")
             }
         );
@@ -2725,7 +2725,7 @@ fn set_global_switch_should_work() {
         ),
         DispatchError::Module {
             index: 3,
-            error: 6,
+            error: 5,
             message: Some("PlaceOrderNotAvailable")
         });
     });
@@ -2763,7 +2763,7 @@ fn renew_file_should_work() {
             Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
             DispatchError::Module {
                 index: 3,
-                error: 11,
+                error: 6,
                 message: Some("FileNotExist")
         });
 
@@ -2904,7 +2904,7 @@ fn renew_onging_file_should_not_work() {
             Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
             DispatchError::Module {
                 index: 3,
-                error: 11,
+                error: 6,
                 message: Some("FileNotExist")
         });
 

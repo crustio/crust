@@ -33,7 +33,7 @@ fn place_storage_order_should_work() {
         let _ = Balances::make_free_balance_be(&source, 4000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 60);
 
         <FileKeysCountFee<Test>>::put(1000);
@@ -76,7 +76,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 60);
 
         assert_noop!(Market::place_storage_order(
@@ -113,7 +113,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 6_000_000);
 
         // 1. New storage order
@@ -303,7 +303,7 @@ fn do_calculate_reward_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 6_000_000);
 
         // 1. New storage order
@@ -413,7 +413,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let _ = Balances::make_free_balance_be(&merchant, 20_000_000);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 60_000);
 
         assert_ok!(Market::place_storage_order(
@@ -556,7 +556,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -866,7 +866,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
         // collateral is 60 < 121 reward
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 6000);
 
         assert_ok!(Market::place_storage_order(
@@ -945,7 +945,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -1136,11 +1136,6 @@ fn do_calculate_reward_should_only_pay_the_groups() {
         let file_size = 134289408;
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
-        for who in merchants.iter() {
-            let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
-            add_collateral(who, 6_000_000);
-        }
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -1197,6 +1192,11 @@ fn do_calculate_reward_should_only_pay_the_groups() {
             ));
 
         add_who_into_replica(&cid, file_size, eve.clone(), legal_pk.clone(), Some(503u32), None);
+        for who in merchants.iter() {
+            let _ = Balances::make_free_balance_be(&who, 20_000_000);
+            mock_bond_owner(&who, &who);
+            add_collateral(who, 6_000_000);
+        }
         update_spower_info();
         assert_eq!(Market::files(&cid).unwrap_or_default(),
             FileInfo {
@@ -1331,7 +1331,7 @@ fn insert_replica_should_work_for_complex_scenario() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone(), zikun.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -1807,7 +1807,7 @@ fn withdraw_staking_pot_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 60);
 
         assert_ok!(Market::place_storage_order(
@@ -1859,7 +1859,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 6000);
 
         for cid in file_lists.clone().iter() {
@@ -1936,7 +1936,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 6000);
 
         assert_ok!(Market::place_storage_order(
@@ -2041,7 +2041,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -2228,7 +2228,7 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -2402,7 +2402,7 @@ fn dynamic_spower_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -2488,7 +2488,7 @@ fn delete_spower_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -2566,7 +2566,7 @@ fn reward_liquidator_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -2708,7 +2708,7 @@ fn set_global_switch_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 60);
 
         assert_ok!(Market::place_storage_order(
@@ -2844,7 +2844,7 @@ fn storage_pot_should_be_balanced() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -2908,10 +2908,10 @@ fn one_owner_should_work() {
         let group1 = vec![merchant.clone(), charlie.clone(), dave.clone()];
         let group2 = vec![eve.clone(), ferdie.clone()];
         for who in group1.iter() {
-            assert_ok!(Market::bond(Origin::signed(who.clone()), bob.clone()));
+            mock_bond_owner(&who, &bob);
         }
         for who in group2.iter() {
-            assert_ok!(Market::bond(Origin::signed(who.clone()), zikun.clone()));
+            mock_bond_owner(&who, &zikun);
         }
 
         let _ = Balances::make_free_balance_be(&bob, 20_000_000);
@@ -2992,10 +2992,10 @@ fn no_bonded_owner_should_work() {
         let group1 = vec![charlie.clone(), dave.clone()];
         let group2 = vec![eve.clone(), ferdie.clone()];
         for who in group1.iter() {
-            assert_ok!(Market::bond(Origin::signed(who.clone()), bob.clone()));
+            mock_bond_owner(&who, &bob);
         }
         for who in group2.iter() {
-            assert_ok!(Market::bond(Origin::signed(who.clone()), zikun.clone()));
+            mock_bond_owner(&who, &zikun);
         }
 
         let _ = Balances::make_free_balance_be(&bob, 20_000_000);
@@ -3071,7 +3071,7 @@ fn max_replicas_and_groups_should_work() {
         let merchants = vec![merchant.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 
@@ -3134,7 +3134,7 @@ fn update_spower_info_should_work() {
         let _ = Balances::make_free_balance_be(&source, 200000);
         let _ = Balances::make_free_balance_be(&merchant, 200000);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 60000);
 
         for cid in file_lists.clone().iter() {
@@ -3264,7 +3264,7 @@ fn place_storage_order_with_discount_should_work() {
         let _ = Balances::make_free_balance_be(&source, 10000);
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
-        assert_ok!(Market::bond(Origin::signed(merchant.clone()), merchant.clone()));
+        mock_bond_owner(&merchant, &merchant);
 
         <FileKeysCountFee<Test>>::put(1000);
         assert_ok!(Market::place_storage_order(
@@ -3337,7 +3337,7 @@ fn spower_delay_should_work() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone()];
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
-            assert_ok!(Market::bond(Origin::signed(who.clone()), who.clone()));
+            mock_bond_owner(&who, &who);
             add_collateral(who, 6_000_000);
         }
 

@@ -56,7 +56,6 @@ macro_rules! log {
 }
 
 pub trait WeightInfo {
-    fn bond() -> Weight;
     fn place_storage_order() -> Weight;
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
@@ -322,10 +321,6 @@ decl_storage! {
         /// It's dynamically adjusted and would change according to the total keys in files
         pub FileKeysCountFee get(fn file_keys_count_fee): BalanceOf<T> = T::InitFileKeysCountFee::get();
 
-        /// Bonding Information
-        pub Bonded get(fn bonded):
-        map hasher(blake2_128_concat) T::AccountId => Option<T::AccountId>;
-
         /// File information iterated by order id
         pub Files get(fn files):
         map hasher(twox_64_concat) MerkleRoot => Option<FileInfo<T::AccountId, BalanceOf<T>>>;
@@ -463,18 +458,6 @@ decl_module! {
             }
             add_db_reads_writes(1, 0);
             consumed_weight
-        }
-
-        /// Bond the origin to the owner
-        #[weight = T::WeightInfo::bond()]
-        pub fn bond(
-            origin,
-            owner: <T::Lookup as StaticLookup>::Source
-        ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-            let owner = T::Lookup::lookup(owner)?;
-            <Bonded<T>>::insert(&who, &owner);
-            Ok(())
         }
 
         /// Place a storage order. The cid and file_size of this file should be provided. Extra tips is accepted.
@@ -980,7 +963,7 @@ impl<T: Config> Module<T> {
     }
 
     fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>) -> bool {
-        if let Some(owner) = Self::bonded(who) {
+        if let Some(owner) = T::SworkerInterface::get_owner(who) {
             if let Some(new_reward) = Self::has_enough_collateral(&owner, amount) {
                 T::BenefitInterface::update_reward(&owner, new_reward);
                 return true;

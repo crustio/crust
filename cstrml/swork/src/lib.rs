@@ -163,6 +163,11 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         AddedFilesCount::put(0);
         added_files_count
     }
+
+    /// Get owner of this member
+    fn get_owner(who: &T::AccountId) -> Option<T::AccountId> {
+        Self::identities(who).unwrap_or_default().group
+    }
 }
 
 /// The module's configuration trait.

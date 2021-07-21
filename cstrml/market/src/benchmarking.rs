@@ -49,15 +49,6 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
 }
 
 benchmarks! {
-    bond {
-        let user = create_funded_user::<T>("user", 100);
-        let owner = create_funded_user::<T>("owner", 100);
-        let owner_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(owner);
-    }: _(RawOrigin::Signed(user.clone()), owner_lookup)
-    verify {
-        assert_eq!(Market::<T>::bonded(&user).is_some(), true);
-    }
-
     place_storage_order {
         Market::<T>::set_market_switch(RawOrigin::Root.into(), true).expect("Something wrong during set market switch");
         let user = create_funded_user::<T>("user", 100);
@@ -91,13 +82,6 @@ mod tests {
     use super::*;
     use crate::mock::{new_test_ext, Test};
     use frame_support::assert_ok;
-
-    #[test]
-    fn bond() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_bond::<Test>());
-        });
-    }
 
     #[test]
     fn place_storage_order() {

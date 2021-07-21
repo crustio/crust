@@ -368,3 +368,14 @@ pub fn run_to_block(n: u64) {
 pub fn update_spower_info() {
     Market::on_initialize(93);
 }
+
+pub fn mock_bond_owner(member: &AccountId, owner: &AccountId) {
+    <swork::Identities<Test>>::mutate(member, |maybe_identity| match *maybe_identity {
+        Some(ref mut identity) => identity.group = Some(owner.clone()),
+        None => *maybe_identity = Some(Identity {
+            anchor: vec![],
+            punishment_deadline: 0,
+            group: Some(owner.clone())
+        })
+    });
+}

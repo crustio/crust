@@ -1365,6 +1365,8 @@ fn create_and_join_group_should_work() {
                 punishment_deadline: NO_PUNISHMENT,
                 group: Some(alice.clone())
             });
+
+            assert_eq!(Swork::get_owner(&bob), Some(alice.clone()));
         });
 }
 

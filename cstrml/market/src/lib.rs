@@ -73,9 +73,10 @@ pub struct FileInfo<AccountId, Balance> {
     // The last block number when the file's amount is calculated
     pub calculated_at: BlockNumber,
     // The file value
+    #[codec(compact)]
     pub amount: Balance,
     // The pre paid pool
-    // TODO: useless field, prepared for the future upgrade
+    #[codec(compact)]
     pub prepaid: Balance,
     // The count of valid replica each report slot
     pub reported_replica_count: u32,

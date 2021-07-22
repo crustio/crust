@@ -752,7 +752,7 @@ fn init_swork_setup() {
         });
         <swork::WorkReports>::insert(pk.clone(), swork::WorkReport {
             report_slot: 0,
-            used: 0,
+            spower: 0,
             free: 20000000000000,
             reported_files_size: 0,
             reported_srd_root: vec![],

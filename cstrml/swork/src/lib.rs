@@ -313,7 +313,9 @@ decl_error! {
         /// Exceed the limit of allowlist number in one group.
         ExceedAllowlistLimit,
         /// Illegal work report. This should never happen.
-        IllegalWorkReport
+        IllegalWorkReport,
+        /// Code has not been expired
+        CodeNotExpired
     }
 }
 
@@ -398,6 +400,19 @@ decl_module! {
             }
             <Codes<T>>::insert(&new_code, &expire_block);
             Self::deposit_event(RawEvent::SetCodeSuccess(new_code, expire_block));
+        }
+
+
+        /// clear the expired code
+        #[weight = T::WeightInfo::set_code()]
+        pub fn clear_expired_code(origin, expired_code: SworkerCode) {
+            let _ = ensure_signed(origin)?;
+            let curr_bn = <system::Module<T>>::block_number();
+            if let Some(expire_block) = Self::codes(&expired_code) {
+                ensure!(expire_block < curr_bn, Error::<T>::CodeNotExpired);
+                <Codes<T>>::remove(&expired_code);
+                Self::deposit_event(RawEvent::RemoveCodeSuccess(expired_code));
+            }
         }
 
         /// Register as new trusted node, can only called from sWorker.
@@ -1290,5 +1305,7 @@ decl_event!(
         RemoveFromAllowlistSuccess(AccountId, AccountId),
         /// Enable the punishment or disable it.
         SetPunishmentSuccess(bool),
+        /// Remove the expired code success
+        RemoveCodeSuccess(SworkerCode),
     }
 );

@@ -969,7 +969,7 @@ impl<T: Config> Module<T> {
                     26 ..= 30 => (false,Perbill::from_percent(5)),
                     31 ..= 37 => (false,Perbill::from_percent(4)),
                     38 ..= 49 => (false,Perbill::from_percent(3)),
-                    50 ..= 100 => (false,Perbill::zero()),
+                    50 ..= 80 => (false,Perbill::zero()),
                     _ => (true, Perbill::from_percent(3))
                 }
             },

@@ -506,6 +506,13 @@ decl_module! {
             0
         }
 
+        fn on_runtime_upgrade() -> frame_support::weights::Weight {
+            for (who, _) in <FreeOrderAccounts<T>>::iter() {
+                <FreeOrderAccounts<T>>::insert(who, 100);
+			}
+            T::BlockWeights::get().max_block
+        }
+
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
@@ -1505,24 +1512,15 @@ impl<T: Config> Module<T> {
             // New order => check the alpha
             Some(alpha) => {
                 match alpha {
-                    0 ..= 5 => (false, Perbill::from_percent(30)),
-                    6 => (false,Perbill::from_percent(25)),
-                    7 => (false,Perbill::from_percent(21)),
-                    8 => (false,Perbill::from_percent(18)),
-                    9 => (false,Perbill::from_percent(16)),
-                    10 => (false,Perbill::from_percent(15)),
-                    11 => (false,Perbill::from_percent(13)),
-                    12 => (false,Perbill::from_percent(12)),
-                    13 => (false,Perbill::from_percent(11)),
-                    14 ..= 15 => (false,Perbill::from_percent(10)),
-                    16 => (false,Perbill::from_percent(9)),
-                    17 ..= 18 => (false,Perbill::from_percent(8)),
-                    19 ..= 21 => (false,Perbill::from_percent(7)),
-                    22 ..= 25 => (false,Perbill::from_percent(6)),
-                    26 ..= 30 => (false,Perbill::from_percent(5)),
-                    31 ..= 37 => (false,Perbill::from_percent(4)),
-                    38 ..= 49 => (false,Perbill::from_percent(3)),
-                    50 ..= 100 => (false,Perbill::zero()),
+                    0 ..= 3 => (false, Perbill::from_percent(15)),
+                    4 => (false,Perbill::from_percent(11)),
+                    5 => (false,Perbill::from_percent(9)),
+                    6 => (false,Perbill::from_percent(7)),
+                    7 => (false,Perbill::from_percent(6)),
+                    8 ..= 9 => (false,Perbill::from_percent(5)),
+                    10 ..= 11 => (false,Perbill::from_percent(4)),
+                    12 ..= 14 => (false,Perbill::from_percent(3)),
+                    15 ..= 30 => (false,Perbill::zero()),
                     _ => (true, Perbill::from_percent(3))
                 }
             },

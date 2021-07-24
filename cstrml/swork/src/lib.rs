@@ -407,8 +407,8 @@ decl_module! {
         #[weight = T::WeightInfo::set_code()]
         pub fn clear_expired_code(origin, expired_code: SworkerCode) {
             let _ = ensure_signed(origin)?;
-            let curr_bn = <system::Module<T>>::block_number();
             if let Some(expire_block) = Self::codes(&expired_code) {
+                let curr_bn = <system::Module<T>>::block_number();
                 ensure!(expire_block < curr_bn, Error::<T>::CodeNotExpired);
                 <Codes<T>>::remove(&expired_code);
                 Self::deposit_event(RawEvent::RemoveCodeSuccess(expired_code));

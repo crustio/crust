@@ -43,6 +43,34 @@ fn register_should_work() {
 }
 
 #[test]
+fn clear_expired_code_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            let applier: AccountId =
+                AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                    .expect("valid ss58 address");
+            let test_code = hex::decode("12").unwrap();
+            run_to_block(600);
+            assert_ok!(Swork::set_code(Origin::root(), test_code.clone(), 1300));
+            assert_noop!(
+                Swork::clear_expired_code(
+                    Origin::signed(applier.clone()),
+                    test_code.clone()
+                ),
+                DispatchError::Module {
+                    index: 2,
+                    error: 20,
+                    message: Some("CodeNotExpired"),
+                }
+            );
+            run_to_block(1301);
+            assert_ok!(Swork::clear_expired_code(Origin::signed(applier.clone()), test_code.clone()));
+            assert_eq!(Swork::codes(test_code.clone()).is_none(), true);
+        });
+}
+
+#[test]
 fn register_pk_with_another_code_should_work() {
     ExtBuilder::default()
         .build()

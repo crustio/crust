@@ -220,9 +220,9 @@ fn validate_punishment_should_work() {
         assert_ok!(Staking::bond(
             Origin::signed(5),
             4,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(4, RewardDestination::Controller));
 
         Staking::upsert_stake_limit(&5, 3000);
         assert_eq!(<ErasValidatorPrefs<Test>>::contains_key(5, 5), false);
@@ -272,13 +272,13 @@ fn rewards_should_work() {
             let init_balance_20 = Balances::total_balance(&20);
 
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(20),
+            assert_ok!(set_payee(
+                20,
                 RewardDestination::Controller
             ));
 
@@ -385,8 +385,8 @@ fn multi_era_reward_should_work() {
             let init_balance_21 = Balances::total_balance(&21);
 
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
 
@@ -461,8 +461,8 @@ fn era_reward_with_dsm_staking_pot_should_work() {
             let init_balance_21 = Balances::total_balance(&21);
 
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
 
@@ -538,8 +538,8 @@ fn era_reward_with_used_fee_should_work() {
             let init_balance_21 = Balances::total_balance(&21);
 
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
 
@@ -620,9 +620,9 @@ fn staking_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                2500,
-                RewardDestination::Controller
+                2500
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
             Staking::upsert_stake_limit(&3, 3000);
             assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
 
@@ -752,20 +752,20 @@ fn guaranteeing_and_rewards_should_work() {
             assert_eq_uvec!(validator_controllers(), vec![10, 20]);
 
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::set_payee(
-                Origin::signed(20),
+            assert_ok!(set_payee(
+                20,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::set_payee(
-                Origin::signed(30),
+            assert_ok!(set_payee(
+                30,
                 RewardDestination::Controller
             ));
-            assert_ok!(Staking::set_payee(
-                Origin::signed(40),
+            assert_ok!(set_payee(
+                40,
                 RewardDestination::Controller
             ));
 
@@ -780,9 +780,9 @@ fn guaranteeing_and_rewards_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
                 (31, 333)
@@ -799,9 +799,9 @@ fn guaranteeing_and_rewards_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(
                 Origin::signed(4),
                 (31, 333)
@@ -1021,8 +1021,8 @@ fn guarantors_also_get_slashed() {
             assert_eq!(Staking::validator_count(), 2);
 
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(20),
+            assert_ok!(set_payee(
+                20,
                 RewardDestination::Controller
             ));
 
@@ -1037,8 +1037,7 @@ fn guarantors_also_get_slashed() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                guarantor_stake,
-                RewardDestination::default()
+                guarantor_stake
             ));
             // but it won't work, cause 10&20 are not validators
             assert_noop!(
@@ -1113,16 +1112,14 @@ fn double_staking_should_fail() {
         assert_ok!(Staking::bond(
             Origin::signed(1),
             2,
-            arbitrary_value,
-            RewardDestination::default()
+            arbitrary_value
         ));
         // 4 = not used so far, 1 stashed => not allowed.
         assert_noop!(
             Staking::bond(
                 Origin::signed(1),
                 4,
-                arbitrary_value,
-                RewardDestination::default()
+                arbitrary_value
             ),
             Error::<Test>::AlreadyBonded,
         );
@@ -1162,16 +1159,14 @@ fn double_controlling_should_fail() {
         assert_ok!(Staking::bond(
             Origin::signed(1),
             2,
-            arbitrary_value,
-            RewardDestination::default(),
+            arbitrary_value
         ));
         // 2 = controller, 3 stashed (Note that 2 is reused.) => no-op
         assert_noop!(
             Staking::bond(
                 Origin::signed(3),
                 2,
-                arbitrary_value,
-                RewardDestination::default()
+                arbitrary_value
             ),
             Error::<Test>::AlreadyPaired,
         );
@@ -1794,8 +1789,8 @@ fn bond_extra_and_withdraw_unbonded_works() {
         .build()
         .execute_with(|| {
             // Set payee to controller. avoids confusion
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
 
@@ -1980,8 +1975,8 @@ fn rebond_works() {
         .build()
         .execute_with(|| {
             // Set payee to controller. avoids confusion
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
 
@@ -2125,8 +2120,8 @@ fn rebond_is_fifo() {
         .build()
         .execute_with(|| {
             // Set payee to controller. avoids confusion
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
 
@@ -2386,8 +2381,8 @@ fn on_free_balance_zero_stash_removes_validator() {
 
             // Set some storage items which we expect to be cleaned up
             // Set payee information
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Stash
             ));
 
@@ -2446,8 +2441,8 @@ fn on_free_balance_zero_stash_removes_guarantor() {
             assert_eq!(Balances::free_balance(&11), 256000);
 
             // Set payee information
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Stash
             ));
 
@@ -2501,8 +2496,8 @@ fn switching_roles() {
 
             // Reset reward destination
             for i in &[10, 20] {
-                assert_ok!(Staking::set_payee(
-                    Origin::signed(*i),
+                assert_ok!(set_payee(
+                    *i,
                     RewardDestination::Controller
                 ));
             }
@@ -2518,18 +2513,18 @@ fn switching_roles() {
             assert_ok!(Staking::bond(
                 Origin::signed(5),
                 6,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(6, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
 
             // add 2 guarantors
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
                 (11, 1000)
@@ -2542,9 +2537,9 @@ fn switching_roles() {
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                500,
-                RewardDestination::Controller
+                500
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(
                 Origin::signed(4),
                 (21, 250)
@@ -2618,8 +2613,7 @@ fn wrong_vote_is_null() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                2000,
-                RewardDestination::default()
+                2000
             ));
             assert_ok!(Staking::guarantee(
                 Origin::signed(2),
@@ -2674,16 +2668,16 @@ fn bond_with_no_staked_value() {
         .execute_with(|| {
             // Can't bond with 1
             assert_noop!(
-                Staking::bond(Origin::signed(1), 2, 1, RewardDestination::Controller),
+                Staking::bond(Origin::signed(1), 2, 1),
                 Error::<Test>::InsufficientValue,
             );
             // bonded with absolute minimum value possible.
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                5,
-                RewardDestination::Controller
+                5
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             assert_eq!(Balances::locks(&1)[0].amount, 5);
 
             // unbonding even 1 will cause all to be unbonded.
@@ -2729,8 +2723,8 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
         .execute_with(|| {
             // setup
             assert_ok!(Staking::chill(Origin::signed(30)));
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
             let init_balance_2 = Balances::free_balance(&2);
@@ -2740,9 +2734,9 @@ fn bond_with_little_staked_value_bounded_by_total_stakes() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                2,
-                RewardDestination::Controller
+                2
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             Staking::upsert_stake_limit(&1, u128::max_value());
             assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
 
@@ -2825,8 +2819,8 @@ fn reward_with_no_stake_limit() {
         .execute_with(|| {
             // setup
             assert_ok!(Staking::chill(Origin::signed(30)));
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
             let _ = Balances::make_free_balance_be(&7, 100);
@@ -2837,9 +2831,9 @@ fn reward_with_no_stake_limit() {
             assert_ok!(Staking::bond(
                 Origin::signed(7),
                 8,
-                100,
-                RewardDestination::Controller
+                100
             ));
+            assert_ok!(set_payee(8, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
             let total_authoring_payout = authoring_rewards_in_era(Staking::current_era().unwrap_or(0));
@@ -2982,8 +2976,7 @@ fn reward_validator_slashing_validator_doesnt_overflow() {
         Staking::bond(
             Origin::signed(2),
             20000,
-            stake - 1,
-            RewardDestination::default(),
+            stake - 1
         )
         .unwrap();
         <ErasStakers<Test>>::insert(
@@ -3892,30 +3885,30 @@ fn update_stakers_should_work_new_era() {
         assert_ok!(Staking::bond(
             Origin::signed(5),
             4,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(4, RewardDestination::Controller));
 
         assert_ok!(Staking::bond(
             Origin::signed(3),
             2,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(2, RewardDestination::Controller));
 
         assert_ok!(Staking::bond(
             Origin::signed(7),
             6,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(6, RewardDestination::Controller));
 
         assert_ok!(Staking::bond(
             Origin::signed(9),
             8,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(8, RewardDestination::Controller));
 
         Staking::upsert_stake_limit(&5, 3000);
         assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
@@ -3986,43 +3979,43 @@ fn eras_stakers_clipped_should_work_new_era() {
         assert_ok!(Staking::bond(
             Origin::signed(5),
             4,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(4, RewardDestination::Controller));
         assert_ok!(Staking::bond(
             Origin::signed(111),
             110,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(110, RewardDestination::Controller));
 
         assert_ok!(Staking::bond(
             Origin::signed(113),
             112,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(112, RewardDestination::Controller));
 
         assert_ok!(Staking::bond(
             Origin::signed(115),
             114,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(114, RewardDestination::Controller));
 
         assert_ok!(Staking::bond(
             Origin::signed(117),
             116,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(116, RewardDestination::Controller));
 
         assert_ok!(Staking::bond(
             Origin::signed(119),
             118,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(118, RewardDestination::Controller));
 
         Staking::upsert_stake_limit(&5, 4000);
         assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
@@ -4121,18 +4114,18 @@ fn guarantee_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(5),
                 6,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(6, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
 
             // add guarantor, bond with 2000
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
 
             // New guarantee ✅
             assert_ok!(Staking::guarantee(Origin::signed(2), (5, 1000)));
@@ -4251,9 +4244,9 @@ fn multi_guarantees_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(Origin::signed(2), (11, 250)));
             assert_ok!(Staking::guarantee(Origin::signed(2), (11, 250)));
 
@@ -4261,9 +4254,9 @@ fn multi_guarantees_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(Origin::signed(4), (11, 2000)));
 
             // guarantor's info guarantors should ✅
@@ -4364,34 +4357,34 @@ fn cut_guarantee_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(5),
                 6,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(6, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
 
             assert_ok!(Staking::bond(
                 Origin::signed(7),
                 8,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(8, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
             // Add guarantor 1
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
 
             // Add guarantor 3
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
 
             // Guarantor's info guarantors should ✅
             assert_eq!(
@@ -4525,27 +4518,27 @@ fn new_era_with_stake_limit_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(Origin::signed(2), (11, 2000)));
 
             // Add guarantor
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                2000,
-                RewardDestination::Controller
+                2000
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
             assert_ok!(Staking::guarantee(Origin::signed(4), (11, 3000)));
 
             // Add validator without stake limit
             assert_ok!(Staking::bond(
                 Origin::signed(7),
                 8,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(8, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
             start_era_with_new_workloads(5, false, 1, 200000000);
@@ -4602,34 +4595,34 @@ fn chill_stash_should_work() {
         assert_ok!(Staking::bond(
             Origin::signed(5),
             6,
-            1000,
-            RewardDestination::Controller
+            1000
         ));
+        assert_ok!(set_payee(6, RewardDestination::Controller));
         assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
         // add a new validator candidate
         assert_ok!(Staking::bond(
             Origin::signed(7),
             8,
-            2000,
-            RewardDestination::Controller
+            2000
         ));
+        assert_ok!(set_payee(8, RewardDestination::Controller));
         assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
         // add guarantor
         assert_ok!(Staking::bond(
             Origin::signed(1),
             2,
-            2000,
-            RewardDestination::Controller
+            2000
         ));
+        assert_ok!(set_payee(2, RewardDestination::Controller));
 
         // add guarantor
         assert_ok!(Staking::bond(
             Origin::signed(3),
             4,
-            2000,
-            RewardDestination::Controller
+            2000
         ));
+        assert_ok!(set_payee(4, RewardDestination::Controller));
 
         assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
         assert_ok!(Staking::guarantee(Origin::signed(2), (5, 250)));
@@ -4738,8 +4731,8 @@ fn double_claim_rewards_should_fail() {
             let init_balance_31 = Balances::total_balance(&31);
 
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(10),
+            assert_ok!(set_payee(
+                10,
                 RewardDestination::Controller
             ));
 
@@ -4809,8 +4802,8 @@ fn era_clean_should_work() {
         .build()
         .execute_with(|| {
             // Set payee to controller
-            assert_ok!(Staking::set_payee(
-                Origin::signed(20),
+            assert_ok!(set_payee(
+                20,
                 RewardDestination::Controller
             ));
             <Module<Test>>::reward_by_ids(vec![(21, 1)]);
@@ -4843,7 +4836,7 @@ fn payout_to_any_account_works() {
         bond_guarantor(1337,  100, vec![(111, 50)]);
 
         // Update payout location
-        assert_ok!(Staking::set_payee(Origin::signed(1337), RewardDestination::Account(42)));
+        assert_ok!(set_payee(1337, RewardDestination::Account(42)));
 
         // Reward Destination account doesn't exist
         assert_eq!(Balances::free_balance(42), 0);
@@ -4881,27 +4874,27 @@ fn update_stage_one_stake_limit_according_to_mpow_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
             assert_ok!(Staking::bond(
                 Origin::signed(5),
                 6,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(6, RewardDestination::Controller));
             assert_ok!(Staking::bond(
                 Origin::signed(7),
                 8,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(8, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
             assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
             assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
@@ -4942,27 +4935,27 @@ fn update_stage_two_stake_limit_according_to_mpow_should_work() {
             assert_ok!(Staking::bond(
                 Origin::signed(1),
                 2,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
             assert_ok!(Staking::bond(
                 Origin::signed(3),
                 4,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
             assert_ok!(Staking::bond(
                 Origin::signed(5),
                 6,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(6, RewardDestination::Controller));
             assert_ok!(Staking::bond(
                 Origin::signed(7),
                 8,
-                1000,
-                RewardDestination::Controller
+                1000
             ));
+            assert_ok!(set_payee(8, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
             assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
             assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));

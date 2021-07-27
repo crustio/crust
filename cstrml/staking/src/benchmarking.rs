@@ -42,9 +42,8 @@ pub fn create_stash_controller<T: Config>(n: u32) -> Result<(T::AccountId, T::Ac
     let stash = create_funded_user::<T>("stash", n);
     let controller = create_funded_user::<T>("controller", n);
     let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
-    let reward_destination = RewardDestination::Staked;
     let amount = T::Currency::minimum_balance() * ACCOUNT_BALANCE_RATIO.into();
-    Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
+    Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount)?;
     return Ok((stash, controller))
 }
 
@@ -113,9 +112,8 @@ benchmarks! {
         let stash = create_funded_user::<T>("stash",100);
         let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller);
-        let reward_destination = RewardDestination::Staked;
         let amount = T::Currency::minimum_balance() * 10u32.into();
-    }: _(RawOrigin::Signed(stash), controller_lookup, amount, reward_destination)
+    }: _(RawOrigin::Signed(stash), controller_lookup, amount)
 
 
     bond_extra {
@@ -131,9 +129,8 @@ benchmarks! {
         let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
         let max_additional = T::Currency::minimum_balance() * 10u32.into();
-        let reward_destination = RewardDestination::Staked;
         let amount = T::Currency::minimum_balance() * 10u32.into();
-        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
+        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount)?;
     }: _(RawOrigin::Signed(controller), max_additional)
 
 
@@ -143,9 +140,8 @@ benchmarks! {
         let controller = create_funded_user::<T>("controller", 100);
         let controller_lookup: <T::Lookup as StaticLookup>::Source = T::Lookup::unlookup(controller.clone());
         let max_additional = T::Currency::minimum_balance() * 10u32.into();
-        let reward_destination = RewardDestination::Staked;
         let amount = T::Currency::minimum_balance() * 10u32.into();
-        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount, reward_destination)?;
+        Staking::<T>::bond(RawOrigin::Signed(stash.clone()).into(), controller_lookup, amount)?;
         Staking::<T>::unbond(RawOrigin::Signed(controller.clone()).into(), max_additional)?;
     }: _(RawOrigin::Signed(controller.clone()))
 
@@ -174,14 +170,6 @@ benchmarks! {
     chill {
         let (_, controller) = create_stash_controller::<T>(100)?;
     }: _(RawOrigin::Signed(controller))
-
-    set_payee {
-        let (stash, controller) = create_stash_controller::<T>(100)?;
-        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Staked);
-    }: _(RawOrigin::Signed(controller), RewardDestination::Controller)
-    verify {
-        assert_eq!(Payee::<T>::get(&stash), RewardDestination::Controller);
-    }
 
     set_controller {
         let (stash, _) = create_stash_controller::<T>(100)?;
@@ -252,7 +240,6 @@ mod tests {
             assert_ok!(test_benchmark_new_era::<Test>());
             assert_ok!(test_benchmark_select_and_update_validators::<Test>());
             assert_ok!(test_benchmark_chill::<Test>());
-            assert_ok!(test_benchmark_set_payee::<Test>());
             assert_ok!(test_benchmark_set_controller::<Test>());
             assert_ok!(test_benchmark_withdraw_unbonded::<Test>());
         });

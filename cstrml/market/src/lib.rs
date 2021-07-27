@@ -506,13 +506,6 @@ decl_module! {
             0
         }
 
-        fn on_runtime_upgrade() -> frame_support::weights::Weight {
-            for (who, _) in <FreeOrderAccounts<T>>::iter() {
-                <FreeOrderAccounts<T>>::insert(who, 100);
-			}
-            T::BlockWeights::get().max_block
-        }
-
         /// Register to be a merchant, you should provide your storage layer's address info
         /// this will require you to collateral first, complexity depends on `Collaterals`(P).
         ///
@@ -1520,7 +1513,6 @@ impl<T: Config> Module<T> {
                     8 ..= 9 => (false,Perbill::from_percent(5)),
                     10 ..= 11 => (false,Perbill::from_percent(4)),
                     12 ..= 14 => (false,Perbill::from_percent(3)),
-                    15 ..= 30 => (false,Perbill::zero()),
                     _ => (true, Perbill::from_percent(3))
                 }
             },

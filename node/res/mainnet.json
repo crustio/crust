@@ -5,6 +5,7 @@
   "bootNodes": [
     "/dns/rpc1.crust.network/tcp/30333/p2p/12D3KooWAzJnjc174fgKnf5xNxZjTBUkj58qsXu1c1saQMNfVRxr",
     "/dns/rpc2.crust.network/tcp/30333/p2p/12D3KooWJCBUsBZEiQJKYq1Tvfzp38NLzdUxqsTezYxTsv9WkcbV",
+    "/dns/rpc3.crust.network/tcp/30333/p2p/12D3KooWAvNtdeV7DWtSUjMrgw52VGnZQFzQLaTuESSZrR7Ma9SB",
     "/dns/rpc4.crust.network/tcp/30333/p2p/12D3KooWNAXEa8Hb7LB8eCzamQP87KQTReV2uo42kBGpTHr19TB6"
   ],
   "telemetryEndpoints": [

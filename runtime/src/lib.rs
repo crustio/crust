@@ -391,10 +391,10 @@ parameter_types! {
     pub const StakingModuleId: ModuleId = ModuleId(*b"cstaking");
     // 6 sessions in an era (6 hours).
     pub const SessionsPerEra: SessionIndex = 6;
-    // 60 eras for unbonding (15 days).
-    pub const BondingDuration: EraIndex = 60;
-    // 28 eras in which slashes can be cancelled (slightly less than 7 days).
-    pub const SlashDeferDuration: EraIndex = 27;
+    // 112 eras for unbonding (28 days).
+    pub const BondingDuration: EraIndex = 28 * 4;
+    // 108 eras in which slashes can be cancelled (slightly less than 28 days).
+    pub const SlashDeferDuration: EraIndex = 27 * 4;
     // 1 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `1`
     pub const SPowerRatio: u128 = 1;
     // 64 guarantors for one validator.
@@ -441,7 +441,7 @@ impl pallet_offences::Config for Runtime {
 }
 
 parameter_types! {
-    pub const ExistentialDeposit: u128 = 1 * MILLICENTS;
+    pub const ExistentialDeposit: u128 = 10 * MILLICENTS;
     pub const MaxLocks: u32 = 50;
 }
 

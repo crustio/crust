@@ -91,5 +91,5 @@ pub mod market {
     #[cfg(feature = "test")]
     pub const COLLATERAL_RATIO: u32 = 10;
     #[cfg(not(feature = "test"))]
-    pub const COLLATERAL_RATIO: u32 = 5;
+    pub const COLLATERAL_RATIO: u32 = 1;
 }

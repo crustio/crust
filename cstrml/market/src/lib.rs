@@ -976,21 +976,25 @@ impl<T: Config> Module<T> {
         // Split the original amount into three parts
         let staking_amount = T::StakingRatio::get() * value;
         let storage_amount = T::StorageRatio::get() * value;
-        let reserved_amount = value - staking_amount - storage_amount;
+        let reserved_amount = value.saturating_add(base_fee).saturating_sub(staking_amount).saturating_sub(storage_amount);
 
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;
 
         // Check the discount for the reserved amount, reserved_amount = max(0, reserved_amount - discount_amount)
-        let discount_amount = T::BenefitInterface::get_market_funds_ratio(who) * value;
+        let discount_amount = Self::get_discount_ratio(who) * (value.saturating_add(base_fee)) ;
         let reserved_amount = reserved_amount.saturating_sub(discount_amount);
-        let reserved_amount = reserved_amount.saturating_add(base_fee);
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, liveness)?;
         T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), liveness)?;
         Ok(storage_amount)
     }
+
+    fn get_discount_ratio(who: &T::AccountId) -> Perbill {
+        T::BenefitInterface::get_market_funds_ratio(who).min(Perbill::from_percent(10))
+    }
+
 
     fn get_current_block_number() -> BlockNumber {
         let current_block_number = <system::Module<T>>::block_number();

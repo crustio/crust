@@ -32,13 +32,32 @@ curl https://sh.rustup.rs -sSf | sh
 cargo build --release
 ```
 
+Depending on your local OS, you **may** need to run the following commands to install extra environment.
+If you cannot build the code, please check the error message and run the corresponding command to fix it.
+```shell
+sudo apt install gcc-multilib
+wget https://apt.llvm.org/llvm.sh
+sudo ./llvm 10
+sudo ln -s /usr/lib/llvm-10/bin/llvm-config llvm-config
+sudo apt install gcc
+sudo apt install clang
+```
+
 ### Build from docker
 
-Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust) to see how to build and run crust with docker.
+Refer [this](https://github.com/crustio/crust/tree/mainnet/docker#dockerize-crust) to see how to build and run crust with docker.
 
 ## Network
 
-### 1. Connect to maxwell
+### 1. Connect to mainnet
+
+```shell
+./target/release/crust --chain mainnet
+```
+
+Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/mainnet/node/res/mainnet.json).
+
+### 2. Connect to maxwell
 
 ```shell
 ./target/release/crust --chain maxwell
@@ -46,7 +65,7 @@ Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust
 
 Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/maxwell/node/res/maxwell.json).
 
-### 2. Connect to rocky
+### 3. Connect to rocky
 
 > Archived chain for only **internal test** now.
 
@@ -54,7 +73,7 @@ Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/ma
 ./target/release/crust --chain rocky
 ```
 
-### 3. Run as dev
+### 4. Run as dev
 
 Purge any existing developer chain state:
 
@@ -70,7 +89,7 @@ Start a development chain with:
 
 Detailed logs may be shown by running the node with the following environment variables set: `RUST_LOG=debug RUST_BACKTRACE=1 cargo run -- --dev`.
 
-### 4. Run as local
+### 5. Run as local
 
 If you want to see the multi-node consensus algorithm in action locally, then you can create a local testnet with two validator nodes for Alice and Bob, who are the initial authorities of the genesis chain that have been endowed with testnet units.
 

@@ -8,7 +8,7 @@ docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:latest ./crust 
 ```
 
 **[more_options]** can be:
-1. `--chain`: Can be `dev`, `test`, `rocky` and `maxwell`
+1. `--chain`: Can be `mainnet`, `dev`, `test`, `rocky` and `maxwell`
 2. `--rpc-external`: Expose rpc port
 3. `--ws-external`: Expose ws port
 4. `--rpc-cors all`: Allow cors requests

@@ -992,7 +992,8 @@ impl<T: Config> Module<T> {
     }
 
     fn get_discount_ratio(who: &T::AccountId) -> Perbill {
-        T::BenefitInterface::get_market_funds_ratio(who).min(Perbill::from_percent(10))
+        let discount_max_ratio = Perbill::one().saturating_sub(T::StakingRatio::get()).saturating_sub(T::StorageRatio::get());
+        T::BenefitInterface::get_market_funds_ratio(who).min(discount_max_ratio)
     }
 
 

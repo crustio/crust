@@ -4,13 +4,13 @@
 
 Implementation of a [Crust Protocol](https://crust.network) node with [substrate](https://github.com/paritytech/substrate).
 
-## Join to play
+## 🎮 Join to play
 
 Please go to [crust wiki](https://wiki.crust.network/docs/en/nodeOverview), refer the node overview.
 
 ## Building
 
-### Build from source
+### ⌨️ Build from source
 
 #### 1. Install Rust
 
@@ -32,8 +32,12 @@ curl https://sh.rustup.rs -sSf | sh
 cargo build --release
 ```
 
-Depending on your local OS, you **may** need to run the following commands to install extra environment.
-If you cannot build the code, please check the error message and run the corresponding command to fix it.
+#### *4. Troubleshooting
+
+> Depending on different building environments, if you cannot build the source code, please check the detail error message and try to run the corresponding commands to fix it
+
+- Debian/Ubuntu/Raspbian
+
 ```shell
 sudo apt install gcc-multilib
 wget https://apt.llvm.org/llvm.sh
@@ -43,21 +47,32 @@ sudo apt install gcc
 sudo apt install clang
 ```
 
-### Build from docker
+- Fedora/RedHat/CentOS
 
-Refer [this](https://github.com/crustio/crust/tree/mainnet/docker#dockerize-crust) to see how to build and run crust with docker.
+```shell
+sudo yum -y install gcc
+sudo yum -y install clang
+```
 
-## Network
+Also, you can join [discord](https://discord.gg/D97GGQndmx) to get help
+
+### 🐳 Dockerize
+
+Please refer [this](https://github.com/crustio/crust/tree/mainnet/docker#dockerize-crust) to see how to build and run crust with docker.
+
+## ⛰ Live Network
 
 ### 1. Connect to mainnet
+
+> The default branch `mainnet` can be build and connect to mainnet.
 
 ```shell
 ./target/release/crust --chain mainnet
 ```
 
-Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/mainnet/node/res/mainnet.json).
-
 ### 2. Connect to maxwell
+
+> Please checkout the branch `release/0.11.1`, then build and connect to maxwell
 
 ```shell
 ./target/release/crust --chain maxwell
@@ -65,15 +80,13 @@ Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/ma
 
 Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/maxwell/node/res/maxwell.json).
 
-### 3. Connect to rocky
+## 🍕 Dev Network
 
-> Archived chain for only **internal test** now.
+### 1. Connect to rocky
 
-```shell
-./target/release/crust --chain rocky
-```
+> Rocky is an open dev network for the using of decentralized storage market, if you want to be a node on rocky, please join [discord](https://discord.gg/D97GGQndmx) for asking bootnodes/docker image
 
-### 4. Run as dev
+### 2. Run as dev
 
 Purge any existing developer chain state:
 
@@ -89,7 +102,7 @@ Start a development chain with:
 
 Detailed logs may be shown by running the node with the following environment variables set: `RUST_LOG=debug RUST_BACKTRACE=1 cargo run -- --dev`.
 
-### 5. Run as local
+### 3. Run as local
 
 If you want to see the multi-node consensus algorithm in action locally, then you can create a local testnet with two validator nodes for Alice and Bob, who are the initial authorities of the genesis chain that have been endowed with testnet units.
 
@@ -118,7 +131,7 @@ In the second terminal, we'll start Bob's substrate node on a different TCP port
 
 Additional CLI usage options are available and may be shown by running `cargo run -- --help`.
 
-## Contribution
+## 🙋🏻‍♂️ Contribution
 
 Please follow the contributions guidelines as outlined in [docs/CONTRIBUTION.md](https://github.com/crustio/crust/blob/master/docs/CONTRIBUTION.md). In all communications and contributions, this project follows the [Contributor Covenant Code of Conduct](https://github.com/paritytech/substrate/blob/master/docs/CODE_OF_CONDUCT.md).
 

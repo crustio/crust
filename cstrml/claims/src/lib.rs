@@ -209,22 +209,6 @@ decl_module! {
         /// The claim's module id, used for deriving its sovereign account ID.
         const ModuleId: ModuleId = T::ModuleId::get();
 
-        /// Init claim pot
-        ///
-        /// This dispatch origin for this call must be _Root_.
-        ///
-        /// Parameter:
-        /// - `amount`: The amount set for the claim pot
-        #[weight = 1000]
-        fn init_pot(origin, amount: BalanceOf<T>) -> DispatchResult {
-            ensure_root(origin)?;
-
-            T::Currency::deposit_creating(&Self::claim_pot(), amount);
-
-            Self::deposit_event(RawEvent::InitPot(Self::claim_pot(), amount));
-            Ok(())
-        }
-
         /// Change superior
         ///
         /// The dispatch origin for this call must be _Root_.
@@ -354,7 +338,7 @@ fn to_ascii_hex(data: &[u8]) -> Vec<u8> {
 
 impl<T: Config> Module<T> {
     // The claim pot account
-    fn claim_pot() -> T::AccountId {
+    pub fn claim_pot() -> T::AccountId {
         // "modl" ++ "crclaims" ++ "clai" is 16 bytes
         T::ModuleId::get().into_sub_account("clai")
     }

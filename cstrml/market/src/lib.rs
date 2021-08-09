@@ -983,7 +983,7 @@ impl<T: Config> Module<T> {
         let storage_amount = storage_amount + tips;
 
         // Check the discount for the reserved amount, reserved_amount = max(0, reserved_amount - discount_amount)
-        let discount_amount = Self::get_discount_ratio(who) * total_amount ;
+        let discount_amount = Self::get_discount_ratio(who) * total_amount;
         let reserved_amount = reserved_amount.saturating_sub(discount_amount);
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;

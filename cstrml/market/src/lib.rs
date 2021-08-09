@@ -974,15 +974,16 @@ impl<T: Config> Module<T> {
     // 18% into storage pot
     fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, base_fee: BalanceOf<T>, tips: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
         // Split the original amount into three parts
+        let total_amount = value.saturating_add(base_fee);
         let staking_amount = T::StakingRatio::get() * value;
         let storage_amount = T::StorageRatio::get() * value;
-        let reserved_amount = value.saturating_add(base_fee).saturating_sub(staking_amount).saturating_sub(storage_amount);
+        let reserved_amount = total_amount.saturating_sub(staking_amount).saturating_sub(storage_amount);
 
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;
 
         // Check the discount for the reserved amount, reserved_amount = max(0, reserved_amount - discount_amount)
-        let discount_amount = Self::get_discount_ratio(who) * (value.saturating_add(base_fee)) ;
+        let discount_amount = Self::get_discount_ratio(who) * total_amount ;
         let reserved_amount = reserved_amount.saturating_sub(discount_amount);
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;

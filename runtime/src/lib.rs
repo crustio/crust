@@ -398,7 +398,7 @@ parameter_types! {
     // 28 eras for unbonding (14 hours).
     pub const BondingDuration: staking::EraIndex = 28;
     // 28 eras in which slashes can be cancelled (14 hours).
-    pub const SlashDeferDuration: staking::EraIndex = 28;
+    pub const SlashDeferDuration: staking::EraIndex = 360;
     // 1 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `1`
     pub const SPowerRatio: u128 = 1;
     // 64 guarantors for one validator.

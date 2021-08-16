@@ -54,6 +54,13 @@ docker pull crustio/crust:maxwell
 docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:maxwell ./crust --base-path /tmp/chain --chain maxwell [more_options]
 ```
 
+### 3. Connect to rocky
+
+```shell
+docker pull crustio/crust:rocky
+docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:rocky ./crust --base-path /tmp/chain --chain rocky [more_options]
+```
+
 **[more_options]** can be:
 
 1. `--rpc-external`: Specify HTTP RPC server TCP port, default is `9933`.

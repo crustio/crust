@@ -84,7 +84,11 @@ Get the bootnodes from [here](https://raw.githubusercontent.com/crustio/crust/ma
 
 ### 1. Connect to rocky
 
-> Rocky is an open dev network for the using of decentralized storage market, if you want to be a node on rocky, please join [discord](https://discord.gg/D97GGQndmx) for asking bootnodes/docker image
+> Rocky has the same function and parameters with Mainnet, developers can deploy applications on this free test network. Read [more](https://wiki.crust.network/docs/en/buildRockyGuidance) about rocky.
+
+```shell
+./target/release/crust --chain rocky
+```
 
 ### 2. Run as dev
 

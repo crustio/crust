@@ -2,7 +2,9 @@
   "name": "Crust Rocky",
   "id": "crust_rocky",
   "chainType": "Live",
-  "bootNodes": [],
+  "bootNodes": [
+    "/ip4/124.156.129.198/tcp/30333/p2p/12D3KooWKPLZBmkVFUfJTdZMYVwsg8WdHNQzEVkzCa43xoYuCJKk"
+  ],
   "telemetryEndpoints": null,
   "protocolId": "crurcky",
   "properties": {

@@ -149,11 +149,6 @@ pub fn rocky_config() -> Result<CrustChainSpec, String> {
     CrustChainSpec::from_json_bytes(&include_bytes!("../res/rocky.json")[..])
 }
 
-/// Crust maxwell(aka. open testnet) config
-pub fn maxwell_config() -> Result<CrustChainSpec, String> {
-    CrustChainSpec::from_json_bytes(&include_bytes!("../res/maxwell.json")[..])
-}
-
 /// Crust mainnet(aka. open testnet) config
 pub fn mainnet_config() -> Result<CrustChainSpec, String> {
     CrustChainSpec::from_json_bytes(&include_bytes!("../res/mainnet.json")[..])
@@ -168,23 +163,6 @@ pub fn rocky_staging_config() -> Result<CrustChainSpec, String> {
         "crust_rocky",
         ChainType::Live,
         move || rocky_staging_testnet_config_genesis(wasm_binary),
-        vec![],
-        None,
-        Some(DEFAULT_PROTOCOL_ID),
-        None,
-        Default::default()
-    ))
-}
-
-/// Crust maxwell staging config
-pub fn maxwell_staging_config() -> Result<CrustChainSpec, String> {
-    let wasm_binary = WASM_BINARY.ok_or("Maxwell wasm not available")?;
-
-    Ok(CrustChainSpec::from_genesis(
-        "Crust Maxwell",
-        "crust_maxwell",
-        ChainType::Live,
-        move || maxwell_staging_testnet_config_genesis(wasm_binary),
         vec![],
         None,
         Some(DEFAULT_PROTOCOL_ID),
@@ -362,113 +340,6 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
         }),
         staking: Some(StakingConfig {
             validator_count: 10,
-            minimum_validator_count: 1,
-            stakers: initial_authorities
-                .iter()
-                .map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
-                .collect(),
-            invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
-            force_era: Forcing::NotForcing,
-            slash_reward_fraction: Perbill::from_percent(10),
-            ..Default::default()
-        }),
-        market: Some(Default::default()),
-        pallet_babe: Some(Default::default()),
-        pallet_grandpa: Some(Default::default()),
-        pallet_im_online: Some(Default::default()),
-        pallet_authority_discovery: Some(AuthorityDiscoveryConfig {
-            keys: vec![]
-        }),
-        swork: Some(SworkConfig {
-            init_codes: vec![]
-        }),
-        locks: Some(LocksConfig {
-            genesis_locks: vec![]
-        }),
-        pallet_treasury: Some(Default::default()),
-    }
-}
-
-/// The genesis spec of crust maxwell test network
-fn maxwell_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
-    // subkey inspect "$SECRET"
-    let endowed_accounts: Vec<AccountId> = vec![
-        // 5Dhss1MkoP1dwPgQABGJEabTcSb6wacD1zQBuJCa6FJdQupX
-        hex!["4895fefce14bb3aee9e55cf7c5adde4bcd1fdbd5957d736a5f6e641a956c750f"].into(),
-        // 5EReCPsRWBeKghGAB871TtnvsyUxbHSK1Cah6uUgdpurijoe
-        hex!["68704cd3ebb09909fa39c8d0b3f5561a0e7e9e1ee15ad38e187b4e6a6618d352"].into(),
-        // 5GYhrGQEz82p75LjvBYXF6HgPbwuFCATjC516emaFnGxW36V
-        hex!["c64bc822a3d7c5a656e82ccd3c84d9fc61e09de146ba56b1e110ea2dacbc5418"].into(),
-        // 5GBgu8tKRqQW5jVw1g99oGu9jZmNBzMW763Co6DNRikQcD8g
-        hex!["b6446db7bbd222dc895e4660b4ece95722c5d5fe9b642e4fa5681fc48c653326"].into(),
-        // 5DP1oCciSLUeDjAMaM1ySVk3aes4DFFWX4jAQvn7ToyoeikX
-        hex!["3a330af995b7ced720718be5e93a97f7def2b1815a00bf66762d88508b0dd750"].into(),
-        // 5Ea7YkWAr6fQJVXukPttx4Y5HjKEjLEQAKj41RKMU6YNpagn
-        hex!["6ee655bb1d454925362dc253db84530d452bda9b36eb2fa03416cdd267dccf02"].into(),
-        // 5D7scpwpUtM3EW8rUDEGdgdF1jqASSCovLt8a79G9SEiGDET
-        hex!["2ea6d44e805bb15ced3d59c8f955cfc77a15324b8d33c212de62a4dd9469ff62"].into(),
-        // 5E9Tsxb8Cg8hf4NryCNiph5rjRAhExVLj8iP8EwMaabaEpqU
-        hex!["5c19a40010e0e65db4c96ea3131b7aeb151fe571bfc6230fe06001645c76b756"].into()
-    ];
-
-    // for i in 1; do for j in {stash, controller}; do subkey inspect "$SECRET//$i//$j"; done; done
-    // for i in 1; do for j in grandpa; do subkey --ed25519 inspect "$SECRET//$i//$j"; done; done
-    // for i in 1; do for j in babe; do subkey --sr25519 inspect "$SECRET//$i//$j"; done; done
-    // for i in 1; do for j in im_online; do subkey --sr25519 inspect "$SECRET//$i//$j"; done; done
-    // for i in 1; do for j in authority_discovery; do subkey --sr25519 inspect "$SECRET//$i//$j"; done; done
-    let initial_authorities: Vec<(
-        AccountId,
-        AccountId,
-        GrandpaId,
-        BabeId,
-        ImOnlineId,
-        AuthorityDiscoveryId,
-    )> = vec![(
-        // 5EReCPsRWBeKghGAB871TtnvsyUxbHSK1Cah6uUgdpurijoe
-        hex!["68704cd3ebb09909fa39c8d0b3f5561a0e7e9e1ee15ad38e187b4e6a6618d352"].into(),
-        // 5Dhss1MkoP1dwPgQABGJEabTcSb6wacD1zQBuJCa6FJdQupX
-        hex!["4895fefce14bb3aee9e55cf7c5adde4bcd1fdbd5957d736a5f6e641a956c750f"].into(),
-        // 5CYdoFnHGT1wMwmEpEmShmNL1sgFKjuqjHnJQ7WGFUCyVocd
-        hex!["154d354140ec66ba3002562af519fdbc3b8ee9a0401d4efb53a2ae821e1df2fc"].unchecked_into(),
-        // 5EReCPsRWBeKghGAB871TtnvsyUxbHSK1Cah6uUgdpurijoe
-        hex!["68704cd3ebb09909fa39c8d0b3f5561a0e7e9e1ee15ad38e187b4e6a6618d352"].unchecked_into(),
-        // 5EReCPsRWBeKghGAB871TtnvsyUxbHSK1Cah6uUgdpurijoe
-        hex!["68704cd3ebb09909fa39c8d0b3f5561a0e7e9e1ee15ad38e187b4e6a6618d352"].unchecked_into(),
-        // 5EReCPsRWBeKghGAB871TtnvsyUxbHSK1Cah6uUgdpurijoe
-        hex!["68704cd3ebb09909fa39c8d0b3f5561a0e7e9e1ee15ad38e187b4e6a6618d352"].unchecked_into(),
-    )];
-
-    // Constants
-    const ENDOWMENT: u128 = 2_500_000 * CRUS;
-    const STASH: u128 = 1_250_000 * CRUS;
-
-    GenesisConfig {
-        pallet_sudo: Some(SudoConfig {
-            key: endowed_accounts[0].clone(),
-        }),
-        frame_system: Some(SystemConfig {
-            code: wasm_binary.to_vec(),
-            changes_trie_config: Default::default(),
-        }),
-        balances_Instance1: Some(BalancesConfig {
-            balances: endowed_accounts
-                .iter()
-                .cloned()
-                .map(|k| (k, ENDOWMENT))
-                .collect(),
-        }),
-        pallet_indices: Some(IndicesConfig {
-            indices: vec![],
-        }),
-        pallet_session: Some(SessionConfig {
-            keys: initial_authorities.iter().map(|x| (
-                x.0.clone(),
-                x.0.clone(),
-                session_keys(x.2.clone(), x.3.clone(), x.4.clone(), x.5.clone()),
-            )).collect::<Vec<_>>(),
-        }),
-        staking: Some(StakingConfig {
-            validator_count: 15,
             minimum_validator_count: 1,
             stakers: initial_authorities
                 .iter()

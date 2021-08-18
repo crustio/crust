@@ -1,0 +1,48 @@
+[package]
+name = 'cstrml-bridge-transfer'
+version = '1.0.0'
+authors = ['crustio']
+edition = '2018'
+license = "Apache-2.0"
+homepage = "https://crust.network"
+repository = "https://github.com/crustio/crust/"
+
+[dependencies]
+# third-party dependencies
+codec = { default-features = false, package = "parity-scale-codec", features = ["derive"], version = "2.0.0" }
+serde = { optional = true, version = "1.0.116" }
+
+# primitives
+sp-std = { default-features = false, version = "3.0.0" }
+sp-runtime = { default-features = false, version = "3.0.0" }
+sp-io = { default-features = false, version = "3.0.0" }
+sp-core = { default-features = false, version = "3.0.0" }
+sp-arithmetic = { default-features = false, version = "3.0.0" }
+
+# frame dependencies
+frame-support = { default-features = false, version = "3.0.0" }
+frame-system = { default-features = false, version = "3.0.0" }
+
+cstrml-bridge = { path = "../bridge" , default-features = false }
+hex = { version = "0.4", default-features = false }
+
+[dev-dependencies]
+blake2-rfc = { version = "0.2.18", default-features = false }
+hex-literal = "0.3"
+balances = { package = "cstrml-balances", path = "../balances" }
+pallet-timestamp = "3.0.0"
+
+[features]
+default = ["std"]
+std = [
+	"codec/std",
+	"serde",
+	"sp-std/std",
+	"sp-runtime/std",
+	"sp-io/std",
+	"sp-core/std",
+	"sp-arithmetic/std",
+	"frame-support/std",
+	"frame-system/std",
+	"cstrml-bridge/std",
+]

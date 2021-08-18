@@ -18,6 +18,8 @@ members = [
     'cstrml/swork',
     'cstrml/market',
     'cstrml/csm-locking',
+    'cstrml/bridge',
+    'cstrml/bridge-transfer',
     'cstrml/swork/benchmarking',
     'runtime',
     'rpc',

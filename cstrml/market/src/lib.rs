@@ -1506,13 +1506,9 @@ impl<T: Config> Module<T> {
             Some(alpha) => {
                 match alpha {
                     0 ..= 3 => (false, Perbill::from_percent(15)),
-                    4 => (false,Perbill::from_percent(11)),
-                    5 => (false,Perbill::from_percent(9)),
-                    6 => (false,Perbill::from_percent(7)),
-                    7 => (false,Perbill::from_percent(6)),
-                    8 ..= 9 => (false,Perbill::from_percent(5)),
-                    10 ..= 11 => (false,Perbill::from_percent(4)),
-                    12 ..= 14 => (false,Perbill::from_percent(3)),
+                    4 => (false, Perbill::from_percent(11)),
+                    5 => (false, Perbill::from_percent(9)),
+                    6 ..= 10 => (false, Perbill::zero()),
                     _ => (true, Perbill::from_percent(3))
                 }
             },

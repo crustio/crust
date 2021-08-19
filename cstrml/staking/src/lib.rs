@@ -668,8 +668,7 @@ decl_storage! {
                 let _ = <Module<T>>::bond(
                     T::Origin::from(Some(stash.clone()).into()),
                     T::Lookup::unlookup(controller.clone()),
-                    balance,
-                    RewardDestination::Staked,
+                    balance
                 );
 
                 gensis_total_stakes += balance;
@@ -847,8 +846,7 @@ decl_module! {
         #[weight = T::WeightInfo::bond()]
         fn bond(origin,
             controller: <T::Lookup as StaticLookup>::Source,
-            #[compact] value: BalanceOf<T>,
-            payee: RewardDestination<T::AccountId>
+            #[compact] value: BalanceOf<T>
         ) {
             let stash = ensure_signed(origin)?;
 
@@ -870,7 +868,7 @@ decl_module! {
             // You're auto-bonded forever, here. We might improve this by only bonding when
             // you actually validate/guarantee and remove once you unbond __everything__.
             <Bonded<T>>::insert(&stash, &controller);
-            <Payee<T>>::insert(&stash, payee);
+            <Payee<T>>::insert(&stash, RewardDestination::Staked);
 
             let current_era = CurrentEra::get().unwrap_or(0);
             let history_depth = Self::history_depth();
@@ -1218,29 +1216,6 @@ decl_module! {
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             Self::chill_stash(&ledger.stash);
             Self::deposit_event(RawEvent::ChillSuccess(controller, ledger.stash));
-        }
-
-        /// (Re-)set the payment target for a controller.
-        ///
-        /// Effects will be felt at the beginning of the next era.
-        ///
-        /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-        ///
-        /// # <weight>
-        /// - Independent of the arguments. Insignificant complexity.
-        /// - Contains a limited number of reads.
-        /// - Writes are limited to the `origin` account key.
-        /// ---------
-        /// - DB Weight:
-        ///     - Read: Ledger
-        ///     - Write: Payee
-        /// # </weight>
-        #[weight = T::WeightInfo::set_payee()]
-        fn set_payee(origin, payee: RewardDestination<T::AccountId>) {
-            let controller = ensure_signed(origin)?;
-            let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
-            let stash = &ledger.stash;
-            <Payee<T>>::insert(stash, payee);
         }
 
         /// (Re-)set the controller of a stash.

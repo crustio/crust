@@ -11,7 +11,7 @@ fn happy_pass_should_work() {
         // 0. Set miner, superior and pot
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
         assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-        assert_ok!(CrustClaims::init_pot(Origin::root(), 1000));
+        let _ = Balances::deposit_creating(&CrustClaims::claim_pot(), 1000);
 
         // 1. Set claim limit = 100
         assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
@@ -143,7 +143,7 @@ fn double_claim_should_failed() {
         // 0. Set miner, superior and pot
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
         assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-        assert_ok!(CrustClaims::init_pot(Origin::root(), 1000));
+        let _ = Balances::deposit_creating(&CrustClaims::claim_pot(), 1000);
 
         // 1. Set limitation
         assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
@@ -200,7 +200,7 @@ fn claim_pot_should_work() {
         // 0. Set miner, superior and pot
         assert_ok!(CrustClaims::change_miner(Origin::root(), 1));
         assert_ok!(CrustClaims::change_superior(Origin::root(), 2));
-        assert_ok!(CrustClaims::init_pot(Origin::root(), 10));
+        let _ = Balances::deposit_creating(&CrustClaims::claim_pot(), 10);
 
         // 1. Set claim limit = 100
         assert_ok!(CrustClaims::set_claim_limit(Origin::signed(2), 100));
@@ -221,7 +221,7 @@ fn claim_pot_should_work() {
         );
 
         // 3. Set pot again
-        assert_ok!(CrustClaims::init_pot(Origin::root(), 100));
+        let _ = Balances::deposit_creating(&CrustClaims::claim_pot(), 100);
         assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone())); // 100 should success due to the `AllowDeath`
     });
 }

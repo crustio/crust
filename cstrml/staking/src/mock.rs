@@ -609,9 +609,9 @@ pub fn bond_validator(acc: u128, val: Balance) {
     assert_ok!(Staking::bond(
         Origin::signed(acc + 1),
         acc,
-        val,
-        RewardDestination::Controller
+        val
     ));
+    assert_ok!(set_payee(acc, RewardDestination::Controller));
     Staking::upsert_stake_limit(&(acc + 1), u128::max_value());
     assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
 }
@@ -623,9 +623,9 @@ pub fn bond_guarantor(acc: u128, val: Balance, targets: Vec<(u128, Balance)>) {
     assert_ok!(Staking::bond(
         Origin::signed(acc + 1),
         acc,
-        val,
-        RewardDestination::Controller
+        val
     ));
+    assert_ok!(set_payee(acc, RewardDestination::Controller));
     for target in targets {
         assert_ok!(Staking::guarantee(Origin::signed(acc), target));
     }
@@ -769,4 +769,11 @@ pub fn staking_rewards_in_era(era_index: EraIndex) -> BalanceOf<Test> {
     let total_reward = Staking::total_rewards_in_era(era_index);
     let authoring_reward = authoring_rewards_in_era(era_index);
     total_reward.saturating_sub(authoring_reward)
+}
+
+pub fn set_payee(controller: u128, payee: RewardDestination<u128>) -> Result<(), ()> {
+    let ledger = Staking::ledger(&controller).unwrap();
+    let stash = &ledger.stash;
+    <Payee<Test>>::insert(stash, payee);
+    Ok(())
 }

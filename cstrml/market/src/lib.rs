@@ -952,24 +952,13 @@ impl<T: Config> Module<T> {
             // New order => check the alpha
             Some(alpha) => {
                 match alpha {
-                    0 ..= 5 => (false, Perbill::from_percent(30)),
-                    6 => (false,Perbill::from_percent(25)),
-                    7 => (false,Perbill::from_percent(21)),
-                    8 => (false,Perbill::from_percent(18)),
-                    9 => (false,Perbill::from_percent(16)),
-                    10 => (false,Perbill::from_percent(15)),
-                    11 => (false,Perbill::from_percent(13)),
-                    12 => (false,Perbill::from_percent(12)),
-                    13 => (false,Perbill::from_percent(11)),
-                    14 ..= 15 => (false,Perbill::from_percent(10)),
-                    16 => (false,Perbill::from_percent(9)),
-                    17 ..= 18 => (false,Perbill::from_percent(8)),
-                    19 ..= 21 => (false,Perbill::from_percent(7)),
-                    22 ..= 25 => (false,Perbill::from_percent(6)),
-                    26 ..= 30 => (false,Perbill::from_percent(5)),
-                    31 ..= 37 => (false,Perbill::from_percent(4)),
-                    38 ..= 49 => (false,Perbill::from_percent(3)),
-                    50 ..= 80 => (false,Perbill::zero()),
+                    0 ..= 3 => (false, Perbill::from_percent(9)),
+                    4 => (false,Perbill::from_percent(7)),
+                    5 => (false,Perbill::from_percent(6)),
+                    6 => (false,Perbill::from_percent(5)),
+                    7 => (false,Perbill::from_percent(4)),
+                    8 ..= 9 => (false,Perbill::from_percent(3)),
+                    10 ..= 30 => (false,Perbill::zero()),
                     _ => (true, Perbill::from_percent(3))
                 }
             },
@@ -984,24 +973,33 @@ impl<T: Config> Module<T> {
     // 72% into staking pot
     // 18% into storage pot
     fn split_into_reserved_and_storage_and_staking_pot(who: &T::AccountId, value: BalanceOf<T>, base_fee: BalanceOf<T>, tips: BalanceOf<T>, liveness: ExistenceRequirement) -> Result<BalanceOf<T>, DispatchError> {
-        // Split the original amount into three parts
+        // Calculate staking amount and storage amount
+        // 18% into storage pot
+        // 72% into staking pot
         let staking_amount = T::StakingRatio::get() * value;
         let storage_amount = T::StorageRatio::get() * value;
-        let reserved_amount = value - staking_amount - storage_amount;
+
+        // Calculate the discount for the total amount
+        // discount_amount = total_amount * min(market_funds_ratio, 0.1)
+        // reserved_amount = total_amount - staking_amount - storage_amount - discount_amount
+        let total_amount = value.saturating_add(base_fee);
+        let discount_amount = Self::get_discount_ratio(who) * total_amount;
+        let reserved_amount = total_amount.saturating_sub(staking_amount).saturating_sub(storage_amount).saturating_sub(discount_amount);
 
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;
-
-        // Check the discount for the reserved amount, reserved_amount = max(0, reserved_amount - discount_amount)
-        let discount_amount = T::BenefitInterface::get_market_funds_ratio(who) * value;
-        let reserved_amount = reserved_amount.saturating_sub(discount_amount);
-        let reserved_amount = reserved_amount.saturating_add(base_fee);
 
         T::Currency::transfer(&who, &Self::reserved_pot(), reserved_amount, liveness)?;
         T::Currency::transfer(&who, &Self::staking_pot(), staking_amount, liveness)?;
         T::Currency::transfer(&who, &Self::storage_pot(), storage_amount.clone(), liveness)?;
         Ok(storage_amount)
     }
+
+    fn get_discount_ratio(who: &T::AccountId) -> Perbill {
+        let discount_max_ratio = Perbill::one().saturating_sub(T::StakingRatio::get()).saturating_sub(T::StorageRatio::get());
+        T::BenefitInterface::get_market_funds_ratio(who).min(discount_max_ratio)
+    }
+
 
     fn get_current_block_number() -> BlockNumber {
         let current_block_number = <system::Module<T>>::block_number();

@@ -1,19 +1,5 @@
 # Dockerize Crust
 
-## Usage
-
-```shell
-docker pull crustio/crust
-docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:latest ./crust --base-path /tmp/chain [more_options]
-```
-
-**[more_options]** can be:
-1. `--chain`: Can be `dev`, `test`, `rocky` and `maxwell`
-2. `--rpc-external`: Expose rpc port
-3. `--ws-external`: Expose ws port
-4. `--rpc-cors all`: Allow cors requests
-5. More can be found with `--help`
-
 ## Scripts
 
 - `build.sh`: Build crust official docker image.
@@ -51,3 +37,34 @@ Please run the scripts under the ***root*** of this repository. ***DO NOT*** run
   ```bash
   docker/build.sh
   ```
+
+## Usage
+
+### 1. Connect to mainnet
+
+```shell
+docker pull crustio/crust:mainnet
+docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:mainnet ./crust --base-path /tmp/chain --chain mainnet [more_options]
+```
+
+### 2. Connect to maxwell
+
+```shell
+docker pull crustio/crust:maxwell
+docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:maxwell ./crust --base-path /tmp/chain --chain maxwell [more_options]
+```
+
+### 3. Connect to rocky
+
+```shell
+docker pull crustio/crust:rocky
+docker run -v /tmp/crust:/tmp/crust --network host crustio/crust:rocky ./crust --base-path /tmp/chain --chain rocky [more_options]
+```
+
+**[more_options]** can be:
+
+1. `--rpc-external`: Specify HTTP RPC server TCP port, default is `9933`.
+2. `--ws-external`: Specify WebSockets RPC server TCP port, default is `9944`.
+3. `--rpc-cors all`: Specify browser Origins allowed to access the HTTP & WS RPC servers.
+4. `--bootnodes`: Specify a list of bootnodes.
+5. More options can be found with `--help`.

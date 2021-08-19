@@ -156,7 +156,7 @@ mod benchmarking;
 pub mod weights;
 
 use sp_std::prelude::*;
-use sp_std::{cmp, result, mem, fmt::Debug, ops::BitOr};
+use sp_std::{cmp, result, fmt::Debug, ops::BitOr};
 use codec::{Codec, Encode, Decode};
 use frame_support::{
 	ensure,

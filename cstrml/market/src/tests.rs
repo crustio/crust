@@ -1658,27 +1658,27 @@ fn update_base_fee_should_work() {
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
-        // alpha == 50 => keep same
-        <swork::AddedFilesCount>::put(500);
+        // alpha == 20 => keep same
+        <swork::AddedFilesCount>::put(200);
         OrdersCount::put(10);
         Market::update_base_fee();
         assert_eq!(Market::file_base_fee(), 970);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
-        // alpha == 0 => increase 30%
+        // alpha == 0 => increase 9%
         <swork::AddedFilesCount>::put(0);
         OrdersCount::put(100);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1261);
+        assert_eq!(Market::file_base_fee(), 1057);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
-        // alpha == 11 => increase 13%
-        <swork::AddedFilesCount>::put(110);
+        // alpha == 6 => increase 5%
+        <swork::AddedFilesCount>::put(60);
         OrdersCount::put(10);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1425);
+        assert_eq!(Market::file_base_fee(), 1110);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
@@ -1686,7 +1686,7 @@ fn update_base_fee_should_work() {
         <swork::AddedFilesCount>::put(1500);
         OrdersCount::put(10);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1382);
+        assert_eq!(Market::file_base_fee(), 1077);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
     });
@@ -3559,10 +3559,10 @@ fn place_storage_order_with_discount_should_work() {
                 replicas: vec![]
             }
         );
-        assert_eq!(Balances::free_balance(&reserved_pot), 1100);
+        assert_eq!(Balances::free_balance(&reserved_pot), 1050);
         assert_eq!(Balances::free_balance(&staking_pot), 1440);
         assert_eq!(Balances::free_balance(&storage_pot), 360);
-        assert_eq!(Balances::free_balance(&source), 7100);
+        assert_eq!(Balances::free_balance(&source), 7150);
 
         set_discount_ratio(1, 10); // 10% discount
 
@@ -3582,10 +3582,34 @@ fn place_storage_order_with_discount_should_work() {
                 replicas: vec![]
             }
         );
-        assert_eq!(Balances::free_balance(reserved_pot), 2100); // 150 + 0
-        assert_eq!(Balances::free_balance(staking_pot), 2880);
-        assert_eq!(Balances::free_balance(storage_pot), 720);
-        assert_eq!(Balances::free_balance(&source), 4300);
+        assert_eq!(Balances::free_balance(&reserved_pot), 1950); // 150 + 0
+        assert_eq!(Balances::free_balance(&staking_pot), 2880);
+        assert_eq!(Balances::free_balance(&storage_pot), 720);
+        assert_eq!(Balances::free_balance(&source), 4450);
+
+
+        set_discount_ratio(1, 5); // 10% discount
+
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, vec![]
+        ));
+        assert_eq!(Market::files(&cid).unwrap_or_default(),
+           FileInfo {
+               file_size,
+               spower: 0,
+               expired_at: 0,
+               calculated_at: 50,
+               amount: 1080, // ( 1000 + 1000 * 1 + 0 + 1000 ) * 0.18
+               prepaid: 0,
+               reported_replica_count: 0,
+               replicas: vec![]
+           }
+        );
+        assert_eq!(Balances::free_balance(reserved_pot), 2850); // 150 + 0
+        assert_eq!(Balances::free_balance(staking_pot), 4320);
+        assert_eq!(Balances::free_balance(storage_pot), 1080);
+        assert_eq!(Balances::free_balance(&source), 1750);
     });
 }
 

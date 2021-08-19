@@ -15,6 +15,7 @@ use sp_core::U256;
 use sp_runtime::traits::{AccountIdConversion, Dispatchable};
 use sp_runtime::{RuntimeDebug, ModuleId};
 use sp_std::prelude::*;
+use sp_std::vec;
 
 use codec::{Decode, Encode, EncodeLike};
 

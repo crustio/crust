@@ -2134,19 +2134,19 @@ fn update_base_fee_should_work() {
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
-        // alpha == 0 => increase 15%
+        // alpha == 0 => increase 3%
         <swork::AddedFilesCount>::put(0);
         OrdersCount::put(100);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1082);
+        assert_eq!(Market::file_base_fee(), 969);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
-        // alpha == 11 => increase 13%
+        // alpha == 11 => increase 3%
         <swork::AddedFilesCount>::put(40);
         OrdersCount::put(10);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1201);
+        assert_eq!(Market::file_base_fee(), 998);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
@@ -2154,7 +2154,7 @@ fn update_base_fee_should_work() {
         <swork::AddedFilesCount>::put(1500);
         OrdersCount::put(10);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1165);
+        assert_eq!(Market::file_base_fee(), 968);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
     });

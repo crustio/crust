@@ -63,7 +63,7 @@ fn transfer_native() {
 			dest_chain,
 			1,
 			resource_id,
-			amount.into(),
+			(amount - 2).into(),
 			recipient,
 		));
 	})

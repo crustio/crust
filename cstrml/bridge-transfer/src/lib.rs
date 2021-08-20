@@ -10,6 +10,7 @@ use cstrml_bridge as bridge;
 use sp_arithmetic::traits::SaturatedConversion;
 use sp_core::U256;
 use sp_std::prelude::*;
+use sp_runtime::traits::Saturating;
 
 #[cfg(test)]
 mod mock;
@@ -55,6 +56,7 @@ decl_error! {
 		InvalidPayload,
 		InvalidFeeOption,
 		FeeOptionsMissiing,
+		LessThanFee,
 	}
 }
 
@@ -91,9 +93,10 @@ decl_module! {
 			} else {
 				min_fee
 			};
-			T::Currency::transfer(&source, &bridge_id, (amount + fee).into(), AllowDeath)?;
+			ensure!(amount > fee, Error::<T>::LessThanFee);
+			T::Currency::transfer(&source, &bridge_id, amount.into(), AllowDeath)?;
 
-			<bridge::Module<T>>::transfer_fungible(dest_id, T::BridgeTokenId::get(), recipient, U256::from(amount.saturated_into::<u128>()))
+			<bridge::Module<T>>::transfer_fungible(dest_id, T::BridgeTokenId::get(), recipient, U256::from(amount.saturating_sub(fee).saturated_into::<u128>()))
 		}
 
 		//

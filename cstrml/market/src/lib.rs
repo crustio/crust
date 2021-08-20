@@ -1505,10 +1505,8 @@ impl<T: Config> Module<T> {
             // New order => check the alpha
             Some(alpha) => {
                 match alpha {
-                    0 ..= 3 => (false, Perbill::from_percent(15)),
-                    4 => (false, Perbill::from_percent(11)),
-                    5 => (false, Perbill::from_percent(9)),
-                    6 ..= 10 => (false, Perbill::zero()),
+                    0 ..= 4 => (false, Perbill::from_percent(3)),
+                    5 ..= 10 => (false, Perbill::zero()),
                     _ => (true, Perbill::from_percent(3))
                 }
             },

@@ -117,8 +117,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 pub fn new_test_ext_initialized(
-	src_id: BridgeChainId,
-	r_id: ResourceId,
+	src_id: u8,
+	r_id: [u8; 32],
 	resource: Vec<u8>,
 ) -> sp_io::TestExternalities {
 	let mut t = new_test_ext();

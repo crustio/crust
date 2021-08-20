@@ -75,7 +75,7 @@ fn complete_proposal_bad_threshold() {
 #[test]
 fn setup_resources() {
 	new_test_ext().execute_with(|| {
-		let id: ResourceId = [1; 32];
+		let id: [u8; 32] = [1; 32];
 		let method = "Pallet.do_something".as_bytes().to_vec();
 		let method2 = "Pallet.do_somethingElse".as_bytes().to_vec();
 

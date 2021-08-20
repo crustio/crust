@@ -84,7 +84,7 @@ benefits = { package = "cstrml-benefits", path = "../cstrml/benefits", default-f
 locks = { package = "cstrml-locks", path = "../cstrml/locks", default-features = false, version = "1.0.0" }
 csm-locking = { package = "cstrml-csm-locking", path = "../cstrml/csm-locking", default-features = false, version = "1.0.0" }
 bridge = { package = "cstrml-bridge", path = "../cstrml/bridge", default-features = false, version = "1.0.0" }
-bridge-transfer = { package = "cstrml-bridge-transfer", path = "../cstrml/bridge_transfer", default-features = false, version = "1.0.0" }
+bridge-transfer = { package = "cstrml-bridge-transfer", path = "../cstrml/bridge-transfer", default-features = false, version = "1.0.0" }
 
 # crust benchmark dependencies
 swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "1.0.0" }

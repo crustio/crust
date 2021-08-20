@@ -22,6 +22,8 @@ members = [
     'cstrml/locks',
     'cstrml/benefits',
     'cstrml/csm-locking',
+    'cstrml/bridge',
+    'cstrml/bridge-transfer',
     'cstrml/swork/benchmarking',
     'runtime',
     'rpc',

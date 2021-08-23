@@ -56,7 +56,7 @@ pub fn new_partial(
 		TFullClient<Block, RuntimeApi, Executor>,
 		TFullBackend<Block>,
 		(),
-		sp_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, Executor>>,
+		sc_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, Executor>>,
 		sc_transaction_pool::FullPool<Block, TFullClient<Block, RuntimeApi, Executor>>,
 		(Option<Telemetry>, Option<TelemetryWorkerHandle>),
 	>,
@@ -149,7 +149,7 @@ pub fn shell_build_import_queue(
 	_: Option<TelemetryHandle>,
 	task_manager: &TaskManager,
 ) -> Result<
-	sp_consensus::DefaultImportQueue<
+	sc_consensus::DefaultImportQueue<
 		Block,
 		TFullClient<Block, RuntimeApi, Executor>,
 	>,
@@ -178,7 +178,7 @@ async fn start_node_impl<RB>(
 where
 	RB: Fn(
 			Arc<TFullClient<Block, RuntimeApi, Executor>>,
-		) -> jsonrpc_core::IoHandler<sc_rpc::Metadata>
+		) -> Result<jsonrpc_core::IoHandler<sc_rpc::Metadata>, sc_service::Error>
 		+ Send
 		+ 'static,
 {
@@ -223,6 +223,7 @@ where
 			import_queue: import_queue.clone(),
 			on_demand: None,
 			block_announce_validator_builder: Some(Box::new(|_| block_announce_validator)),
+			warp_sync: None,
 		})?;
 
 	let rpc_client = client.clone();
@@ -316,6 +317,7 @@ where
 		slot_duration,
 		// We got around 500ms for proposing
 		block_proposal_slot_portion: SlotProportion::new(1f32 / 24f32),
+        max_block_proposal_slot_portion: Some(SlotProportion::new(1f32 / 16f32)),
 		telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
 	});
 
@@ -359,7 +361,7 @@ pub async fn start_node(
 		parachain_config,
 		polkadot_config,
 		id,
-		|_| Default::default(),
+		|_| Ok(Default::default()),
 	)
 	.await
 }

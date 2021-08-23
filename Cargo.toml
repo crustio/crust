@@ -12,14 +12,5 @@ exclude = [
 ]
 
 members = [
-    'cstrml/balances',
-    'cstrml/candy',
-    'cstrml/claims',
-    'cstrml/staking',
-    'cstrml/swork',
-    'cstrml/market',
-    'cstrml/swork/benchmarking',
-    'crust-collator',
-    'runtime',
-    'rpc'
+    'crust-collator'
 ]

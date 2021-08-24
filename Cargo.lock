@@ -1135,9 +1135,9 @@ version = "0.12.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
- "cstrml-candy",
  "cstrml-bridge",
  "cstrml-bridge-transfer",
+ "cstrml-candy",
  "cstrml-claims",
  "cstrml-csm-locking",
  "cstrml-market",
@@ -1257,20 +1257,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cstrml-candy"
-version = "0.12.0"
-dependencies = [
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "serde",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
 name = "cstrml-bridge"
 version = "1.0.0"
 dependencies = [
@@ -1300,6 +1286,20 @@ dependencies = [
  "parity-scale-codec",
  "serde",
  "sp-arithmetic",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-candy"
+version = "0.12.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",

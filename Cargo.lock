@@ -1135,6 +1135,8 @@ version = "0.12.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",
+ "cstrml-bridge",
+ "cstrml-bridge-transfer",
  "cstrml-candy",
  "cstrml-claims",
  "cstrml-csm-locking",
@@ -1148,6 +1150,7 @@ dependencies = [
  "frame-system",
  "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
+ "hex-literal",
  "pallet-authority-discovery",
  "pallet-authorship",
  "pallet-babe",
@@ -1247,6 +1250,42 @@ dependencies = [
  "pallet-transaction-payment",
  "parity-scale-codec",
  "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-bridge"
+version = "1.0.0"
+dependencies = [
+ "cstrml-balances",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "cstrml-bridge-transfer"
+version = "1.0.0"
+dependencies = [
+ "blake2-rfc",
+ "cstrml-balances",
+ "cstrml-bridge",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "hex-literal",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "serde",
+ "sp-arithmetic",
  "sp-core",
  "sp-io",
  "sp-runtime",

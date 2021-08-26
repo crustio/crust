@@ -51,7 +51,7 @@ fn load_spec(
 		"track" => Ok(Box::new(chain_spec::ChainSpec::from_json_bytes(
 			&include_bytes!("../res/track.json")[..],
 		)?)),
-		"2008" => Ok(Box::new(chain_spec::get_chain_spec(2008.into()))),
+		"2080" => Ok(Box::new(chain_spec::get_chain_spec(2080.into()))),
 		"2012" => Ok(Box::new(chain_spec::get_chain_spec(2012.into()))),
 		"" => Ok(Box::new(chain_spec::get_chain_spec(para_id))),
 		path => Ok(Box::new(chain_spec::ChainSpec::from_json_file(

@@ -319,7 +319,7 @@ pub struct AllowedList;
 impl AllowedList {
 	fn is_allowed(id: u32) -> bool {
 		match id {
-			2008 => true, // Local testnet
+			2080 => true, // Local testnet
 			2012 => true, // Local testnet
 			2000 => true, // Acala
 			2004 => true, // Phala
@@ -361,7 +361,7 @@ parameter_types! {
 
 match_type! {
 	pub type ParentOrParentsUnitPlurality: impl Contains<MultiLocation> = {
-		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. }) | X2(Parent, Parachain(2012)) | X2(Parent, Parachain(2008))
+		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. }) | X2(Parent, Parachain(2012)) | X2(Parent, Parachain(2080))
 	};
 }
 

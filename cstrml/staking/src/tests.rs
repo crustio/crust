@@ -3041,6 +3041,7 @@ fn offence_deselects_validator_when_slash_is_zero() {
             &[Perbill::from_percent(0)],
         );
         assert_eq!(Staking::force_era(), Forcing::ForceNew);
+        assert_eq!(Staking::disable_stake_limit(), true);
         assert!(!<Validators<Test>>::contains_key(21));
     });
 }
@@ -4457,6 +4458,121 @@ fn new_era_with_stake_limit_should_work() {
                 }
             );
             assert_eq!(Staking::current_elected(), vec![11, 21, 31, 7]);
+        });
+}
+
+#[test]
+fn new_era_without_stake_limit_should_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .own_workload(2)
+        .total_workload(100000000)
+        .validator_count(3)
+        .build()
+        .execute_with(|| {
+            // put some money in account that we'll use.
+            for i in 1..10 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            for i in 100..110 {
+                let _ = Balances::deposit_creating(&i, 50000);
+            }
+
+            start_era(1, false);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 2000);
+            start_era(4, false);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 5000);
+
+            // Add guarantor
+            assert_ok!(Staking::bond(
+                Origin::signed(1),
+                2,
+                2000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (11, 2000)));
+
+            // Add guarantor
+            assert_ok!(Staking::bond(
+                Origin::signed(3),
+                4,
+                2000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::guarantee(Origin::signed(4), (11, 3000)));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(7),
+                8,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(103),
+                104,
+                30000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(104), ValidatorPrefs::default()));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(105),
+                106,
+                30000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(106), ValidatorPrefs::default()));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(107),
+                108,
+                30000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(108), ValidatorPrefs::default()));
+            let _ = Staking::set_disable_stake_limit(Origin::root(), true);
+
+            start_era_with_new_workloads(5, false, 1, 200000000);
+            assert_eq!(Staking::stake_limit(&11), Some(2500));
+
+            // 5's stake limit should be None
+            assert_eq!(Staking::stake_limit(&7), None);
+            assert_eq!(Staking::stake_limit(&103), None);
+            assert_eq!(Staking::stake_limit(&105), None);
+            assert_eq!(Staking::stake_limit(&107), None);
+
+            // Valid ratio should not work
+            assert_eq!(
+                Staking::eras_stakers(5, 11),
+                Exposure {
+                    total: 5000,
+                    own: 1000,
+                    others: vec![IndividualExposure {
+                        who: 1,
+                        value: 2000
+                    }, IndividualExposure {
+                        who: 3,
+                        value: 2000
+                    }]
+                }
+            );
+            // 7 should  be elected but with 0 stakes
+            assert_eq!(
+                Staking::eras_stakers(5, 7),
+                Exposure {
+                    total: 1000,
+                    own: 1000,
+                    others: vec![]
+                }
+            );
+            assert_eq!(Staking::current_elected(), vec![103, 105, 107]);
         });
 }
 

@@ -50,11 +50,11 @@
 
 use super::{
     EraIndex, Config, Module, Store, BalanceOf, Exposure, Perbill, SessionInterface,
-    NegativeImbalanceOf, UnappliedSlash,
+    NegativeImbalanceOf, UnappliedSlash
 };
 use sp_runtime::{traits::{Zero, Saturating}, RuntimeDebug};
 use frame_support::{
-    StorageMap, StorageDoubleMap,
+    StorageMap, StorageDoubleMap, StorageValue,
     traits::{Currency, OnUnbalanced, Imbalance},
 };
 use sp_std::vec::Vec;
@@ -289,7 +289,8 @@ pub(crate) fn compute_slash<T: Config>(params: SlashParams<T>)
             // make sure to disable validator till the end of this session
             if T::SessionInterface::disable_validator(stash).unwrap_or(false) {
                 // force a new era, to select a new validator set
-                <Module<T>>::ensure_new_era()
+                <Module<T>>::ensure_new_era();
+                <Module<T> as Store>::DisableStakeLimit::put(true);
             }
         }
     }
@@ -329,7 +330,8 @@ fn kick_out_if_recent<T: Config>(
         // make sure to disable validator till the end of this session
         if T::SessionInterface::disable_validator(params.stash).unwrap_or(false) {
             // force a new era, to select a new validator set
-            <Module<T>>::ensure_new_era()
+            <Module<T>>::ensure_new_era();
+            <Module<T> as Store>::DisableStakeLimit::put(true);
         }
     }
 }

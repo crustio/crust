@@ -655,6 +655,8 @@ decl_storage! {
 
         /// The earliest era for which we have a pending, unapplied slash.
         EarliestUnappliedSlash: Option<EraIndex>;
+
+        pub DisableStakeLimit get(fn disable_stake_limit): bool = false;
     }
     add_extra_genesis {
         config(stakers):
@@ -1508,6 +1510,15 @@ decl_module! {
             Self::deposit_event(RawEvent::PotList(staking_pot));
             Ok(())
         }
+
+        #[weight = 1000]
+        pub fn set_disable_stake_limit(
+            origin,
+            disable_stake_limit: bool
+        ) {
+            let _ = ensure_root(origin)?;
+            DisableStakeLimit::put(disable_stake_limit);
+        }
     }
 }
 
@@ -2199,6 +2210,7 @@ impl<T: Config> Module<T> {
         );
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
         let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
+        let disable_stake_limit = Self::disable_stake_limit();
         for (v_stash, voters) in vg_graph.iter() {
             let v_controller = Self::bonded(v_stash).unwrap();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
@@ -2207,7 +2219,7 @@ impl<T: Config> Module<T> {
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
 
             // 0. Add to `validator_stakes` but skip adding to `eras_stakers` if stake limit goes 0
-            if stake_limit == Zero::zero() {
+            if !disable_stake_limit && stake_limit == Zero::zero() {
                 validators_stakes.push((v_stash.clone(), 0));
                 continue;
             }
@@ -2218,7 +2230,11 @@ impl<T: Config> Module<T> {
                     Zero::zero(),
                     |acc, ie| acc.saturating_add(ie.value)
                 ));
-            let valid_votes_ratio = Perbill::from_rational_approximation(stake_limit, total_stakes).min(Perbill::one());
+            let valid_votes_ratio = if !disable_stake_limit {
+                Perbill::from_rational_approximation(stake_limit, total_stakes).min(Perbill::one())
+            } else {
+                Perbill::one()
+            };
 
             // 2. Calculate validator valid stake
             let own_stake = valid_votes_ratio * v_ledger.active;

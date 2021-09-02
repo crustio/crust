@@ -259,6 +259,13 @@ impl<AID> BenefitInterface<AID, BalanceOf<Test>, NegativeImbalanceOf<Test>> for 
     }
 }
 
+pub struct TestLocksInterface;
+impl LocksInterface<AccountId, BalanceOf<Test>> for TestLocksInterface {
+    fn get_all_cru18_locks() -> Vec<(AccountId, BalanceOf<Test>)> {
+        vec![(131, 5000), (133, 5000), (135, 5000), (205, 1000), (207, 3000), (209, 1500)]
+    }
+}
+
 parameter_types! {
     pub const PunishmentSlots: u32 = 1;
     pub const MaxGroupSize: u32 = 100;
@@ -306,6 +313,7 @@ impl Config for Test {
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type BenefitInterface = TestBenefitInterface;
     type UncheckedFrozenBondFund = UncheckedFrozenBondFund;
+    type LocksInterface = TestLocksInterface;
     type WeightInfo = weight::WeightInfo;
 }
 

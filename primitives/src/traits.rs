@@ -5,6 +5,7 @@ use frame_support::traits::{LockableCurrency, WithdrawReasons};
 use crate::{SworkerAnchor, MerkleRoot, BlockNumber, EraIndex};
 use sp_std::collections::btree_set::BTreeSet;
 use sp_runtime::{DispatchError, Perbill};
+use frame_support::traits::Vec;
 
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
@@ -53,4 +54,8 @@ pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {
 	fn get_collateral_and_reward(who: &AccountId) -> (Balance, Balance);
 
 	fn get_market_funds_ratio(who: &AccountId) -> Perbill;
+}
+
+pub trait LocksInterface<AccountId, Balance> {
+	fn get_all_cru18_locks() -> Vec<(AccountId, Balance)>;
 }

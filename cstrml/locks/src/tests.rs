@@ -313,3 +313,23 @@ fn extend_lock_should_work() {
         assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
     });
 }
+
+#[test]
+fn get_cru18_locks_should_work() {
+    new_test_ext().execute_with(|| {
+        run_to_block(300);
+        assert_ok!(CrustLocks::set_unlock_from(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_from().unwrap(), 1000);
+
+        let _ = Balances::make_free_balance_be(&1, 2400);
+        CrustLocks::issue_and_set_lock(&1, &2400, CRU24);
+        let _ = Balances::make_free_balance_be(&2, 1700);
+        CrustLocks::issue_and_set_lock(&2, &1700, CRU18);
+        let _ = Balances::make_free_balance_be(&3, 2500);
+        CrustLocks::issue_and_set_lock(&3, &2500, CRU18);
+        let _ = Balances::make_free_balance_be(&4, 2400);
+        CrustLocks::issue_and_set_lock(&4, &2400, CRU24D6);
+
+        assert_eq!(CrustLocks::get_all_cru18_locks(), vec![(3, 2500), (2, 1700)]);
+    });
+}

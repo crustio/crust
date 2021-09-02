@@ -213,17 +213,26 @@ pub struct StakingLedger<AccountId, Balance: HasCompact> {
 impl<AccountId, Balance: HasCompact + Copy + Saturating + AtLeast32BitUnsigned> StakingLedger<AccountId, Balance> {
     /// Remove entries from `unlocking` that are sufficiently old and reduce the
     /// total by the sum of their balances.
-    fn consolidate_unlocked(self, current_era: EraIndex) -> Self {
+    fn consolidate_unlocked(self, current_era: EraIndex, frozen_balance: Balance) -> Self {
         let mut total = self.total;
         let unlocking = self
             .unlocking
             .into_iter()
-            .filter(|chunk| {
-                if chunk.era > current_era {
-                    true
+            .filter_map(|chunk| {
+                if chunk.era > current_era || total <= frozen_balance {
+                    Some(chunk)
                 } else {
                     total = total.saturating_sub(chunk.value);
-                    false
+                    if total < frozen_balance {
+                        let new_chunk = UnlockChunk {
+                            value: frozen_balance - total,
+                            era: chunk.era
+                        };
+                        total = frozen_balance;
+                        Some(new_chunk)
+                    } else {
+                        None
+                    }
                 }
             })
             .collect();
@@ -467,6 +476,9 @@ pub trait Config: frame_system::Config {
 
     /// Fee reduction interface
     type BenefitInterface: BenefitInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
+
+    /// Used for bonding buffer
+    type UncheckedFrozenBondFund: Get<BalanceOf<Self>>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -772,6 +784,8 @@ decl_error! {
         InsufficientCurrency,
         /// Can not rebond without unlocking chunks.
         NoUnlockChunk,
+        /// Staking locks need to be the maximum locks
+        InsufficientFrozenBond,
     }
 }
 
@@ -804,6 +818,8 @@ decl_module! {
 
         /// Storage power ratio for crust network phase 1
         const SPowerRatio: u128 = T::SPowerRatio::get();
+
+        const UncheckedFrozenBondFund: BalanceOf<T> = T::UncheckedFrozenBondFund::get();
 
         type Error = Error<T>;
 
@@ -864,6 +880,9 @@ decl_module! {
             if value < T::Currency::minimum_balance() {
                 Err(Error::<T>::InsufficientValue)?
             }
+
+            // Have to make the staking lock to be the maximum lock.
+            ensure!(value.saturating_add(T::UncheckedFrozenBondFund::get()) >= T::Currency::frozen_balance(&stash), Error::<T>::InsufficientFrozenBond);
 
             // You're auto-bonded forever, here. We might improve this by only bonding when
             // you actually validate/guarantee and remove once you unbond __everything__.
@@ -1060,7 +1079,10 @@ decl_module! {
             let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let (stash, old_total) = (ledger.stash.clone(), ledger.total);
             if let Some(current_era) = Self::current_era() {
-                ledger = ledger.consolidate_unlocked(current_era)
+                // remove the lock first, update_ledger would add the lock back anyway
+                T::Currency::remove_lock(STAKING_ID, &stash);
+                let frozen_balance = T::Currency::frozen_balance(&stash);
+                ledger = ledger.consolidate_unlocked(current_era, frozen_balance);
             }
 
             if ledger.unlocking.is_empty() && ledger.active.is_zero() {
@@ -1068,8 +1090,6 @@ decl_module! {
                 // portion to fall below existential deposit + will have no more unlocking chunks
                 // left. We can now safely remove all staking-related information.
                 Self::kill_stash(&stash)?;
-                // remove the lock.
-                T::Currency::remove_lock(STAKING_ID, &stash);
             } else {
                 // This was the consequence of a partial unbond. just update the ledger and move on.
                 Self::update_ledger(&controller, &ledger);

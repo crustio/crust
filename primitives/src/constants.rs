@@ -14,7 +14,7 @@ pub mod currency {
     pub const FIRST_YEAR_REWARDS: Balance = 5_000_000 * CRUS;
 
     pub const fn deposit(items: u32, bytes: u32) -> Balance {
-		items as Balance * 2_000 * CENTS + (bytes as Balance) * 100 * MILLICENTS
+		items as Balance * 1_000 * CENTS + (bytes as Balance) * 100 * MILLICENTS
 	}
 }
 

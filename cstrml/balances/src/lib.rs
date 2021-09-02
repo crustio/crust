@@ -1392,4 +1392,8 @@ impl<T: Config<I>, I: 'static> UsableCurrency<T::AccountId> for Module<T, I>
 	fn usable_balance(who: &T::AccountId) -> Self::Balance {
 		Self::account(who).usable(Reasons::All)
 	}
+
+	fn frozen_balance(who: &T::AccountId) -> Self::Balance {
+		Self::account(who).frozen(Reasons::All)
+	}
 }

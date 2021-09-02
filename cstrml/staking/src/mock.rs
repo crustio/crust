@@ -282,6 +282,7 @@ parameter_types! {
     pub const MaxGuarantorRewardedPerValidator: u32 = 4;
     pub const SPowerRatio: u128 = 2_500;
     pub const MarketStakingPotDuration: u32 = 5;
+    pub const UncheckedFrozenBondFund: Balance = 10;
 }
 
 impl Config for Test {
@@ -304,6 +305,7 @@ impl Config for Test {
     type MarketStakingPot = TestStaking;
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type BenefitInterface = TestBenefitInterface;
+    type UncheckedFrozenBondFund = UncheckedFrozenBondFund;
     type WeightInfo = weight::WeightInfo;
 }
 

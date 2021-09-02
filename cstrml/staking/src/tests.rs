@@ -5070,6 +5070,190 @@ fn change_authoring_reward_ratio_according_to_validator_count_should_work() {
         });
 }
 
+#[test]
+fn reward_should_be_locked_with_other_lock() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+            // Create a validator:
+            for i in 130..140 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            Balances::set_lock(
+                *b"testing ",
+                &131,
+                5000,
+                WithdrawReasons::all(),
+            );
+
+            // bond should fail
+            assert_noop!(Staking::bond(
+                Origin::signed(131),
+                132,
+                1000
+            ), DispatchError::Module {
+                index: 3,
+                error: 16,
+                message: Some("InsufficientFrozenBond"),
+            });
+
+            assert_ok!(Staking::bond(
+                Origin::signed(131),
+                132,
+                4990
+            ));
+
+            assert_eq!(Balances::locks(&131)[0].amount, 5000);
+
+            assert_eq!(Balances::locks(&131)[1].amount, 4990);
+
+            Staking::upsert_stake_limit(&131, u128::max_value());
+            assert_ok!(Staking::validate(Origin::signed(132), ValidatorPrefs::default()));
+
+            start_era(1, true);
+            <Module<Test>>::reward_by_ids(vec![(131, 1)]);
+            // Compute total payout now for whole duration as other parameter won't change
+            start_era(2, true);
+            assert_ok!(<Module<Test>>::reward_stakers(Origin::signed(1337), 131, 1));
+
+            assert_eq!(Balances::locks(&131)[0].amount, 5000);
+
+            assert_eq!(Balances::locks(&131)[1].amount, 209019550997461);
+
+            assert_eq!(
+                Staking::ledger(&132),
+                Some(StakingLedger {
+                    stash: 131,
+                    total: 209019550997461,
+                    active: 209019550997461,
+                    unlocking: vec![],
+                    claimed_rewards:vec![1],
+                })
+            );
+
+            assert_ok!(Staking::unbond(Origin::signed(132), 209019550997461));
+            assert_eq!(
+                Staking::ledger(&132),
+                Some(StakingLedger {
+                    stash: 131,
+                    total: 209019550997461,
+                    active: 0,
+                    unlocking: vec![UnlockChunk {
+                        value: 209019550997461,
+                        era: 5
+                    }],
+                    claimed_rewards: vec![1]
+                })
+            );
+            assert_eq!(Balances::locks(&131)[1].amount, 209019550997461);
+            <Module<Test>>::reward_by_ids(vec![(131, 1)]);
+            start_era(5, true);
+            assert_ok!(<Module<Test>>::reward_stakers(Origin::signed(1337), 131, 2));
+
+            assert_eq!(
+                Staking::ledger(&132),
+                Some(StakingLedger {
+                    stash: 131,
+                    total: 209019550997461 + 209019550992471,
+                    active: 209019550992471,
+                    unlocking: vec![UnlockChunk {
+                        value: 209019550997461,
+                        era: 5
+                    }],
+                    claimed_rewards: vec![1, 2]
+                })
+            );
+            assert_eq!(Balances::locks(&131)[1].amount, 209019550997461 + 209019550992471);
+            Staking::withdraw_unbonded(Origin::signed(132)).unwrap();
+            assert_eq!(
+                Staking::ledger(&132),
+                Some(StakingLedger {
+                    stash: 131,
+                    total: 209019550992471,
+                    active: 209019550992471,
+                    unlocking: vec![],
+                    claimed_rewards: vec![1, 2]
+                })
+            );
+            assert_eq!(Balances::locks(&131)[1].amount, 209019550992471);
+            assert_ok!(Staking::unbond(Origin::signed(132), 209019550992471));
+            start_era(8, true);
+            Staking::withdraw_unbonded(Origin::signed(132)).unwrap();
+            assert_eq!(
+                Staking::ledger(&132),
+                Some(StakingLedger {
+                    stash: 131,
+                    total: 5000,
+                    active: 0,
+                    unlocking: vec![UnlockChunk {
+                        value: 5000,
+                        era: 8
+                    }],
+                    claimed_rewards: vec![1, 2]
+                })
+            );
+            assert_eq!(Balances::locks(&131)[1].amount, 5000);
+
+            assert_ok!(Staking::rebond(Origin::signed(132), 3000));
+            assert_ok!(Staking::unbond(Origin::signed(132), 3000));
+            start_era(11, true);
+            Balances::set_lock(
+                *b"testing ",
+                &131,
+                4000,
+                WithdrawReasons::all(),
+            );
+
+            Staking::withdraw_unbonded(Origin::signed(132)).unwrap();
+            assert_eq!(
+                Staking::ledger(&132),
+                Some(StakingLedger {
+                    stash: 131,
+                    total: 4000,
+                    active: 0,
+                    unlocking: vec![UnlockChunk {
+                        value: 1000,
+                        era: 8
+                    },
+                    UnlockChunk {
+                        value: 3000,
+                        era: 11
+                    }],
+                    claimed_rewards: vec![1, 2]
+                })
+            );
+            assert_eq!(Balances::locks(&131)[1].amount, 4000);
+
+            // Mock the slash
+            Balances::set_lock(
+                *b"testing ",
+                &131,
+                5000,
+                WithdrawReasons::all(),
+            );
+
+            Staking::withdraw_unbonded(Origin::signed(132)).unwrap();
+            assert_eq!(
+                Staking::ledger(&132),
+                Some(StakingLedger {
+                    stash: 131,
+                    total: 4000,
+                    active: 0,
+                    unlocking: vec![UnlockChunk {
+                        value: 1000,
+                        era: 8
+                    },
+                    UnlockChunk {
+                        value: 3000,
+                        era: 11
+                    }],
+                    claimed_rewards: vec![1, 2]
+                })
+            );
+            assert_eq!(Balances::locks(&131)[1].amount, 4000);
+        });
+}
 // #[test]
 // fn randomly_select_validators_works() {
 //     ExtBuilder::default()

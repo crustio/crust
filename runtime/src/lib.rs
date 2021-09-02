@@ -401,6 +401,8 @@ parameter_types! {
     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
     // 60 eras means 15 days if era = 6 hours
     pub const MarketStakingPotDuration: u32 = 60;
+    // free transfer amount for other locks
+    pub const UncheckedFrozenBondFund: Balance = 1 * DOLLARS;
 }
 
 impl staking::Config for Runtime {
@@ -426,6 +428,7 @@ impl staking::Config for Runtime {
     type MarketStakingPot = Market;
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type BenefitInterface = Benefits;
+    type UncheckedFrozenBondFund = UncheckedFrozenBondFund;
     type WeightInfo = staking::weight::WeightInfo;
 }
 
@@ -732,7 +735,7 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 8; // 8 report slot == 8 hours
-    pub const MaxGroupSize: u32 = 100;
+    pub const MaxGroupSize: u32 = 1000;
 }
 
 impl swork::Config for Runtime {
@@ -754,7 +757,7 @@ parameter_types! {
     pub const FileReplica: u32 = 4;
     pub const InitFileByteFee: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const InitFileKeysCountFee: Balance = MILLICENTS / 10;
-    pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
+    pub const StorageReferenceRatio: (u128, u128) = (50, 100); // 50/100 = 50%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(6u64, 100000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 100000);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);

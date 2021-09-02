@@ -9,6 +9,8 @@ use sp_runtime::{DispatchError, Perbill};
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
 	fn usable_balance(who: &AccountId) -> Self::Balance;
+
+	fn frozen_balance(who: &AccountId) -> Self::Balance;
 }
 
 /// Means for interacting with a specialized version of the `swork` trait.

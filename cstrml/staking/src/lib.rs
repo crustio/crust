@@ -30,7 +30,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, AccountIdConversion, CheckedSub, AtLeast32BitUnsigned
+        AccountIdConversion, CheckedSub, AtLeast32BitUnsigned
     },
 };
 use sp_staking::{
@@ -2150,7 +2150,6 @@ impl<T: Config> Module<T> {
 
         let to_votes =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
-        let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
         // II. Construct and fill in the V/G graph
         // TC is O(V + G*1), V means validator's number, G means guarantor's number
@@ -2166,16 +2165,17 @@ impl<T: Config> Module<T> {
                 (v_stash, Vec::<IndividualExposure<T::AccountId, BalanceOf<T>>>::new())
             ).collect();
         for (guarantor, guarantee) in <Guarantors<T>>::iter() {
-            let Guarantee { total: _, submitted_in, mut targets, suppressed: _ } = guarantee;
+            let Guarantee { total: _, submitted_in: _ , targets, suppressed: _ } = guarantee;
 
-            // Filter out guarantee targets which were guaranteed before the most recent
-            // slashing span.
-            targets.retain(|ie| {
-                <Self as Store>::SlashingSpans::get(&ie.who).map_or(
-                    true,
-                    |spans| submitted_in >= spans.last_nonzero_slash(),
-                )
-            });
+            // Disable this filter
+            // // Filter out guarantee targets which were guaranteed before the most recent
+            // // slashing span.
+            // targets.retain(|ie| {
+            //     <Self as Store>::SlashingSpans::get(&ie.who).map_or(
+            //         true,
+            //         |spans| submitted_in >= spans.last_nonzero_slash(),
+            //     )
+            // });
             
             for target in targets {
                 if let Some(g) = vg_graph.get_mut(&target.who) {
@@ -2197,14 +2197,14 @@ impl<T: Config> Module<T> {
             "💸 Build the erasStakers for the era {:?}.",
             current_era,
         );
-        let mut validators_stakes_with_stake_limit: Vec<(T::AccountId, u128)> = vec![];
-        let mut validators_stakes_without_stake_limit: Vec<(T::AccountId, u128)> = vec![];
+        let mut validators_stakes_in_effective_stakes: Vec<(T::AccountId, u128)> = vec![];
+        let mut validators_stakes_in_total_stakes: Vec<(T::AccountId, u128)> = vec![];
 
-        let mut eras_total_stakes_with_stake_limit: BalanceOf<T> = Zero::zero();
-        let mut exposures_with_stake_limit = BTreeMap::new();
+        let mut eras_total_effective_stakes: BalanceOf<T> = Zero::zero();
+        let mut exposures_in_effective_stakes = BTreeMap::new();
 
-        let mut eras_total_stakes_without_stake_limit: BalanceOf<T> = Zero::zero();
-        let mut exposures_without_stake_limit = BTreeMap::new();
+        let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
+        let mut exposures_in_total_stakes = BTreeMap::new();
 
         for (v_stash, voters) in vg_graph.iter() {
             let v_controller = Self::bonded(v_stash).unwrap();
@@ -2212,9 +2212,9 @@ impl<T: Config> Module<T> {
                 Self::ledger(&v_controller).unwrap();
 
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
-            // 2. Construct exposure with stake limit
+            // 1. Construct exposure by effective stakes
             if stake_limit != Zero::zero() {
-                // 0. Calculate the ratio
+                // 1.1 Calculate the ratio
                 let total_stakes = v_ledger.active.saturating_add(
                     voters.iter().fold(
                         Zero::zero(),
@@ -2222,32 +2222,37 @@ impl<T: Config> Module<T> {
                     ));
                 let valid_votes_ratio = Perbill::from_rational_approximation(stake_limit, total_stakes);
 
-                let new_exposure_with_stake_limit = Self::build_exposure(&voters, v_ledger.active, Some(valid_votes_ratio));
+                let new_exposure = Self::build_exposure(&voters, v_ledger.active, Some(valid_votes_ratio));
 
-                let exposure_total = new_exposure_with_stake_limit.total;
-                eras_total_stakes_with_stake_limit = eras_total_stakes_with_stake_limit.saturating_add(&exposure_total);
-                validators_stakes_with_stake_limit.push((v_stash.clone(), to_votes(exposure_total)));
-                exposures_with_stake_limit.insert(v_stash.clone(), new_exposure_with_stake_limit);
+                let exposure_total = new_exposure.total;
+                validators_stakes_in_effective_stakes.push((v_stash.clone(), to_votes(exposure_total)));
+
+                eras_total_effective_stakes = eras_total_effective_stakes.saturating_add(exposure_total);
+                exposures_in_effective_stakes.insert(v_stash.clone(), new_exposure);
             }
 
-            // 3. Construct exposure without stake limit
-            let new_exposure_with_stake_limit = Self::build_exposure(&voters, v_ledger.active, None);
-            let exposure_total = new_exposure_with_stake_limit.total;
-            eras_total_stakes_without_stake_limit = eras_total_stakes_without_stake_limit.saturating_add(&exposure_total);
-            validators_stakes_without_stake_limit.push((v_stash.clone(), to_votes(exposure_total)));
-            exposures_without_stake_limit.insert(v_stash.clone(), new_exposure_without_stake_limit);
+            // 2. Construct exposure by total stakes
+            let new_exposure = Self::build_exposure(&voters, v_ledger.active, None);
+            let exposure_total = new_exposure.total;
+            eras_total_stakes = eras_total_stakes.saturating_add(exposure_total);
+            if stake_limit == Zero::zero() {
+                validators_stakes_in_total_stakes.push((v_stash.clone(), to_votes(exposure_total)));
+            }
+            exposures_in_total_stakes.insert(v_stash.clone(), new_exposure);
 
+            // 3. Store ErasValidatorPrefs
             <ErasValidatorPrefs<T>>::insert(&current_era, &v_stash, Self::validators(&v_stash).clone());
         }
 
-        // IV. TopDown Election Algorithm with Randomlization
-        let to_elect_with_stake_limit = (Self::validator_count() as usize).min(validators_stakes_with_stake_limit.len());
+        // IV. TopDown Election Algorithm
+        // 1. Select the validators from effective stakes first
+        let to_elect_in_effective_stakes = (Self::validator_count() as usize).min(validators_stakes_in_effective_stakes.len());
 
-        let mut elected_stashes= Self::do_election(validators_stakes_with_stake_limit, to_elect_with_stake_limit);
-        let to_elect_without_stake_limit = (Self::validator_count() as usize).min(validators_stakes_without_stake_limit.len()).saturating_sub(to_elect_with_stake_limit);
-
-        if to_elect_without_stake_limit != 0 {
-            elected_stashes.concact(Self::do_election(validators_stakes_without_stake_limit, to_elect_without_stake_limit));
+        let mut elected_stashes= Self::do_election(validators_stakes_in_effective_stakes, to_elect_in_effective_stakes);
+        let to_elect_in_total_stakes = (Self::validator_count() as usize).saturating_sub(to_elect_in_effective_stakes).min(validators_stakes_in_total_stakes.len());
+        // 2. Fulfill the remaining seats from total stakes validators
+        if to_elect_in_total_stakes != 0 {
+            elected_stashes.append(&mut Self::do_election(validators_stakes_in_total_stakes, to_elect_in_total_stakes));
         }
 
         log!(
@@ -2266,31 +2271,26 @@ impl<T: Config> Module<T> {
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
 
+        // Update ErasStakers, ErasTotalStakes and ErasStakerClipped
         let clipped_max_len = T::MaxGuarantorRewardedPerValidator::get() as usize;
-        if to_elect_with_stake_limit * 5 >= to_elect_without_stake_limit {
-            <ErasTotalStakes<T>>::insert(&current_era, eras_total_stakes_with_stake_limit);
-
-            for (v_stash, new_exposure) in exposures_with_stake_limit.iter() {
-                <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
-                let mut exposure_clipped = new_exposure;
-                if exposure_clipped.others.len() > clipped_max_len {
-                    exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
-                    exposure_clipped.others.truncate(clipped_max_len.clone());
-                }
-                <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
-            }
+        let (new_exposures, total_stakes) = if to_elect_in_effective_stakes * 5 >= to_elect_in_total_stakes {
+            // Choose the effective stakes data
+            (exposures_in_effective_stakes, eras_total_effective_stakes)
         } else {
-            <ErasTotalStakes<T>>::insert(&current_era, eras_total_stakes_without_stake_limit);
+            // Choose the total stakes data
+            (exposures_in_total_stakes, eras_total_stakes)
+        };
 
-            for (v_stash, new_exposure) in exposures_without_stake_limit.iter() {
-                <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
-                let mut exposure_clipped = new_exposure;
-                if exposure_clipped.others.len() > clipped_max_len {
-                    exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
-                    exposure_clipped.others.truncate(clipped_max_len.clone());
-                }
-                <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
+        <ErasTotalStakes<T>>::insert(&current_era, total_stakes);
+
+        for (v_stash, new_exposure) in new_exposures {
+            <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
+            let mut exposure_clipped = new_exposure;
+            if exposure_clipped.others.len() > clipped_max_len {
+                exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
+                exposure_clipped.others.truncate(clipped_max_len.clone());
             }
+            <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
         }
 
         // In order to keep the property required by `n_session_ending`
@@ -2300,10 +2300,14 @@ impl<T: Config> Module<T> {
         Some(elected_stashes)
     }
 
-    fn build_exposure(votes: &Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>,
+    fn build_exposure(voters: &Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>,
                       own_stake: BalanceOf<T>,
                       maybe_valid_votes_ratio: Option<Perbill>) -> Exposure<T::AccountId, BalanceOf<T>> {
-        let own_stake = valid_votes_ratio * own_stake;
+        let own_stake = if let Some(valid_votes_ratio) = maybe_valid_votes_ratio {
+            valid_votes_ratio * own_stake
+        } else {
+            own_stake
+        };
 
         let mut new_exposure = Exposure {
             total: own_stake,

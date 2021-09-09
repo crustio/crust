@@ -4,9 +4,29 @@
 // Ensure we're `no_std` when compiling for Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::{Parameter, decl_module, decl_event, decl_storage, decl_error, ensure};
-use sp_runtime::traits::{Member, AtLeast32BitUnsigned, Zero, StaticLookup};
-use frame_system::{ensure_signed, ensure_root};
+use frame_support::{
+    dispatch::DispatchResult,
+    traits::{
+        Get, ExistenceRequirement::KeepAlive, Currency
+    },
+    Parameter, decl_module, decl_event, decl_storage, decl_error, ensure,
+};
+use sp_runtime::{
+    ModuleId,
+    traits::{CheckedDiv, Convert, Member, AtLeast32BitUnsigned, Zero, StaticLookup, AccountIdConversion},
+    transaction_validity::{
+        TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
+    }
+};
+use codec::{Encode};
+use frame_system::{ensure_signed, ensure_root, ensure_none};
+use primitives::{
+    traits::UsableCurrency
+};
+use sp_std::prelude::*;
+
+type BalanceOf<T> =
+<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 /// The module configuration trait.
 pub trait Config: frame_system::Config {
@@ -15,6 +35,18 @@ pub trait Config: frame_system::Config {
 
     /// The units in which we record balances.
     type Balance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
+
+    /// The candy's module id, used for staking pot
+    type ModuleId: Get<ModuleId>;
+
+    /// The candy balance.
+    type Currency: UsableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+
+    type MinimalCandy: Get<Self::Balance>;
+
+    type ExchangeRatio: Get<Self::Balance>;
+
+    type CurrencyToVote: Convert<Self::Balance, BalanceOf<Self>>;
 }
 
 decl_event! {
@@ -39,6 +71,10 @@ decl_error! {
 		BalanceLow,
 		/// Balance should be non-zero
 		BalanceZero,
+		/// No Candy
+		NoCandy,
+		/// Candy is not enough
+		NotEnoughCandy,
 	}
 }
 
@@ -54,6 +90,8 @@ decl_storage! {
 decl_module! {
 	pub struct Module<T: Config> for enum Call where origin: T::Origin {
 		type Error = Error<T>;
+
+		const CandyPot: T::AccountId = T::ModuleId::get().into_sub_account("cndy");
 
 		fn deposit_event() = default;
 
@@ -126,8 +164,72 @@ decl_module! {
 			<Total<T>>::mutate(|total_supply| *total_supply -= burned_balances);
 			<Balances<T>>::insert(target, remains - burned_balances);
 		}
+
+		/// Exchange candy
+        /// Unsigned transaction with tx pool validation
+        #[weight = 0]
+        fn exchange_candy(origin, dest: T::AccountId) -> DispatchResult {
+            let _ = ensure_none(origin)?;
+
+            // 1. Check the dest have candy again
+            ensure!(<Balances<T>>::contains_key(&dest), Error::<T>::NoCandy);
+
+            // 2. Check he has enough candy
+            let candy = Self::balances(&dest);
+            ensure!(candy >= T::MinimalCandy::get(), Error::<T>::NotEnoughCandy);
+
+            // 3. Transfer CRU
+            let cru = candy.checked_div(&T::ExchangeRatio::get()).unwrap();
+            let to_balance = |e: T::Balance| <T::CurrencyToVote as Convert<T::Balance, BalanceOf<T>>>::convert(e);
+            T::Currency::transfer(&Self::candy_pot(), &dest, to_balance(cru), KeepAlive)?;
+
+            // 4. Remove the record
+            <Total<T>>::mutate(|total_supply| *total_supply -= candy);
+			<Balances<T>>::remove(dest);
+
+			Ok(())
+        }
 	}
 }
+
+impl<T: Config> Module<T> {
+    /// Staking pot for authoring reward and staking reward
+    pub fn candy_pot() -> T::AccountId {
+        // "modl" ++ "candying" ++ "cndy" is 16 bytes
+        T::ModuleId::get().into_sub_account("cndy")
+    }
+}
+
+impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
+    type Call = Call<T>;
+
+    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+        const PRIORITY: u64 = 100;
+
+        let account = match call {
+            Call::exchange_candy(account) => {
+                // 1. Check the dest have candy again
+                let e = InvalidTransaction::Custom(0u8.into());
+                ensure!(<Balances<T>>::contains_key(account), e);
+                let candy = Self::balances(account);
+                // 2. Check he has enough candy
+                let e = InvalidTransaction::Custom(1u8.into());
+                ensure!(candy >= T::MinimalCandy::get(), e);
+                account
+            }
+            _ => return Err(InvalidTransaction::Call.into()),
+        };
+
+        Ok(ValidTransaction {
+            priority: PRIORITY,
+            requires: vec![],
+            provides: vec![("exchange_candy", account).encode()],
+            longevity: TransactionLongevity::max_value(),
+            propagate: true,
+        })
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -138,9 +240,21 @@ mod tests {
     use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header};
     use crate as candy;
 
+    pub struct CurrencyToVoteHandler;
+    impl Convert<u64, u64> for CurrencyToVoteHandler {
+        fn convert(x: u64) -> u64 {
+            x
+        }
+    }
+
     parameter_types! {
 		pub const BlockHashCount: u64 = 250;
+        pub const CandyModuleId: ModuleId = ModuleId(*b"candying");
+        pub const MinimalCandy: u64 = 2000;
+        pub const ExchangeRatio: u64 = 1000;
+        pub const ExistentialDeposit: u64 = 1;
 	}
+
     impl frame_system::Config for Test {
         type BaseCallFilter = ();
         type BlockWeights = ();
@@ -159,15 +273,31 @@ mod tests {
         type DbWeight = ();
         type Version = ();
         type PalletInfo = PalletInfo;
-        type AccountData = ();
+        type AccountData = balances::AccountData<u64>;
         type OnNewAccount = ();
         type OnKilledAccount = ();
         type SystemWeightInfo = ();
         type SS58Prefix = ();
     }
+
+    impl balances::Config for Test {
+        type Balance = u64;
+        type DustRemoval = ();
+        type Event = ();
+        type ExistentialDeposit = ExistentialDeposit;
+        type AccountStore = System;
+        type WeightInfo = ();
+        type MaxLocks = ();
+    }
+
     impl Config for Test {
         type Event = ();
         type Balance = u64;
+        type ModuleId = CandyModuleId;
+        type Currency = Balances;
+        type MinimalCandy = MinimalCandy;
+        type ExchangeRatio = ExchangeRatio;
+        type CurrencyToVote = CurrencyToVoteHandler;
     }
     type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
     type Block = frame_system::mocking::MockBlock<Test>;
@@ -179,7 +309,8 @@ mod tests {
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		Candy: candy::{Module, Call, Storage, Event<T>},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Candy: candy::{Module, Call, Storage, Event<T>, ValidateUnsigned},
 	}
 );
 
@@ -276,6 +407,41 @@ mod tests {
             assert_ok!(Candy::issue(Origin::root(), 1, 100));
             assert_eq!(Candy::balances(2), 0);
             assert_noop!(Candy::burn(Origin::root(), 2, 0), Error::<Test>::BalanceZero);
+        });
+    }
+
+    #[test]
+    fn exchange_candy_should_work() {
+        new_test_ext().execute_with(|| {
+            let _ = Balances::make_free_balance_be(&Candy::candy_pot(), 100);
+
+            assert_ok!(Candy::issue(Origin::root(), 1, 10000));
+            assert_ok!(Candy::issue(Origin::root(), 2, 2000));
+            assert_ok!(Candy::issue(Origin::root(), 3, 1000));
+            assert_ok!(Candy::exchange_candy(Origin::none(), 1));
+            assert_eq!(Balances::free_balance(1), 10);
+            assert_eq!(Candy::balances(1), 0);
+            assert_eq!(Candy::total(), 3000);
+            assert_eq!(Balances::free_balance(&Candy::candy_pot()), 90);
+
+            assert_ok!(Candy::exchange_candy(Origin::none(), 2));
+            assert_eq!(Balances::free_balance(2), 2);
+            assert_eq!(Candy::balances(2), 0);
+            assert_eq!(Candy::total(), 1000);
+            assert_eq!(Balances::free_balance(&Candy::candy_pot()), 88);
+
+            assert_noop!(
+                Candy::exchange_candy(Origin::none(), 3),
+                Error::<Test>::NotEnoughCandy
+            );
+            assert_eq!(Candy::balances(3), 1000);
+            assert_eq!(Candy::total(), 1000);
+            assert_eq!(Balances::free_balance(&Candy::candy_pot()), 88);
+
+            assert_noop!(
+                Candy::exchange_candy(Origin::none(), 4),
+                Error::<Test>::NoCandy
+            );
         });
     }
 }

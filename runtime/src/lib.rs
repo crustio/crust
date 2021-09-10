@@ -103,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 5,
+    spec_version: 4,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -429,7 +429,6 @@ impl staking::Config for Runtime {
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type BenefitInterface = Benefits;
     type UncheckedFrozenBondFund = UncheckedFrozenBondFund;
-    type LocksInterface = Locks;
     type WeightInfo = staking::weight::WeightInfo;
 }
 

@@ -53,7 +53,7 @@ use swork;
 use primitives::{
     EraIndex,
     constants::{currency::*, time::*, staking::*},
-    traits::{UsableCurrency, MarketInterface, BenefitInterface, LocksInterface}
+    traits::{UsableCurrency, MarketInterface, BenefitInterface}
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
@@ -480,8 +480,6 @@ pub trait Config: frame_system::Config {
     /// Used for bonding buffer
     type UncheckedFrozenBondFund: Get<BalanceOf<Self>>;
 
-    type LocksInterface: LocksInterface<Self::AccountId, BalanceOf<Self>>;
-
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
 }
@@ -838,11 +836,6 @@ decl_module! {
                 }
             }
             // `on_finalize` weight is tracked in `on_initialize`
-        }
-
-        fn on_runtime_upgrade() -> frame_support::weights::Weight {
-            Self::bonding_all_cru18();
-            T::BlockWeights::get().max_block
         }
 
         /// Take the origin account as a stash and lock up `value` of its balance. `controller` will
@@ -2390,52 +2383,6 @@ impl<T: Config> Module<T> {
             1001 ..= 2500 => Perbill::from_percent(30),
             2501 ..= 5000 => Perbill::from_percent(40),
             5001 ..= u32::MAX => Perbill::from_percent(50),
-        }
-    }
-
-    pub fn bonding_all_cru18() {
-        for (who, frozen_amount) in T::LocksInterface::get_all_cru18_locks() {
-            if let Some(controller) = Self::bonded(&who) {
-                // bond extra logic
-                let mut ledger = Self::ledger(&controller).unwrap();
-                // if we need to bond extra
-                if ledger.total.saturating_add(T::UncheckedFrozenBondFund::get()) < frozen_amount {
-                    let max_additional = frozen_amount - ledger.total - T::UncheckedFrozenBondFund::get();
-                    // Same logic for bond_extra
-                    let stash_balance = T::Currency::free_balance(&ledger.stash);
-                    if let Some(extra) = stash_balance.checked_sub(&ledger.total) {
-                        let extra = extra.min(max_additional);
-                        ledger.total += extra;
-                        ledger.active += extra;
-                        Self::update_ledger(&controller, &ledger);
-                    }
-                }
-            } else {
-                if let Some(_) = Self::ledger(&who) {
-                    // Cannot do anything here sinc we don't know which controller to use
-                } else {
-                    // New bond logic
-                    let mut value = frozen_amount.saturating_sub(T::UncheckedFrozenBondFund::get());
-                    <Bonded<T>>::insert(&who, &who);
-                    <Payee<T>>::insert(&who, RewardDestination::Staked);
-
-                    let current_era = CurrentEra::get().unwrap_or(0);
-                    let history_depth = Self::history_depth();
-                    let last_reward_era = current_era.saturating_sub(history_depth);
-
-                    let stash_balance = T::Currency::free_balance(&who);
-                    value = value.min(stash_balance);
-                    let item = StakingLedger {
-                        stash: who.clone(),
-                        total: value,
-                        active: value,
-                        unlocking: vec![],
-                        claimed_rewards: (last_reward_era..current_era).collect(),
-                    };
-                    Self::update_ledger(&who, &item);
-                }
-            }
-
         }
     }
 

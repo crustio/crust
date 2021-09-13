@@ -429,7 +429,6 @@ impl staking::Config for Runtime {
     type MarketStakingPotDuration = MarketStakingPotDuration;
     type BenefitInterface = Benefits;
     type UncheckedFrozenBondFund = UncheckedFrozenBondFund;
-    type LocksInterface = Locks;
     type WeightInfo = staking::weight::WeightInfo;
 }
 

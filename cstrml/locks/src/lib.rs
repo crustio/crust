@@ -19,7 +19,7 @@ use sp_runtime::{
     RuntimeDebug, DispatchResult, Perbill, traits::Zero
 };
 
-use primitives::{BlockNumber, traits::LocksInterface};
+use primitives::BlockNumber;
 
 #[cfg(test)]
 mod mock;
@@ -51,7 +51,7 @@ pub trait Config: frame_system::Config {
     type WeightInfo: WeightInfo;
 }
 
-#[derive(Copy, Clone, Encode, Decode, Default, RuntimeDebug, PartialEq, Eq)]
+#[derive(Copy, Clone, Encode, Decode, Default, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct LockType {
     pub delay: BlockNumber, // Init delay time. Currently only 0 and 6 months
@@ -84,18 +84,6 @@ pub struct Lock<Balance: HasCompact> {
     pub last_unlock_at: BlockNumber,
     // The lock type, which is one of CRU18/CRU24/CRU24D6
     pub lock_type: LockType
-}
-
-
-impl<T: Config> LocksInterface<<T as frame_system::Config>::AccountId, BalanceOf<T>> for Module<T> {
-    fn get_all_cru18_locks() -> Vec<(<T as frame_system::Config>::AccountId, BalanceOf<T>)> {
-        <Locks<T>>::iter().filter_map(|(who, lock)| {
-            match lock.lock_type {
-                CRU18 => Some((who, lock.total)),
-                _ => None
-            }
-        }).collect()
-    }
 }
 
 decl_event!(

@@ -903,8 +903,8 @@ construct_runtime! {
         Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
 
         // ChainBridge
-        ChainBridge: bridge::{Module, Call, Storage, Event<T>} = 100,
-        BridgeTransfer: bridge_transfer::{Module, Call, Event<T>, Storage} = 101,
+        ChainBridge: bridge::{Module, Call, Storage, Event<T>},
+        BridgeTransfer: bridge_transfer::{Module, Call, Event<T>, Storage},
     }
 }
 

@@ -1296,6 +1296,8 @@ dependencies = [
 name = "cstrml-candy"
 version = "0.12.0"
 dependencies = [
+ "cst-primitives",
+ "cstrml-balances",
  "frame-support",
  "frame-system",
  "parity-scale-codec",

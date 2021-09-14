@@ -15,7 +15,7 @@ use sp_runtime::{
     ModuleId,
     traits::{CheckedDiv, Convert, Member, AtLeast32BitUnsigned, Zero, StaticLookup, AccountIdConversion},
     transaction_validity::{
-        TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
+        TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
     }
 };
 use codec::{Encode};
@@ -224,7 +224,7 @@ impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
             priority: PRIORITY,
             requires: vec![],
             provides: vec![("exchange_candy", account).encode()],
-            longevity: TransactionLongevity::max_value(),
+            longevity: 64,
             propagate: true,
         })
     }

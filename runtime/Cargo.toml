@@ -17,6 +17,7 @@ codec = { default-features = false, features = ["derive"], package = "parity-sca
 serde = { features = ["derive"], optional = true, version = "1.0.117" }
 static_assertions = "1.1.0"
 smallvec = "1.4.1"
+hex-literal = "0.3.1"
 
 # substrate primitives
 authority-discovery-primitives = { default-features = false, package = "sp-authority-discovery", version = "3.0.0" }
@@ -82,6 +83,8 @@ staking = { package = "cstrml-staking", path = "../cstrml/staking", default-feat
 benefits = { package = "cstrml-benefits", path = "../cstrml/benefits", default-features = false, version = "1.0.0" }
 locks = { package = "cstrml-locks", path = "../cstrml/locks", default-features = false, version = "1.0.0" }
 csm-locking = { package = "cstrml-csm-locking", path = "../cstrml/csm-locking", default-features = false, version = "1.0.0" }
+bridge = { package = "cstrml-bridge", path = "../cstrml/bridge", default-features = false, version = "1.0.0" }
+bridge-transfer = { package = "cstrml-bridge-transfer", path = "../cstrml/bridge-transfer", default-features = false, version = "1.0.0" }
 
 # crust benchmark dependencies
 swork-benchmarking = { package = "cstrml-swork-benchmarking", path = "../cstrml/swork/benchmarking", default-features = false, optional = true, version = "1.0.0" }

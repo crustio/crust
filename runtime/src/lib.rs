@@ -103,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 5,
+    spec_version: 4,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -817,6 +817,31 @@ impl locks::Config for Runtime {
     type WeightInfo = locks::weight::WeightInfo<Runtime>;
 }
 
+parameter_types! {
+    pub const BridgeChainId: u8 = 1;
+    pub const ProposalLifetime: BlockNumber = 50400; // ~7 days
+}
+
+impl bridge::Config for Runtime {
+    type Event = Event;
+    type BridgeCommitteeOrigin = MoreThanHalfCouncil;
+    type Proposal = Call;
+    type BridgeChainId = BridgeChainId;
+    type ProposalLifetime = ProposalLifetime;
+}
+
+parameter_types! {
+    // bridge::derive_resource_id(1, &bridge::hashing::blake2_128(b"CRU"));
+    pub const BridgeTokenId: [u8; 32] = hex_literal::hex!("000000000000000000000000000000608d1bc9a2d146ebc94667c336721b2801");
+}
+
+impl bridge_transfer::Config for Runtime {
+    type Event = Event;
+    type BridgeOrigin = bridge::EnsureBridge<Runtime>;
+    type Currency = Balances;
+    type BridgeTokenId = BridgeTokenId;
+}
+
 construct_runtime! {
     pub enum Runtime where
         Block = Block,
@@ -876,6 +901,10 @@ construct_runtime! {
         Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
         // Multisig module. Late addition.
         Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
+
+        // ChainBridge
+        ChainBridge: bridge::{Module, Call, Storage, Event<T>},
+        BridgeTransfer: bridge_transfer::{Module, Call, Event<T>, Storage},
     }
 }
 

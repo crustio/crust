@@ -2167,16 +2167,16 @@ impl<T: Config> Module<T> {
                 (v_stash, Vec::<IndividualExposure<T::AccountId, BalanceOf<T>>>::new())
             ).collect();
         for (guarantor, guarantee) in <Guarantors<T>>::iter() {
-            let Guarantee { total: _, submitted_in, mut targets, suppressed: _ } = guarantee;
+            let Guarantee { total: _, submitted_in: _, targets, suppressed: _ } = guarantee;
 
-            // Filter out guarantee targets which were guaranteed before the most recent
-            // slashing span.
-            targets.retain(|ie| {
-                <Self as Store>::SlashingSpans::get(&ie.who).map_or(
-                    true,
-                    |spans| submitted_in >= spans.last_nonzero_slash(),
-                )
-            });
+            // // Filter out guarantee targets which were guaranteed before the most recent
+            // // slashing span.
+            // targets.retain(|ie| {
+            //     <Self as Store>::SlashingSpans::get(&ie.who).map_or(
+            //         true,
+            //         |spans| submitted_in >= spans.last_nonzero_slash(),
+            //     )
+            // });
             
             for target in targets {
                 if let Some(g) = vg_graph.get_mut(&target.who) {

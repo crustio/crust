@@ -1881,6 +1881,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
             );
         }
         assert_eq!(Balances::free_balance(&storage_pot), 361);
+        assert_eq!(Market::orders_count(), 2);
 
         run_to_block(303);
         let legal_wr_info = legal_work_report_with_added_files();
@@ -1907,6 +1908,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
                 }]
             }
         );
+        assert_eq!(Market::orders_count(), 2);
         assert_eq!(Balances::free_balance(&storage_pot), 361);
         // reported_file_size_cid2 = 1000 > 100 => close this file
         add_who_into_replica(&cid2, reported_file_size_cid2, merchant.clone(), legal_pk.clone(), None, None);
@@ -1916,6 +1918,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
             reward: 180
         });
         assert_eq!(Balances::free_balance(&storage_pot), 361);
+        assert_eq!(Market::orders_count(), 1);
     })
 }
 

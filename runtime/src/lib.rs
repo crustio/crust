@@ -452,7 +452,7 @@ parameter_types! {
 }
 
 parameter_types! {
-	pub const CandidacyBond: Balance = 10 * DOLLARS;
+	pub const CandidacyBond: Balance = 1 * DOLLARS;
 	pub const VotingBondBase: Balance = 1 * DOLLARS;
 	pub const VotingBondFactor: Balance = 10 * CENTS;
 	pub const TermDuration: BlockNumber = 7 * DAYS;

@@ -1025,6 +1025,7 @@ impl<T: Config> Module<T> {
                     }
                     <Files<T>>::remove(cid);
                     FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
+                    OrdersCount::mutate(|count| {*count = count.saturating_sub(1)});
                     Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
                 }
             }

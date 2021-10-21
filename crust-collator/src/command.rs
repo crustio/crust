@@ -217,7 +217,7 @@ pub fn run() -> Result<()> {
 				let polkadot_config = SubstrateCli::create_configuration(
 					&polkadot_cli,
 					&polkadot_cli,
-					config.task_executor.clone(),
+					config.tokio_handle.clone(),
 				)
 				.map_err(|err| format!("Relay chain argument error: {}", err))?;
 
@@ -304,11 +304,11 @@ pub fn run() -> Result<()> {
 					generate_genesis_block(&config.chain_spec).map_err(|e| format!("{:?}", e))?;
 				let genesis_state = format!("0x{:?}", HexDisplay::from(&block.header().encode()));
 
-				let task_executor = config.task_executor.clone();
+				let tokio_handle = config.tokio_handle.clone();
 				let polkadot_config = SubstrateCli::create_configuration(
 					&polkadot_cli,
 					&polkadot_cli,
-					task_executor,
+					tokio_handle,
 				)
 				.map_err(|err| format!("Relay chain argument error: {}", err))?;
 
@@ -418,16 +418,8 @@ impl CliConfiguration<Self> for RelayChainCli {
 		self.base.base.rpc_ws_max_connections()
 	}
 
-	fn rpc_http_threads(&self) -> Result<Option<usize>> {
-		self.base.base.rpc_http_threads()
-	}
-
 	fn rpc_cors(&self, is_dev: bool) -> Result<Option<Vec<String>>> {
 		self.base.base.rpc_cors(is_dev)
-	}
-
-	fn telemetry_external_transport(&self) -> Result<Option<sc_service::config::ExtTransport>> {
-		self.base.base.telemetry_external_transport()
 	}
 
 	fn default_heap_pages(&self) -> Result<Option<u64>> {

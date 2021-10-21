@@ -28,8 +28,6 @@ use cumulus_client_service::{
 use cumulus_primitives_core::ParaId;
 use parachain_runtime::RuntimeApi;
 use crust_parachain_primitives::Block;
-use sc_executor::native_executor_instance;
-pub use sc_executor::NativeExecutor;
 use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
 use sc_telemetry::{Telemetry, TelemetryHandle, TelemetryWorker, TelemetryWorkerHandle};
 use sp_core::Pair;
@@ -37,13 +35,22 @@ use sp_runtime::traits::BlakeTwo256;
 use sp_trie::PrefixedMemoryDB;
 use std::sync::Arc;
 use sp_consensus::SlotData;
+use polkadot_service::NativeExecutionDispatch;
+use sc_executor::NativeElseWasmExecutor;
 
-// Native executor instance.
-native_executor_instance!(
-	pub Executor,
-	parachain_runtime::api::dispatch,
-	parachain_runtime::native_version,
-);
+pub struct CrustParachainRuntimeExecutor;
+
+impl sc_executor::NativeExecutionDispatch for CrustParachainRuntimeExecutor {
+	type ExtendHostFunctions = ();
+
+	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
+		parachain_runtime::api::dispatch(method, data)
+	}
+
+	fn native_version() -> sc_executor::NativeVersion {
+		parachain_runtime::native_version()
+	}
+}
 
 /// Starts a `ServiceBuilder` for a full service.
 ///
@@ -53,11 +60,11 @@ pub fn new_partial(
 	config: &Configuration,
 ) -> Result<
 	PartialComponents<
-		TFullClient<Block, RuntimeApi, Executor>,
+		TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>,
 		TFullBackend<Block>,
 		(),
-		sc_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, Executor>>,
-		sc_transaction_pool::FullPool<Block, TFullClient<Block, RuntimeApi, Executor>>,
+		sc_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
+		sc_transaction_pool::FullPool<Block, TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
 		(Option<Telemetry>, Option<TelemetryWorkerHandle>),
 	>,
 	sc_service::Error,
@@ -71,10 +78,17 @@ pub fn new_partial(
 		})
 		.transpose()?;
 
+	let executor = sc_executor::NativeElseWasmExecutor::<CrustParachainRuntimeExecutor>::new(
+			config.wasm_method,
+			config.default_heap_pages,
+			config.max_runtime_instances,
+		);
+
 	let (client, backend, keystore_container, task_manager) =
-		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(
+		sc_service::new_full_parts::<Block, RuntimeApi, _>(
 			&config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
+			executor,
 		)?;
 	let client = Arc::new(client);
 
@@ -144,14 +158,14 @@ pub fn new_partial(
 
 /// Build the import queue for the shell runtime.
 pub fn shell_build_import_queue(
-	client: Arc<TFullClient<Block, RuntimeApi, Executor>>,
+	client: Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
 	config: &Configuration,
 	_: Option<TelemetryHandle>,
 	task_manager: &TaskManager,
 ) -> Result<
 	sc_consensus::DefaultImportQueue<
 		Block,
-		TFullClient<Block, RuntimeApi, Executor>,
+		TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>,
 	>,
 	sc_service::Error,
 > {
@@ -174,10 +188,10 @@ async fn start_node_impl<RB>(
 	polkadot_config: Configuration,
 	id: ParaId,
 	rpc_ext_builder: RB,
-) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)>
+) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>)>
 where
 	RB: Fn(
-			Arc<TFullClient<Block, RuntimeApi, Executor>>,
+			Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
 		) -> Result<jsonrpc_core::IoHandler<sc_rpc::Metadata>, sc_service::Error>
 		+ Send
 		+ 'static,
@@ -356,7 +370,7 @@ pub async fn start_node(
 	parachain_config: Configuration,
 	polkadot_config: Configuration,
 	id: ParaId,
-) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)> {
+) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>)> {
 	start_node_impl(
 		parachain_config,
 		polkadot_config,

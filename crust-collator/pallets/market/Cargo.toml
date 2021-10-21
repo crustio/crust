@@ -10,18 +10,19 @@ repository = "https://github.com/crustio/crust/"
 [dependencies]
 # third party dependencies
 serde = { version = "1.0.111", optional = true }
-codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false }
+codec = { package = "parity-scale-codec", version = "2.3.0", default-features = false }
 serde_json = "1.0.51"
+scale-info = { version = "1.0.0", default-features = false, features = ["derive"] }
 
 # substrate frames
-frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.9", default-features = false }
-frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.9", default-features = false }
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.11", default-features = false }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.11", default-features = false }
 
 # substrate primitives
-sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.9", default-features = false }
-sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.9", default-features = false }
-sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.9", default-features = false }
-sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.9", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.11", default-features = false }
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.11", default-features = false }
+sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.11", default-features = false }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.11", default-features = false }
 
 # crust runtime modules
 primitives = { package = "crust-parachain-primitives", path = "../../primitives", default-features = false }
@@ -31,6 +32,7 @@ xstorage = { package = "xstorage", path = "../xstorage", default-features = fals
 default = ["std"]
 std = [
     "serde",
+    "scale-info/std",
     "codec/std",
     "frame-support/std",
     "sp-core/std",

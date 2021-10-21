@@ -44,7 +44,7 @@ pub trait WeightInfo {
     fn reward_merchant() -> Weight;
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default, scale_info::TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct FileInfo<AccountId, Balance> {
     // The ordered file size, which declare by user
@@ -64,7 +64,7 @@ pub struct FileInfo<AccountId, Balance> {
     pub replicas: Vec<Replica<AccountId>>
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default, scale_info::TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Replica<AccountId> {
     // Controller account
@@ -80,7 +80,7 @@ pub struct Replica<AccountId> {
 /// According to the definition, we should put this one into swork pallet.
 /// However, in consideration of performance,
 /// we put this in market to avoid too many keys in storage
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default, scale_info::TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct UsedInfo {
     // The size of used value in MPoW
@@ -91,7 +91,7 @@ pub struct UsedInfo {
     pub groups: BTreeMap<SworkerAnchor, bool>
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default, scale_info::TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct MerchantLedger<Balance> {
     // The current reward amount.

@@ -60,7 +60,7 @@ pub use sp_runtime::{Perbill, Permill};
 
 // XCM imports
 use polkadot_parachain::primitives::Sibling;
-use xcm::v0::{MultiAsset, MultiLocation, Junction::*, MultiLocation::*, NetworkId, BodyId, OriginKind};
+use xcm::latest::prelude::*;
 use xcm_builder::{
 	AccountId32Aliases, CurrencyAdapter, LocationInverter, ParentIsDefault, RelayChainAsNative,
 	SiblingParachainConvertsVia, SignedAccountId32AsNative,
@@ -176,7 +176,7 @@ impl frame_system::Config for Runtime {
 	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
 	type Lookup = AccountIdLookup<AccountId, ()>;
 	/// The index type for storing how many extrinsics an account has signed.
-	type Index = Index;
+	type Index = crust_parachain_primitives::Index;
 	/// The index type for blocks.
 	type BlockNumber = BlockNumber;
 	/// The type for hashing blocks and tries.
@@ -226,6 +226,7 @@ parameter_types! {
 	pub const TransactionByteFee: u128 = 1;
 	pub const MaxLocks: u32 = 50;
 	pub const MaxReserves: u32 = 50;
+	pub const OperationalFeeMultiplier: u8 = 5;
 }
 
 impl pallet_balances::Config for Runtime {
@@ -247,6 +248,7 @@ impl pallet_transaction_payment::Config for Runtime {
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ();
+	type OperationalFeeMultiplier = OperationalFeeMultiplier;
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -289,10 +291,10 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 impl parachain_info::Config for Runtime {}
 
 parameter_types! {
-	pub const RococoLocation: MultiLocation = X1(Parent);
+	pub const RococoLocation: MultiLocation = MultiLocation::parent();
 	pub const RococoNetwork: NetworkId = NetworkId::Kusama;
 	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
-	pub Ancestry: MultiLocation = X1(Parachain(ParachainInfo::parachain_id().into()));
+	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 }
 
 type LocationToAccountId = (
@@ -329,26 +331,28 @@ impl AllowedList {
 	}
 }
 
-pub struct IsAllowedToCrust<Origin>(PhantomData<Origin>);
-impl<
-	Origin: OriginTrait
-> ConvertOrigin<Origin> for IsAllowedToCrust<Origin> {
-	fn convert_origin(origin: MultiLocation, kind: OriginKind) -> Result<Origin, MultiLocation> {
-		match (kind, origin) {
-			(OriginKind::Superuser, X2(Parent, Parachain(id)))
-			if AllowedList::is_allowed(id.into()) =>
-				Ok(Origin::root()),
-			(_, origin) => Err(origin),
-		}
-	}
-}
+// pub struct IsAllowedToCrust<Origin>(PhantomData<Origin>);
+// impl<
+// 	Origin: OriginTrait
+// > ConvertOrigin<Origin> for IsAllowedToCrust<Origin> {
+// 	fn convert_origin(origin: impl Into<MultiLocation>, kind: OriginKind) -> Result<Origin, MultiLocation> {
+// 		let origin = origin.into();
+// 		match (kind, origin) {
+// 			(OriginKind::Superuser, X2(Parent, Parachain(id)))
+// 			if AllowedList::is_allowed(id.into()) =>
+// 				Ok(Origin::root()),
+// 			(_, origin) => Err(origin),
+// 		}
+// 	}
+// }
+// // IsAllowedToCrust<Origin>,
+
 
 pub type XcmOriginToTransactDispatchOrigin = (
 	SovereignSignedViaLocation<LocationToAccountId, Origin>,
 	RelayChainAsNative<RelayChainOrigin, Origin>,
 	SiblingParachainAsNative<cumulus_pallet_xcm::Origin, Origin>,
 	ParentAsSuperuser<Origin>,
-	IsAllowedToCrust<Origin>,
 	SignedAccountId32AsNative<RococoNetwork, Origin>,
 );
 
@@ -356,12 +360,14 @@ parameter_types! {
 	// One XCM operation is 1_000_000_000 weight - almost certainly a conservative estimate.
 	pub UnitWeightCost: Weight = 1_000_000_000;
 	// One ROC buys 1 second of weight.
-	pub const WeightPrice: (MultiLocation, u128) = (X1(Parent), ROC);
+	pub const WeightPrice: (MultiLocation, u128) = (MultiLocation::parent(), ROC);
+	pub const MaxInstructions: u32 = 100;
 }
 
 match_type! {
 	pub type ParentOrParentsUnitPlurality: impl Contains<MultiLocation> = {
-		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. }) | X2(Parent, Parachain(2012)) | X2(Parent, Parachain(2080))
+		MultiLocation { parents: 1, interior: Here } |
+		MultiLocation { parents: 1, interior: X1(Plurality { id: BodyId::Unit, .. }) }
 	};
 }
 
@@ -382,9 +388,12 @@ impl Config for XcmConfig {
 	type IsTeleporter = NativeAsset;
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Barrier = Barrier;
-	type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
+	type Weigher = FixedWeightBounds<UnitWeightCost, Call, MaxInstructions>;
 	type Trader = UsingComponents<IdentityFee<Balance>, RococoLocation, AccountId, Balances, ()>;
-	type ResponseHandler = ();	// Don't handle responses for now.
+	type ResponseHandler = PolkadotXcm;
+	type AssetTrap = PolkadotXcm;
+	type AssetClaims = PolkadotXcm;
+	type SubscriptionService = PolkadotXcm;
 }
 
 pub type LocalOriginToLocation = (
@@ -395,7 +404,7 @@ pub type LocalOriginToLocation = (
 /// queues.
 pub type XcmRouter = (
 	// Two routers - use UMP to communicate with the relay chain:
-	cumulus_primitives_utility::ParentAsUmp<ParachainSystem>,
+	cumulus_primitives_utility::ParentAsUmp<ParachainSystem, ()>,
 	// ..and XCMP to communicate with the sibling chains.
 	XcmpQueue,
 );
@@ -408,9 +417,13 @@ impl pallet_xcm::Config for Runtime {
 	type XcmExecuteFilter = Everything;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type XcmTeleportFilter = Everything;
-	type XcmReserveTransferFilter = ();
-	type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
+	type XcmReserveTransferFilter = frame_support::traits::Nothing;
+	type Weigher = FixedWeightBounds<UnitWeightCost, Call, MaxInstructions>;
 	type LocationInverter = LocationInverter<Ancestry>;
+	type Origin = Origin;
+	type Call = Call;
+	const VERSION_DISCOVERY_QUEUE_SIZE: u32 = 100;
+	type AdvertisedXcmVersion = pallet_xcm::CurrentXcmVersion;
 }
 
 impl cumulus_pallet_xcm::Config for Runtime {
@@ -428,6 +441,7 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type Event = Event;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type ChannelInfo = ParachainSystem;
+	type VersionWrapper = ();
 }
 
 impl cumulus_ping::Config for Runtime {
@@ -503,9 +517,9 @@ impl market::Config for Runtime {
     type MaximumFileSize = MaximumFileSize;
 }
 
-impl xstorage::Config for Runtime {
-	type XcmpMessageSender = XcmRouter;
-}
+// impl xstorage::Config for Runtime {
+// 	type XcmpMessageSender = XcmRouter;
+// }
 
 parameter_types! {
 	pub const UncleGenerations: u32 = 0;
@@ -522,6 +536,7 @@ parameter_types! {
 	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(33);
 	pub const Period: u32 = 6 * HOURS;
 	pub const Offset: u32 = 0;
+	pub const MaxAuthorities: u32 = 100_000;
 }
 
 impl pallet_session::Config for Runtime {
@@ -542,6 +557,7 @@ impl pallet_session::Config for Runtime {
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 	type DisabledValidators = ();
+	type MaxAuthorities = MaxAuthorities;
 }
 
 impl cumulus_pallet_aura_ext::Config for Runtime {}
@@ -603,7 +619,7 @@ construct_runtime! {
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Storage, Event<T>, Origin},
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin},
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>},
-		Xstorage: xstorage::{Pallet, Storage, Call},
+		// Xstorage: xstorage::{Pallet, Storage, Call},
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 		Market: market::{Pallet, Call, Storage, Event<T>, Config} = 100,
@@ -659,7 +675,7 @@ impl_runtime_apis! {
 
 	impl sp_api::Metadata<Block> for Runtime {
 		fn metadata() -> OpaqueMetadata {
-			Runtime::metadata().into()
+			OpaqueMetadata::new(Runtime::metadata().into())
 		}
 	}
 
@@ -717,7 +733,7 @@ impl_runtime_apis! {
 		}
 
 		fn authorities() -> Vec<AuraId> {
-			Aura::authorities()
+			Aura::authorities().into_inner()
 		}
 	}
 

@@ -3,11 +3,6 @@ panic = 'unwind'
 
 [workspace]
 exclude = [
-    "utils/webpki",
-    "utils/ring",
-    "utils/serde_json_no_std",
-    "utils/serde_derive_no_std",
-    "utils/serde_derive_no_std",
     "cumulus"
 ]
 

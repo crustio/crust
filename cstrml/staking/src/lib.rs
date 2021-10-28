@@ -54,6 +54,7 @@ use primitives::{
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
+const POS_RATIO: usize = 5;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
 const MAX_GUARANTEE: usize = 16;
 const STAKING_ID: LockIdentifier = *b"staking ";
@@ -2273,7 +2274,7 @@ impl<T: Config> Module<T> {
 
         // Update ErasStakers, ErasTotalStakes and ErasStakerClipped
         let clipped_max_len = T::MaxGuarantorRewardedPerValidator::get() as usize;
-        let (new_exposures, total_stakes) = if to_elect_in_effective_stakes * 5 >= to_elect_in_total_stakes {
+        let (new_exposures, total_stakes) = if to_elect_in_effective_stakes * POS_RATIO >= elected_stashes.len() {
             // Choose the effective stakes data
             (exposures_in_effective_stakes, eras_total_effective_stakes)
         } else {

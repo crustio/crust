@@ -4905,6 +4905,178 @@ fn change_validator_count_should_work() {
         });
 }
 
+#[test]
+fn new_era_with_safe_logic_should_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .own_workload(2)
+        .total_workload(100000000)
+        .validator_count(8)
+        .build()
+        .execute_with(|| {
+            // put some money in account that we'll use.
+            for i in 50..80 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            start_era(4, false);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 5000);
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(51),
+                52,
+                2000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(52), ValidatorPrefs::default()));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(53),
+                54,
+                2500,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(54), ValidatorPrefs::default()));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(57),
+                58,
+                1000,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(58), ValidatorPrefs::default()));
+
+            start_era(5, false);
+            assert_eq!(Staking::stake_limit(&11), Some(5000));
+
+            // 5's stake limit should be None
+            assert_eq!(Staking::stake_limit(&57), None);
+
+            // Valid ratio should work
+            assert_eq!(
+                Staking::eras_stakers(5, 11),
+                Exposure {
+                    total: 1000,
+                    own: 1000,
+                    others: vec![]
+                }
+            );
+            // 7 should  be elected but with 0 stakes
+            assert_eq!(
+                Staking::eras_stakers(5, 57),
+                Exposure {
+                    total: 0,
+                    own: 0,
+                    others: vec![]
+                }
+            );
+            assert_eq!(Staking::current_elected(), vec![11, 21, 31, 53, 51, 57]);
+            assert_eq!(Staking::eras_total_stakes(5), 2001);
+
+            assert_ok!(Staking::chill(Origin::signed(10)));
+            assert_ok!(Staking::chill(Origin::signed(20)));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(55),
+                56,
+                1500,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(56), ValidatorPrefs::default()));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(73),
+                74,
+                1300,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(74), ValidatorPrefs::default()));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(61),
+                62,
+                1100,
+                RewardDestination::Controller
+            ));
+            assert_ok!(Staking::validate(Origin::signed(62), ValidatorPrefs::default()));
+
+            start_era(6, false);
+            assert_eq!(Staking::current_elected(), vec![31, 53, 51, 55, 73, 61, 57]);
+
+            // Record the total stakes
+            assert_eq!(
+                Staking::eras_stakers(6, 31),
+                Exposure {
+                    total: 1,
+                    own: 1,
+                    others: vec![]
+                }
+            );
+
+            assert_eq!(
+                Staking::eras_stakers(6, 51),
+                Exposure {
+                    total: 2000,
+                    own: 2000,
+                    others: vec![]
+                }
+            );
+
+            assert_eq!(
+                Staking::eras_stakers(6, 53),
+                Exposure {
+                    total: 2500,
+                    own: 2500,
+                    others: vec![]
+                }
+            );
+
+            assert_eq!(
+                Staking::eras_stakers(6, 55),
+                Exposure {
+                    total: 1500,
+                    own: 1500,
+                    others: vec![]
+                }
+            );
+
+            assert_eq!(
+                Staking::eras_stakers(6, 57),
+                Exposure {
+                    total: 1000,
+                    own: 1000,
+                    others: vec![]
+                }
+            );
+
+            assert_eq!(
+                Staking::eras_stakers(6, 73),
+                Exposure {
+                    total: 1300,
+                    own: 1300,
+                    others: vec![]
+                }
+            );
+            assert_eq!(
+                Staking::eras_stakers(6, 61),
+                Exposure {
+                    total: 1100,
+                    own: 1100,
+                    others: vec![]
+                }
+            );
+
+            assert_eq!(Staking::eras_total_stakes(6), 9401);
+
+        });
+}
+
 // #[test]
 // fn randomly_select_validators_works() {
 //     ExtBuilder::default()

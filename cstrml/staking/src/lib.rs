@@ -30,7 +30,7 @@ use sp_runtime::{
     Perbill, RuntimeDebug, SaturatedConversion, ModuleId,
     traits::{
         Convert, Zero, One, StaticLookup, Saturating, AtLeast32Bit,
-        CheckedAdd, AccountIdConversion, CheckedSub, AtLeast32BitUnsigned
+        AccountIdConversion, CheckedSub, AtLeast32BitUnsigned
     },
 };
 use sp_staking::{
@@ -54,6 +54,7 @@ use primitives::{
 };
 
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
+const POS_RATIO: usize = 5;
 const MAX_UNLOCKING_CHUNKS: usize = 32;
 const MAX_GUARANTEE: usize = 16;
 const STAKING_ID: LockIdentifier = *b"staking ";
@@ -2150,7 +2151,6 @@ impl<T: Config> Module<T> {
 
         let to_votes =
             |b: BalanceOf<T>| <T::CurrencyToVote as Convert<BalanceOf<T>, u64>>::convert(b) as u128;
-        let to_balance = |e: u128| <T::CurrencyToVote as Convert<u128, BalanceOf<T>>>::convert(e);
 
         // II. Construct and fill in the V/G graph
         // TC is O(V + G*1), V means validator's number, G means guarantor's number
@@ -2166,16 +2166,17 @@ impl<T: Config> Module<T> {
                 (v_stash, Vec::<IndividualExposure<T::AccountId, BalanceOf<T>>>::new())
             ).collect();
         for (guarantor, guarantee) in <Guarantors<T>>::iter() {
-            let Guarantee { total: _, submitted_in, mut targets, suppressed: _ } = guarantee;
+            let Guarantee { total: _, submitted_in: _ , targets, suppressed: _ } = guarantee;
 
-            // Filter out guarantee targets which were guaranteed before the most recent
-            // slashing span.
-            targets.retain(|ie| {
-                <Self as Store>::SlashingSpans::get(&ie.who).map_or(
-                    true,
-                    |spans| submitted_in >= spans.last_nonzero_slash(),
-                )
-            });
+            // Disable this filter
+            // // Filter out guarantee targets which were guaranteed before the most recent
+            // // slashing span.
+            // targets.retain(|ie| {
+            //     <Self as Store>::SlashingSpans::get(&ie.who).map_or(
+            //         true,
+            //         |spans| submitted_in >= spans.last_nonzero_slash(),
+            //     )
+            // });
             
             for target in targets {
                 if let Some(g) = vg_graph.get_mut(&target.who) {
@@ -2197,78 +2198,64 @@ impl<T: Config> Module<T> {
             "💸 Build the erasStakers for the era {:?}.",
             current_era,
         );
+        let mut validators_stakes_in_effective_stakes: Vec<(T::AccountId, u128)> = vec![];
+        let mut validators_stakes_in_total_stakes: Vec<(T::AccountId, u128)> = vec![];
+
+        let mut eras_total_effective_stakes: BalanceOf<T> = Zero::zero();
+        let mut exposures_in_effective_stakes = BTreeMap::new();
+
         let mut eras_total_stakes: BalanceOf<T> = Zero::zero();
-        let mut validators_stakes: Vec<(T::AccountId, u128)> = vec![];
+        let mut exposures_in_total_stakes = BTreeMap::new();
+
         for (v_stash, voters) in vg_graph.iter() {
             let v_controller = Self::bonded(v_stash).unwrap();
             let v_ledger: StakingLedger<T::AccountId, BalanceOf<T>> =
                 Self::ledger(&v_controller).unwrap();
 
             let stake_limit = Self::stake_limit(v_stash).unwrap_or(Zero::zero());
+            // 1. Construct exposure by effective stakes
+            if stake_limit != Zero::zero() {
+                // 1.1 Calculate the ratio
+                let total_stakes = v_ledger.active.saturating_add(
+                    voters.iter().fold(
+                        Zero::zero(),
+                        |acc, ie| acc.saturating_add(ie.value)
+                    ));
+                let valid_votes_ratio = Perbill::from_rational_approximation(stake_limit, total_stakes);
 
-            // 0. Add to `validator_stakes` but skip adding to `eras_stakers` if stake limit goes 0
-            if stake_limit == Zero::zero() {
-                validators_stakes.push((v_stash.clone(), 0));
-                continue;
+                let new_exposure = Self::build_exposure(&voters, v_ledger.active, Some(valid_votes_ratio));
+
+                let exposure_total = new_exposure.total;
+                validators_stakes_in_effective_stakes.push((v_stash.clone(), to_votes(exposure_total)));
+
+                eras_total_effective_stakes = eras_total_effective_stakes.saturating_add(exposure_total);
+                exposures_in_effective_stakes.insert(v_stash.clone(), new_exposure);
             }
 
-            // 1. Calculate the ratio
-            let total_stakes = v_ledger.active.saturating_add(
-                voters.iter().fold(
-                    Zero::zero(),
-                    |acc, ie| acc.saturating_add(ie.value)
-                ));
-            let valid_votes_ratio = Perbill::from_rational_approximation(stake_limit, total_stakes).min(Perbill::one());
-
-            // 2. Calculate validator valid stake
-            let own_stake = valid_votes_ratio * v_ledger.active;
-
-            // 3. Construct exposure
-            let mut new_exposure = Exposure {
-                total: own_stake,
-                own: own_stake,
-                others: vec![]
-            };
-            for voter in voters {
-                let g_valid_stake = valid_votes_ratio * voter.value;
-                new_exposure.total = new_exposure.total.saturating_add(g_valid_stake);
-                new_exposure.others.push(IndividualExposure {
-                    who: voter.who.clone(),
-                    value: g_valid_stake
-                });
-            }
-
-            // 4. Update snapshots
-            <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
+            // 2. Construct exposure by total stakes
+            let new_exposure = Self::build_exposure(&voters, v_ledger.active, None);
             let exposure_total = new_exposure.total;
-            let mut exposure_clipped = new_exposure;
-            let clipped_max_len = T::MaxGuarantorRewardedPerValidator::get() as usize;
-            if exposure_clipped.others.len() > clipped_max_len {
-                exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
-                exposure_clipped.others.truncate(clipped_max_len);
+            eras_total_stakes = eras_total_stakes.saturating_add(exposure_total);
+            if stake_limit == Zero::zero() {
+                validators_stakes_in_total_stakes.push((v_stash.clone(), to_votes(exposure_total)));
             }
-            <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
+            exposures_in_total_stakes.insert(v_stash.clone(), new_exposure);
 
+            // 3. Store ErasValidatorPrefs
             <ErasValidatorPrefs<T>>::insert(&current_era, &v_stash, Self::validators(&v_stash).clone());
-            if let Some(maybe_total_stakes) = eras_total_stakes.checked_add(&exposure_total) {
-                eras_total_stakes = maybe_total_stakes;
-            } else {
-                eras_total_stakes = to_balance(u64::max_value() as u128);
-            }
-
-            // 5. Push validator stakes
-            validators_stakes.push((v_stash.clone(), to_votes(exposure_total)))
         }
 
-        // IV. TopDown Election Algorithm with Randomlization
-        let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
+        // IV. TopDown Election Algorithm
+        // 1. Select the validators from effective stakes first
+        let to_elect_in_effective_stakes = (Self::validator_count() as usize).min(validators_stakes_in_effective_stakes.len());
 
-        // If there's no validators, be as same as little validators
-        if to_elect < minimum_validator_count {
-            return None;
+        let mut elected_stashes= Self::do_election(validators_stakes_in_effective_stakes, to_elect_in_effective_stakes);
+        let to_elect_in_total_stakes = (Self::validator_count() as usize).saturating_sub(to_elect_in_effective_stakes).min(validators_stakes_in_total_stakes.len());
+        // 2. Fulfill the remaining seats from total stakes validators
+        if to_elect_in_total_stakes != 0 {
+            elected_stashes.append(&mut Self::do_election(validators_stakes_in_total_stakes, to_elect_in_total_stakes));
         }
 
-        let elected_stashes= Self::do_election(validators_stakes, to_elect);
         log!(
             info,
             "💸 new validator set of size {:?} has been elected via for era {:?}",
@@ -2276,18 +2263,71 @@ impl<T: Config> Module<T> {
             current_era,
         );
 
+        // If there's no validators, be as same as little validators
+        if elected_stashes.len() < minimum_validator_count {
+            return None;
+        }
+
         // V. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
 
-        // Update slot stake.
-        <ErasTotalStakes<T>>::insert(&current_era, eras_total_stakes);
+        // Update ErasStakers, ErasTotalStakes and ErasStakerClipped
+        let clipped_max_len = T::MaxGuarantorRewardedPerValidator::get() as usize;
+        let (new_exposures, total_stakes) = if to_elect_in_effective_stakes * POS_RATIO >= elected_stashes.len() {
+            // Choose the effective stakes data
+            (exposures_in_effective_stakes, eras_total_effective_stakes)
+        } else {
+            // Choose the total stakes data
+            (exposures_in_total_stakes, eras_total_stakes)
+        };
+
+        <ErasTotalStakes<T>>::insert(&current_era, total_stakes);
+
+        for (v_stash, new_exposure) in new_exposures {
+            <ErasStakers<T>>::insert(&current_era, &v_stash, new_exposure.clone());
+            let mut exposure_clipped = new_exposure;
+            if exposure_clipped.others.len() > clipped_max_len {
+                exposure_clipped.others.sort_by(|a, b| a.value.cmp(&b.value).reverse());
+                exposure_clipped.others.truncate(clipped_max_len.clone());
+            }
+            <ErasStakersClipped<T>>::insert(&current_era, &v_stash, exposure_clipped);
+        }
 
         // In order to keep the property required by `n_session_ending`
         // that we must return the new validator set even if it's the same as the old,
         // as long as any underlying economic conditions have changed, we don't attempt
         // to do any optimization where we compare against the prior set.
         Some(elected_stashes)
+    }
+
+    fn build_exposure(voters: &Vec<IndividualExposure<T::AccountId, BalanceOf<T>>>,
+                      own_stake: BalanceOf<T>,
+                      maybe_valid_votes_ratio: Option<Perbill>) -> Exposure<T::AccountId, BalanceOf<T>> {
+        let own_stake = if let Some(valid_votes_ratio) = maybe_valid_votes_ratio {
+            valid_votes_ratio * own_stake
+        } else {
+            own_stake
+        };
+
+        let mut new_exposure = Exposure {
+            total: own_stake,
+            own: own_stake,
+            others: vec![]
+        };
+        for voter in voters {
+            let g_valid_stake = if let Some(valid_votes_ratio) = maybe_valid_votes_ratio {
+                valid_votes_ratio * voter.value
+            } else {
+                voter.value
+            };
+            new_exposure.total = new_exposure.total.saturating_add(g_valid_stake);
+            new_exposure.others.push(IndividualExposure {
+                who: voter.who.clone(),
+                value: g_valid_stake
+            });
+        }
+        new_exposure
     }
 
     /// Remove all associated data of a stash account from the staking system.

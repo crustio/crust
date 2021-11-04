@@ -459,7 +459,7 @@ parameter_types! {
 	pub const TipFindersFee: Percent = Percent::from_percent(20);
 	pub const TipReportDepositBase: Balance = 1 * DOLLARS;
 	pub const DataDepositPerByte: Balance = 1 * CENTS;
-    pub const MaximumReasonLength: u32 = 16384;
+	pub const MaximumReasonLength: u32 = 16384;
 	// pub const BountyDepositBase: Balance = 1 * DOLLARS;
 	// pub const BountyDepositPayoutDelay: BlockNumber = 4 * DAYS;
 	// pub const BountyUpdatePeriod: BlockNumber = 90 * DAYS;

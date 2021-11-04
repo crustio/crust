@@ -4,7 +4,7 @@
 
 Implementation of a [Crust Protocol](https://crust.network) node with [substrate](https://github.com/paritytech/substrate).
 
-## 🎮 Join to play
+## 🎮 Join to Play
 
 Please go to [crust wiki](https://wiki.crust.network/docs/en/nodeOverview), refer the node overview.
 
@@ -12,7 +12,7 @@ Please go to [crust wiki](https://wiki.crust.network/docs/en/nodeOverview), refe
 
 ### ⌨️ Build from source
 
-#### 1. Install Rust
+#### 1. Install rust
 
 > If, after installation, running `rustc --version` in the console fails, refer to [it](https://www.rust-lang.org/tools/install) to repair.
 
@@ -20,13 +20,13 @@ Please go to [crust wiki](https://wiki.crust.network/docs/en/nodeOverview), refe
 curl https://sh.rustup.rs -sSf | sh
 ```
 
-#### 2. Initialize your Wasm Build environment
+#### 2. Initialize your wasm build environment
 
 ```shell
 ./scripts/init.sh
 ```
 
-#### 3. Build Wasm and native code
+#### 3. Build wasm and native code
 
 ```bash
 cargo build --release

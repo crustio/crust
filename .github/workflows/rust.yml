@@ -6,11 +6,15 @@ on:
       - master
       - mainnet*
       - feature/*
+    paths-ignore:
+      - '**.md'
   pull_request:
     branches:
       - master
       - mainnet*
       - feature/*
+    paths-ignore:
+      - '**.md'
 jobs:
   build_and_test:
     name: Build & Test

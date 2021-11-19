@@ -54,3 +54,7 @@ pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {
 
 	fn get_market_funds_ratio(who: &AccountId) -> Perbill;
 }
+
+pub trait LocksInterface<AccountId, Balance> {
+	fn create_cru18_lock(who: &AccountId, value: Balance);
+}

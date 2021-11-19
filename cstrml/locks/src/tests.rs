@@ -23,6 +23,28 @@ fn issue_and_set_lock_should_work() {
 }
 
 #[test]
+fn create_cru18_lock_should_work() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(CrustLocks::set_unlock_from(Origin::root(), 1000));
+        assert_eq!(CrustLocks::unlock_from().unwrap(), 1000);
+        // Already run to 1800 blocks
+        run_to_block(9000);
+        // Create a new cru 18 account
+        let _ = Balances::make_free_balance_be(&1, 1800);
+        assert_eq!(Balances::free_balance(&1), 1800);
+        assert_eq!(Balances::total_issuance(), 1800);
+        CrustLocks::create_cru18_lock(&1, 1800);
+        assert_eq!(Balances::locks(&1)[0].amount, 1800);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+
+        // Test unlock
+        assert_ok!(CrustLocks::unlock(Origin::signed(1)));
+        assert_eq!(Balances::locks(&1)[0].amount, 1000);
+        assert_eq!(Balances::locks(&1)[0].id, CRU_LOCK_ID);
+    });
+}
+
+#[test]
 fn set_unlock_from_should_work() {
     new_test_ext().execute_with(|| {
         run_to_block(300);

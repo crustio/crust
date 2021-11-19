@@ -20,6 +20,7 @@ use sp_runtime::{
 };
 
 use primitives::BlockNumber;
+use primitives::traits::LocksInterface;
 
 #[cfg(test)]
 mod mock;
@@ -84,6 +85,13 @@ pub struct Lock<Balance: HasCompact> {
     pub last_unlock_at: BlockNumber,
     // The lock type, which is one of CRU18/CRU24/CRU24D6
     pub lock_type: LockType
+}
+
+impl<T: Config> LocksInterface<<T as frame_system::Config>::AccountId, BalanceOf<T>> for Module<T>
+{
+    fn create_cru18_lock(who: &<T as frame_system::Config>::AccountId, amount: BalanceOf<T>) {
+        Self::create_or_extend_lock(who, &amount, CRU18);
+    }
 }
 
 decl_event!(

@@ -1259,6 +1259,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "log",
+ "orml-xcm",
  "pallet-aura",
  "pallet-authorship",
  "pallet-balances",
@@ -4660,6 +4661,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "orml-xcm"
+version = "0.4.1-dev"
+source = "git+https://github.com/open-web3-stack/open-runtime-module-library?rev=b89b1f98fcf0f5c341fbef1d12bfd869a2f2a9fe#b89b1f98fcf0f5c341fbef1d12bfd869a2f2a9fe"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-xcm",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-std",
+ "xcm",
+]
+
+[[package]]
 name = "owning_ref"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5355,6 +5370,7 @@ dependencies = [
  "log",
  "parity-scale-codec",
  "scale-info",
+ "serde",
  "sp-core",
  "sp-runtime",
  "sp-std",

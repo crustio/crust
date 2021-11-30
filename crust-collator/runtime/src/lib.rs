@@ -54,6 +54,7 @@ pub use frame_support::{
 };
 use frame_system::limits::{BlockLength, BlockWeights};
 use frame_system::{EnsureOneOf, EnsureRoot};
+use sp_std::convert::TryFrom;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 #[cfg(any(feature = "std", test))]
@@ -78,6 +79,14 @@ use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
 use xcm::v0::Xcm;
 use frame_support::traits::Contains;
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use xcm::v1::{
+	prelude::*,
+	AssetId::{Abstract, Concrete},
+	Fungibility::Fungible,
+	MultiAsset, MultiLocation,
+};
+use sp_runtime::traits::CheckedConversion;
+use xcm_executor::traits::{FilterAssetLocation, MatchesFungible};
 
 pub type SessionHandlers = ();
 
@@ -381,8 +390,8 @@ impl pallet_scheduler::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT / 4;
-	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT / 4;
+	pub ReservedXcmpWeight: Weight = RuntimeBlockWeights::get().max_block / 4;
+	pub ReservedDmpWeight: Weight = RuntimeBlockWeights::get().max_block / 4;
 }
 
 impl cumulus_pallet_parachain_system::Config for Runtime {
@@ -400,6 +409,7 @@ impl parachain_info::Config for Runtime {}
 
 parameter_types! {
 	pub const RococoLocation: MultiLocation = MultiLocation::parent();
+	pub const LocalTestNetwork: MultiLocation = MultiLocation { parents: 1, interior: X1(Parachain(2012)) };
 	pub const RococoNetwork: NetworkId = NetworkId::Kusama;
 	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
@@ -410,19 +420,6 @@ type LocationToAccountId = (
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	AccountId32Aliases<RococoNetwork, AccountId>,
 );
-
-type LocalAssetTransactor = CurrencyAdapter<
-	// Use this currency:
-	Balances,
-	// Use this currency when it is a fungible asset matching the given location or name:
-	IsConcrete<RococoLocation>,
-	// Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
-	LocationToAccountId,
-	// Our chain's account ID type (we can't get away without mentioning it explicitly):
-	AccountId,
-	// We don't track any teleports.
-	(),
->;
 
 pub struct AllowedList;
 
@@ -439,24 +436,62 @@ impl AllowedList {
 	}
 }
 
-// pub struct IsAllowedToCrust<Origin>(PhantomData<Origin>);
-// impl<
-// 	Origin: OriginTrait
-// > ConvertOrigin<Origin> for IsAllowedToCrust<Origin> {
-// 	fn convert_origin(origin: impl Into<MultiLocation>, kind: OriginKind) -> Result<Origin, MultiLocation> {
-// 		let origin = origin.into();
-// 		match (kind, origin) {
-// 			(OriginKind::Superuser, X2(Parent, Parachain(id)))
-// 			if AllowedList::is_allowed(id.into()) =>
-// 				Ok(Origin::root()),
-// 			(_, origin) => Err(origin),
-// 		}
-// 	}
-// }
-// // IsAllowedToCrust<Origin>,
+
+pub struct IsFromSiblingParachain;
+impl Contains<MultiLocation> for IsFromSiblingParachain {
+	fn contains(id: &MultiLocation) -> bool {
+		match id {
+			MultiLocation { parents: 1, interior: X1(Junction::Parachain(id)) } if AllowedList::is_allowed(id.clone()) => true,
+			_ => false
+		}
+	}
+}
+
+pub struct IsSiblingParachainsConcrete<T>(PhantomData<T>);
+impl<T: Contains<MultiLocation>, B: TryFrom<u128>> MatchesFungible<B>
+	for IsSiblingParachainsConcrete<T>
+{
+	fn matches_fungible(a: &MultiAsset) -> Option<B> {
+		match (&a.id, &a.fun) {
+			(Concrete(ref id), Fungible(ref amount)) if T::contains(id) => {
+				CheckedConversion::checked_from(*amount)
+			}
+			_ => None,
+		}
+	}
+}
+
+type LocalAssetTransactor = CurrencyAdapter<
+	// Use this currency:
+	Balances,
+	// Use this currency when it is a fungible asset matching the given location or name:
+	IsSiblingParachainsConcrete<IsFromSiblingParachain>,
+	// Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
+	LocationToAccountId,
+	// Our chain's account ID type (we can't get away without mentioning it explicitly):
+	AccountId,
+	// We don't track any teleports.
+	(),
+>;
+
+pub struct IsAllowedToCrust<Origin>(PhantomData<Origin>);
+impl<
+	Origin: OriginTrait
+> ConvertOrigin<Origin> for IsAllowedToCrust<Origin> {
+	fn convert_origin(origin: impl Into<MultiLocation>, kind: OriginKind) -> Result<Origin, MultiLocation> {
+		match (kind, origin.into()) {
+			(
+				OriginKind::Superuser,
+				MultiLocation { parents: 0, interior: X1(Junction::Parachain(id)) },
+			) if AllowedList::is_allowed(id.into()) => Ok(Origin::root()),
+			(_, origin) => Err(origin),
+		}
+	}
+}
 
 
 pub type XcmOriginToTransactDispatchOrigin = (
+	IsAllowedToCrust<Origin>,
 	SovereignSignedViaLocation<LocationToAccountId, Origin>,
 	RelayChainAsNative<RelayChainOrigin, Origin>,
 	SiblingParachainAsNative<cumulus_pallet_xcm::Origin, Origin>,
@@ -525,13 +560,18 @@ impl pallet_xcm::Config for Runtime {
 	type XcmExecuteFilter = Everything;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type XcmTeleportFilter = Everything;
-	type XcmReserveTransferFilter = frame_support::traits::Nothing;
+	type XcmReserveTransferFilter = Everything;
 	type Weigher = FixedWeightBounds<UnitWeightCost, Call, MaxInstructions>;
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Origin = Origin;
 	type Call = Call;
 	const VERSION_DISCOVERY_QUEUE_SIZE: u32 = 100;
 	type AdvertisedXcmVersion = pallet_xcm::CurrentXcmVersion;
+}
+
+impl orml_xcm::Config for Runtime {
+	type Event = Event;
+	type SovereignOrigin = frame_system::EnsureRoot<AccountId>;
 }
 
 impl cumulus_pallet_xcm::Config for Runtime {
@@ -726,6 +766,7 @@ construct_runtime! {
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin},
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>},
 		// Xstorage: xstorage::{Pallet, Storage, Call},
+		OrmlXcm: orml_xcm::{Pallet, Call, Event<T>},
 
 		Utility: pallet_utility::{Pallet, Call, Event},
 		Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>},

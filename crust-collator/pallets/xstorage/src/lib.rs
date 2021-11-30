@@ -4,7 +4,8 @@ use frame_support::{decl_error, decl_module, decl_storage, pallet_prelude::*};
 use frame_system::ensure_signed;
 use sp_std::prelude::*;
 
-use xcm::v0::{Xcm, SendXcm, OriginKind, MultiLocation, Junction};
+use xcm::v2::prelude::*;
+use codec::Encode;
 
 pub trait Config: frame_system::Config {
 	/// Something to send an HRMP message.
@@ -36,14 +37,16 @@ decl_module! {
 			let set_call = (100u8, 0u8, cid, size).encode();
 
 			// TODO: Use RelayedFrom instead of Transact to include account id
-			let transact = Xcm::Transact {
+			let transact = Xcm(vec![Instruction::Transact {
 				origin_type: OriginKind::Superuser,
 				require_weight_at_most: 1_000,
-				call: set_call.into()
-			};
+				call: set_call.into(),
+			}]);
 
 			// TODO: Use Xtoken as well to pay this order
-			T::XcmpMessageSender::send_xcm(MultiLocation::X2(Junction::Parent, Junction::Parachain(2012)), transact).map_err(|_| Error::<T>::FailedToSend)?;
+			T::XcmpMessageSender::send_xcm(
+				MultiLocation { parents: 0, interior: X1(Parachain(2008)) },
+				transact).map_err(|_| Error::<T>::FailedToSend)?;
 
 			Ok(().into())
 		}

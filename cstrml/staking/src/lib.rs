@@ -1471,6 +1471,12 @@ decl_module! {
             ensure_root(origin)?;
             StartRewardEra::put(start_reward_era);
         }
+
+        #[weight = 1000]
+        fn cancel_era_reward(origin, era_index: EraIndex) {
+            ensure_root(origin)?;
+            <ErasStakingPayout<T>>::remove(era_index);
+        }
     }
 }
 

@@ -168,8 +168,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
     let force_authoring = config.force_authoring;
     let disable_grandpa = config.disable_grandpa;
     let name = config.network.node_name.clone();
-    let backoff_authoring_blocks =
-        Some(sc_consensus_slots::BackoffAuthoringOnFinalizedHeadLagging::default());
+    let backoff_authoring_blocks: Option<()> = None;
     let prometheus_registry = config.prometheus_registry().cloned();
 
     let shared_voter_state = rpc_setup;

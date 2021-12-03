@@ -666,6 +666,12 @@ decl_storage! {
 
         /// The earliest era for which we have a pending, unapplied slash.
         EarliestUnappliedSlash: Option<EraIndex>;
+
+        /// Approved candidates to be validators
+        ApprovedValidators get(fn approved_validators): Vec<T::AccountId>;
+
+        /// Manual Selection
+        ManualSelection get(fn manual_selection): bool = false;
     }
     add_extra_genesis {
         config(stakers):
@@ -1477,6 +1483,34 @@ decl_module! {
             ensure_root(origin)?;
             <ErasStakingPayout<T>>::remove(era_index);
         }
+
+        #[weight = 1000]
+        fn add_approved_validators(origin, new_validators: Vec<T::AccountId>) {
+            ensure_root(origin)?;
+            <ApprovedValidators<T>>::mutate( |current_validators| {
+                for validator in new_validators {
+                    if current_validators.contains(&validator) {
+                        continue;
+                    } else {
+                        current_validators.push(validator);
+                    }
+                }
+            });
+        }
+
+        #[weight = 1000]
+        fn remove_approved_validators(origin, old_validators: Vec<T::AccountId>) {
+            ensure_root(origin)?;
+            let mut new_validators = Self::approved_validators();
+            new_validators.retain(|validator| !old_validators.contains(validator));
+            <ApprovedValidators<T>>::put(new_validators);
+        }
+
+        #[weight = 1000]
+        fn enable_manual_selection(origin, enable: bool) {
+            ensure_root(origin)?;
+            ManualSelection::put(enable);
+        }
     }
 }
 
@@ -2267,7 +2301,13 @@ impl<T: Config> Module<T> {
             validators_stakes.push((v_stash.clone(), to_votes(exposure_total)))
         }
 
-        // IV. TopDown Election Algorithm with Randomlization
+        // IV. Just preserve removed validators
+        if Self::manual_selection() {
+            let approved_validators = Self::approved_validators();
+            validators_stakes.retain(|validator| approved_validators.contains(&validator.0));
+        }
+
+        // V. TopDown Election Algorithm with Randomlization
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
         // If there's no validators, be as same as little validators
@@ -2283,7 +2323,7 @@ impl<T: Config> Module<T> {
             current_era,
         );
 
-        // V. Update general staking storage
+        // VI. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
 

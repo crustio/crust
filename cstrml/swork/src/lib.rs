@@ -432,7 +432,7 @@ decl_module! {
         /// - Read: Identities
         /// - Write: 3
         /// # </weight>
-        #[weight = (T::WeightInfo::register(), DispatchClass::Operational)]
+        #[weight = T::WeightInfo::register()]
         pub fn register(
             origin,
             ias_sig: IASSig,
@@ -483,7 +483,7 @@ decl_module! {
         /// - Read: Identities, ReportedInSlot, Code, market.Merchant, market.SOrder
         /// - Write: WorkReport, ReportedInSlot, market.SOrder
         /// # </weight>
-        #[weight = (T::WeightInfo::report_works(added_files.len() as u32, deleted_files.len() as u32), DispatchClass::Operational)]
+        #[weight = T::WeightInfo::report_works(added_files.len() as u32, deleted_files.len() as u32)]
         pub fn report_works(
             origin,
             curr_pk: SworkerPubKey,

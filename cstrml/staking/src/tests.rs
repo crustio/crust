@@ -5283,3 +5283,192 @@ fn reward_should_be_locked_with_other_lock() {
 //
 //         });
 // }
+
+#[test]
+fn force_selection_should_work() {
+    ExtBuilder::default()
+        .guarantee(false)
+        .own_workload(2)
+        .total_workload(100000000)
+        .validator_count(8)
+        .build()
+        .execute_with(|| {
+            // put some money in account that we'll use.
+            for i in 1..10 {
+                let _ = Balances::deposit_creating(&i, 5000);
+            }
+
+            start_era(1, false);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 2000);
+            start_era(4, false);
+            assert_eq!(Staking::stake_limit(&11).unwrap_or_default(), 5000);
+
+            // Add guarantor
+            assert_ok!(Staking::bond(
+                Origin::signed(1),
+                2,
+                2000
+            ));
+            assert_ok!(set_payee(2, RewardDestination::Controller));
+            assert_ok!(Staking::guarantee(Origin::signed(2), (11, 2000)));
+
+            // Add guarantor
+            assert_ok!(Staking::bond(
+                Origin::signed(3),
+                4,
+                2000
+            ));
+            assert_ok!(set_payee(4, RewardDestination::Controller));
+            assert_ok!(Staking::guarantee(Origin::signed(4), (11, 3000)));
+
+            // Add validator without stake limit
+            assert_ok!(Staking::bond(
+                Origin::signed(7),
+                8,
+                1000
+            ));
+            assert_ok!(set_payee(8, RewardDestination::Controller));
+            assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
+
+            assert_ok!(Staking::force_validators_whitelist(Origin::root(), true));
+            assert_ok!(Staking::set_validators_whitelist(Origin::root(), vec![11, 21, 31, 7]));
+
+            start_era_with_new_workloads(5, false, 1, 200000000);
+            assert_eq!(Staking::stake_limit(&11), Some(2500));
+
+            // 5's stake limit should be None
+            assert_eq!(Staking::stake_limit(&7), None);
+
+            // Valid ratio should work
+            assert_eq!(
+                Staking::eras_stakers(5, 11),
+                Exposure {
+                    total: 2500,
+                    own: 500,
+                    others: vec![IndividualExposure {
+                        who: 1,
+                        value: 1000
+                    }, IndividualExposure {
+                        who: 3,
+                        value: 1000
+                    }]
+                }
+            );
+            // 7 should  be elected but with 0 stakes
+            assert_eq!(
+                Staking::eras_stakers(5, 7),
+                Exposure {
+                    total: 0,
+                    own: 0,
+                    others: vec![]
+                }
+            );
+            assert_eq!(Staking::current_elected(), vec![11, 21, 31, 7]);
+            assert_eq!(Staking::current_elected().len(), 4);
+
+            assert_ok!(Staking::set_validators_whitelist(Origin::root(), vec![31, 7]));
+
+            start_era_with_new_workloads(6, false, 1, 200000000);
+            assert_eq!(Staking::stake_limit(&11), Some(2500));
+
+            // 5's stake limit should be None
+            assert_eq!(Staking::stake_limit(&7), None);
+
+            // Valid ratio should work
+            assert_eq!(
+                Staking::eras_stakers(6, 11),
+                Exposure {
+                    total: 2500,
+                    own: 500,
+                    others: vec![IndividualExposure {
+                        who: 1,
+                        value: 1000
+                    }, IndividualExposure {
+                        who: 3,
+                        value: 1000
+                    }]
+                }
+            );
+            // 7 should  be elected but with 0 stakes
+            assert_eq!(
+                Staking::eras_stakers(6, 7),
+                Exposure {
+                    total: 0,
+                    own: 0,
+                    others: vec![]
+                }
+            );
+            assert_eq!(Staking::current_elected(), vec![31, 7]);
+            assert_eq!(Staking::current_elected().len(), 2);
+
+            assert_ok!(Staking::set_validators_whitelist(Origin::root(), vec![11, 50, 31, 7]));
+
+            start_era_with_new_workloads(7, false, 1, 200000000);
+            assert_eq!(Staking::stake_limit(&11), Some(2500));
+
+            // 5's stake limit should be None
+            assert_eq!(Staking::stake_limit(&7), None);
+
+            // Valid ratio should work
+            assert_eq!(
+                Staking::eras_stakers(7, 11),
+                Exposure {
+                    total: 2500,
+                    own: 500,
+                    others: vec![IndividualExposure {
+                        who: 1,
+                        value: 1000
+                    }, IndividualExposure {
+                        who: 3,
+                        value: 1000
+                    }]
+                }
+            );
+            // 7 should  be elected but with 0 stakes
+            assert_eq!(
+                Staking::eras_stakers(7, 7),
+                Exposure {
+                    total: 0,
+                    own: 0,
+                    others: vec![]
+                }
+            );
+            assert_eq!(Staking::current_elected(), vec![11, 31, 7]);
+            assert_eq!(Staking::current_elected().len(), 3);
+
+            assert_ok!(Staking::force_validators_whitelist(Origin::root(), false));
+
+            start_era_with_new_workloads(8, false, 1, 200000000);
+            assert_eq!(Staking::stake_limit(&11), Some(2500));
+
+            // 5's stake limit should be None
+            assert_eq!(Staking::stake_limit(&7), None);
+
+            // Valid ratio should work
+            assert_eq!(
+                Staking::eras_stakers(8, 11),
+                Exposure {
+                    total: 2500,
+                    own: 500,
+                    others: vec![IndividualExposure {
+                        who: 1,
+                        value: 1000
+                    }, IndividualExposure {
+                        who: 3,
+                        value: 1000
+                    }]
+                }
+            );
+            // 7 should  be elected but with 0 stakes
+            assert_eq!(
+                Staking::eras_stakers(8, 7),
+                Exposure {
+                    total: 0,
+                    own: 0,
+                    others: vec![]
+                }
+            );
+            assert_eq!(Staking::current_elected(), vec![11, 21, 31, 7]);
+            assert_eq!(Staking::current_elected().len(), 4);
+        });
+}

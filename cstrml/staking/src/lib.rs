@@ -666,6 +666,12 @@ decl_storage! {
 
         /// The earliest era for which we have a pending, unapplied slash.
         EarliestUnappliedSlash: Option<EraIndex>;
+
+        /// Whitelist candidates to be validators
+        ValidatorsWhitelist get(fn validators_whitelist): Vec<T::AccountId>;
+
+        /// Force Selection
+        ForceSelection get(fn force_selection): bool = false;
     }
     add_extra_genesis {
         config(stakers):
@@ -1477,6 +1483,18 @@ decl_module! {
             ensure_root(origin)?;
             <ErasStakingPayout<T>>::remove(era_index);
         }
+
+        #[weight = 1000]
+        fn set_validators_whitelist(origin, new_validators: Vec<T::AccountId>) {
+            ensure_root(origin)?;
+            <ValidatorsWhitelist<T>>::put(new_validators);
+        }
+
+        #[weight = 1000]
+        fn force_validators_whitelist(origin, enable: bool) {
+            ensure_root(origin)?;
+            ForceSelection::put(enable);
+        }
     }
 }
 
@@ -2267,7 +2285,13 @@ impl<T: Config> Module<T> {
             validators_stakes.push((v_stash.clone(), to_votes(exposure_total)))
         }
 
-        // IV. TopDown Election Algorithm with Randomlization
+        // IV. Just preserve removed validators
+        if Self::force_selection() {
+            let validators_whitelist = Self::validators_whitelist();
+            validators_stakes.retain(|validator| validators_whitelist.contains(&validator.0));
+        }
+
+        // V. TopDown Election Algorithm with Randomlization
         let to_elect = (Self::validator_count() as usize).min(validators_stakes.len());
 
         // If there's no validators, be as same as little validators
@@ -2283,7 +2307,7 @@ impl<T: Config> Module<T> {
             current_era,
         );
 
-        // V. Update general staking storage
+        // VI. Update general staking storage
         // Set the new validator set in sessions.
         <CurrentElected<T>>::put(&elected_stashes);
 

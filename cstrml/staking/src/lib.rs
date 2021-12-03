@@ -667,11 +667,11 @@ decl_storage! {
         /// The earliest era for which we have a pending, unapplied slash.
         EarliestUnappliedSlash: Option<EraIndex>;
 
-        /// Approved candidates to be validators
-        ApprovedValidators get(fn approved_validators): Vec<T::AccountId>;
+        /// Whitelist candidates to be validators
+        ValidatorsWhitelist get(fn validators_whitelist): Vec<T::AccountId>;
 
-        /// Manual Selection
-        ManualSelection get(fn manual_selection): bool = false;
+        /// Force Selection
+        ForceSelection get(fn force_selection): bool = false;
     }
     add_extra_genesis {
         config(stakers):
@@ -1485,31 +1485,15 @@ decl_module! {
         }
 
         #[weight = 1000]
-        fn add_approved_validators(origin, new_validators: Vec<T::AccountId>) {
+        fn set_validators_whitelist(origin, new_validators: Vec<T::AccountId>) {
             ensure_root(origin)?;
-            <ApprovedValidators<T>>::mutate( |current_validators| {
-                for validator in new_validators {
-                    if current_validators.contains(&validator) {
-                        continue;
-                    } else {
-                        current_validators.push(validator);
-                    }
-                }
-            });
+            <ValidatorsWhitelist<T>>::put(new_validators);
         }
 
         #[weight = 1000]
-        fn remove_approved_validators(origin, old_validators: Vec<T::AccountId>) {
+        fn force_validators_whitelist(origin, enable: bool) {
             ensure_root(origin)?;
-            let mut new_validators = Self::approved_validators();
-            new_validators.retain(|validator| !old_validators.contains(validator));
-            <ApprovedValidators<T>>::put(new_validators);
-        }
-
-        #[weight = 1000]
-        fn enable_manual_selection(origin, enable: bool) {
-            ensure_root(origin)?;
-            ManualSelection::put(enable);
+            ForceSelection::put(enable);
         }
     }
 }
@@ -2302,9 +2286,9 @@ impl<T: Config> Module<T> {
         }
 
         // IV. Just preserve removed validators
-        if Self::manual_selection() {
-            let approved_validators = Self::approved_validators();
-            validators_stakes.retain(|validator| approved_validators.contains(&validator.0));
+        if Self::force_selection() {
+            let validators_whitelist = Self::validators_whitelist();
+            validators_stakes.retain(|validator| validators_whitelist.contains(&validator.0));
         }
 
         // V. TopDown Election Algorithm with Randomlization

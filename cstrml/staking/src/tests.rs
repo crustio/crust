@@ -5285,7 +5285,7 @@ fn reward_should_be_locked_with_other_lock() {
 // }
 
 #[test]
-fn manual_selection_should_work() {
+fn force_selection_should_work() {
     ExtBuilder::default()
         .guarantee(false)
         .own_workload(2)
@@ -5330,8 +5330,8 @@ fn manual_selection_should_work() {
             assert_ok!(set_payee(8, RewardDestination::Controller));
             assert_ok!(Staking::validate(Origin::signed(8), ValidatorPrefs::default()));
 
-            assert_ok!(Staking::enable_manual_selection(Origin::root(), true));
-            assert_ok!(Staking::add_approved_validators(Origin::root(), vec![11, 21, 31, 7]));
+            assert_ok!(Staking::force_validators_whitelist(Origin::root(), true));
+            assert_ok!(Staking::set_validators_whitelist(Origin::root(), vec![11, 21, 31, 7]));
 
             start_era_with_new_workloads(5, false, 1, 200000000);
             assert_eq!(Staking::stake_limit(&11), Some(2500));
@@ -5366,7 +5366,7 @@ fn manual_selection_should_work() {
             assert_eq!(Staking::current_elected(), vec![11, 21, 31, 7]);
             assert_eq!(Staking::current_elected().len(), 4);
 
-            assert_ok!(Staking::remove_approved_validators(Origin::root(), vec![11, 21]));
+            assert_ok!(Staking::set_validators_whitelist(Origin::root(), vec![31, 7]));
 
             start_era_with_new_workloads(6, false, 1, 200000000);
             assert_eq!(Staking::stake_limit(&11), Some(2500));
@@ -5401,7 +5401,7 @@ fn manual_selection_should_work() {
             assert_eq!(Staking::current_elected(), vec![31, 7]);
             assert_eq!(Staking::current_elected().len(), 2);
 
-            assert_ok!(Staking::add_approved_validators(Origin::root(), vec![11, 50]));
+            assert_ok!(Staking::set_validators_whitelist(Origin::root(), vec![11, 50, 31, 7]));
 
             start_era_with_new_workloads(7, false, 1, 200000000);
             assert_eq!(Staking::stake_limit(&11), Some(2500));
@@ -5436,7 +5436,7 @@ fn manual_selection_should_work() {
             assert_eq!(Staking::current_elected(), vec![11, 31, 7]);
             assert_eq!(Staking::current_elected().len(), 3);
 
-            assert_ok!(Staking::enable_manual_selection(Origin::root(), false));
+            assert_ok!(Staking::force_validators_whitelist(Origin::root(), false));
 
             start_era_with_new_workloads(8, false, 1, 200000000);
             assert_eq!(Staking::stake_limit(&11), Some(2500));

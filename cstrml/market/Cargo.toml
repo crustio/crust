@@ -14,16 +14,16 @@ serde = { optional = true, version = "1.0.116" }
 serde_json = "1.0.51"
 
 # substrate frames
-frame-system = { default-features = false, version = "3.0.0" }
-frame-support = { default-features = false, version = "3.0.0" }
+frame-system = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+frame-support = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
 
 # substrate primitives
-sp-core = { default-features = false, version = "3.0.0" }
-sp-io = { default-features = false, version = "3.0.0" }
-sp-runtime = { default-features = false, version = "3.0.0" }
-sp-std = { default-features = false, version = "3.0.0" }
+sp-core = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-io = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-runtime = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-std = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
 
-frame-benchmarking = { default-features = false, optional = true, version = "3.0.0" }
+frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
 
 # crust runtime modules
 primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
@@ -50,4 +50,4 @@ hex = "0.4.2"
 swork = { package = "cstrml-swork", path = "../swork" }
 balances = { package = "cstrml-balances", path = "../balances" }
 primitives = { package = "cst-primitives", path = "../../primitives", features = ["test"] }
-frame-benchmarking = "3.0.0"
+frame-benchmarking = { git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}

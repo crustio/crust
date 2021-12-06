@@ -13,16 +13,16 @@ codec = { default-features = false, package = "parity-scale-codec", features = [
 serde = { optional = true, version = "1.0.116" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = "3.0.0" }
-frame-system = { default-features = false, version = "3.0.0" }
+frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 
 # substrate primitives
-sp-core = { default-features = false, version = "3.0.0" }
-sp-io = { default-features = false, version = "3.0.0" }
-sp-runtime = { default-features = false, version = "3.0.0" }
-sp-std = { default-features = false, version = "3.0.0" }
+sp-core = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-io = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 
-frame-benchmarking = { version = "3.0.0", default-features = false }
+frame-benchmarking = { git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4", default-features = false }
 
 # crust runtime modules
 primitives = { package = "cst-primitives", path = "../../../primitives", default-features = false }
@@ -50,5 +50,5 @@ std = [
 
 [dev-dependencies]
 hex = "0.4.2"
-keyring = { package = "sp-keyring", version = "3.0.0" }
+keyring = { package = "sp-keyring", git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 primitives = { package = "cst-primitives", path = "../../../primitives", features = ["test"] }

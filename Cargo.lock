@@ -1065,7 +1065,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "crust"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "crust-rpc",
  "crust-runtime",
@@ -1090,6 +1090,7 @@ dependencies = [
  "sc-network",
  "sc-service",
  "sc-transaction-pool",
+ "sp-blockchain",
  "sp-consensus",
  "sp-consensus-babe",
  "sp-core",
@@ -1132,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "crust-runtime"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "cst-primitives",
  "cstrml-balances",

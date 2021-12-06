@@ -41,6 +41,7 @@ sp-inherents = "3.0.0"
 sp-io = "3.0.0"
 sp-runtime = "3.0.0"
 sp-finality-grandpa = "3.0.0"
+sp-blockchain = "3.0.0"
 frame-benchmarking-cli = { optional = true, version = "3.0.0" }
 frame-benchmarking = "3.0.0"
 

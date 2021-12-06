@@ -13,6 +13,160 @@ use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
 use sp_inherents::InherentDataProviders;
 use sc_consensus::LongestChain;
+use primitives::Hash;
+use sp_runtime::traits::{Block as BlockT, NumberFor};
+
+/// A custom GRANDPA voting rule that "pauses" voting (i.e. keeps voting for the
+/// same last finalized block) after a given block at height `N` has been
+/// finalized and for a delay of `M` blocks, i.e. until the best block reaches
+/// `N` + `M`, the voter will keep voting for block `N`.
+pub(crate) struct PauseAfterBlockFor<N>(pub(crate) N, pub(crate) N);
+
+impl<Block, B> sc_finality_grandpa::VotingRule<Block, B> for PauseAfterBlockFor<NumberFor<Block>> where
+	Block: BlockT,
+	B: sp_blockchain::HeaderBackend<Block>,
+{
+	fn restrict_vote(
+		&self,
+		backend: &B,
+		base: &Block::Header,
+		best_target: &Block::Header,
+		current_target: &Block::Header,
+	) -> Option<(Block::Hash, NumberFor<Block>)> {
+		use sp_runtime::generic::BlockId;
+		use sp_runtime::traits::Header as _;
+
+		// walk backwards until we find the target block
+		let find_target = |
+			target_number: NumberFor<Block>,
+			current_header: &Block::Header
+		| {
+			let mut target_hash = current_header.hash();
+			let mut target_header = current_header.clone();
+
+			loop {
+				if *target_header.number() < target_number {
+					unreachable!(
+						"we are traversing backwards from a known block; \
+						 blocks are stored contiguously; \
+						 qed"
+					);
+				}
+
+				if *target_header.number() == target_number {
+					return Some((target_hash, target_number));
+				}
+
+				target_hash = *target_header.parent_hash();
+				target_header = backend.header(BlockId::Hash(target_hash)).ok()?
+					.expect("Header known to exist due to the existence of one of its descendents; qed");
+			}
+		};
+
+		// only restrict votes targeting a block higher than the block
+		// we've set for the pause
+		if *current_target.number() > self.0 {
+			// if we're past the pause period (i.e. `self.0 + self.1`)
+			// then we no longer need to restrict any votes
+			if *best_target.number() > self.0 + self.1 {
+				return None;
+			}
+
+			// if we've finalized the pause block, just keep returning it
+			// until best number increases enough to pass the condition above
+			if *base.number() >= self.0 {
+				return Some((base.hash(), *base.number()));
+			}
+
+			// otherwise find the target header at the pause block
+			// to vote on
+			return find_target(self.0, current_target);
+		}
+
+		None
+	}
+}
+
+/// GRANDPA hard forks due to borked migration of session keys after a runtime
+/// upgrade (at #1491596), the signalled authority set changes were invalid
+/// (blank keys) and were impossible to finalize. The authorities for these
+/// intermediary pending changes are replaced with a static list comprised of
+/// w3f validators and randomly selected validators from the latest session (at
+/// #1500988).
+pub(crate) fn crust_hard_forks() -> Vec<(
+	sp_finality_grandpa::SetId,
+	(Hash, primitives::BlockNumber),
+	sp_finality_grandpa::AuthorityList,
+)> {
+	use sp_core::crypto::Ss58Codec;
+	use std::str::FromStr;
+
+	let forks = vec![
+		(
+			602,
+			"9d32d5843dd7ae68737bfba0231defe408fdfab1b7e810db533fc86dd734cbdd",
+			2080275,
+		)
+	];
+
+	let authorities = vec![
+		"cTMmjdpJRYK29BTX3cZQDhM3VZ91xGK33meXgz76zmwfaLuWz",
+        "cTKc4d4EDi6n135WJGdUkT36iPfFvJmB8NA2VkbKR4RodQpAK",
+        "cTN3AwR6gYkGASvfnico7mCjgxT52M5fjm46NUq4Yfspqr1ma",
+        "cTHCtMbZz1i5FYhthwauuVURq7ZxGvHsP6uzbZhDsdUhBzaye",
+        "cTGMAvCmt1RgmgRvgfZXuNAMGbm8LTUPLD1QGwTURapjaSS3Z",
+        "cTKo1b7f7Dhhv8XVMwj5TVAPZ3oHorKU3u7irh4eTH1vCC7rg",
+        "cTJPqJ3pAV2qQJ3xLEYV5QHGyEhxdvjxLnY5FPiRvs6MS8oAK",
+        "cTLR8jfWciSpp7f85DXd9AnoPookoZ1eJ3Byqnt5ba2Af3BGf",
+        "cTHqvwfeG5Tbhj9bBFKVQMVPFfH91VRZSDStZvf5EXY3icBcs",
+        "cTL16BLMRsywUSaX2PAXXSKTQWk6HoqRt6HMLigngugNkE98E",
+        "cTHS8vPhbKZNqDbhhbem48i5eiXvbSiYFqJhon6kyu4o7WhTn",
+        "cTHP3dWJv58XbXn6B6kV8H2Y2vfJYR6bKrrdhsQ1QnUEv6JVL",
+        "cTMTz6pC9cSFB5kbSe1ekijJ1rZD6YpRjV35bb8EvshtgDEgo",
+        "cTHnmhzeJqEEe6ySX4HeUYs1FBJGk7kjMzQr2PB4erKHoboEq",
+        "cTJUqxo9F9hmkRKSEHbVpFYQ6YA72HQ1Lv4BLhDNX9xxZCg1u",
+        "cTHohq8LBHvzzAPJZTkCdKJdienVuaouVLGoPSEN1R1iaYzfj",
+        "cTKh69q4YWbA5DQumvcWB4ejMc6PmEEkAz7QVRhDheWoqkrQQ",
+        "cTMgaVKvsnW4StpKrjpxk6dakkbZdFUL6NzJHzgnrhnn7u65M",
+        "cTJZie9HQkfxkkWuhjhoZg7LsPZMaS9ZZMC4uyEZkzJ6u8Yd2",
+        "cTGqk1RCAugyD89mqGvN3o85oGwnzSaHwYMxsqKK23eFdsZbM",
+        "cTLBw5NVHZVCsFy4v536HbBnW81FvUqmunopoNssWAgvcsvDJ",
+        "cTGihWBE4xcyWpnyTkDuWZhKYBrCthGRcfY5JVnwL9vX2QtGH",
+        "cTJ7bb3EMFA46dgaouK457jXftmfxxFJvKv5Eoiu72M4Y6yx5",
+        "cTL1yTqS5GRgDTmMxHGwLER6aDrHNneYgP2JMaxoAa3eSMZsE",
+        "cTKcDS1txuUXWhuGHQYYwGqvJeBwJiLnWGzvovv41pg8XLCf8",
+        "cTGdA4TsMDu6JWRSfZxxeacrPFAwxpzdgsmWnACsJnruzymM7",
+        "cTMeQ78rS6t4BHro3SrVxV1aiadv7iFNuS869YijNaQ6fD492",
+        "cTLRkvWw5jcQUaFPnAtqYyH4kaGmYSTkdSiqSEw8zjGjiaRE3",
+	];
+
+	let authorities = authorities
+		.into_iter()
+		.map(|address| {
+			(
+				sp_finality_grandpa::AuthorityId::from_ss58check(address)
+					.expect("hard fork authority addresses are static and they should be carefully defined; qed."),
+				1,
+			)
+		})
+		.collect::<Vec<_>>();
+
+	forks
+		.into_iter()
+		.map(|(set_id, hash, number)| {
+			let hash = Hash::from_str(hash)
+				.expect("hard fork hashes are static and they should be carefully defined; qed.");
+
+			(set_id, (hash, number), authorities.clone())
+		})
+		.collect()
+}
+
+
+
+
+
+
 
 // Our native executor instance.
 // TODO: Bring benchmarks back
@@ -67,12 +221,14 @@ pub fn new_partial(config: &Configuration) -> Result<
     client.clone(),
     );
 
-    let (grandpa_block_import, grandpa_link) =
-        sc_finality_grandpa::block_import(
-            client.clone(),
-            &(client.clone() as Arc<_>),
-            select_chain.clone()
-        )?;
+    let grandpa_hard_forks = crust_hard_forks();
+
+    let (grandpa_block_import, grandpa_link) = sc_finality_grandpa::block_import_with_authority_set_hard_forks(
+        client.clone(),
+        &(client.clone() as Arc<_>),
+        select_chain.clone(),
+        grandpa_hard_forks
+    )?;
 
     let justification_import = grandpa_block_import.clone();
 

@@ -336,25 +336,25 @@ pub(crate) fn grandpa_mainnet_hard_forks() -> Vec<AuthoritySetHardFork<Block>> {
     use sp_core::crypto::Ss58Codec;
 
     let authorities = vec![
-        // (Public(710a4eb0d7eb4d399fc824134b27055914d26a67a49e929c4d64200f83c2e936 (5EcvL6bL...)), 1),
+        // 710a4eb0d7eb4d399fc824134b27055914d26a67a49e929c4d64200f83c2e936 (5EcvL6bL...)
         "5EcvL6bLUYPmr2GGZjkGNpQUCCgGVf8imVwF7D5rvUWXzkSn",
-        // (Public(109409eba4571f2a31a2ad61fee8eda976606e953813956ea2d05af5f43a856d (5CSSbkgw...)), 1),
+        // 109409eba4571f2a31a2ad61fee8eda976606e953813956ea2d05af5f43a856d (5CSSbkgw...)
         "5CSSbkgwsvotFhFdsy6KbyQXPVux1PHrNcso1dGgyjErnevM",
-        // (Public(6a0519ec737e402f92c7802428d3249abdaece67cbe15b5662f3fd3776733e34 (5ETiSxSR...)), 1),
+        // 6a0519ec737e402f92c7802428d3249abdaece67cbe15b5662f3fd3776733e34 (5ETiSxSR...)
         "5ETiSxSRryzBTsqzRJsxyuav4g4FwmZwWPLsPnxz1UgJMS1w",
-        // (Public(6c2dd59b305af2edee2d785fb89142d00cd4a4023a9771f3753f3d44a16ae12d (5EWYeKuo...)), 1),
+        // 6c2dd59b305af2edee2d785fb89142d00cd4a4023a9771f3753f3d44a16ae12d (5EWYeKuo...)
         "5EWYeKuo13L56kzb3tCgyq8A1ehLQiL8wX9zAfQdCm9ghRK7",
-        // (Public(df48d76e5963d94bb3cbf98bafbfd01742d00a76e55b30691e131e3e9f94d4bf (5H7UB3GD...)), 1),
+        // df48d76e5963d94bb3cbf98bafbfd01742d00a76e55b30691e131e3e9f94d4bf (5H7UB3GD...)
         "5H7UB3GDRvaanzGdxFBeEv2qF1cHU87YTpm2NcBp9UZ1NGg3",
-        // (Public(e310e3d448225456845dd24284555730ce8c7606a25245cd0669f3d4dd975e7d (5HCRk8G2...)), 1),
+        // e310e3d448225456845dd24284555730ce8c7606a25245cd0669f3d4dd975e7d (5HCRk8G2...)
         "5HCRk8G2M3nFGG8VamTkbznfzFCELPx9ekVwtXrGKc3ehJuy",
-        // (Public(92d3f200161ca558ae8b4995fd41b2a32524236237fcd1c48468248118475afe (5FPDotXR...)), 1),
+        // 92d3f200161ca558ae8b4995fd41b2a32524236237fcd1c48468248118475afe (5FPDotXR...)
         "5FPDotXRfXwsDD9pyrooH8wPoDqvPEwUsKqhRD4adBP3MDeD",
-        // (Public(f82870a932ca87247d7ecb8ef5844a5907fc4e2172f8f2a7e9158e4f09f3f56c (5Hg5kD4R...)), 1),
+        // f82870a932ca87247d7ecb8ef5844a5907fc4e2172f8f2a7e9158e4f09f3f56c (5Hg5kD4R...)
         "5Hg5kD4RMjW1unMutF2JHrNkzcMJL9kUdmTthH98vcJpnwZ1",
-        // (Public(4d0be5a393045dbaf170e3a828173e8211bd2f67146c24bdf093736ad8d78812 (5Doj5W7q...)), 1),
+        // 4d0be5a393045dbaf170e3a828173e8211bd2f67146c24bdf093736ad8d78812 (5Doj5W7q...)
         "5Doj5W7qVmW7QjCuBS2VNPKgDNdzFU2oKuoAUvdC81Yjj9cK",
-        // (Public(b07dd100bea10b1497e0e0de5f3a7bd7bf9fda374138be6ebe24e8ac69b8c41b (5G47fF16...)), 1)],
+        // b07dd100bea10b1497e0e0de5f3a7bd7bf9fda374138be6ebe24e8ac69b8c41b (5G47fF16...)
         "5G47fF16SxQJCDTY3wEvWEjPFAm8rAB4ZAqh8dnBo9zkCfJP"
     ];
 

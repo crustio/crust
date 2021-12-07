@@ -8,7 +8,7 @@ use std::time::Duration;
 use sc_client_api::{RemoteBackend, ExecutorProvider};
 use crust_runtime::{self, opaque::Block, RuntimeApi};
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
-use sc_finality_grandpa::{self, FinalityProofProvider as GrandpaFinalityProofProvider};
+use sc_finality_grandpa::{self, AuthoritySetHardFork, FinalityProofProvider as GrandpaFinalityProofProvider};
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
 use sp_inherents::InherentDataProviders;
@@ -68,10 +68,11 @@ pub fn new_partial(config: &Configuration) -> Result<
     );
 
     let (grandpa_block_import, grandpa_link) =
-        sc_finality_grandpa::block_import(
+        sc_finality_grandpa::block_import_with_authority_set_hard_forks(
             client.clone(),
             &(client.clone() as Arc<_>),
-            select_chain.clone()
+            select_chain.clone(),
+            grandpa_mainnet_hard_forks(),
         )?;
 
     let justification_import = grandpa_block_import.clone();
@@ -321,6 +322,71 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError>
     Ok(task_manager)
 }
 
+/// On block #2080276 the network had some issues that led to finality being stalled. In order to
+/// recover the network a bunch of `grandpa.noteStalled` extrinsics were pushed, unfortunately this
+/// led to an inconsistency in the number of authority set changes that were applied, in particular
+/// authorities that were online at the time applied one extra forced change and therefore their set
+/// id will be off by one when compared to syncing nodes. This makes it so that e.g. signature
+/// verification of justifications fails and syncing nodes cannot get to the latest finalized block.
+/// In order to fix this we need to "manually" insert a forced change as a GRANDPA hard fork below.
+/// The list of authorities below is taken from block #2080862 (https://crust.subscan.io/extrinsic/2080862-0?event=2080862-1),
+/// and the manual forced change is inserted at #2080800.
+pub(crate) fn grandpa_mainnet_hard_forks() -> Vec<AuthoritySetHardFork<Block>> {
+    use std::str::FromStr;
+    use sp_core::crypto::Ss58Codec;
+
+    let authorities = vec![
+        // (Public(710a4eb0d7eb4d399fc824134b27055914d26a67a49e929c4d64200f83c2e936 (5EcvL6bL...)), 1),
+        "5EcvL6bLUYPmr2GGZjkGNpQUCCgGVf8imVwF7D5rvUWXzkSn",
+        // (Public(109409eba4571f2a31a2ad61fee8eda976606e953813956ea2d05af5f43a856d (5CSSbkgw...)), 1),
+        "5CSSbkgwsvotFhFdsy6KbyQXPVux1PHrNcso1dGgyjErnevM",
+        // (Public(6a0519ec737e402f92c7802428d3249abdaece67cbe15b5662f3fd3776733e34 (5ETiSxSR...)), 1),
+        "5ETiSxSRryzBTsqzRJsxyuav4g4FwmZwWPLsPnxz1UgJMS1w",
+        // (Public(6c2dd59b305af2edee2d785fb89142d00cd4a4023a9771f3753f3d44a16ae12d (5EWYeKuo...)), 1),
+        "5EWYeKuo13L56kzb3tCgyq8A1ehLQiL8wX9zAfQdCm9ghRK7",
+        // (Public(df48d76e5963d94bb3cbf98bafbfd01742d00a76e55b30691e131e3e9f94d4bf (5H7UB3GD...)), 1),
+        "5H7UB3GDRvaanzGdxFBeEv2qF1cHU87YTpm2NcBp9UZ1NGg3",
+        // (Public(e310e3d448225456845dd24284555730ce8c7606a25245cd0669f3d4dd975e7d (5HCRk8G2...)), 1),
+        "5HCRk8G2M3nFGG8VamTkbznfzFCELPx9ekVwtXrGKc3ehJuy",
+        // (Public(92d3f200161ca558ae8b4995fd41b2a32524236237fcd1c48468248118475afe (5FPDotXR...)), 1),
+        "5FPDotXRfXwsDD9pyrooH8wPoDqvPEwUsKqhRD4adBP3MDeD",
+        // (Public(f82870a932ca87247d7ecb8ef5844a5907fc4e2172f8f2a7e9158e4f09f3f56c (5Hg5kD4R...)), 1),
+        "5Hg5kD4RMjW1unMutF2JHrNkzcMJL9kUdmTthH98vcJpnwZ1",
+        // (Public(4d0be5a393045dbaf170e3a828173e8211bd2f67146c24bdf093736ad8d78812 (5Doj5W7q...)), 1),
+        "5Doj5W7qVmW7QjCuBS2VNPKgDNdzFU2oKuoAUvdC81Yjj9cK",
+        // (Public(b07dd100bea10b1497e0e0de5f3a7bd7bf9fda374138be6ebe24e8ac69b8c41b (5G47fF16...)), 1)],
+        "5G47fF16SxQJCDTY3wEvWEjPFAm8rAB4ZAqh8dnBo9zkCfJP"
+    ];
+
+    let set_id = 607;
+    let block_number = 2080800;
+    let block_hash = "0x1967d464a2f26354491c5c00dfcf906234d9689fb72ae4741305a949287604f2";
+    let last_finalized = 2080278;
+
+    let block_hash = primitives::Hash::from_str(block_hash)
+        .expect("hard fork hashes are static and they should be carefully defined; qed.");
+
+    let authorities = authorities
+        .into_iter()
+        .map(|address| {
+            (
+                sp_finality_grandpa::AuthorityId::from_ss58check(address)
+                    .expect("hard fork authority addresses are static and they should be carefully defined; qed."),
+                1,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    vec![
+        AuthoritySetHardFork {
+            set_id,
+            block: (block_hash, block_number),
+            authorities,
+            last_finalized: Some(last_finalized),
+        }
+    ]
+}
+
 /// Builds a new service for a light client.
 pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError> {
     let (client, backend, keystore, mut task_manager, on_demand) =
@@ -338,10 +404,11 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
         on_demand.clone(),
     ));
 
-    let (grandpa_block_import, _) = sc_finality_grandpa::block_import(
+    let (grandpa_block_import, _) = sc_finality_grandpa::block_import_with_authority_set_hard_forks(
         client.clone(),
         &(client.clone() as Arc<_>),
         select_chain.clone(),
+        grandpa_mainnet_hard_forks(),
     )?;
     let finality_proof_import = grandpa_block_import.clone();
 

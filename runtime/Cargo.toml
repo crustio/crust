@@ -9,7 +9,7 @@ homepage = "https://crust.network"
 repository = "https://github.com/crustio/crust/"
 
 [build-dependencies]
-substrate-wasm-builder = { git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
+substrate-wasm-builder = { git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
 
 [dependencies]
 # third party dependencies
@@ -20,58 +20,58 @@ smallvec = "1.4.1"
 hex-literal = "0.3.1"
 
 # substrate primitives
-authority-discovery-primitives = { default-features = false, package = "sp-authority-discovery", git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-babe-primitives = { default-features = false, package = "sp-consensus-babe", git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-api = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-block-builder = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-core = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-inherents = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-io = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-offchain = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-runtime = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-session = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-staking = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-std = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-transaction-pool = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-version = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-arithmetic = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+authority-discovery-primitives = { default-features = false, package = "sp-authority-discovery", git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+babe-primitives = { default-features = false, package = "sp-consensus-babe", git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-api = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-block-builder = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-core = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-inherents = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-io = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-offchain = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-session = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-staking = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-transaction-pool = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-version = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-arithmetic = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
 
 # substrate frame dependencies
-pallet-authorship = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-authority-discovery = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-babe = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-bounties = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-collective = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-democracy = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-elections-phragmen = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-frame-executive = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-grandpa = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-im-online = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-indices = { git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a", default-features = false }
-pallet-identity = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
-pallet-membership = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-offences = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-randomness-collective-flip = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-scheduler = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-session = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-sudo = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-frame-support = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-staking-reward-curve = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-frame-system = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-timestamp = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-tips = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-transaction-payment = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-treasury = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-utility = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-multisig = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-authorship = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-authority-discovery = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-babe = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-bounties = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-collective = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-democracy = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-elections-phragmen = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+frame-executive = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-grandpa = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-im-online = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-indices = { git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a", default-features = false }
+pallet-identity = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
+pallet-membership = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-offences = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-randomness-collective-flip = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-scheduler = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-session = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-sudo = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-staking-reward-curve = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-timestamp = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-tips = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-transaction-payment = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-treasury = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-utility = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-multisig = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
 
 # substrate benchmark dependencies
-frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
-frame-system-benchmarking = { default-features = false, optional = true, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
+frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
+frame-system-benchmarking = { default-features = false, optional = true, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
 
 # Used for the crust"s RPCs
-frame-system-rpc-runtime-api = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-pallet-transaction-payment-rpc-runtime-api = { default-features = false, git = "https://github.com/mmyyrroonn/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+frame-system-rpc-runtime-api = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+pallet-transaction-payment-rpc-runtime-api = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
 
 # crust runtime modules
 balances = { package = "cstrml-balances", path = "../cstrml/balances", default-features = false, version = "1.0.0" }

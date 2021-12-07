@@ -40,9 +40,12 @@ cargo build --release
 
 ```shell
 sudo apt install gcc-multilib
+
 wget https://apt.llvm.org/llvm.sh
-sudo ./llvm 10
-sudo ln -s /usr/lib/llvm-10/bin/llvm-config llvm-config
+chmod +x ./llvm.sh
+sudo ./llvm.sh 10
+sudo ln -s /usr/lib/llvm-10/bin/llvm-config /user/bin/llvm-config
+
 sudo apt install gcc
 sudo apt install clang
 ```

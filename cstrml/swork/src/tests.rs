@@ -3006,7 +3006,7 @@ fn basic_check_should_work() {
 
             let mut legal_wr_info = legal_work_report_with_added_files();
             // Exceed the max files count
-            for index in 0..5000 {
+            for index in 0..300 {
                 legal_wr_info.added_files.push((format!("{:04}", index).as_bytes().to_vec(), 0, 0));
             }
             assert_noop!(

@@ -52,7 +52,7 @@ pub(crate) const LOG_TARGET: &'static str = "swork";
 const IDENTITY_UPDATE_LENGTH: usize = 500; // Loop 500 identities per block
 const SRD_LIMIT: u64 = 2_251_799_813_685_248; // 2 PB <-> 2 * 1024 * 1024 * 1024 * 1024 * 1024.
 const FILES_LIMIT: u64 = 9_007_199_254_740_992; // 8 PB <-> 8 * 1024 * 1024 * 1024 * 1024 * 1024.
-const FILES_COUNT_LIMIT: usize = 5000; // 5000 files for now.
+const FILES_COUNT_LIMIT: usize = 300; // TODO: 300 files for now(will be deleted after completed wr reporting mechanism).
 const NEW_IDENTITY: ReportSlot = 1;
 const NO_PUNISHMENT: ReportSlot = 0;
 
@@ -502,7 +502,7 @@ decl_module! {
             let mut prev_pk = curr_pk.clone();
 
             // 1. Basic check
-            ensure!(reported_srd_size < SRD_LIMIT && reported_files_size < FILES_LIMIT && added_files.len() < FILES_COUNT_LIMIT, Error::<T>::IllegalWorkReport);
+            ensure!(reported_srd_size < SRD_LIMIT && reported_files_size < FILES_LIMIT && added_files.len() <= FILES_COUNT_LIMIT && deleted_files.len() <= FILES_COUNT_LIMIT, Error::<T>::IllegalWorkReport);
 
             // 2. Ensure reporter is registered
             ensure!(PubKeys::contains_key(&curr_pk), Error::<T>::IllegalReporter);
@@ -986,6 +986,7 @@ impl<T: Config> Module<T> {
         let mut old_spower: u64 = 0;
         let mut old_free: u64 = 0;
         let mut old_reported_files_size: u64 = 0;
+
         // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
 

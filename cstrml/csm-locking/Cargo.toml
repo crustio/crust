@@ -14,28 +14,28 @@ safe-mix = { default-features = false, version = "1.0.0" }
 codec = { package = "parity-scale-codec", default-features = false, features = ["derive"], version = "2.0.0" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = "3.0.0" }
-frame-system = { default-features = false, version = "3.0.0" }
+frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 
 # substrate primitives
-sp-keyring = { optional = true, version = "3.0.0" }
-sp-std = { default-features = false, version = "3.0.0" }
-sp-io ={ default-features = false, version = "3.0.0" }
-sp-runtime = { default-features = false, version = "3.0.0" }
-frame-benchmarking = { default-features = false, optional = true, version = "3.0.0" }
+sp-keyring = { optional = true, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-io ={ default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 
 # crust runtime modules
 primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
 
 [dev-dependencies]
-sp-core = "3.0.0"
+sp-core = { git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4"}
 balances = { package = "cstrml-balances", path = "../balances" }
 primitives = { package = "cst-primitives", path = "../../primitives", features = ["test"] }
-pallet-timestamp = "3.0.0"
-frame-benchmarking = "3.0.0"
+pallet-timestamp = { git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4"}
+frame-benchmarking = { git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4"}
 
 # private crate inside substrate
-substrate-test-utils = "3.0.0"
+substrate-test-utils = { git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4"}
 
 [features]
 equalize = []

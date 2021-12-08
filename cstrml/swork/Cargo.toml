@@ -15,14 +15,14 @@ base64 = { default-features = false, features = ["alloc"], version = "0.12.2" }
 p256 = { default-features = false, features = ["ecdsa"], version = "0.5.1" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, version = "3.0.0" }
-frame-system = { default-features = false, version = "3.0.0" }
+frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 
 # substrate primitives
-sp-core = { default-features = false, version = "3.0.0" }
-sp-io = { default-features = false, version = "3.0.0" }
-sp-runtime = { default-features = false, version = "3.0.0" }
-sp-std = { default-features = false, version = "3.0.0" }
+sp-core = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-io = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 
 # crust runtime modules
 primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
@@ -30,7 +30,7 @@ webpki = { package = "webpki", path = "../../utils/webpki", default-features = f
 serde_json = { package = "serde_json_no_std", path = "../../utils/serde_json_no_std", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
-keyring = { package = "sp-keyring", version = "3.0.0" }
+keyring = { package = "sp-keyring", git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 balances = { package = "cstrml-balances", path = "../balances" }
 primitives = { package = "cst-primitives", path = "../../primitives", features = ["test"] }
 market = { package = "cstrml-market", path = "../market" }

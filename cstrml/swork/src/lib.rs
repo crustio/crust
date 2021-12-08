@@ -753,7 +753,7 @@ decl_module! {
             ensure!(Self::groups(&owner).allowlist.contains(&who), Error::<T>::NotInAllowlist);
 
             // 6. Ensure who's wr's spower is zero
-            ensure!(Self::work_reports(identity.anchor).unwrap_or_default().spower == 0, Error::<T>::IllegalSpower);
+            ensure!(Self::work_reports(identity.anchor).unwrap_or_default().reported_files_size == 0, Error::<T>::IllegalSpower);
 
             // 7. Join the group
             <Groups<T>>::mutate(&owner, |group| {

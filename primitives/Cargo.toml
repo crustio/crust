@@ -13,10 +13,10 @@ serde = { optional = true, features = ["derive"], version = "1.0.116" }
 parity-scale-codec = { default-features = false, features = ["bit-vec", "derive"], version = "2.0.0" }
 
 # substrate primitives
-sp-runtime = { default-features = false, version = "3.0.0" }
-sp-core = { default-features = false, version = "3.0.0" }
-sp-std = { default-features = false, version = "3.0.0" }
-frame-support = { default-features = false, version = "3.0.0" }
+sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-core = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 
 [features]
 default = ["std"]

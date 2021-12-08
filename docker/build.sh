@@ -32,7 +32,7 @@ source $DIR/utils.sh
 
 BUILD_DIR="`pwd`"
 DIST_FILE="target/release/crust"
-CRUST_VER=`head -n 10 runtime/Cargo.toml|awk '/version/{print $3}' |sed  s"/\"//g"`
+CRUST_VER=`head -n 10 node/Cargo.toml|awk '/version/{print $3}' |sed  s"/\"//g"`
 IMAGEID="crustio/crust:${CRUST_VER}"
 
 if [ ! -f "$DIST_FILE" ]; then

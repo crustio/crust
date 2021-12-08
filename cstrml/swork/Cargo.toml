@@ -15,14 +15,14 @@ base64 = { default-features = false, features = ["alloc"], version = "0.12.2" }
 p256 = { default-features = false, features = ["ecdsa"], version = "0.5.1" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
 
 # substrate primitives
-sp-core = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-io = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-core = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+sp-io = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
 
 # crust runtime modules
 primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
@@ -30,7 +30,7 @@ webpki = { package = "webpki", path = "../../utils/webpki", default-features = f
 serde_json = { package = "serde_json_no_std", path = "../../utils/serde_json_no_std", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
-keyring = { package = "sp-keyring", git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+keyring = { package = "sp-keyring", git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
 balances = { package = "cstrml-balances", path = "../balances" }
 primitives = { package = "cst-primitives", path = "../../primitives", features = ["test"] }
 market = { package = "cstrml-market", path = "../market" }

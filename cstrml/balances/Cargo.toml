@@ -13,19 +13,19 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 serde = { optional = true, version = "1.0.116" }
 codec = { package = "parity-scale-codec", default-features = false, features = ["derive"], version = "2.0.0" }
-sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
-frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a" }
+sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+sp-runtime = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
+frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18" }
 
 # crust runtime modules
 primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
 
 [dev-dependencies]
-sp-io = { git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
-sp-core = { git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
-pallet-transaction-payment = { git = "https://github.com/crustio/substrate", rev = "4a099fc018f066288b28917d2f73f1823b7a7b9a"}
+sp-io = { git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18"}
+sp-core = { git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18"}
+pallet-transaction-payment = { git = "https://github.com/crustio/substrate", rev = "1495ddae7caf1d1e541084e85507fa49f8cb3a18"}
 primitives = { package = "cst-primitives", path = "../../primitives", features = ["test"] }
 
 [features]

@@ -4663,7 +4663,7 @@ dependencies = [
 [[package]]
 name = "orml-xcm"
 version = "0.4.1-dev"
-source = "git+https://github.com/open-web3-stack/open-runtime-module-library?rev=b89b1f98fcf0f5c341fbef1d12bfd869a2f2a9fe#b89b1f98fcf0f5c341fbef1d12bfd869a2f2a9fe"
+source = "git+https://github.com/open-web3-stack/open-runtime-module-library?rev=03fe5543968c3774738ab38c64323b1d1c7d58d4#03fe5543968c3774738ab38c64323b1d1c7d58d4"
 dependencies = [
  "frame-support",
  "frame-system",

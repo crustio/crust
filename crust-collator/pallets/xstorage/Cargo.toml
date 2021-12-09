@@ -44,4 +44,5 @@ std = [
 	"cumulus-primitives-core/std",
 	"xcm/std",
 	"polkadot-primitives/std",
+	"xcm-executor/std"
 ]

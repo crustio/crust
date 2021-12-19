@@ -156,9 +156,6 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                     created_at: Some(valid_at)
                 };
                 Self::insert_replica(&mut file_info, new_replica);
-                PendingFiles::mutate(|files| {
-                    files.insert(cid.clone());
-                });
                 file_info.reported_replica_count += 1;
                 // Always return the file size for this [who] reported first time
                 spower = file_info.file_size;
@@ -217,9 +214,6 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // 3. Decrease the reported_replica_count
             if to_decrease_count != 0 {
                 file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(to_decrease_count);
-                PendingFiles::mutate(|files| {
-                    files.insert(cid.clone());
-                });
             }
             <Files<T>>::insert(cid, file_info);
         }
@@ -443,18 +437,6 @@ decl_module! {
             if ((now + BASE_FEE_UPDATE_OFFSET) % BASE_FEE_UPDATE_SLOT).is_zero() {
                 Self::update_base_fee();
                 add_db_reads_writes(3, 3);
-            }
-            add_db_reads_writes(1, 0);
-            if ((now + SPOWER_UPDATE_OFFSET) % SPOWER_UPDATE_SLOT).is_zero() || Self::pending_files().len() >= MAX_PENDING_FILES {
-                let files = Self::get_files_to_update();
-                for cid in files {
-                    if let Some(mut file_info) = Self::files(&cid) {
-                        let groups_count = Self::update_replicas_spower(&mut file_info, Some(now));
-                        <Files<T>>::insert(cid, file_info);
-                        add_db_reads_writes(groups_count, groups_count + 1);
-                    }
-                    add_db_reads_writes(1, 0);
-                }
             }
             add_db_reads_writes(1, 0);
             consumed_weight
@@ -1098,28 +1080,6 @@ impl<T: Config> Module<T> {
         };
 
         integer * file_size + file_size / denominator * numerator
-    }
-
-    fn get_files_to_update() -> Vec<MerkleRoot> {
-        let mut pending_files = PendingFiles::take();
-        let mut files_to_update = Vec::<MerkleRoot>::new();
-        let mut count = 0;
-        // Loop the MAX_PENDING_FILES files
-        for cid in &pending_files {
-            if count >= MAX_PENDING_FILES {
-                break;
-            }
-            files_to_update.push(cid.clone());
-            count += 1;
-        }
-        // Remove the MAX_PENDING_FILES files from pending files
-        if files_to_update.len() < pending_files.len() {
-            for cid in files_to_update.clone() {
-                pending_files.remove(&cid);
-            }
-            PendingFiles::put(pending_files);
-        }
-        files_to_update
     }
 }
 

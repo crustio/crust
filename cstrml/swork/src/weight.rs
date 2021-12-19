@@ -42,9 +42,9 @@ impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().writes(3 as Weight))
 	}
 	fn report_works(added: u32, deleted: u32) -> Weight {
-		(3_105_000_000 as Weight)
-			.saturating_add((515_000_000 as Weight).saturating_mul(added as Weight))
-			.saturating_add((287_000_000 as Weight).saturating_mul(deleted as Weight))
+		(6_105_000_000 as Weight)
+			.saturating_add((750_000_000 as Weight).saturating_mul(added as Weight))
+			.saturating_add((578_000_000 as Weight).saturating_mul(deleted as Weight))
 			.saturating_add(T::DbWeight::get().reads(1 as Weight).saturating_mul(added as Weight))
 			.saturating_add(T::DbWeight::get().writes(1 as Weight).saturating_mul(added as Weight))
 			.saturating_add(T::DbWeight::get().reads(3 as Weight).saturating_mul(deleted as Weight))

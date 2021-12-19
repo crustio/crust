@@ -845,7 +845,8 @@ impl<T: Config> Module<T> {
 
     fn insert_replica(file_info: &mut FileInfo<T::AccountId, BalanceOf<T>>, new_replica: Replica<T::AccountId>) {
         file_info.replicas.push(new_replica);
-        file_info.replicas.sort_by_key(|d| d.valid_at);
+        // TODO: Use BTreeMap / BTreeSet in the future
+        // file_info.replicas.sort_by_key(|d| d.valid_at);
     }
 
     fn init_pot(account: fn() -> T::AccountId) {

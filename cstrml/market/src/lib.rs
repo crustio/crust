@@ -497,7 +497,8 @@ decl_module! {
             let curr_bn = Self::get_current_block_number();
 
             // 6. do calculate reward. Try to close file and decrease first party storage
-            Self::do_calculate_reward(&cid, curr_bn);
+            // TODO: refine this logic in the future
+            //Self::do_calculate_reward(&cid, curr_bn);
 
             // 7. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);

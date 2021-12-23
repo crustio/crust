@@ -752,7 +752,7 @@ decl_module! {
             // 5. Ensure who is in the allowlist
             ensure!(Self::groups(&owner).allowlist.contains(&who), Error::<T>::NotInAllowlist);
 
-            // 6. Ensure who's wr's spower is zero
+            // 6. Set who's wr's spower to zero
             WorkReports::mutate_exists(&identity.anchor, |maybe_wr| match *maybe_wr {
                 Some(WorkReport { ref mut spower, .. }) => {
                     *spower = 0;
@@ -807,7 +807,7 @@ decl_module! {
                 group.members.remove(&who);
             });
 
-            // 6. Remove the group owner
+            // 6. Reset the work report to no files
             WorkReports::mutate_exists(&identity.anchor, |maybe_wr| match *maybe_wr {
                 Some(WorkReport { ref mut spower, ref mut reported_files_size, ref mut reported_files_root, .. }) => {
                     *spower = 0;

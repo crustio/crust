@@ -936,18 +936,22 @@ impl<T: Config> Module<T> {
             // New order => check the alpha
             Some(alpha) => {
                 match alpha {
-                    0 ..= 3 => (false, Perbill::from_percent(9)),
-                    4 => (false,Perbill::from_percent(7)),
-                    5 => (false,Perbill::from_percent(6)),
-                    6 => (false,Perbill::from_percent(5)),
-                    7 => (false,Perbill::from_percent(4)),
-                    8 ..= 9 => (false,Perbill::from_percent(3)),
+                    0 ..= 1 => (false,Perbill::from_percent(20)),
+                    2 => (false,Perbill::from_percent(18)),
+                    3 => (false,Perbill::from_percent(15)),
+                    4 => (false,Perbill::from_percent(12)),
+                    5 => (false,Perbill::from_percent(10)),
+                    6 => (false,Perbill::from_percent(8)),
+                    7 => (false,Perbill::from_percent(6)),
+                    8 => (false,Perbill::from_percent(4)),
+                    9 => (false,Perbill::from_percent(2)),
                     10 ..= 30 => (false,Perbill::zero()),
-                    _ => (true, Perbill::from_percent(3))
+                    31 ..= 50 => (true,Perbill::from_percent(3)),
+                    _ => (true, Perbill::from_percent(5))
                 }
             },
             // No new order => decrease the price
-            None => (true, Perbill::from_percent(3))
+            None => (true, Perbill::from_percent(5))
         }
     }
 

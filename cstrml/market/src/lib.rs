@@ -855,14 +855,11 @@ impl<T: Config> Module<T> {
             }
             // 1. Calculate total amount
             let (file_base_fee, file_amount) = Self::get_file_fee(file_info.file_size);
-            let renew_reward = T::RenewRewardRatio::get() * ( file_amount.clone() + file_base_fee.clone() );
-            let total_amount = file_base_fee.clone() + file_amount.clone() + renew_reward.clone();
+            let total_amount = file_base_fee.clone() + file_amount.clone();
             // 2. Check if prepaid pool can afford the price
             if file_info.prepaid >= total_amount {
                 file_info.prepaid = file_info.prepaid.saturating_sub(total_amount.clone());
-                // 3. Reward liquidator.
-                T::Currency::transfer(&Self::storage_pot(), liquidator, renew_reward, KeepAlive)?;
-                // 4. Split into reserved, storage and staking account
+                // 3. Split into reserved, storage and staking account
                 let file_amount = Self::split_into_reserved_and_storage_and_staking_pot(&Self::storage_pot(), file_amount.clone(), file_base_fee, Zero::zero(), KeepAlive)?;
                 file_info.amount += file_amount;
                 if file_info.replicas.len() == 0 {

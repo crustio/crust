@@ -579,14 +579,10 @@ decl_module! {
 
             let curr_bn = Self::get_current_block_number();
 
-            // 6. do calculate reward. Try to close file and decrease first party storage
-            // TODO: refine this logic in the future
-            //Self::do_calculate_reward(&cid, curr_bn);
-
-            // 7. three scenarios: new file, extend time(refresh time)
+            // 6. three scenarios: new file, extend time(refresh time)
             Self::upsert_new_file_info(&cid, &amount, &curr_bn, charged_file_size);
 
-            // 8. Update new order status.
+            // 7. Update new order status.
             HasNewOrder::put(true);
             OrdersCount::mutate(|count| {*count = count.saturating_add(1)});
 
@@ -1074,8 +1070,7 @@ impl<T: Config> Module<T> {
         // discount_amount = total_amount * min(market_funds_ratio, 0.1)
         // reserved_amount = total_amount - staking_amount - storage_amount - discount_amount
         let total_amount = value.saturating_add(base_fee);
-        let discount_amount = Self::get_discount_ratio(who) * total_amount;
-        let reserved_amount = total_amount.saturating_sub(staking_amount).saturating_sub(storage_amount).saturating_sub(discount_amount);
+        let reserved_amount = total_amount.saturating_sub(staking_amount).saturating_sub(storage_amount);
 
         // Add the tips into storage amount
         let storage_amount = storage_amount + tips;

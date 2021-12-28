@@ -44,6 +44,9 @@ use primitives::{
 
 pub(crate) const LOG_TARGET: &'static str = "market";
 const MAX_REPLICAS: usize = 200;
+// We should change `calculate_reward_amount` if we change the REWARD_PERSON
+// Any ratio change should re-design the `calculate_reward_amount` as well
+const REWARD_PERSON: u32 = 4;
 
 #[macro_export]
 macro_rules! log {
@@ -210,10 +213,19 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                         // set created_at to some
                         created_at: Some(valid_at)
                     };
-                    file_info.replicas.insert(owner, new_replica);
+                    file_info.replicas.insert(owner.clone(), new_replica);
                     file_info.reported_replica_count += 1;
                     // Always return the file size for this [who] reported first time
                     spower = file_info.file_size;
+
+                    if file_info.remaining_paid_count > 0 {
+                        let reward_amount = Self::calculate_reward_amount(file_info.remaining_paid_count, &file_info.amount);
+                        if let Some(new_reward) = Self::has_enough_collateral(&owner, &reward_amount) {
+                            T::BenefitInterface::update_reward(&owner, new_reward);
+                            file_info.amount -= reward_amount;
+                            file_info.remaining_paid_count -= 1;
+                        }
+                    }
                 }
             }
 
@@ -860,6 +872,7 @@ impl<T: Config> Module<T> {
                     // we keep the original amount and expected_replica_count
                     file_info.expired_at = 0;
                     file_info.calculated_at = curr_bn;
+                    file_info.remaining_paid_count = REWARD_PERSON;
                 } else {
                     // Refresh the file to the new file
                     file_info.expired_at = curr_bn + T::FileDuration::get();
@@ -919,7 +932,7 @@ impl<T: Config> Module<T> {
                 calculated_at: curr_bn.clone(),
                 amount: amount.clone(),
                 prepaid: Zero::zero(),
-                remaining_paid_count: 4u32,
+                remaining_paid_count: REWARD_PERSON,
                 reported_replica_count: 0u32,
                 replicas: BTreeMap::new()
             };
@@ -1123,6 +1136,16 @@ impl<T: Config> Module<T> {
             }
         }
         false
+    }
+
+    fn calculate_reward_amount(remaining_paid_count: u32, amount: &BalanceOf<T>) -> BalanceOf<T> {
+        match remaining_paid_count {
+            4u32 => Perbill::from_parts(138888888) * *amount,
+            3u32 => Perbill::from_parts(161290320) * *amount,
+            2u32 => Perbill::from_parts(192307690) * *amount,
+            1u32 => Perbill::from_parts(238095240) * *amount,
+            _ => Zero::zero()
+        }
     }
 
     fn update_replicas_spower(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, curr_bn: Option<BlockNumber>) -> u64 {

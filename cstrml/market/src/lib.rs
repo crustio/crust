@@ -150,7 +150,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `storage power` size is counted by `(who, anchor)`
         // if the file doesn't exist/exceed-replicas(aka. is_counted == false), return false(doesn't increase storage power) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
-        let mut spower: u64 = 0;
+        let mut spower: u64 = reported_file_size;
         let mut is_valid_cid: bool = false;
         if let Some(mut file_info) = <Files<T>>::get(cid) {
             is_valid_cid = true;
@@ -188,8 +188,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             }
 
             // 4. The first join the replicas and file become live(expired_at > calculated_at)
-            let curr_bn = Self::get_current_block_number();
             if file_info.expired_at == 0 {
+                let curr_bn = Self::get_current_block_number();
                 file_info.calculated_at = curr_bn;
                 file_info.expired_at = curr_bn + T::FileDuration::get();
             }
@@ -199,38 +199,32 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         } else if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
             is_valid_cid = true;
             // 1. Check if the length of the groups exceed MAX_REPLICAS or not
-            let mut is_counted = file_info.replicas.len() < MAX_REPLICAS;
-            // 2. Check if the file is stored by other members
-            if is_counted {
-                if file_info.replicas.contains_key(&owner) {
-                    is_counted = false;
+            if file_info.replicas.len() < MAX_REPLICAS {
+                // 2. Check if the file is stored by other members
+                if !file_info.replicas.contains_key(&owner) {
+                    let new_replica = Replica {
+                        who: who.clone(),
+                        valid_at,
+                        anchor: anchor.clone(),
+                        is_reported: true,
+                        // set created_at to some
+                        created_at: Some(valid_at)
+                    };
+                    file_info.replicas.insert(owner, new_replica);
+                    file_info.reported_replica_count += 1;
+                    // Always return the file size for this [who] reported first time
+                    spower = file_info.file_size;
                 }
             }
 
-            // 3. Prepare new replica info
-            if is_counted {
-                let new_replica = Replica {
-                    who: who.clone(),
-                    valid_at,
-                    anchor: anchor.clone(),
-                    is_reported: true,
-                    // set created_at to some
-                    created_at: Some(valid_at)
-                };
-                file_info.replicas.insert(owner, new_replica);
-                file_info.reported_replica_count += 1;
-                // Always return the file size for this [who] reported first time
-                spower = file_info.file_size;
-            }
-
-            // 4. The first join the replicas and file become live(expired_at > calculated_at)
-            let curr_bn = Self::get_current_block_number();
+            // 3. The first join the replicas and file become live(expired_at > calculated_at)
             if file_info.expired_at == 0 {
+                let curr_bn = Self::get_current_block_number();
                 file_info.calculated_at = curr_bn;
                 file_info.expired_at = curr_bn + T::FileDuration::get();
             }
 
-            // 5. Update files
+            // 4. Update files
             <FilesV2<T>>::insert(cid, file_info);
         }
         (spower, is_valid_cid)
@@ -239,7 +233,10 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     /// Node who delete the replica
     /// Accept id(who, anchor), cid and current block number
     /// Returns the real storage power of this file and whether this file is in the market system
-    fn delete_replica(who: &<T as system::Config>::AccountId, owner: <T as system::Config>::AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> (u64, bool) {
+    fn delete_replica(who: &<T as system::Config>::AccountId,
+                      owner: <T as system::Config>::AccountId,
+                      cid: &MerkleRoot,
+                      anchor: &SworkerAnchor) -> (u64, bool) {
         let mut spower: u64 = 0;
         let mut is_valid_cid: bool = false;
         // 1. Delete replica from file_info

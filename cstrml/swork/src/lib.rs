@@ -1053,7 +1053,7 @@ impl<T: Config> Module<T> {
         changed_files: &Vec<(MerkleRoot, u64, u64)>,
         anchor: &SworkerPubKey,
         is_added: bool) -> (u64, u32) {
-        let mut changed_files_size: u64 = 0;
+        let mut changed_spower: u64 = 0;
         let mut changed_files_count: u32 = 0;
 
         // 1. Loop changed files
@@ -1067,14 +1067,14 @@ impl<T: Config> Module<T> {
                         owner = group_owner;
                     }
                 };
-                let (added_file_size, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, owner, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members);
-                changed_files_size = changed_files_size.saturating_add(added_file_size);
+                let (added_spower, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, owner, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members);
                 if is_valid_cid {
                     changed_files_count += 1;
+                    changed_spower = changed_spower.saturating_add(added_spower);
                 }
             }
         } else {
-            for (cid, _, _) in changed_files {
+            for (cid, size, valid_at) in changed_files {
                 // 2. If mapping to storage orders
                 let mut owner = reporter.clone();
                 if let Some(identity) = Self::identities(reporter) {
@@ -1082,14 +1082,18 @@ impl<T: Config> Module<T> {
                         owner = group_owner;
                     }
                 };
-                let (deleted_file_size, is_valid_cid) = T::MarketInterface::delete_replica(reporter, owner, cid, anchor);
-                changed_files_size = changed_files_size.saturating_add(deleted_file_size);
+                let (deleted_spower, is_valid_cid) = T::MarketInterface::delete_replica(reporter, owner, cid, anchor);
+                if deleted_spower != 0 {
+                    changed_spower = changed_spower.saturating_add(deleted_spower);
+                } else if TryInto::<u32>::try_into(*valid_at).ok().unwrap() > 2445603u32 {
+                    changed_spower = changed_spower.saturating_add(*size);
+                }
                 if is_valid_cid {
                     changed_files_count += 1;
                 }
             }
         }
-        (changed_files_size, changed_files_count)
+        (changed_spower, changed_files_count)
     }
 
     /// Get workload by reporter account,

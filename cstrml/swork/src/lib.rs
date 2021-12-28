@@ -138,7 +138,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     fn update_spower(anchor: &SworkerAnchor, anchor_decrease_spower: u64, anchor_increase_spower: u64) {
         if anchor_decrease_spower != anchor_increase_spower {
             WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
-                Some(WorkReport { ref mut spower, .. }) => *spower = spower.saturating_sub(anchor_decrease_spower).saturating_add(anchor_increase_spower),
+                Some(WorkReport { ref mut spower, .. }) => *spower = spower.saturating_add(anchor_increase_spower).saturating_sub(anchor_decrease_spower),
                 ref mut i => *i = None,
             });
         }

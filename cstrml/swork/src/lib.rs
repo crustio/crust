@@ -752,8 +752,13 @@ decl_module! {
             // 5. Ensure who is in the allowlist
             ensure!(Self::groups(&owner).allowlist.contains(&who), Error::<T>::NotInAllowlist);
 
-            // 6. Ensure who's wr's spower is zero
-            ensure!(Self::work_reports(identity.anchor).unwrap_or_default().reported_files_size == 0, Error::<T>::IllegalSpower);
+            // 6. Set who's wr's spower to zero
+            WorkReports::mutate_exists(&identity.anchor, |maybe_wr| match *maybe_wr {
+                Some(WorkReport { ref mut spower, .. }) => {
+                    *spower = 0;
+                },
+                ref mut i => *i = None,
+            });
 
             // 7. Join the group
             <Groups<T>>::mutate(&owner, |group| {
@@ -802,7 +807,21 @@ decl_module! {
                 group.members.remove(&who);
             });
 
-            // 6. Emit event
+            // 6. Reset the work report to no files
+            WorkReports::mutate_exists(&identity.anchor, |maybe_wr| match *maybe_wr {
+                Some(WorkReport { ref mut spower, ref mut reported_files_size, ref mut reported_files_root, .. }) => {
+                    *spower = 0;
+                    *reported_files_size = 0;
+                    *reported_files_root = [
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].to_vec();
+                },
+                ref mut i => *i = None,
+            });
+
+            // 7. Emit event
             Self::deposit_event(RawEvent::QuitGroupSuccess(who, owner));
 
             Ok(())

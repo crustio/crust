@@ -812,11 +812,12 @@ decl_module! {
                 Some(WorkReport { ref mut spower, ref mut reported_files_size, ref mut reported_files_root, .. }) => {
                     *spower = 0;
                     *reported_files_size = 0;
+                    // The total number of 0 is 32
                     *reported_files_root = [
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].to_vec();
+                        0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0].to_vec();
                 },
                 ref mut i => *i = None,
             });

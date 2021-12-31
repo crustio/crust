@@ -153,7 +153,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // `is_counted` is a concept in swork-side, which means if this `cid`'s `storage power` size is counted by `(who, anchor)`
         // if the file doesn't exist/exceed-replicas(aka. is_counted == false), return false(doesn't increase storage power) cause it's junk.
         // if the file exist, is_counted == true, will change it later.
-        let mut spower: u64 = reported_file_size;
+        let mut spower: u64 = 0;
         let mut is_valid_cid: bool = false;
         if let Some(mut file_info) = <Files<T>>::get(cid) {
             is_valid_cid = true;

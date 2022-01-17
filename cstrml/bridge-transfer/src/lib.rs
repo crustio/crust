@@ -20,6 +20,8 @@ mod tests;
 
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+type CSMBalanceOf<T> =
+	<<T as Config>::CSMCurrency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 pub trait Config: system::Config + bridge::Config {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
@@ -31,11 +33,17 @@ pub trait Config: system::Config + bridge::Config {
 	type Currency: Currency<Self::AccountId>;
 
 	type BridgeTokenId: Get<[u8; 32]>;
+
+	/// The currency mechanism.
+	type CSMCurrency: Currency<Self::AccountId>;
+
+	type CSMTokenId: Get<[u8; 32]>;
 }
 
 decl_storage! {
 	trait Store for Module<T: Config> as BridgeTransfer {
 		BridgeFee get(fn bridge_fee): map hasher(opaque_blake2_256) u8 => (BalanceOf<T>, u32);
+		CSMFee get(fn csm_fee): map hasher(opaque_blake2_256) u8 => (CSMBalanceOf<T>, u32);
 	}
 }
 
@@ -43,9 +51,12 @@ decl_event! {
 	pub enum Event<T>
 	where
 		Balance = BalanceOf<T>,
+		CSMBalance = CSMBalanceOf<T>,
 	{
 		/// [chainId, min_fee, fee_scale]
 		FeeUpdated(u8, Balance, u32),
+		/// [chainId, min_fee, fee_scale]
+		CSMFeeUpdated(u8, CSMBalance, u32),
 	}
 }
 
@@ -97,6 +108,35 @@ decl_module! {
 			T::Currency::transfer(&source, &bridge_id, amount.into(), AllowDeath)?;
 
 			<bridge::Module<T>>::transfer_fungible(dest_id, T::BridgeTokenId::get(), recipient, U256::from(amount.saturating_sub(fee).saturated_into::<u128>()))
+		}
+
+		#[weight = 195_000_000]
+		pub fn sudo_change_csm_fee(origin, min_fee: CSMBalanceOf<T>, fee_scale: u32, dest_id: u8) -> DispatchResult {
+			ensure_root(origin)?;
+			ensure!(fee_scale <= 1000u32, Error::<T>::InvalidFeeOption);
+			CSMFee::<T>::insert(dest_id, (min_fee, fee_scale));
+			Self::deposit_event(RawEvent::CSMFeeUpdated(dest_id, min_fee, fee_scale));
+			Ok(())
+		}
+
+		/// Transfers some amount of the native token to some recipient on a (whitelisted) destination chain.
+		#[weight = 195_000_000]
+		pub fn transfer_csm_native(origin, amount: CSMBalanceOf<T>, recipient: Vec<u8>, dest_id: u8) -> DispatchResult {
+			let source = ensure_signed(origin)?;
+			ensure!(<bridge::Module<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
+			let bridge_id = <bridge::Module<T>>::account_id();
+			ensure!(CSMFee::<T>::contains_key(&dest_id), Error::<T>::FeeOptionsMissiing);
+			let (min_fee, fee_scale) = Self::csm_fee(dest_id);
+			let fee_estimated = amount * fee_scale.into() / 1000u32.into();
+			let fee = if fee_estimated > min_fee {
+				fee_estimated
+			} else {
+				min_fee
+			};
+			ensure!(amount > fee, Error::<T>::LessThanFee);
+			T::CSMCurrency::transfer(&source, &bridge_id, amount.into(), AllowDeath)?;
+
+			<bridge::Module<T>>::transfer_fungible(dest_id, T::CSMTokenId::get(), recipient, U256::from(amount.saturating_sub(fee).saturated_into::<u128>()))
 		}
 
 		//

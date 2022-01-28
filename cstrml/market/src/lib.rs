@@ -1644,31 +1644,20 @@ impl<T: Config> Module<T> {
     }
 
     pub fn calculate_used_size(file_size: u64, reported_group_count: u32) -> u64 {
-        let (integer, numerator, denominator): (u64, u64, u64) = match reported_group_count {
-            0 => (0, 0, 1),
-            1..=8 => (1, 1, 20),
-            9..=16 => (1, 1, 5),
-            17..=24 => (1, 1, 2),
-            25..=32 => (2, 0, 1),
-            33..=40 => (2, 3, 5),
-            41..=48 => (3, 3, 10),
-            49..=55 => (4, 0, 1),
-            56..=65 => (5, 0, 1),
-            66..=74 => (6, 0, 1),
-            75..=83 => (7, 0, 1),
-            84..=92 => (8, 0, 1),
-            93..=100 => (8, 1, 2),
-            101..=115 => (8, 4, 5),
-            116..=127 => (9, 0, 1),
-            128..=142 => (9, 1, 5),
-            143..=157 => (9, 2, 5),
-            158..=167 => (9, 3, 5),
-            168..=182 => (9, 4, 5),
-            183..=200 => (10, 0, 1),
-            _ => (10, 0, 1), // larger than 200 => 200
+        let used_ratio: u64 = match reported_group_count {
+            1..=10 => 2,
+            11..=20 => 4,
+            21..=30 => 6,
+            31..=40 => 8,
+            41..=70 => 10,
+            71..=80 => 8,
+            81..=90 => 6,
+            91..=100 => 4,
+            101..=200 => 2,
+            _ => return 0,
         };
 
-        integer * file_size + file_size / denominator * numerator
+        used_ratio * file_size
     }
 
     fn get_files_to_update() -> Vec<MerkleRoot> {

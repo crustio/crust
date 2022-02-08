@@ -122,6 +122,7 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 		None,
 		None,
 		None,
+		None,
 		Extensions {
 			relay_chain: "westend-dev".into(),
 			para_id: id.into(),
@@ -168,6 +169,7 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 		None,
 		None,
 		None,
+		None,
 		Extensions {
 			relay_chain: "westend-dev".into(),
 			para_id: id.into(),
@@ -186,7 +188,6 @@ fn testnet_genesis(
 			code: parachain_runtime::WASM_BINARY
 				.expect("WASM binary was not build, please build it!")
 				.to_vec(),
-			changes_trie_config: Default::default(),
 		},
 		balances: parachain_runtime::BalancesConfig {
 			balances: endowed_accounts
@@ -195,8 +196,7 @@ fn testnet_genesis(
 				.map(|k| (k, 1 << 50))
 				.collect(),
 		},
-		market: parachain_runtime::MarketConfig { },
-		sudo: parachain_runtime::SudoConfig { key: root_key },
+		sudo: parachain_runtime::SudoConfig { key: Some(root_key) },
 		parachain_info: parachain_runtime::ParachainInfoConfig { parachain_id: id },
 		collator_selection: parachain_runtime::CollatorSelectionConfig {
 			invulnerables: invulnerables.iter().cloned().map(|(acc, _)| acc).collect(),

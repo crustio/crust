@@ -36,7 +36,7 @@ use sp_runtime::{
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult,
 };
-use sp_std::prelude::*;
+use sp_std::{cmp::Ordering, prelude::*};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -45,7 +45,7 @@ use sp_version::RuntimeVersion;
 use sp_std::marker::PhantomData;
 pub use frame_support::{
 	construct_runtime, parameter_types, PalletId, match_type,
-	traits::{Randomness, OriginTrait, IsInVec, Everything, InstanceFilter},
+	traits::{Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, EnsureOneOf, PrivilegeCmp},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 		DispatchClass, IdentityFee, Weight,
@@ -53,7 +53,7 @@ pub use frame_support::{
 	StorageValue, RuntimeDebug,
 };
 use frame_system::limits::{BlockLength, BlockWeights};
-use frame_system::{EnsureOneOf, EnsureRoot};
+use frame_system::{EnsureRoot};
 use sp_std::convert::TryFrom;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
@@ -115,6 +115,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
+	state_version: 0,
 };
 
 pub const MILLISECS_PER_BLOCK: u64 = 6000;
@@ -216,6 +217,7 @@ impl frame_system::Config for Runtime {
 	type BlockLength = RuntimeBlockLength;
 	type SS58Prefix = SS58Prefix;
 	type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;
+	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
 parameter_types! {
@@ -284,6 +286,7 @@ impl pallet_utility::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
 	type WeightInfo = weights::pallet_utility::WeightInfo<Runtime>;
+	type PalletsOrigin = OriginCaller;
 }
 
 parameter_types! {
@@ -376,6 +379,16 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) * RuntimeBlockWeights::get().max_block;
 	pub const MaxScheduledPerBlock: u32 = 50;
+	pub const NoPreimagePostponement: Option<u32> = Some(10);
+}
+
+/// Used the compare the privilege of an origin inside the scheduler.
+pub struct OriginPrivilegeCmp;
+
+impl PrivilegeCmp<OriginCaller> for OriginPrivilegeCmp {
+	fn cmp_privilege(left: &OriginCaller, right: &OriginCaller) -> Option<Ordering> {
+		None
+	}
 }
 
 impl pallet_scheduler::Config for Runtime {
@@ -387,6 +400,9 @@ impl pallet_scheduler::Config for Runtime {
     type ScheduleOrigin = frame_system::EnsureRoot<AccountId>;
     type MaxScheduledPerBlock = MaxScheduledPerBlock;
     type WeightInfo = ();
+	type OriginPrivilegeCmp = OriginPrivilegeCmp;
+	type PreimageProvider = ();
+	type NoPreimagePostponement = NoPreimagePostponement;
 }
 
 parameter_types! {
@@ -396,7 +412,7 @@ parameter_types! {
 
 impl cumulus_pallet_parachain_system::Config for Runtime {
 	type Event = Event;
-	type OnValidationData = ();
+	type OnSystemEvent = ();
 	type SelfParaId = parachain_info::Pallet<Runtime>;
 	type OutboundXcmpMessageSource = XcmpQueue;
 	type DmpMessageHandler = DmpQueue;
@@ -589,7 +605,8 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type Event = Event;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type ChannelInfo = ParachainSystem;
-	type VersionWrapper = ();
+	type VersionWrapper = PolkadotXcm;
+	type ExecuteOverweightOrigin = frame_system::EnsureRoot<AccountId>;
 }
 
 impl cumulus_ping::Config for Runtime {
@@ -642,28 +659,28 @@ parameter_types! {
     pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 
-impl market::Config for Runtime {
-    /// The market's module id, used for deriving its sovereign account ID.
-    type PalletId = MarketPalletId;
-    type Currency = Balances;
-    type CurrencyToBalance = CurrencyToVoteHandler;
-    type SworkerInterface = Market;
-    type Event = Event;
-    /// File duration.
-    type FileDuration = FileDuration;
-    type FileReplica = FileReplica;
-    type FileBaseFee = FileBaseFee;
-    type FileInitPrice = FileInitPrice;
-    type StorageReferenceRatio = StorageReferenceRatio;
-    type StorageIncreaseRatio = StorageIncreaseRatio;
-    type StorageDecreaseRatio = StorageDecreaseRatio;
-    type StakingRatio = StakingRatio;
-    type TaxRatio = TaxRatio;
-	type RenewRewardRatio = RenewRewardRatio;
-    type UsedTrashMaxSize = UsedTrashMaxSize;
-    type WeightInfo = market::weight::WeightInfo<Runtime>;
-    type MaximumFileSize = MaximumFileSize;
-}
+// impl market::Config for Runtime {
+//     /// The market's module id, used for deriving its sovereign account ID.
+//     type PalletId = MarketPalletId;
+//     type Currency = Balances;
+//     type CurrencyToBalance = CurrencyToVoteHandler;
+//     type SworkerInterface = Market;
+//     type Event = Event;
+//     /// File duration.
+//     type FileDuration = FileDuration;
+//     type FileReplica = FileReplica;
+//     type FileBaseFee = FileBaseFee;
+//     type FileInitPrice = FileInitPrice;
+//     type StorageReferenceRatio = StorageReferenceRatio;
+//     type StorageIncreaseRatio = StorageIncreaseRatio;
+//     type StorageDecreaseRatio = StorageDecreaseRatio;
+//     type StakingRatio = StakingRatio;
+//     type TaxRatio = TaxRatio;
+// 	type RenewRewardRatio = RenewRewardRatio;
+//     type UsedTrashMaxSize = UsedTrashMaxSize;
+//     type WeightInfo = market::weight::WeightInfo<Runtime>;
+//     type MaximumFileSize = MaximumFileSize;
+// }
 
 // impl xstorage::Config for Runtime {
 // 	type XcmpMessageSender = XcmRouter;
@@ -720,7 +737,6 @@ parameter_types! {
 
 /// We allow root and the Relay Chain council to execute privileged collator selection operations.
 pub type CollatorSelectionUpdateOrigin = EnsureOneOf<
-	AccountId,
 	EnsureRoot<AccountId>,
 	EnsureXcm<IsMajorityOfBody<RococoLocation, ExecutiveBody>>,
 >;
@@ -773,7 +789,7 @@ construct_runtime! {
 		Multisig: pallet_multisig::{Pallet, Call, Storage, Event<T>},
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
-		Market: market::{Pallet, Call, Storage, Event<T>, Config} = 100,
+		// Market: market::{Pallet, Call, Storage, Event<T>, Config} = 100,
 	}
 }
 
@@ -806,7 +822,7 @@ pub type Executive = frame_executive::Executive<
 	Block,
 	frame_system::ChainContext<Runtime>,
 	Runtime,
-	AllPallets,
+	AllPalletsWithSystem,
 >;
 
 impl_runtime_apis! {
@@ -889,8 +905,8 @@ impl_runtime_apis! {
 	}
 
 	impl cumulus_primitives_core::CollectCollationInfo<Block> for Runtime {
-		fn collect_collation_info() -> cumulus_primitives_core::CollationInfo {
-			ParachainSystem::collect_collation_info()
+		fn collect_collation_info(header: &<Block as BlockT>::Header) -> cumulus_primitives_core::CollationInfo {
+			ParachainSystem::collect_collation_info(header)
 		}
 	}
 }

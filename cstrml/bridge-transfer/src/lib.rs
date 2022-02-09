@@ -20,7 +20,7 @@ mod tests;
 
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-type CSMBalanceOf<T> =
+type CsmBalanceOf<T> =
 	<<T as Config>::CSMCurrency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 pub trait Config: system::Config + bridge::Config {
@@ -43,7 +43,7 @@ pub trait Config: system::Config + bridge::Config {
 decl_storage! {
 	trait Store for Module<T: Config> as BridgeTransfer {
 		BridgeFee get(fn bridge_fee): map hasher(opaque_blake2_256) u8 => (BalanceOf<T>, u32);
-		CSMFee get(fn csm_fee): map hasher(opaque_blake2_256) u8 => (CSMBalanceOf<T>, u32);
+		CSMFee get(fn csm_fee): map hasher(opaque_blake2_256) u8 => (CsmBalanceOf<T>, u32);
 	}
 }
 
@@ -51,12 +51,12 @@ decl_event! {
 	pub enum Event<T>
 	where
 		Balance = BalanceOf<T>,
-		CSMBalance = CSMBalanceOf<T>,
+		CsmBalance = CsmBalanceOf<T>,
 	{
 		/// [chainId, min_fee, fee_scale]
 		FeeUpdated(u8, Balance, u32),
 		/// [chainId, min_fee, fee_scale]
-		CSMFeeUpdated(u8, CSMBalance, u32),
+		CSMFeeUpdated(u8, CsmBalance, u32),
 	}
 }
 
@@ -111,7 +111,7 @@ decl_module! {
 		}
 
 		#[weight = 195_000_000]
-		pub fn sudo_change_csm_fee(origin, min_fee: CSMBalanceOf<T>, fee_scale: u32, dest_id: u8) -> DispatchResult {
+		pub fn sudo_change_csm_fee(origin, min_fee: CsmBalanceOf<T>, fee_scale: u32, dest_id: u8) -> DispatchResult {
 			ensure_root(origin)?;
 			ensure!(fee_scale <= 1000u32, Error::<T>::InvalidFeeOption);
 			CSMFee::<T>::insert(dest_id, (min_fee, fee_scale));
@@ -121,7 +121,7 @@ decl_module! {
 
 		/// Transfers some amount of the native token to some recipient on a (whitelisted) destination chain.
 		#[weight = 195_000_000]
-		pub fn transfer_csm_native(origin, amount: CSMBalanceOf<T>, recipient: Vec<u8>, dest_id: u8) -> DispatchResult {
+		pub fn transfer_csm_native(origin, amount: CsmBalanceOf<T>, recipient: Vec<u8>, dest_id: u8) -> DispatchResult {
 			let source = ensure_signed(origin)?;
 			ensure!(<bridge::Module<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
 			let bridge_id = <bridge::Module<T>>::account_id();

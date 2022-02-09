@@ -73,6 +73,39 @@ fn transfer_native() {
 }
 
 #[test]
+fn transfer_to_elrond() {
+	new_test_ext().execute_with(|| {
+		let dest_chain = 100;
+		let resource_id = BridgeTokenId::get();
+		let amount: u64 = 100;
+		let recipient = vec![99];
+
+		assert_ok!(Bridge::whitelist_chain(Origin::root(), dest_chain.clone()));
+		assert_ok!(BridgeTransfer::sudo_change_fee(
+			Origin::root(),
+			2,
+			2,
+			dest_chain.clone()
+		));
+		assert_ok!(BridgeTransfer::transfer_to_elrond(
+			Origin::signed(RELAYER_A),
+			amount.clone(),
+			recipient.clone()
+		));
+
+		expect_event(bridge::RawEvent::FungibleTransfer(
+			dest_chain,
+			1,
+			resource_id,
+			(amount - 2).into(),
+			recipient,
+		));
+		let elrond_pot: u64 = Bridge::elrond_pot();
+		assert_eq!(Balances::free_balance(&elrond_pot), 100);
+	})
+}
+
+#[test]
 fn transfer() {
 	new_test_ext().execute_with(|| {
 		// Check inital state

@@ -29,6 +29,7 @@ mod tests;
 
 const DEFAULT_RELAYER_THRESHOLD: u32 = 1;
 const MODULE_ID: ModuleId = ModuleId(*b"crust/bg");
+const ELROND_ID: ModuleId = ModuleId(*b"elrondbg");
 
 
 /// Helper function to concatenate a chain ID and some bytes to produce a resource ID.
@@ -212,6 +213,7 @@ decl_module! {
 		const ChainIdentity: u8 = T::BridgeChainId::get();
 		const ProposalLifetime: T::BlockNumber = T::ProposalLifetime::get();
 		const BridgeAccountId: T::AccountId = MODULE_ID.into_account();
+		const ElrondAccountId: T::AccountId = ELROND_ID.into_account();
 
 		fn deposit_event() = default;
 
@@ -349,6 +351,11 @@ impl<T: Config> Module<T> {
 	/// This is used both as an origin check and deposit/withdrawal account.
 	pub fn account_id() -> T::AccountId {
 		MODULE_ID.into_account()
+	}
+
+	/// Provides an AccountId for the pallet to store elrond bridge.
+	pub fn elrond_pot() -> T::AccountId {
+		ELROND_ID.into_account()
 	}
 
 	/// Asserts if a resource is registered

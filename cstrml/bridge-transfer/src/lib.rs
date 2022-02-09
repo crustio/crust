@@ -102,6 +102,28 @@ decl_module! {
 			<bridge::Module<T>>::transfer_fungible(dest_id, T::BridgeTokenId::get(), recipient, U256::from(amount.saturating_sub(fee).saturated_into::<u128>()))
 		}
 
+		/// Transfers some amount of the native token to some recipient on a (whitelisted) destination chain.
+		#[weight = 195_000_000]
+		pub fn transfer_to_elrond(origin, amount: BalanceOf<T>, recipient: Vec<u8>) -> DispatchResult {
+			let source = ensure_signed(origin)?;
+			// Set elrond chain id to 100
+			let dest_id = 100u8;
+			ensure!(<bridge::Module<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
+			let elrond_pot = <bridge::Module<T>>::elrond_pot();
+			ensure!(BridgeFee::<T>::contains_key(&dest_id), Error::<T>::FeeOptionsMissiing);
+			let (min_fee, fee_scale) = Self::bridge_fee(dest_id);
+			let fee_estimated = amount * fee_scale.into() / 1000u32.into();
+			let fee = if fee_estimated > min_fee {
+				fee_estimated
+			} else {
+				min_fee
+			};
+			ensure!(amount > fee, Error::<T>::LessThanFee);
+			T::Currency::transfer(&source, &elrond_pot, amount.into(), AllowDeath)?;
+
+			<bridge::Module<T>>::transfer_fungible(dest_id, T::BridgeTokenId::get(), recipient, U256::from(amount.saturating_sub(fee).saturated_into::<u128>()))
+		}
+
 		//
 		// Executable calls. These can be triggered by a bridge transfer initiated on another chain
 		//

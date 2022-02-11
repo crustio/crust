@@ -118,8 +118,6 @@ pub fn native_version() -> NativeVersion {
     }
 }
 
-type MoreThanHalfCouncil = EnsureRoot<AccountId>;
-
 /// We assume that an on-initialize consumes 2.5% of the weight on average, hence a single extrinsic
 /// will not be allowed to consume more than `AvailableBlockRatio - 2.5%`.
 pub const AVERAGE_ON_INITIALIZE_RATIO: Perbill = Perbill::from_perthousand(25);
@@ -331,8 +329,8 @@ impl pallet_identity::Config for Runtime {
     type MaxAdditionalFields = MaxAdditionalFields;
     type MaxRegistrars = MaxRegistrars;
     type Slashed = Treasury;
-    type ForceOrigin = MoreThanHalfCouncil;
-    type RegistrarOrigin = MoreThanHalfCouncil;
+    type ForceOrigin = EnsureRootOrHalfCouncil;
+    type RegistrarOrigin = EnsureRootOrHalfCouncil;
     type WeightInfo = weights::pallet_identity::WeightInfo<Runtime>;
 }
 
@@ -456,7 +454,7 @@ parameter_types! {
 	pub const TreasuryModuleId: ModuleId = ModuleId(*b"py/trsry");
 
 	pub const TipCountdown: BlockNumber = 1 * DAYS;
-	pub const TipFindersFee: Percent = Percent::from_percent(20);
+	pub const TipFindersFee: Percent = Percent::from_percent(0);
 	pub const TipReportDepositBase: Balance = 1 * DOLLARS;
 	pub const DataDepositPerByte: Balance = 1 * CENTS;
 	pub const MaximumReasonLength: u32 = 16384;
@@ -473,7 +471,7 @@ impl pallet_treasury::Config for Runtime {
     type ModuleId = TreasuryModuleId;
     type Currency = Balances;
     type ApproveOrigin = ApproveOrigin;
-    type RejectOrigin = MoreThanHalfCouncil;
+    type RejectOrigin = EnsureRootOrHalfCouncil;
     type Event = Event;
     type OnSlash = Treasury;
     type ProposalBond = ProposalBond;
@@ -504,10 +502,10 @@ impl pallet_multisig::Config for Runtime {
 }
 
 parameter_types! {
-	pub const CandidacyBond: Balance = 100 * DOLLARS;
+	pub const CandidacyBond: Balance = 10 * DOLLARS;
 	pub const VotingBondBase: Balance = 1 * DOLLARS;
 	pub const VotingBondFactor: Balance = 10 * CENTS;
-	pub const TermDuration: BlockNumber = 7 * DAYS;
+	pub const TermDuration: BlockNumber = 3 * DAYS;
 	pub const DesiredMembers: u32 = 13;
 	pub const DesiredRunnersUp: u32 = 20;
 	pub const ElectionsPhragmenModuleId: LockIdentifier = *b"phrelect";
@@ -613,12 +611,12 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 }
 
 parameter_types! {
-	pub const LaunchPeriod: BlockNumber = 28 * DAYS;
-	pub const VotingPeriod: BlockNumber = 28 * DAYS;
+	pub const LaunchPeriod: BlockNumber = 7 * DAYS;
+	pub const VotingPeriod: BlockNumber = 7 * DAYS;
 	pub const FastTrackVotingPeriod: BlockNumber = 3 * HOURS;
 	pub const InstantAllowed: bool = true;
-	pub const MinimumDeposit: Balance = 100 * DOLLARS;
-	pub const EnactmentPeriod: BlockNumber = 28 * DAYS;
+	pub const MinimumDeposit: Balance = 1 * DOLLARS;
+	pub const EnactmentPeriod: BlockNumber = 7 * DAYS;
 	pub const CooloffPeriod: BlockNumber = 7 * DAYS;
 	// One cent: $10,000 / MB
 	pub const PreimageByteDeposit: Balance = 1 * CENTS;
@@ -709,6 +707,8 @@ impl claims::Config for Runtime {
     type Event = Event;
     type Currency = Balances;
     type Prefix = Prefix;
+    type LocksInterface = Locks;
+    type CRU18Origin = EnsureRootOrHalfCouncil;
 }
 
 // TODO: better way to deal with fee(s)
@@ -824,7 +824,7 @@ parameter_types! {
 
 impl bridge::Config for Runtime {
     type Event = Event;
-    type BridgeCommitteeOrigin = MoreThanHalfCouncil;
+    type BridgeCommitteeOrigin = EnsureRootOrHalfCouncil;
     type Proposal = Call;
     type BridgeChainId = BridgeChainId;
     type ProposalLifetime = ProposalLifetime;

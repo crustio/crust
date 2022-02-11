@@ -9,7 +9,9 @@ use frame_support::parameter_types;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header,
 };
+use frame_system::EnsureRoot;
 use hex_literal::hex;
+use primitives::*;
 
 parameter_types! {
     pub const BlockHashCount: u32 = 250;
@@ -53,6 +55,17 @@ impl balances::Config for Test {
     type MaxLocks = ();
 }
 
+parameter_types! {
+    pub const UnlockPeriod: BlockNumber = 1000;
+}
+
+impl locks::Config for Test {
+    type Event = ();
+    type Currency = Balances;
+    type UnlockPeriod = UnlockPeriod;
+    type WeightInfo = locks::weight::WeightInfo<Test>;
+}
+
 parameter_types!{
     pub const ClaimModuleId: ModuleId = ModuleId(*b"crclaims");
     pub Prefix: &'static [u8] = b"Pay RUSTs to the TEST account:";
@@ -62,6 +75,8 @@ impl Config for Test {
     type Event = ();
     type Currency = Balances;
     type Prefix = Prefix;
+    type LocksInterface = CrustLocks;
+    type CRU18Origin = EnsureRoot<u64>;
 }
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -75,6 +90,7 @@ frame_support::construct_runtime!(
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         CrustClaims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+        CrustLocks: locks::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
 

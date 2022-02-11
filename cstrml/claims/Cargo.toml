@@ -20,9 +20,11 @@ sp-runtime = { default-features = false, git = "https://github.com/crustio/subst
 sp-core = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 sp-std = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 sp-io = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+primitives = { package = "cst-primitives", path = "../../primitives", default-features = false }
 
 [dev-dependencies]
 balances = { path = "../balances", package = "cstrml-balances" }
+locks = { path = "../locks", package = "cstrml-locks" }
 hex-literal = "0.3.1"
 
 [features]

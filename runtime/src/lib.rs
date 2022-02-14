@@ -708,7 +708,11 @@ impl claims::Config for Runtime {
     type Currency = Balances;
     type Prefix = Prefix;
     type LocksInterface = Locks;
-    type CRU18Origin = EnsureRootOrHalfCouncil;
+    type CRU18Origin = EnsureOneOf<
+        AccountId,
+        EnsureRoot<AccountId>,
+        pallet_collective::EnsureProportionMoreThan<_4, _5, AccountId, CouncilCollective>
+    >;
 }
 
 // TODO: better way to deal with fee(s)

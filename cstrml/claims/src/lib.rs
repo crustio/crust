@@ -7,7 +7,7 @@ use sp_std::prelude::*;
 use sp_io::{hashing::keccak_256, crypto::secp256k1_ecdsa_recover};
 use frame_support::{
     decl_event, decl_storage, decl_module, decl_error, ensure,
-    traits::{Currency, Get, ExistenceRequirement::AllowDeath}
+    traits::{Currency, Get, ExistenceRequirement::AllowDeath, EnsureOrigin}
 };
 use frame_system::{ensure_signed, ensure_root, ensure_none};
 use codec::{Encode, Decode};
@@ -23,6 +23,8 @@ use sp_runtime::{
         Zero, StaticLookup, Saturating, AccountIdConversion
     },
 };
+
+use primitives::traits::LocksInterface;
 
 #[cfg(test)]
 mod mock;
@@ -45,6 +47,12 @@ pub trait Config: frame_system::Config {
 
     /// The constant used for ethereum signature.
     type Prefix: Get<&'static [u8]>;
+
+    /// The locks interface used for CRU18
+    type LocksInterface: LocksInterface<Self::AccountId, BalanceOf<Self>>;
+
+    /// The origin who can call claim_cru18
+    type CRU18Origin: EnsureOrigin<Self::Origin>;
 }
 
 /// An Ethereum address (i.e. 20 bytes, used to represent an Ethereum account).
@@ -149,6 +157,8 @@ decl_event!(
         Claimed(AccountId, EthereumAddress, Balance),
         /// Ethereum address was bonded to account. [who, ethereum_address]
         BondEthSuccess(AccountId, EthereumAddress),
+        /// Someone claimed some CRU18s. [who, amount]
+        CRU18Claimed(AccountId, Balance),
     }
 );
 
@@ -194,6 +204,9 @@ decl_storage! {
 
         /// [who] can mint the claims
         Miner get(fn miner): Option<T::AccountId>;
+
+        /// Mark if the cru18 claim transaction has already been claimed
+        CRU18Claimed get(fn cru18_clamined): map hasher(twox_64_concat) T::AccountId => bool;
     }
 }
 
@@ -321,6 +334,25 @@ decl_module! {
 
             // 3. Make sure signer is match with claimer
             Self::process_claim(tx, signer, dest)
+        }
+
+        #[weight = 200_698_000]
+        fn claim_cru18(origin, dest: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
+            T::CRU18Origin::ensure_origin(origin)?;
+
+            // 1. Check the cru18 not be claimed
+            ensure!(!Self::cru18_clamined(&dest), Error::<T>::AlreadyBeClaimed);
+
+            // 2. Transfer the cru and set the lock
+            T::Currency::transfer(&Self::claim_pot(), &dest, amount.clone(), AllowDeath)?;
+            T::LocksInterface::create_cru18_lock(&dest, amount);
+
+            // 3. Mark it be claimed
+            <CRU18Claimed<T>>::insert(&dest, true);
+
+            // Let's deposit an event to let the outside world know who claimed money
+            Self::deposit_event(RawEvent::CRU18Claimed(dest, amount));
+            Ok(())
         }
     }
 }

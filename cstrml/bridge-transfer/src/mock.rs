@@ -101,6 +101,7 @@ impl bridge::Config for Test {
 parameter_types! {
 	// bridge::derive_resource_id(1, &bridge::hashing::blake2_128(b"CRU"));
 	pub const BridgeTokenId: [u8; 32] = hex!("000000000000000000000000000000608d1bc9a2d146ebc94667c336721b2801");
+	pub const CSMTokenId: [u8; 32] = hex!("00000000000000000000000000000098aef84ac01d96413445cf3dc4d5c44c01");
 }
 
 impl Config for Test {
@@ -108,6 +109,8 @@ impl Config for Test {
 	type BridgeOrigin = bridge::EnsureBridge<Test>;
 	type Currency = Balances;
 	type BridgeTokenId = BridgeTokenId;
+	type CSMCurrency = Balances;
+	type CSMTokenId = CSMTokenId;
 }
 
 impl pallet_timestamp::Config for Test {

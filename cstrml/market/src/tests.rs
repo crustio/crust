@@ -3005,11 +3005,11 @@ fn calculate_used_size_should_work() {
     new_test_ext().execute_with(|| {
         let file_size = 1000;
         assert_eq!(Market::calculate_used_size(file_size, 0) , 0);
-        assert_eq!(Market::calculate_used_size(file_size, 200) , file_size * 10);
-        assert_eq!(Market::calculate_used_size(file_size, 250) , file_size * 10);
-        assert_eq!(Market::calculate_used_size(file_size, 146) , file_size * 9 + file_size * 2 / 5);
-        assert_eq!(Market::calculate_used_size(file_size, 16) , file_size + file_size / 5);
-        assert_eq!(Market::calculate_used_size(file_size, 128) , file_size * 9 + file_size / 5);
+        assert_eq!(Market::calculate_used_size(file_size, 200) , file_size * 2);
+        assert_eq!(Market::calculate_used_size(file_size, 250) , 0);
+        assert_eq!(Market::calculate_used_size(file_size, 146) , file_size * 2);
+        assert_eq!(Market::calculate_used_size(file_size, 16) , file_size * 4);
+        assert_eq!(Market::calculate_used_size(file_size, 128) , file_size * 2);
     });
 }
 

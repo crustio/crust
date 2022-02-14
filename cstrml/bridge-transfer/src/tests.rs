@@ -3,7 +3,7 @@
 use super::mock::{
 	assert_events, balances, expect_event, new_test_ext, Balances, Bridge,
 	BridgeTransfer, Call, Event, Origin, ProposalLifetime, ENDOWED_BALANCE, RELAYER_A,
-	RELAYER_B, RELAYER_C, BridgeTokenId
+	RELAYER_B, RELAYER_C, BridgeTokenId, CSMTokenId
 };
 
 use super::*;
@@ -35,6 +35,46 @@ fn constant_equality() {
 	let r_id = bridge::derive_resource_id(1, &blake2_128(b"CRU"));
 	let encoded: [u8; 32] = hex_literal::hex!("000000000000000000000000000000608d1bc9a2d146ebc94667c336721b2801");
 	assert_eq!(r_id, encoded);
+}
+
+#[test]
+fn csm_constant_equality() {
+	let r_id = bridge::derive_resource_id(1, &blake2_128(b"CSM"));
+	// print!("{}", hex::encode(r_id));
+	let encoded: [u8; 32] = hex_literal::hex!("00000000000000000000000000000098aef84ac01d96413445cf3dc4d5c44c01");
+	assert_eq!(r_id, encoded);
+}
+
+#[test]
+fn transfer_csm_native() {
+	new_test_ext().execute_with(|| {
+		let dest_chain = 3;
+		let resource_id = CSMTokenId::get();
+		let amount: u64 = 100;
+		let recipient = vec![99];
+
+		assert_ok!(Bridge::whitelist_chain(Origin::root(), dest_chain.clone()));
+		assert_ok!(BridgeTransfer::sudo_change_csm_fee(
+			Origin::root(),
+			2,
+			2,
+			dest_chain.clone()
+		));
+		assert_ok!(BridgeTransfer::transfer_csm_native(
+			Origin::signed(RELAYER_A),
+			amount.clone(),
+			recipient.clone(),
+			dest_chain,
+		));
+
+		expect_event(bridge::RawEvent::FungibleTransfer(
+			dest_chain,
+			1,
+			resource_id,
+			(amount - 2).into(),
+			recipient,
+		));
+	})
 }
 
 #[test]

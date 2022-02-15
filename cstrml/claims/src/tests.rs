@@ -225,24 +225,3 @@ fn claim_pot_should_work() {
         assert_ok!(CrustClaims::claim(Origin::none(), 1, tx_hash.clone(), sig.clone())); // 100 should success due to the `AllowDeath`
     });
 }
-
-#[test]
-fn claim_cru18_should_work() {
-    new_test_ext().execute_with(|| {
-        // 0. Set miner, superior and pot
-        let _ = Balances::deposit_creating(&CrustClaims::claim_pot(), 1000);
-        assert_ok!(CrustClaims::claim_cru18(Origin::root(), 1, 100));
-        assert_eq!(Balances::free_balance(1), 100);
-        assert_eq!(Balances::free_balance(CrustClaims::claim_pot()), 900);
-        assert_eq!(Balances::locks(&1)[0].amount, 100);
-        assert_eq!(Balances::locks(&1)[0].id, *b"crulock ");
-        assert_noop!(
-            CrustClaims::claim_cru18(Origin::root(), 1, 100),
-            DispatchError::Module {
-                index: 2,
-                error: 4,
-                message: Some("AlreadyBeClaimed")
-            }
-        );
-    });
-}

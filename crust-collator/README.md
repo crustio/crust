@@ -31,7 +31,7 @@ After build, export new chain spec json file:
 Then grab the crust blockchain source code:
 
 ```bash
-git clone https://github.com/crustio/crust.git
+git clone https://github.com/paritytech/crust.git
 cd crust
 git checkout parachain/rococo-v2
 ```

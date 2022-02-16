@@ -9,10 +9,18 @@ serde = { version = "1.0.101", optional = true, features = ["derive"] }
 codec = { package = "parity-scale-codec", version = "2.3.0", default-features = false, features = ["derive"] }
 log = { version = "0.4.14", default-features = false }
 scale-info = { version = "1.0.0", default-features = false, features = ["derive"] }
+smallvec = "1.4.1"
+hex-literal = "0.3.1"
 
-crust-parachain-primitives = { path = "../primitives", default-features = false }
 xstorage = { path = "../pallets/xstorage", default-features = false }
+claims = { package = "cstrml-claims", path = "../pallets/claims", default-features = false}
 pallet-collator-selection = { path = '../pallets/collator-selection', default-features = false }
+# swork = { package = "cstrml-swork", path = "../pallets/swork", default-features = false }
+# staking = { package = "cstrml-staking", path = "../pallets/staking", default-features = false }
+# benefits = { package = "cstrml-benefits", path = "../pallets/benefits", default-features = false }
+bridge = { package = "cstrml-bridge", path = "../pallets/bridge", default-features = false }
+bridge-transfer = { package = "cstrml-bridge-transfer", path = "../pallets/bridge-transfer", default-features = false }
+crust-parachain-primitives = { path = "../primitives", default-features = false }
 
 # Substrate dependencies
 sp-std = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
@@ -27,6 +35,7 @@ sp-block-builder = { git = "https://github.com/paritytech/substrate", default-fe
 sp-transaction-pool = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 sp-inherents = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 sp-consensus-aura = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
+sp-arithmetic = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 
 frame-support = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 frame-executive = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
@@ -83,6 +92,7 @@ std = [
 	"sp-version/std",
 	"sp-offchain/std",
 	"sp-session/std",
+	"sp-arithmetic/std",
 	"sp-block-builder/std",
 	"sp-transaction-pool/std",
 	"sp-inherents/std",
@@ -119,4 +129,10 @@ std = [
 	"pallet-multisig/std",
 	"pallet-proxy/std",
 	"orml-xcm/std",
+	"claims/std",
+	# "swork/std",
+	# "staking/std",
+	# "benefits/std",
+	"bridge/std",
+	"bridge-transfer/std",
 ]

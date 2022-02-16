@@ -22,9 +22,10 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+mod impls;
 mod weights;
 pub use crust_parachain_primitives::{
-    constants::{currency::*},
+    constants::{currency::*}, traits::*,
     *
 };
 use sp_api::impl_runtime_apis;
@@ -32,7 +33,7 @@ use codec::{Decode, Encode, MaxEncodedLen};
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{BlakeTwo256, Block as BlockT, AccountIdLookup, Convert, SaturatedConversion},
+	traits::{BlakeTwo256, Block as BlockT, AccountIdLookup, Convert, SaturatedConversion, Zero},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult,
 };
@@ -43,9 +44,10 @@ use sp_version::RuntimeVersion;
 
 // A few exports that help ease life for downstream crates.
 use sp_std::marker::PhantomData;
+use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
 pub use frame_support::{
 	construct_runtime, parameter_types, PalletId, match_type,
-	traits::{Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, EnsureOneOf, PrivilegeCmp},
+	traits::{Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, EnsureOneOf, PrivilegeCmp, Currency},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 		DispatchClass, IdentityFee, Weight,
@@ -69,7 +71,8 @@ use xcm_builder::{
 	SiblingParachainConvertsVia, SignedAccountId32AsNative,
 	SovereignSignedViaLocation, EnsureXcmOrigin, AllowUnpaidExecutionFrom, ParentAsSuperuser,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds, IsConcrete, NativeAsset,
-	UsingComponents, SignedToAccountId32, SiblingParachainAsNative
+	UsingComponents, SignedToAccountId32, SiblingParachainAsNative, AllowKnownQueryResponses,
+	AllowSubscriptionsFrom
 };
 use xcm_executor::{
 	traits::ConvertOrigin,
@@ -87,6 +90,9 @@ use xcm::v1::{
 };
 use sp_runtime::traits::CheckedConversion;
 use xcm_executor::traits::{FilterAssetLocation, MatchesFungible};
+use impls::{CurrencyToVoteHandler, OneTenthFee, CurrencyAdapter as TransactionFeeCurrencyAdapter};
+
+type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 
 pub type SessionHandlers = ();
 
@@ -111,7 +117,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("crust-collator"),
 	impl_name: create_runtime_str!("crust-collator"),
 	authoring_version: 1,
-	spec_version: 7,
+	spec_version: 10,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -259,7 +265,7 @@ impl pallet_balances::Config for Runtime {
 impl pallet_transaction_payment::Config for Runtime {
 	type OnChargeTransaction = pallet_transaction_payment::CurrencyAdapter<Balances, ()>;
 	type TransactionByteFee = TransactionByteFee;
-	type WeightToFee = IdentityFee<Balance>;
+	type WeightToFee = OneTenthFee<Balance>;
 	type FeeMultiplierUpdate = ();
 	type OperationalFeeMultiplier = OperationalFeeMultiplier;
 }
@@ -513,6 +519,8 @@ pub type XcmOriginToTransactDispatchOrigin = (
 	SiblingParachainAsNative<cumulus_pallet_xcm::Origin, Origin>,
 	ParentAsSuperuser<Origin>,
 	SignedAccountId32AsNative<RococoNetwork, Origin>,
+	// Xcm origins can be represented natively under the Xcm pallet's Xcm origin.
+	XcmPassthrough<Origin>,
 );
 
 parameter_types! {
@@ -534,6 +542,10 @@ pub type Barrier = (
 	TakeWeightCredit,
 	AllowTopLevelPaidExecutionFrom<Everything>,
 	AllowUnpaidExecutionFrom<ParentOrParentsUnitPlurality>,	// <- Parent gets free execution
+	// Expected responses are OK.
+	AllowKnownQueryResponses<PolkadotXcm>,
+	// Subscriptions for version tracking are OK.
+	AllowSubscriptionsFrom<Everything>,
 );
 
 pub struct XcmConfig;
@@ -616,48 +628,22 @@ impl cumulus_ping::Config for Runtime {
 	type XcmSender = XcmRouter;
 }
 
-/// Simple structure that exposes how u64 currency can be represented as... u64.
-pub struct CurrencyToVoteHandler;
-
-impl Convert<u64, u64> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u64 {
-        x
-    }
-}
-impl Convert<u128, u128> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u128 {
-        x
-    }
-}
-impl Convert<u128, u64> for CurrencyToVoteHandler {
-    fn convert(x: u128) -> u64 {
-        x.saturated_into()
-    }
-}
-
-impl Convert<u64, u128> for CurrencyToVoteHandler {
-    fn convert(x: u64) -> u128 {
-        x as u128
-    }
-}
-
-
-parameter_types! {
-    /// Unit is pico
-    pub const MarketPalletId: PalletId = PalletId(*b"crmarket");
-    pub const FileDuration: BlockNumber = 30 * DAYS;
-    pub const FileReplica: u32 = 4;
-    pub const FileBaseFee: Balance = MILLICENTS * 1;
-    pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
-    pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
-    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
-    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
-    pub const StakingRatio: Perbill = Perbill::from_percent(80);
-    pub const TaxRatio: Perbill = Perbill::from_percent(10);
-    pub const UsedTrashMaxSize: u128 = 1_000;
-    pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
-    pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
-}
+// parameter_types! {
+//     /// Unit is pico
+//     pub const MarketPalletId: PalletId = PalletId(*b"crmarket");
+//     pub const FileDuration: BlockNumber = 30 * DAYS;
+//     pub const FileReplica: u32 = 4;
+//     pub const FileBaseFee: Balance = MILLICENTS * 1;
+//     pub const FileInitPrice: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
+//     pub const StorageReferenceRatio: (u128, u128) = (25, 100); // 25/100 = 25%
+//     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(1u64, 10000);
+//     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 10000);
+//     pub const StakingRatio: Perbill = Perbill::from_percent(80);
+//     pub const TaxRatio: Perbill = Perbill::from_percent(10);
+//     pub const UsedTrashMaxSize: u128 = 1_000;
+//     pub const MaximumFileSize: u64 = 137_438_953_472; // 128G = 128 * 1024 * 1024 * 1024
+//     pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
+// }
 
 // impl market::Config for Runtime {
 //     /// The market's module id, used for deriving its sovereign account ID.
@@ -753,6 +739,135 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = weights::pallet_collator_selection::WeightInfo<Runtime>;
 }
 
+// pub struct MockMarket;
+
+// impl MarketInterface<AccountId, Balance> for MockMarket {
+// 	// used for `added_files`
+// 	// return real spower of this file and whether this file is in the market system
+// 	fn upsert_replica(_: &AccountId, _: AccountId, _: &MerkleRoot, _: u64, _: &SworkerAnchor, _: BlockNumber, _: &Option<BTreeSet<AccountId>>) -> (u64, bool) {
+// 		(0, false)
+// 	}
+// 	// used for `delete_files`
+// 	// return real spower of this file and whether this file is in the market system
+// 	fn delete_replica(_: &AccountId, _: AccountId, _: &MerkleRoot, _: &SworkerAnchor) -> (u64, bool) {
+// 		(0, false)
+// 	}
+// 	// used for distribute market staking payout
+// 	fn withdraw_staking_pot() -> Balance {
+// 		Zero::zero()
+// 	}
+// }
+
+// parameter_types! {
+//     pub const StakingPalletId: PalletId = PalletId(*b"cstaking");
+//     // 112 eras for unbonding (28 days).
+//     pub const BondingDuration: EraIndex = 28 * 4;
+//     // 108 eras in which slashes can be cancelled (slightly less than 28 days).
+//     pub const SlashDeferDuration: EraIndex = 27 * 4;
+//     // 1 * CRUs / TB, since we treat 1 TB = 1_000_000_000_000, so the ratio = `1`
+//     pub const SPowerRatio: u128 = 1;
+//     // 64 guarantors for one validator.
+//     pub const MaxGuarantorRewardedPerValidator: u32 = 64;
+//     // 60 eras means 15 days if era = 6 hours
+//     pub const MarketStakingPotDuration: u32 = 60;
+//     // free transfer amount for other locks
+//     pub const UncheckedFrozenBondFund: Balance = 1 * DOLLARS;
+// }
+
+// impl staking::Config for Runtime {
+//     type PalletId = StakingPalletId;
+//     type Currency = Balances;
+//     type UnixTime = Timestamp;
+
+//     type CurrencyToVote = CurrencyToVoteHandler;
+//     type RewardRemainder = ();
+//     type Event = Event;
+//     type Reward = ();
+//     type Randomness = RandomnessCollectiveFlip;
+//     type BondingDuration = BondingDuration;
+//     type MaxGuarantorRewardedPerValidator = MaxGuarantorRewardedPerValidator;
+
+//     // A majority of the council can cancel the slash.
+//     type SPowerRatio = SPowerRatio;
+//     type MarketStakingPot = MockMarket;
+//     type MarketStakingPotDuration = MarketStakingPotDuration;
+//     type BenefitInterface = Benefits;
+//     type UncheckedFrozenBondFund = UncheckedFrozenBondFund;
+//     type WeightInfo = staking::weight::WeightInfo;
+// }
+
+// parameter_types! {
+//     pub const PunishmentSlots: u32 = 8; // 8 report slot == 8 hours
+//     pub const MaxGroupSize: u32 = 1000;
+// }
+
+// impl swork::Config for Runtime {
+//     type Currency = Balances;
+//     type Event = Event;
+//     type PunishmentSlots = PunishmentSlots;
+//     type Works = Staking;
+//     type MarketInterface = MockMarket;
+//     type MaxGroupSize = MaxGroupSize;
+//     type BenefitInterface = Benefits;
+//     type WeightInfo = swork::weight::WeightInfo<Runtime>;
+// }
+
+// parameter_types! {
+//     pub const BenefitReportWorkCost: Balance = 3 * DOLLARS;
+//     pub BenefitsLimitRatio: Perbill = Perbill::from_rational_approximation(2u64, 1000);
+//     pub const BenefitMarketCostRatio: Perbill = Perbill::one();
+// }
+
+// impl benefits::Config for Runtime {
+//     type Event = Event;
+//     type Currency = Balances;
+//     type BenefitReportWorkCost = BenefitReportWorkCost;
+//     type BenefitsLimitRatio = BenefitsLimitRatio;
+//     type BenefitMarketCostRatio = BenefitMarketCostRatio;
+//     type BondingDuration = BondingDuration;
+//     type WeightInfo = benefits::weight::WeightInfo<Runtime>;
+// }
+
+parameter_types! {
+    pub const BridgeClaimsPalletId: PalletId = PalletId(*b"crclaims");
+    pub Prefix: &'static [u8] = b"Pay CSMs to the Crust Shadow account:";
+}
+
+impl claims::Config for Runtime {
+    type PalletId = BridgeClaimsPalletId;
+    type Event = Event;
+    type Currency = Balances;
+    type Prefix = Prefix;
+}
+
+parameter_types! {
+    pub const BridgeChainId: u8 = 3;
+    pub const ProposalLifetime: BlockNumber = 50400; // ~7 days
+}
+
+type MoreThanHalfCouncil = EnsureRoot<AccountId>;
+
+impl bridge::Config for Runtime {
+	type PalletId = BridgeClaimsPalletId;
+    type Event = Event;
+    type BridgeCommitteeOrigin = MoreThanHalfCouncil;
+    type Proposal = Call;
+    type BridgeChainId = BridgeChainId;
+    type ProposalLifetime = ProposalLifetime;
+}
+
+parameter_types! {
+    // bridge::derive_resource_id(1, &bridge::hashing::blake2_128(b"CSM"));
+    pub const BridgeTokenId: [u8; 32] = hex_literal::hex!("00000000000000000000000000000098aef84ac01d96413445cf3dc4d5c44c01");
+}
+
+impl bridge_transfer::Config for Runtime {
+    type Event = Event;
+    type BridgeOrigin = bridge::EnsureBridge<Runtime>;
+    type Currency = Balances;
+    type BridgeTokenId = BridgeTokenId;
+}
+
 construct_runtime! {
 	pub enum Runtime where
 		Block = Block,
@@ -790,6 +905,16 @@ construct_runtime! {
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 		// Market: market::{Pallet, Call, Storage, Event<T>, Config} = 100,
+
+		// // Crust modules
+		// Staking: staking::{Pallet, Call, Storage, Event<T>} = 110,
+		// Swork: swork::{Pallet, Call, Storage, Event<T>} = 111,
+		Claims: claims::{Pallet, Call, Storage, Event<T>, ValidateUnsigned} = 112,
+		// Benefits: benefits::{Pallet, Call, Storage, Event<T>} = 113,
+
+		// ChainBridge
+		ChainBridge: bridge::{Pallet, Call, Storage, Event<T>} = 114,
+		BridgeTransfer: bridge_transfer::{Pallet, Call, Event<T>, Storage} = 115,
 	}
 }
 

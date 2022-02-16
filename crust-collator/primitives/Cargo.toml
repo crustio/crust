@@ -18,3 +18,4 @@ std = [
 	"sp-runtime/std",
 	"sp-core/std"
 ]
+test = []

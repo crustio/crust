@@ -30,7 +30,7 @@ while getopts ":hp" opt; do
 done
 
 TOOLCHAIN_VER="`cat docker/rust-toolchain`"
-IMAGEID="crustio/crust-env:${TOOLCHAIN_VER}"
+IMAGEID="paritytech/crust-env:${TOOLCHAIN_VER}"
 
 docker build docker/crust-env --build-arg TOOLCHAIN="${TOOLCHAIN_VER}" -t $IMAGEID
 

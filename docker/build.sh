@@ -33,7 +33,7 @@ source $DIR/utils.sh
 BUILD_DIR="`pwd`"
 DIST_FILE="target/release/crust"
 CRUST_VER=`head -n 10 runtime/Cargo.toml|awk '/version/{print $3}' |sed  s"/'//g"`
-IMAGEID="crustio/crust:${CRUST_VER}"
+IMAGEID="paritytech/crust:${CRUST_VER}"
 
 if [ ! -f "$DIST_FILE" ]; then
     log_err "Binary from $DIST_FILE doesn't exist, please build crust binary first."

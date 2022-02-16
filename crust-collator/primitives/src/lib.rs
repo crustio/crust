@@ -39,6 +39,9 @@ pub type BlockId = generic::BlockId<Block>;
 /// An index to a block.
 pub type BlockNumber = u32;
 
+/// Counter for the number of eras that have passed.
+pub type EraIndex = u32;
+
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
 
@@ -64,6 +67,16 @@ pub type DigestItem = generic::DigestItem;
 
 /// An instant or duration in time.
 pub type Moment = u64;
+
+/// The IAS signature type
+pub type IASSig = Vec<u8>;
+
+/// The ISV body type, contains the enclave code and public key
+pub type ISVBody = Vec<u8>;
+
+/// sworker certification type, begin with `-----BEGIN CERTIFICATE-----`
+/// and end with `-----END CERTIFICATE-----`
+pub type SworkerCert = Vec<u8>;
 
 /// sworker public key, little-endian-format, 64 bytes vec
 pub type SworkerPubKey = Vec<u8>;

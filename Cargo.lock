@@ -1319,7 +1319,9 @@ dependencies = [
 name = "cstrml-claims"
 version = "1.0.0"
 dependencies = [
+ "cst-primitives",
  "cstrml-balances",
+ "cstrml-locks",
  "frame-support",
  "frame-system",
  "hex-literal",

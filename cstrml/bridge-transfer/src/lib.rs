@@ -135,5 +135,14 @@ decl_module! {
 			<T as Config>::Currency::transfer(&source, &to, amount.into(), AllowDeath)?;
 			Ok(())
 		}
+
+		/// Executes a simple currency transfer using the bridge account as the source
+		#[weight = 195_000_000]
+		pub fn transfer_from_elrond(origin, to: T::AccountId, amount: BalanceOf<T>, _rid: [u8; 32]) -> DispatchResult {
+			let _ = T::BridgeOrigin::ensure_origin(origin)?;
+			let elrond_pot = <bridge::Module<T>>::elrond_pot();
+			<T as Config>::Currency::transfer(&elrond_pot, &to, amount.into(), AllowDeath)?;
+			Ok(())
+		}
 	}
 }

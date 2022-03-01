@@ -127,11 +127,12 @@ pub const ENDOWED_BALANCE: u64 = 100_000_000;
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let bridge_id = ModuleId(*b"crust/bg").into_account();
+	let elrond_id = ModuleId(*b"elrondbg").into_account();
 	let mut t = frame_system::GenesisConfig::default()
 		.build_storage::<Test>()
 		.unwrap();
 	balances::GenesisConfig::<Test> {
-		balances: vec![(bridge_id, ENDOWED_BALANCE), (RELAYER_A, ENDOWED_BALANCE)],
+		balances: vec![(bridge_id, ENDOWED_BALANCE), (RELAYER_A, ENDOWED_BALANCE), (elrond_id, ENDOWED_BALANCE)],
 	}
 	.assimilate_storage(&mut t)
 	.unwrap();

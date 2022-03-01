@@ -101,9 +101,35 @@ fn transfer_to_elrond() {
 			recipient,
 		));
 		let elrond_pot: u64 = Bridge::elrond_pot();
-		assert_eq!(Balances::free_balance(&elrond_pot), 100);
+		assert_eq!(Balances::free_balance(&elrond_pot), 100 + ENDOWED_BALANCE);
 	})
 }
+
+#[test]
+fn transfer_from_elrond() {
+	new_test_ext().execute_with(|| {
+		// Check inital state
+		let bridge_id: u64 = Bridge::elrond_pot();
+		let resource_id = BridgeTokenId::get();
+		assert_eq!(Balances::free_balance(&bridge_id), ENDOWED_BALANCE);
+		// Transfer and check result
+		assert_ok!(BridgeTransfer::transfer_from_elrond(
+			Origin::signed(Bridge::account_id()),
+			RELAYER_A,
+			10,
+			resource_id,
+		));
+		assert_eq!(Balances::free_balance(&bridge_id), ENDOWED_BALANCE - 10);
+		assert_eq!(Balances::free_balance(RELAYER_A), ENDOWED_BALANCE + 10);
+
+		assert_events(vec![Event::balances(balances::Event::Transfer(
+			bridge_id,
+			RELAYER_A,
+			10,
+		))]);
+	})
+}
+
 
 #[test]
 fn transfer() {

@@ -83,19 +83,19 @@ mod tests {
     use crate::mock::{new_test_ext, Test};
     use frame_support::assert_ok;
 
-    #[test]
-    fn place_storage_order() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_place_storage_order::<Test>());
-        });
-    }
+    // #[test]
+    // fn place_storage_order() {
+    //     new_test_ext().execute_with(|| {
+    //         assert_ok!(test_benchmark_place_storage_order::<Test>());
+    //     });
+    // }
 
-    #[test]
-    fn calculate_reward() {
-        new_test_ext().execute_with(|| {
-            assert_ok!(test_benchmark_calculate_reward::<Test>());
-        });
-    }
+    // #[test]
+    // fn calculate_reward() {
+    //     new_test_ext().execute_with(|| {
+    //         assert_ok!(test_benchmark_calculate_reward::<Test>());
+    //     });
+    // }
 
 }
 

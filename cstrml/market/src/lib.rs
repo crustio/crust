@@ -222,8 +222,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                         let reward_amount = Self::calculate_reward_amount(file_info.remaining_paid_count, &file_info.amount);
                         if let Some(new_reward) = Self::has_enough_collateral(&owner, &reward_amount) {
                             T::BenefitInterface::update_reward(&owner, new_reward);
-                            file_info.amount -= reward_amount;
-                            file_info.remaining_paid_count -= 1;
+                            file_info.amount = file_info.amount.saturating_sub(reward_amount);
+                            file_info.remaining_paid_count = file_info.remaining_paid_count.saturating_sub(1);
                         }
                     }
                 }
@@ -266,7 +266,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                         if replica.created_at.is_none() { is_spower_counted = Some(true); } else { is_spower_counted = Some(false); };
                     }
                     if replica.is_reported {
-                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_calculate_reward`
+                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `update_replicas`
                         to_decrease_count += 1;
                     }
                 }
@@ -294,7 +294,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
             // Some(true) => Already pass the SpowerReadyPeriod, decrease the spower
             // Some(false) => Still in SpowerReadyPeriod, decrease the file_size
             let mut is_spower_counted: Option<bool> = None;
-            let maybe_replica = file_info.replicas.remove(&owner);
+            let maybe_replica = file_info.replicas.get(&owner);
             if let Some(replica) = maybe_replica {
                 if replica.who == *who {
                     if replica.anchor == *anchor {
@@ -302,9 +302,10 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                         if replica.created_at.is_none() { is_spower_counted = Some(true); } else { is_spower_counted = Some(false); };
                     }
                     if replica.is_reported {
-                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `do_calculate_reward`
+                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `update_replicas`
                         to_decrease_count += 1;
                     }
+                    file_info.replicas.remove(&owner);
                 }
             }
 
@@ -648,7 +649,7 @@ decl_module! {
             Self::maybe_reward_liquidator(&cid, curr_bn, &liquidator)?;
 
             // 4. Refresh the status of the file and calculate the reward for merchants
-            Self::do_calculate_reward(&cid, curr_bn);
+            Self::update_replicas(&cid, curr_bn);
 
             // 5. Try to renew file if prepaid is not zero
             Self::try_to_renew_file(&cid, curr_bn, &liquidator)?;
@@ -682,6 +683,7 @@ decl_module! {
         }
 
         /// Migrate the file to file v2
+        /// TODO: Need to weight this one!!!!!!!
         #[weight = T::WeightInfo::reward_merchant()]
         pub fn do_file_migration(
             origin,
@@ -780,13 +782,12 @@ impl<T: Config> Module<T> {
         T::ModuleId::get().into_sub_account("rese")
     }
 
-    /// Calculate reward from file's replica
-    /// This function will calculate the file's reward, update replicas
+    /// This function will update replicas
     /// and (maybe) insert file's status(delete file)
     /// input:
     ///   - cid: MerkleRoot
     ///   - curr_bn: BlockNumber
-    pub fn do_calculate_reward(cid: &MerkleRoot, curr_bn: BlockNumber)
+    pub fn update_replicas(cid: &MerkleRoot, curr_bn: BlockNumber)
     {
         // 1. File must exist
         if Self::filesv2(cid).is_none() { return; }
@@ -891,7 +892,7 @@ impl<T: Config> Module<T> {
 
     fn maybe_reward_liquidator(cid: &MerkleRoot, curr_bn: BlockNumber, liquidator: &T::AccountId) -> DispatchResult {
         if let Some(mut file_info) = Self::filesv2(cid) {
-            if curr_bn > file_info.expired_at {
+            if curr_bn >= file_info.expired_at {
                 let reward_liquidator_amount = file_info.amount;
                 file_info.amount = Zero::zero();
                 T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive)?;
@@ -1125,6 +1126,28 @@ impl<T: Config> Module<T> {
                     Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
                 }
             }
+        } else if let Some(mut file_info) = Self::files(cid) {
+            if file_info.replicas.len().is_zero() {
+                // ordered_file_size == reported_file_size, return it
+                if file_info.file_size == reported_file_size {
+                    return
+                // ordered_file_size > reported_file_size, correct it
+                } else if file_info.file_size > reported_file_size {
+                    file_info.file_size = reported_file_size;
+                    <Files<T>>::insert(cid, file_info);
+                // ordered_file_size < reported_file_size, close it with notification
+                } else {
+                    let total_amount = file_info.amount + file_info.prepaid;
+                    if !Self::maybe_reward_merchant(who, &total_amount) {
+                        // This should not have error => discard the result
+                        let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
+                    }
+                    <Files<T>>::remove(cid);
+                    FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
+                    OrdersCount::mutate(|count| {*count = count.saturating_sub(1)});
+                    Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
+                }
+            }
         }
     }
 
@@ -1139,11 +1162,12 @@ impl<T: Config> Module<T> {
     }
 
     fn calculate_reward_amount(remaining_paid_count: u32, amount: &BalanceOf<T>) -> BalanceOf<T> {
+        // x = 2.5 / (18 - 2.5 * {0, 1, 2, 3})
         match remaining_paid_count {
-            4u32 => Perbill::from_parts(138888888) * *amount,
-            3u32 => Perbill::from_parts(161290320) * *amount,
-            2u32 => Perbill::from_parts(192307690) * *amount,
-            1u32 => Perbill::from_parts(238095240) * *amount,
+            4u32 => Perbill::from_parts(138888888) * *amount, // 2.5 / 18
+            3u32 => Perbill::from_parts(161290320) * *amount, // 2.5 / 15.5
+            2u32 => Perbill::from_parts(192307690) * *amount, // 2.5 / 13
+            1u32 => Perbill::from_parts(238095240) * *amount, // 2.5 / 10.5
             _ => Zero::zero()
         }
     }

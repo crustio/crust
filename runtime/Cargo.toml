@@ -162,4 +162,5 @@ runtime-benchmarks = [
     "benefits/runtime-benchmarks",
     "csm-locking/runtime-benchmarks",
     "locks/runtime-benchmarks",
+    "bridge/runtime-benchmarks",
 ]

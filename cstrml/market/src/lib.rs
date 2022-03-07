@@ -62,6 +62,7 @@ pub trait WeightInfo {
     fn place_storage_order() -> Weight;
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
+    fn do_file_migration(files_count: u32) -> Weight;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -683,8 +684,7 @@ decl_module! {
         }
 
         /// Migrate the file to file v2
-        /// TODO: Need to weight this one!!!!!!!
-        #[weight = T::WeightInfo::reward_merchant()]
+        #[weight = T::WeightInfo::do_file_migration(*files_count)]
         pub fn do_file_migration(
             origin,
             files_count: u32

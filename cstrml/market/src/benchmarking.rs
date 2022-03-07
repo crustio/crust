@@ -21,7 +21,7 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     user
 }
 
-fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_at: BlockNumber, calculated_at: BlockNumber, amount: u32)
+fn build_market_file_v1<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_at: BlockNumber, calculated_at: BlockNumber, amount: u32)
     -> FileInfo<T::AccountId, BalanceOf<T>>
 {
     let mut replicas: Vec<Replica<T::AccountId>> = vec![];
@@ -48,6 +48,34 @@ fn build_market_file<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_siz
     file_info
 }
 
+fn build_market_file_v2<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_at: BlockNumber, calculated_at: BlockNumber, amount: u32)
+    -> FileInfoV2<T::AccountId, BalanceOf<T>>
+{
+    let mut replicas = BTreeMap::<T::AccountId, Replica<T::AccountId>>::new();
+    for _ in 0..200 {
+        let new_replica = Replica {
+            who: user.clone(),
+            valid_at,
+            anchor: pub_key.clone(),
+            is_reported: true,
+            created_at: None
+        };
+        replicas.insert(user.clone(), new_replica);
+    }
+    let file_info = FileInfoV2 {
+        file_size,
+        spower: file_size,
+        expired_at,
+        calculated_at,
+        amount: T::Currency::minimum_balance() * amount.into(),
+        prepaid: Zero::zero(),
+        reported_replica_count: 0,
+        remaining_paid_count: 4,
+        replicas
+    };
+    file_info
+}
+
 benchmarks! {
     place_storage_order {
         Market::<T>::set_enable_market(RawOrigin::Root.into(), true).expect("Something wrong during set market switch");
@@ -55,11 +83,11 @@ benchmarks! {
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];
-        <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000));
+        <self::FilesV2<T>>::insert(&cid, build_market_file_v2::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000u32.into()));
         system::Module::<T>::set_block_number(600u32.into());
     }: _(RawOrigin::Signed(user.clone()), cid.clone(), file_size, T::Currency::minimum_balance() * 10u32.into(), vec![])
     verify {
-        assert_eq!(Market::<T>::files(&cid).unwrap_or_default().calculated_at, 600);
+        assert_eq!(Market::<T>::filesv2(&cid).unwrap_or_default().calculated_at, 400);
     }
 
     calculate_reward {
@@ -67,12 +95,29 @@ benchmarks! {
         let cid = vec![0];
         let file_size: u64 = 10;
         let pub_key = vec![1];
-        <self::Files<T>>::insert(&cid, build_market_file::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000u32.into()));
+        <self::FilesV2<T>>::insert(&cid, build_market_file_v2::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000u32.into()));
         system::Module::<T>::set_block_number(2600u32.into());
         <T as crate::Config>::Currency::make_free_balance_be(&crate::Module::<T>::storage_pot(), T::Currency::minimum_balance() * 2000u32.into());
     }: _(RawOrigin::Signed(user.clone()), cid.clone())
     verify {
-        assert_eq!(Market::<T>::files(&cid).is_none(), true);
+        assert_eq!(Market::<T>::filesv2(&cid).is_none(), true);
+    }
+
+    do_file_migration {
+        let somebody = create_funded_user::<T>("user", 200);
+        for index in 0..100 {
+            let user = create_funded_user::<T>("user", index);
+            let cid = vec![index as u8];
+            let file_size: u64 = index as u64;
+            let pub_key = vec![index as u8];
+            <self::Files<T>>::insert(&cid, build_market_file_v1::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000u32.into()));
+        }
+    }: _(RawOrigin::Signed(somebody.clone()), 100)
+    verify {
+        for index in 0..100 {
+            let cid = vec![index as u8];
+            assert_eq!(Market::<T>::filesv2(&cid).is_some(), true);
+        }
     }
 
 }
@@ -83,19 +128,19 @@ mod tests {
     use crate::mock::{new_test_ext, Test};
     use frame_support::assert_ok;
 
-    // #[test]
-    // fn place_storage_order() {
-    //     new_test_ext().execute_with(|| {
-    //         assert_ok!(test_benchmark_place_storage_order::<Test>());
-    //     });
-    // }
+    #[test]
+    fn place_storage_order() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(test_benchmark_place_storage_order::<Test>());
+        });
+    }
 
-    // #[test]
-    // fn calculate_reward() {
-    //     new_test_ext().execute_with(|| {
-    //         assert_ok!(test_benchmark_calculate_reward::<Test>());
-    //     });
-    // }
+    #[test]
+    fn calculate_reward() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(test_benchmark_calculate_reward::<Test>());
+        });
+    }
 
 }
 

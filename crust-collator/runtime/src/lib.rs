@@ -91,6 +91,8 @@ use xcm::v1::{
 use sp_runtime::traits::CheckedConversion;
 use xcm_executor::traits::{FilterAssetLocation, MatchesFungible};
 use impls::{CurrencyToVoteHandler, OneTenthFee, CurrencyAdapter as TransactionFeeCurrencyAdapter};
+use cumulus_primitives_core::ParaId;
+use frame_support::pallet_prelude::*;
 
 type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 
@@ -431,7 +433,7 @@ impl parachain_info::Config for Runtime {}
 
 parameter_types! {
 	pub const RococoLocation: MultiLocation = MultiLocation::parent();
-	pub const LocalTestNetwork: MultiLocation = MultiLocation { parents: 1, interior: X1(Parachain(2012)) };
+	pub const LocalTestNetwork: MultiLocation = MultiLocation::here();
 	pub const RococoNetwork: NetworkId = NetworkId::Kusama;
 	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
@@ -443,39 +445,41 @@ type LocationToAccountId = (
 	AccountId32Aliases<RococoNetwork, AccountId>,
 );
 
-pub struct AllowedList;
+pub trait NativeAssetChecker {
+	fn is_native_asset(asset: &MultiAsset) -> bool;
+	fn is_native_asset_id(id: &MultiLocation) -> bool;
+	fn native_asset_id() -> MultiLocation;
+}
 
-impl AllowedList {
-	fn is_allowed(id: u32) -> bool {
-		match id {
-			2008 => true, // Local testnet
-			2012 => true, // Local testnet
-			2000 => true, // Acala
-			2004 => true, // Phala
-			2003 => true, // Reserved
-			_ => false
+pub struct NativeAssetFilter<T>(PhantomData<T>);
+impl<T: Get<ParaId>> NativeAssetChecker for NativeAssetFilter<T> {
+	fn is_native_asset(asset: &MultiAsset) -> bool {
+		match (&asset.id, &asset.fun) {
+			// So far our native asset is concrete
+			(Concrete(ref id), Fungible(_)) if Self::is_native_asset_id(id) => true,
+			_ => false,
 		}
+	}
+
+	fn is_native_asset_id(id: &MultiLocation) -> bool {
+		let native_locations = [
+			MultiLocation::here(),
+			(1, X1(Parachain(T::get().into()))).into(),
+		];
+		native_locations.contains(id)
+	}
+
+	fn native_asset_id() -> MultiLocation {
+		(1, X1(Parachain(T::get().into()))).into()
 	}
 }
 
 
-pub struct IsFromSiblingParachain;
-impl Contains<MultiLocation> for IsFromSiblingParachain {
-	fn contains(id: &MultiLocation) -> bool {
-		match id {
-			MultiLocation { parents: 1, interior: X1(Junction::Parachain(id)) } if AllowedList::is_allowed(id.clone()) => true,
-			_ => false
-		}
-	}
-}
-
-pub struct IsSiblingParachainsConcrete<T>(PhantomData<T>);
-impl<T: Contains<MultiLocation>, B: TryFrom<u128>> MatchesFungible<B>
-	for IsSiblingParachainsConcrete<T>
-{
+pub struct NativeAssetMatcher<C>(PhantomData<C>);
+impl<C: NativeAssetChecker, B: TryFrom<u128>> MatchesFungible<B> for NativeAssetMatcher<C> {
 	fn matches_fungible(a: &MultiAsset) -> Option<B> {
 		match (&a.id, &a.fun) {
-			(Concrete(ref id), Fungible(ref amount)) if T::contains(id) => {
+			(Concrete(_), Fungible(ref amount)) if C::is_native_asset(a) => {
 				CheckedConversion::checked_from(*amount)
 			}
 			_ => None,
@@ -487,7 +491,7 @@ type LocalAssetTransactor = CurrencyAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
-	IsSiblingParachainsConcrete<IsFromSiblingParachain>,
+	NativeAssetMatcher<NativeAssetFilter<ParachainInfo>>,
 	// Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
 	LocationToAccountId,
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
@@ -496,24 +500,8 @@ type LocalAssetTransactor = CurrencyAdapter<
 	(),
 >;
 
-pub struct IsAllowedToCrust<Origin>(PhantomData<Origin>);
-impl<
-	Origin: OriginTrait
-> ConvertOrigin<Origin> for IsAllowedToCrust<Origin> {
-	fn convert_origin(origin: impl Into<MultiLocation>, kind: OriginKind) -> Result<Origin, MultiLocation> {
-		match (kind, origin.into()) {
-			(
-				OriginKind::Superuser,
-				MultiLocation { parents: 0, interior: X1(Junction::Parachain(id)) },
-			) if AllowedList::is_allowed(id.into()) => Ok(Origin::root()),
-			(_, origin) => Err(origin),
-		}
-	}
-}
-
 
 pub type XcmOriginToTransactDispatchOrigin = (
-	IsAllowedToCrust<Origin>,
 	SovereignSignedViaLocation<LocationToAccountId, Origin>,
 	RelayChainAsNative<RelayChainOrigin, Origin>,
 	SiblingParachainAsNative<cumulus_pallet_xcm::Origin, Origin>,
@@ -560,7 +548,7 @@ impl Config for XcmConfig {
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, Call, MaxInstructions>;
-	type Trader = UsingComponents<IdentityFee<Balance>, RococoLocation, AccountId, Balances, ()>;
+	type Trader = UsingComponents<IdentityFee<Balance>, LocalTestNetwork, AccountId, Balances, ()>;
 	type ResponseHandler = PolkadotXcm;
 	type AssetTrap = PolkadotXcm;
 	type AssetClaims = PolkadotXcm;

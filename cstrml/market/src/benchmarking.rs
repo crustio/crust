@@ -21,33 +21,6 @@ fn create_funded_user<T: Config>(string: &'static str, n: u32) -> T::AccountId {
     user
 }
 
-fn build_market_file_v1<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_at: BlockNumber, calculated_at: BlockNumber, amount: u32)
-    -> FileInfo<T::AccountId, BalanceOf<T>>
-{
-    let mut replicas: Vec<Replica<T::AccountId>> = vec![];
-    for _ in 0..200 {
-        let new_replica = Replica {
-            who: user.clone(),
-            valid_at,
-            anchor: pub_key.clone(),
-            is_reported: true,
-            created_at: None
-        };
-        replicas.push(new_replica);
-    }
-    let file_info = FileInfo {
-        file_size,
-        spower: file_size,
-        expired_at,
-        calculated_at,
-        amount: T::Currency::minimum_balance() * amount.into(),
-        prepaid: Zero::zero(),
-        reported_replica_count: 0,
-        replicas
-    };
-    file_info
-}
-
 fn build_market_file_v2<T: Config>(user: &T::AccountId, pub_key: &Vec<u8>, file_size: u64, valid_at: BlockNumber, expired_at: BlockNumber, calculated_at: BlockNumber, amount: u32)
     -> FileInfoV2<T::AccountId, BalanceOf<T>>
 {
@@ -102,24 +75,6 @@ benchmarks! {
     verify {
         assert_eq!(Market::<T>::filesv2(&cid).is_none(), true);
     }
-
-    do_file_migration {
-        let somebody = create_funded_user::<T>("user", 200);
-        for index in 0..100 {
-            let user = create_funded_user::<T>("user", index);
-            let cid = vec![index as u8];
-            let file_size: u64 = index as u64;
-            let pub_key = vec![index as u8];
-            <self::Files<T>>::insert(&cid, build_market_file_v1::<T>(&user, &pub_key, file_size, 300, 1000, 400, 1000u32.into()));
-        }
-    }: _(RawOrigin::Signed(somebody.clone()), 100)
-    verify {
-        for index in 0..100 {
-            let cid = vec![index as u8];
-            assert_eq!(Market::<T>::filesv2(&cid).is_some(), true);
-        }
-    }
-
 }
 
 #[cfg(test)]

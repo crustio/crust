@@ -65,29 +65,6 @@ pub trait WeightInfo {
     fn do_file_migration(files_count: u32) -> Weight;
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct FileInfo<AccountId, Balance> {
-    // The ordered file size, which declare by user
-    pub file_size: u64,
-    // The storage power value in MPoW
-    pub spower: u64,
-    // The block number when the file goes invalid
-    pub expired_at: BlockNumber,
-    // The last block number when the file's amount is calculated
-    pub calculated_at: BlockNumber,
-    // The file value
-    #[codec(compact)]
-    pub amount: Balance,
-    // The pre paid pool
-    #[codec(compact)]
-    pub prepaid: Balance,
-    // The count of valid replica each report slot
-    pub reported_replica_count: u32,
-    // The replica list, distinct by group
-    pub replicas: Vec<Replica<AccountId>>
-}
-
 #[derive(Debug, PartialEq, Encode, Decode, Default, Clone)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct FileInfoV2<AccountId: Ord, Balance> {
@@ -145,9 +122,8 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
                       cid: &MerkleRoot,
                       reported_file_size: u64,
                       anchor: &SworkerAnchor,
-                      valid_at: BlockNumber,
-                      maybe_members: &Option<BTreeSet<<T as system::Config>::AccountId>>
-    ) -> (u64, bool) {
+                      valid_at: BlockNumber
+                    ) -> (u64, bool) {
         // Judge if file_info.file_size == reported_file_size or not
         Self::maybe_upsert_file_size(who, cid, reported_file_size);
 
@@ -156,51 +132,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         // if the file exist, is_counted == true, will change it later.
         let mut spower: u64 = 0;
         let mut is_valid_cid: bool = false;
-        if let Some(mut file_info) = <Files<T>>::get(cid) {
-            is_valid_cid = true;
-            // 1. Check if the length of the groups exceed MAX_REPLICAS or not
-            let mut is_counted = file_info.replicas.len() < MAX_REPLICAS;
-            // 2. Check if the file is stored by other members
-            if is_counted {
-                if let Some(members) = maybe_members {
-                    for replica in file_info.replicas.iter() {
-                        if members.contains(&replica.who) {
-                            if T::SworkerInterface::check_anchor(&replica.who, &replica.anchor) {
-                                // duplicated in group and set is_counted to false
-                                is_counted = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Prepare new replica info
-            if is_counted {
-                let new_replica = Replica {
-                    who: who.clone(),
-                    valid_at,
-                    anchor: anchor.clone(),
-                    is_reported: true,
-                    // set created_at to some
-                    created_at: Some(valid_at)
-                };
-                file_info.replicas.push(new_replica);
-                file_info.reported_replica_count += 1;
-                // Always return the file size for this [who] reported first time
-                spower = file_info.file_size;
-            }
-
-            // 4. The first join the replicas and file become live(expired_at > calculated_at)
-            if file_info.expired_at == 0 {
-                let curr_bn = Self::get_current_block_number();
-                file_info.calculated_at = curr_bn;
-                file_info.expired_at = curr_bn + T::FileDuration::get();
-            }
-
-            // 5. Update files
-            <Files<T>>::insert(cid, file_info);
-        } else if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
+        if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
             is_valid_cid = true;
             // 1. Check if the length of the groups exceed MAX_REPLICAS or not
             if file_info.replicas.len() < MAX_REPLICAS {
@@ -253,42 +185,7 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         let mut spower: u64 = 0;
         let mut is_valid_cid: bool = false;
         // 1. Delete replica from file_info
-        if let Some(mut file_info) = <Files<T>>::get(cid) {
-            is_valid_cid = true;
-            let mut to_decrease_count = 0;
-            // None => No such file
-            // Some(true) => Already pass the SpowerReadyPeriod, decrease the spower
-            // Some(false) => Still in SpowerReadyPeriod, decrease the file_size
-            let mut is_spower_counted: Option<bool> = None;
-            file_info.replicas.retain(|replica| {
-                if replica.who == *who {
-                    if replica.anchor == *anchor {
-                        // We added it before
-                        if replica.created_at.is_none() { is_spower_counted = Some(true); } else { is_spower_counted = Some(false); };
-                    }
-                    if replica.is_reported {
-                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `update_replicas`
-                        to_decrease_count += 1;
-                    }
-                }
-                replica.who != *who
-            });
-
-            // 2. Return the original storage power in wr
-            if let Some(is_spower_counted) = is_spower_counted {
-                if is_spower_counted {
-                    spower = file_info.spower;
-                } else {
-                    spower = file_info.file_size;
-                }
-            }
-
-            // 3. Decrease the reported_replica_count
-            if to_decrease_count != 0 {
-                file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(to_decrease_count);
-            }
-            <Files<T>>::insert(cid, file_info);
-        } else if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
+        if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
             is_valid_cid = true;
             let mut to_decrease_count = 0;
             // None => No such file
@@ -445,10 +342,6 @@ decl_storage! {
 
         /// The minimal file price by keys
         pub MinFileKeysCountFee get(fn min_file_keys_count_fee): BalanceOf<T> = Zero::zero();
-
-        /// File information iterated by order id
-        pub Files get(fn files):
-        map hasher(twox_64_concat) MerkleRoot => Option<FileInfo<T::AccountId, BalanceOf<T>>>;
 
         /// File V2 information iterated by order id
         pub FilesV2 get(fn filesv2):
@@ -689,46 +582,6 @@ decl_module! {
             T::BenefitInterface::update_reward(&merchant, Zero::zero());
 
             Self::deposit_event(RawEvent::RewardMerchantSuccess(merchant));
-            Ok(())
-        }
-
-        /// Migrate the file to file v2
-        #[weight = T::WeightInfo::do_file_migration(*files_count)]
-        pub fn do_file_migration(
-            origin,
-            files_count: u32
-        ) -> DispatchResult {
-            let _ = ensure_signed(origin)?;
-
-            let mut count = 0u32;
-            for (cid, file) in <Files<T>>::iter() {
-                let mut new_replicas = BTreeMap::<T::AccountId, Replica<T::AccountId>>::new();
-                for replica in file.replicas {
-                    let mut owner = replica.who.clone();
-                    if let Some(group_owner) = T::SworkerInterface::get_owner(&replica.who) {
-                        owner = group_owner;
-                    }
-                    new_replicas.insert(owner, replica);
-                }
-                let file_info = FileInfoV2::<T::AccountId, BalanceOf<T>> {
-                    file_size: file.file_size,
-                    spower: file.spower,
-                    expired_at: file.expired_at,
-                    calculated_at: file.calculated_at,
-                    amount: file.amount,
-                    prepaid: file.prepaid,
-                    remaining_paid_count: 0u32,
-                    reported_replica_count: file.reported_replica_count,
-                    replicas: new_replicas
-                };
-                <FilesV2<T>>::insert(&cid, file_info);
-                <Files<T>>::remove(cid);
-                count += 1;
-                if count > files_count {
-                    break;
-                }
-            }
-
             Ok(())
         }
 
@@ -1198,28 +1051,6 @@ impl<T: Config> Module<T> {
                         let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
                     }
                     <FilesV2<T>>::remove(cid);
-                    FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
-                    OrdersCount::mutate(|count| {*count = count.saturating_sub(1)});
-                    Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
-                }
-            }
-        } else if let Some(mut file_info) = Self::files(cid) {
-            if file_info.replicas.len().is_zero() {
-                // ordered_file_size == reported_file_size, return it
-                if file_info.file_size == reported_file_size {
-                    return
-                // ordered_file_size > reported_file_size, correct it
-                } else if file_info.file_size > reported_file_size {
-                    file_info.file_size = reported_file_size;
-                    <Files<T>>::insert(cid, file_info);
-                // ordered_file_size < reported_file_size, close it with notification
-                } else {
-                    let total_amount = file_info.amount + file_info.prepaid;
-                    if !Self::maybe_reward_merchant(who, &total_amount) {
-                        // This should not have error => discard the result
-                        let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
-                    }
-                    <Files<T>>::remove(cid);
                     FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
                     OrdersCount::mutate(|count| {*count = count.saturating_sub(1)});
                     Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));

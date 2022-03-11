@@ -14,7 +14,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market::{Replica, FileInfo};
+pub use market::{Replica, FileInfoV2};
 use swork::Works;
 use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator, collections::btree_map::BTreeMap};

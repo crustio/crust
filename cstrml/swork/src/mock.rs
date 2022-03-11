@@ -15,7 +15,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market::{Replica, FileInfo, FileInfoV2};
+pub use market::{Replica, FileInfoV2};
 use primitives::{traits::BenefitInterface, EraIndex, MerkleRoot};
 use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
@@ -710,7 +710,7 @@ pub fn add_not_live_files() {
     ].to_vec();
 
     for (file, file_size) in files.iter() {
-        insert_file(file, 1000, 0, 1000, 0, 0, vec![], *file_size);
+        insert_file(file, 1000, 0, 1000, 0, 0, BTreeMap::from_iter(vec![]), *file_size);
     }
 
     let storage_pot = Market::storage_pot();
@@ -721,7 +721,6 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
     let files: Vec<(Vec<u8>, u64)> = [
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(), 134289408),
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(), 7),
-        ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(), 37),
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oI".as_bytes().to_vec(), 1),
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oJ".as_bytes().to_vec(), 1),
         ("QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oK".as_bytes().to_vec(), 1)
@@ -735,23 +734,24 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
         created_at: Some(200)
     };
     for (file, file_size) in files.iter() {
-        insert_file(file, 200, 12000, 1000, 0, 1, vec![replica_info.clone()], *file_size);
+        insert_file(file, 200, 12000, 1000, 0, 1, BTreeMap::from_iter(vec![(who.clone(), replica_info.clone())]), *file_size);
     }
 }
 
-fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: Vec<Replica<AccountId>>, file_size: u64) {
-    let file_info = FileInfo {
+fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: BTreeMap::<AccountId, Replica<AccountId>>, file_size: u64) {
+    let file_info = FileInfoV2 {
         file_size,
         spower: Market::calculate_spower(file_size, replicas.len() as u32),
-        expired_at,
+        expired_at, 
         calculated_at,
         amount,
         prepaid,
         reported_replica_count,
+        remaining_paid_count: 4,
         replicas
     };
 
-    <market::Files<Test>>::insert(f_id, file_info);
+    <market::FilesV2<Test>>::insert(f_id, file_info);
 }
 
 pub fn update_identities() {

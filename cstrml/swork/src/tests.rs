@@ -410,7 +410,6 @@ fn report_works_should_work() {
             ));
 
             // Check work report
-            update_spower_info();
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
             // Check workloads after work report
@@ -431,7 +430,7 @@ fn report_works_should_work() {
             // Check same file all been confirmed
             assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default(), FileInfo {
                 file_size: 134289408,
-                spower: Market::calculate_spower(134289408, 1),
+                spower: 0,
                 expired_at: 1303,
                 calculated_at: 303,
                 amount: 1000,
@@ -447,7 +446,7 @@ fn report_works_should_work() {
             });
             assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default(), FileInfo {
                 file_size: 268578816,
-                spower: Market::calculate_spower(268578816, 1),
+                spower: 0,
                 expired_at: 1303,
                 calculated_at: 303,
                 amount: 1000,
@@ -507,7 +506,6 @@ fn report_works_for_invalid_cids_should_work() {
             ));
 
             // Check work report
-            update_spower_info();
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
             // Check workloads after work report
@@ -1781,15 +1779,20 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 bob.clone()
             ));
 
-            // bob's spower is not 0
-            assert_noop!(Swork::join_group(
+            // bob's spower is set to 0
+            assert_ok!(Swork::join_group(
                 Origin::signed(bob.clone()),
                 alice.clone()
-            ),
-            DispatchError::Module {
-                index: 2,
-                error: 11,
-                message: Some("IllegalSpower"),
+            ));
+
+
+            assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
+                report_slot: 0,
+                spower: 0,
+                free: 0,
+                reported_files_size: 2,
+                reported_srd_root: hex::decode("00").unwrap(),
+                reported_files_root: hex::decode("11").unwrap()
             });
 
             add_wr(&b_pk, &WorkReport {
@@ -1814,11 +1817,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
                 eve.clone()
             ));
 
-            // Bob join the alice's group
-            assert_ok!(Swork::join_group(
-                Origin::signed(bob.clone()),
-                alice.clone()
-            ));
+            // join the alice's group
             assert_ok!(Swork::join_group(
                 Origin::signed(charlie.clone()),
                 alice.clone()
@@ -1945,11 +1944,10 @@ fn join_group_should_work_for_spower_in_work_report() {
                 alice_wr_info.sig
             ));
 
-            update_spower_info();
             assert_eq!(Market::files(&file_a).unwrap_or_default(),
                 FileInfo {
                     file_size: 13,
-                    spower: 13,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -1967,7 +1965,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_b).unwrap_or_default(),
                 FileInfo {
                     file_size: 7,
-                    spower: 7,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -1985,7 +1983,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(),
                 FileInfo {
                     file_size: 37,
-                    spower: 37 + 1,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2027,7 +2025,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_b).unwrap_or_default(),
                 FileInfo {
                     file_size: 7,
-                    spower: 7,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2047,7 +2045,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(),
                 FileInfo {
                     file_size: 37,
-                    spower: 37 + 1,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2085,11 +2083,10 @@ fn join_group_should_work_for_spower_in_work_report() {
                     ]
                 }
             );
-            update_spower_info();
             assert_eq!(Market::files(&file_d).unwrap_or_default(),
                 FileInfo {
                     file_size: 55,
-                    spower: 55 + 2,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2133,7 +2130,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(),
                 FileInfo {
                     file_size: 37,
-                    spower: 37 + 1,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2153,7 +2150,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_d).unwrap_or_default(),
                 FileInfo {
                     file_size: 55,
-                    spower: 55 + 2,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2200,7 +2197,6 @@ fn join_group_should_work_for_spower_in_work_report() {
                 reported_files_root: hex::decode("11").unwrap()
             });
 
-            update_spower_info();
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 spower: 22, // still equal to file size
@@ -2233,7 +2229,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_b).unwrap_or_default(),
                 FileInfo {
                     file_size: 7,
-                    spower: 7,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2253,7 +2249,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_c).unwrap_or_default(),
                 FileInfo {
                     file_size: 37,
-                    spower: 37 + 1,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2274,7 +2270,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_d).unwrap_or_default(),
                 FileInfo {
                     file_size: 55,
-                    spower: 55 + 2,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2314,11 +2310,10 @@ fn join_group_should_work_for_spower_in_work_report() {
                 eve_wr_info.files_root,
                 eve_wr_info.sig
             ));
-            update_spower_info();
             assert_eq!(Market::files(&file_c).unwrap_or_default(),
                 FileInfo {
                     file_size: 37,
-                    spower: 37 + 1,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2338,7 +2333,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::files(&file_d).unwrap_or_default(),
                 FileInfo {
                     file_size: 55,
-                    spower: 55 + 2,
+                    spower: 0,
                     expired_at: 1303,
                     calculated_at: 303,
                     amount: 1000,
@@ -2379,13 +2374,14 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Swork::added_files_count(), 9);
             run_to_block(1500);
             let alice_wr_info = group_work_report_alice_1500();
+            assert_ok!(Market::do_file_migration(Origin::signed(eve.clone()), 10));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_c.clone()));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_d.clone()));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_e.clone()));
             // A, B still open, C, D, E already close. Trash I is full. Trash II has one file. Now we report works of alice to close A, B as well.
-            assert_eq!(Market::files(&file_c), None);
-            assert_eq!(Market::files(&file_d), None);
-            assert_eq!(Market::files(&file_e), None);
+            assert_eq!(Market::filesv2(&file_c), None);
+            assert_eq!(Market::filesv2(&file_d), None);
+            assert_eq!(Market::filesv2(&file_e), None);
 
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
@@ -2404,6 +2400,27 @@ fn join_group_should_work_for_spower_in_work_report() {
                 reported_srd_root: hex::decode("00").unwrap(),
                 reported_files_root: hex::decode("11").unwrap()
             });
+
+            assert_eq!(Market::filesv2(&file_a).unwrap_or_default(),
+                FileInfoV2 {
+                    file_size: 13,
+                    spower: 0,
+                    expired_at: 1303,
+                    calculated_at: 303,
+                    amount: 1000,
+                    prepaid: 0,
+                    reported_replica_count: 1,
+                    remaining_paid_count: 0,
+                    replicas: BTreeMap::from_iter(vec![(ferdie.clone(), Replica {
+                        who: alice.clone(),
+                        valid_at: 303,
+                        anchor: a_pk.clone(),
+                        is_reported: true,
+                        created_at: Some(303)
+                    })])
+                }
+            );
+
             assert_ok!(Swork::report_works(
                 Origin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
@@ -2420,12 +2437,25 @@ fn join_group_should_work_for_spower_in_work_report() {
             ));
 
             // delete won't call calculate payout anymore and won't close the file
-            assert_eq!(Market::files(&file_a).is_some(), true);
-            assert_eq!(Market::files(&file_b).is_some(), true);
+            assert_eq!(Market::filesv2(&file_a).is_some(), true);
+            assert_eq!(Market::filesv2(&file_a).unwrap_or_default(),
+                FileInfoV2 {
+                    file_size: 13,
+                    spower: 0,
+                    expired_at: 1303,
+                    calculated_at: 303,
+                    amount: 1000,
+                    prepaid: 0,
+                    reported_replica_count: 0,
+                    remaining_paid_count: 0,
+                    replicas: BTreeMap::from_iter(vec![].into_iter())
+                }
+            );
+            assert_eq!(Market::filesv2(&file_b).is_some(), true);
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_a.clone()));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_b.clone()));
-            assert_eq!(Market::files(&file_a), None);
-            assert_eq!(Market::files(&file_b), None);
+            assert_eq!(Market::filesv2(&file_a), None);
+            assert_eq!(Market::filesv2(&file_b), None);
 
             // d has gone!
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
@@ -2556,7 +2586,6 @@ fn join_group_should_work_for_stake_limit() {
             ));
 
             run_to_block(603);
-            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 12884901888);
@@ -2607,7 +2636,7 @@ fn quit_group_should_work_for_stake_limit() {
                 }
             );
 
-            // alice, bob and eve become a group
+            // alice join the ferdie's group
             assert_ok!(Swork::create_group(
                 Origin::signed(ferdie.clone())
             ));
@@ -2647,17 +2676,16 @@ fn quit_group_should_work_for_stake_limit() {
                 Origin::signed(alice.clone())
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
-            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
-            assert_eq!(Swork::spower(), 57); // 7 + 13 + 37 + 0 + 0 + 1
-            assert_eq!(Swork::reported_files_size(), 57); // 57
+            assert_eq!(Swork::spower(), 0); // set spower to zero
+            assert_eq!(Swork::reported_files_size(), 0);
             assert_eq!(Swork::current_report_slot(), 600);
             let map = WorkloadMap::get().borrow().clone();
-            // All workload is counted to alice. bob and eve is None.
+            // All workload is counted to alice. ferdie is None.
             assert_eq!(*map.get(&ferdie).unwrap(), 0);
-            assert_eq!(*map.get(&alice).unwrap(), 4294967353u128);
+            assert_eq!(*map.get(&alice).unwrap(), 4294967296u128);
         });
 }
 
@@ -2758,7 +2786,6 @@ fn kick_out_should_work_for_stake_limit() {
                 alice.clone()
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
-            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
@@ -2821,7 +2848,6 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             ));
 
             run_to_block(603);
-            update_spower_info();
             update_identities();
 
             assert_eq!(Swork::free(), 4294967296);
@@ -3406,7 +3432,6 @@ fn spower_delay_should_work() {
             ));
 
             // Check work report
-            update_spower_info();
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
             // Check workloads after work report
@@ -3427,7 +3452,7 @@ fn spower_delay_should_work() {
             // Check same file all been confirmed
             assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default(), FileInfo {
                 file_size: 134289408,
-                spower: Market::calculate_spower(134289408, 1),
+                spower: 0,
                 expired_at: 1303,
                 calculated_at: 303,
                 amount: 1000,
@@ -3443,7 +3468,7 @@ fn spower_delay_should_work() {
             });
             assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default(), FileInfo {
                 file_size: 268578816,
-                spower: Market::calculate_spower(268578816, 1),
+                spower: 0,
                 expired_at: 1303,
                 calculated_at: 303,
                 amount: 1000,
@@ -3460,6 +3485,8 @@ fn spower_delay_should_work() {
             assert_eq!(Swork::added_files_count(), 2);
 
             run_to_block(606);
+
+            assert_ok!(Market::do_file_migration(Origin::signed(reporter.clone()), 10));
 
             assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[0].0.clone()));
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {

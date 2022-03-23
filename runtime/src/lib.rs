@@ -766,7 +766,7 @@ parameter_types! {
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 100000);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
-    pub const MaximumFileSize: u64 = 34_359_738_368; // 32G = 32 * 1024 * 1024 * 1024
+    pub const MaximumFileSize: u64 = 8_589_934_592; // 8G = 8 * 1024 * 1024 * 1024
     pub const RenewRewardRatio: Perbill = Perbill::from_percent(5);
 }
 

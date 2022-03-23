@@ -138,7 +138,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     fn update_spower(anchor: &SworkerAnchor, anchor_decrease_spower: u64, anchor_increase_spower: u64) {
         if anchor_decrease_spower != anchor_increase_spower {
             WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
-                Some(WorkReport { ref mut spower, .. }) => *spower = spower.saturating_sub(anchor_decrease_spower).saturating_add(anchor_increase_spower),
+                Some(WorkReport { ref mut spower, .. }) => *spower = spower.saturating_add(anchor_increase_spower).saturating_sub(anchor_decrease_spower),
                 ref mut i => *i = None,
             });
         }
@@ -1053,20 +1053,22 @@ impl<T: Config> Module<T> {
         changed_files: &Vec<(MerkleRoot, u64, u64)>,
         anchor: &SworkerPubKey,
         is_added: bool) -> (u64, u32) {
-        let mut changed_files_size: u64 = 0;
+        let mut changed_spower: u64 = 0;
         let mut changed_files_count: u32 = 0;
 
         // 1. Loop changed files
         if is_added {
             for (cid, size, valid_at) in changed_files {
                 let mut members = None;
+                let mut owner = reporter.clone();
                 if let Some(identity) = Self::identities(reporter) {
-                    if let Some(owner) = identity.group {
-                        members= Some(Self::groups(owner).members);
+                    if let Some(group_owner) = identity.group {
+                        members= Some(Self::groups(group_owner.clone()).members);
+                        owner = group_owner;
                     }
                 };
-                let (added_file_size, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members);
-                changed_files_size = changed_files_size.saturating_add(added_file_size);
+                let (added_spower, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, owner, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members);
+                changed_spower = changed_spower.saturating_add(added_spower);
                 if is_valid_cid {
                     changed_files_count += 1;
                 }
@@ -1074,14 +1076,20 @@ impl<T: Config> Module<T> {
         } else {
             for (cid, _, _) in changed_files {
                 // 2. If mapping to storage orders
-                let (deleted_file_size, is_valid_cid) = T::MarketInterface::delete_replica(reporter, cid, anchor);
-                changed_files_size = changed_files_size.saturating_add(deleted_file_size);
+                let mut owner = reporter.clone();
+                if let Some(identity) = Self::identities(reporter) {
+                    if let Some(group_owner) = identity.group {
+                        owner = group_owner;
+                    }
+                };
+                let (deleted_spower, is_valid_cid) = T::MarketInterface::delete_replica(reporter, owner, cid, anchor);
+                changed_spower = changed_spower.saturating_add(deleted_spower);
                 if is_valid_cid {
                     changed_files_count += 1;
                 }
             }
         }
-        (changed_files_size, changed_files_count)
+        (changed_spower, changed_files_count)
     }
 
     /// Get workload by reporter account,

@@ -15,7 +15,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-pub use market::{Replica, FileInfo};
+pub use market::{Replica, FileInfo, FileInfoV2};
 use primitives::{traits::BenefitInterface, EraIndex, MerkleRoot};
 use balances::{AccountData, NegativeImbalance};
 pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIterator};
@@ -752,10 +752,6 @@ fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: B
     };
 
     <market::Files<Test>>::insert(f_id, file_info);
-}
-
-pub fn update_spower_info() {
-    Market::on_initialize(93);
 }
 
 pub fn update_identities() {

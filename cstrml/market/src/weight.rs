@@ -46,4 +46,10 @@ impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().reads(8 as Weight))
 			.saturating_add(T::DbWeight::get().writes(4 as Weight))
 	}
+	fn do_file_migration(files_count: u32) -> Weight {
+		(1_116_000_000 as Weight)
+				.saturating_add((900_000_000 as Weight).saturating_mul(files_count as Weight))
+				.saturating_add(T::DbWeight::get().reads(2 as Weight).saturating_mul(files_count as Weight))
+				.saturating_add(T::DbWeight::get().writes(2 as Weight).saturating_mul(files_count as Weight))
+	}
 }

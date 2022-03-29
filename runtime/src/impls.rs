@@ -60,7 +60,7 @@ impl<T> WeightToFeePolynomial for OneTenthFee<T> where
     fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
         smallvec!(WeightToFeeCoefficient {
 			coeff_integer: 0u32.into(),
-			coeff_frac: Perbill::from_percent(10),
+			coeff_frac: Perbill::from_percent(30),
 			negative: false,
 			degree: 1,
 		})

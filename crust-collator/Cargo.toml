@@ -54,9 +54,13 @@ sc-tracing = { git = "https://github.com/paritytech/substrate", branch = "polkad
 sp-offchain = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
 sp-consensus-aura = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
 substrate-prometheus-endpoint = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
+sp-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
 
 # RPC related dependencies
 jsonrpc-core = "18.0.0"
+sc-transaction-pool-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
+frame-rpc-system = { package = "substrate-frame-rpc-system", git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
+pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
 
 # Cumulus dependencies
 cumulus-client-cli = { path = "../cumulus/client/cli" }

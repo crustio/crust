@@ -25,6 +25,8 @@ use cumulus_client_network::BlockAnnounceValidator;
 use cumulus_client_service::{
 	prepare_node_config, start_collator, start_full_node, StartCollatorParams, StartFullNodeParams,
 };
+
+use crate::rpc;
 use cumulus_client_consensus_common::ParachainConsensus;
 use crust_parachain_primitives::Hash;
 use cumulus_primitives_core::ParaId;
@@ -244,7 +246,20 @@ where
 		})?;
 
 	let rpc_client = client.clone();
-	let rpc_extensions_builder = Box::new(move |_, _| rpc_ext_builder(rpc_client.clone()));
+	let rpc_extensions_builder = {
+		let client = client.clone();
+		let transaction_pool = transaction_pool.clone();
+
+		Box::new(move |deny_unsafe, _| {
+			let deps = rpc::FullDeps {
+				client: client.clone(),
+				pool: transaction_pool.clone(),
+				deny_unsafe,
+			};
+
+			Ok(rpc::create_full(deps))
+		})
+	};
 	let force_authoring = parachain_config.force_authoring;
 
 	sc_service::spawn_tasks(sc_service::SpawnTasksParams {

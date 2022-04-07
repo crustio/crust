@@ -40,6 +40,7 @@ sp-arithmetic = { git = "https://github.com/paritytech/substrate", default-featu
 frame-support = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 frame-executive = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 frame-system = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
+frame-system-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 pallet-balances = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 pallet-randomness-collective-flip = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 pallet-timestamp = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
@@ -100,6 +101,7 @@ std = [
 	"frame-support/std",
 	"frame-executive/std",
 	"frame-system/std",
+	"frame-system-rpc-runtime-api/std",
 	"pallet-balances/std",
 	"pallet-randomness-collective-flip/std",
 	"pallet-timestamp/std",

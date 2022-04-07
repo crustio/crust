@@ -1036,6 +1036,12 @@ impl_runtime_apis! {
 			TransactionPayment::query_fee_details(uxt, len)
 		}
 	}
+
+	impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, crust_parachain_primitives::Index> for Runtime {
+		fn account_nonce(account: AccountId) -> crust_parachain_primitives::Index {
+			System::account_nonce(account)
+		}
+	}
 }
 
 struct CheckInherents;

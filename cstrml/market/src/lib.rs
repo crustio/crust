@@ -426,9 +426,15 @@ decl_storage! {
         /// The file base fee for each storage order.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
+        /// The minimal file base fee for each storage order.
+        pub MinFileBaseFee get(fn min_file_base_fee): BalanceOf<T> = Zero::zero();
+
         /// The file price per MB.
         /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
         pub FileByteFee get(fn file_byte_fee): BalanceOf<T> = T::InitFileByteFee::get();
+
+        /// The minimal file price per MB.
+        pub MinFileByteFee get(fn min_file_byte_fee): BalanceOf<T> = Zero::zero();
 
         /// Files count, determinate the FileKeysCountFee
         pub FileKeysCount get(fn files_count): u32 = 0;
@@ -436,6 +442,9 @@ decl_storage! {
         /// The file price by keys
         /// It's dynamically adjusted and would change according to the total keys in files
         pub FileKeysCountFee get(fn file_keys_count_fee): BalanceOf<T> = T::InitFileKeysCountFee::get();
+
+        /// The minimal file price by keys
+        pub MinFileKeysCountFee get(fn min_file_keys_count_fee): BalanceOf<T> = Zero::zero();
 
         /// File information iterated by order id
         pub Files get(fn files):
@@ -754,6 +763,71 @@ decl_module! {
             Self::deposit_event(RawEvent::SetBaseFeeSuccess(base_fee));
             Ok(())
         }
+
+        /// Set the file byte fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_byte_fee(
+            origin,
+            #[compact] byte_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            <FileByteFee<T>>::put(byte_fee);
+            Ok(())
+        }
+
+        /// Set the file key count fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_key_count_fee(
+            origin,
+            #[compact] key_count_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            <FileKeysCountFee<T>>::put(key_count_fee);
+            Ok(())
+        }
+
+        /// Set the mininal file base fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_min_base_fee(
+            origin,
+            #[compact] min_base_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            <MinFileBaseFee<T>>::put(min_base_fee);
+            Ok(())
+        }
+
+        /// Set the minimal file byte fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_min_byte_fee(
+            origin,
+            #[compact] min_byte_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            <MinFileByteFee<T>>::put(min_byte_fee);
+            Ok(())
+        }
+
+        /// Set the minimal file key count fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_min_key_count_fee(
+            origin,
+            #[compact] min_key_count_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            <MinFileKeysCountFee<T>>::put(min_key_count_fee);
+            Ok(())
+        }
     }
 }
 
@@ -990,32 +1064,34 @@ impl<T: Config> Module<T> {
         let (files_size, free) = T::SworkerInterface::get_files_size_and_free_space();
         let total_capacity = files_size.saturating_add(free);
         let (numerator, denominator) = T::StorageReferenceRatio::get();
+        let min_file_byte_fee = Self::min_file_byte_fee();
         // Too much supply => decrease the price
         if files_size.saturating_mul(denominator) <= total_capacity.saturating_mul(numerator) {
             <FileByteFee<T>>::mutate(|file_byte_fee| {
                 let gap = T::StorageDecreaseRatio::get() * file_byte_fee.clone();
-                *file_byte_fee = file_byte_fee.saturating_sub(gap);
+                *file_byte_fee = file_byte_fee.saturating_sub(gap).max(min_file_byte_fee);
             });
         } else {
             <FileByteFee<T>>::mutate(|file_byte_fee| {
                 let gap = (T::StorageIncreaseRatio::get() * file_byte_fee.clone()).max(BalanceOf::<T>::saturated_from(1u32));
-                *file_byte_fee = file_byte_fee.saturating_add(gap);
+                *file_byte_fee = file_byte_fee.saturating_add(gap).max(min_file_byte_fee);
             });
         }
     }
 
     pub fn update_file_keys_count_fee() {
         let files_count = Self::files_count();
+        let min_file_keys_count_fee = Self::min_file_keys_count_fee();
         if files_count > FILES_COUNT_REFERENCE {
             // TODO: Independent mechanism
             <FileKeysCountFee<T>>::mutate(|file_keys_count_fee| {
                 let gap = (T::StorageIncreaseRatio::get() * file_keys_count_fee.clone()).max(BalanceOf::<T>::saturated_from(1u32));
-                *file_keys_count_fee = file_keys_count_fee.saturating_add(gap);
+                *file_keys_count_fee = file_keys_count_fee.saturating_add(gap).max(min_file_keys_count_fee);
             })
         } else {
             <FileKeysCountFee<T>>::mutate(|file_keys_count_fee| {
                 let gap = T::StorageDecreaseRatio::get() * file_keys_count_fee.clone();
-                *file_keys_count_fee = file_keys_count_fee.saturating_sub(gap);
+                *file_keys_count_fee = file_keys_count_fee.saturating_sub(gap).max(min_file_keys_count_fee);
             })
         }
     }
@@ -1028,13 +1104,14 @@ impl<T: Config> Module<T> {
         OrdersCount::put(0);
         // decide what to do
         let (is_to_decrease, ratio) = Self::base_fee_ratio(added_files_count.checked_div(orders_count));
+        let min_file_base_fee = Self::min_file_base_fee();
         // update the file base fee
         <FileBaseFee<T>>::mutate(|file_base_fee| {
             let gap = ratio * file_base_fee.clone();
             if is_to_decrease {
-                *file_base_fee = file_base_fee.saturating_sub(gap);
+                *file_base_fee = file_base_fee.saturating_sub(gap).max(min_file_base_fee);
             } else {
-                *file_base_fee = file_base_fee.saturating_add(gap);
+                *file_base_fee = file_base_fee.saturating_add(gap).max(min_file_base_fee);
             }
         })
     }

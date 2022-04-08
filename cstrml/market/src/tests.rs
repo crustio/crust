@@ -739,6 +739,16 @@ fn update_file_byte_fee_should_work() {
         <swork::ReportedFilesSize>::put(60000);
         Market::update_file_byte_fee();
         assert_eq!(Market::file_byte_fee(), 41);
+
+        // price is 40 and cannot decrease
+        <MinFileByteFee<Test>>::put(80);
+        <swork::ReportedFilesSize>::put(1000);
+        Market::update_file_byte_fee();
+        assert_eq!(Market::file_byte_fee(), 80);
+
+        <swork::ReportedFilesSize>::put(1000);
+        Market::update_file_byte_fee();
+        assert_eq!(Market::file_byte_fee(), 80);
     });
 }
 
@@ -786,6 +796,19 @@ fn update_base_fee_should_work() {
         assert_eq!(Market::file_base_fee(), 1169);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
+
+
+        // price is 40 and cannot decrease
+        <MinFileBaseFee<Test>>::put(1300);
+        <swork::AddedFilesCount>::put(1500);
+        OrdersCount::put(10);
+        Market::update_base_fee();
+        assert_eq!(Market::file_base_fee(), 1300);
+
+        <swork::AddedFilesCount>::put(60);
+        OrdersCount::put(10);
+        Market::update_base_fee();
+        assert_eq!(Market::file_base_fee(), 1404);
     });
 }
 
@@ -880,6 +903,24 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         ));
         Market::on_initialize(37);
         assert_eq!(Market::file_keys_count_fee(), 41);
+
+        <MinFileKeysCountFee<Test>>::put(80);
+        FileKeysCount::put(20_000_000);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, vec![]
+        ));
+        Market::on_initialize(37);
+        assert_eq!(Market::file_keys_count_fee(), 80);
+
+        // price is 80 and will increase by 1
+        FileKeysCount::put(20_000_001);
+        assert_ok!(Market::place_storage_order(
+            Origin::signed(source.clone()), cid.clone(),
+            file_size, 0, vec![]
+        ));
+        Market::on_initialize(37);
+        assert_eq!(Market::file_keys_count_fee(), 81);
     });
 }
 

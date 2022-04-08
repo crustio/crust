@@ -78,9 +78,9 @@ pub mod market {
     pub const BASE_FEE_UPDATE_SLOT: u32 = 600;
     pub const BASE_FEE_UPDATE_OFFSET: u32 = 22;
 
-    pub const PRICE_UPDATE_SLOT: u32 = 10;
+    pub const PRICE_UPDATE_SLOT: u32 = 600;
     pub const PRICE_UPDATE_OFFSET: u32 = 3;
-    pub const FILES_COUNT_REFERENCE: u32 = 20_000_000; // 20_000_000 / 50_000_000 = 40%
+    pub const FILES_COUNT_REFERENCE: u32 = 2_000_000; // 2_000_000 / 50_000_000 = 40% // Try 2M first
 
     pub const SPOWER_UPDATE_SLOT: u32 = 100;
     pub const SPOWER_UPDATE_OFFSET: u32 = 7;

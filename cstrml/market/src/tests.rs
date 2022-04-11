@@ -830,22 +830,22 @@ fn update_file_byte_fee_per_blocks_should_work() {
         Market::on_initialize(6);
         assert_eq!(Market::file_byte_fee(), 1000);
         // update file price
-        Market::on_initialize(7);
+        Market::on_initialize(597);
         assert_eq!(Market::file_byte_fee(), 990);
         <swork::Free>::put(10000);
         <swork::ReportedFilesSize>::put(10000);
         // no new order => don't update
-        Market::on_initialize(17);
+        Market::on_initialize(1197);
         assert_eq!(Market::file_byte_fee(), 990);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         // 26 + 3 % 10 is not zero
-        Market::on_initialize(26);
+        Market::on_initialize(1796);
         assert_eq!(Market::file_byte_fee(), 990);
         // update file price
-        Market::on_initialize(27);
+        Market::on_initialize(1797);
         assert_eq!(Market::file_byte_fee(), 980);
     });
 }
@@ -866,60 +866,60 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
 
         // 6 + 3 % 10 is not zero
         <FileKeysCountFee<Test>>::put(1000);
-        Market::on_initialize(6);
+        Market::on_initialize(596);
         assert_eq!(Market::file_keys_count_fee(), 1000);
         // update file price
-        Market::on_initialize(7);
+        Market::on_initialize(597);
         assert_eq!(Market::file_keys_count_fee(), 990);
         // no new order => don't update
-        Market::on_initialize(17);
+        Market::on_initialize(1197);
         assert_eq!(Market::file_keys_count_fee(), 990);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         // 26 + 3 % 10 is not zero
-        Market::on_initialize(26);
+        Market::on_initialize(1796);
         assert_eq!(Market::file_keys_count_fee(), 990);
         // update file price
-        Market::on_initialize(27);
+        Market::on_initialize(1797);
         assert_eq!(Market::file_keys_count_fee(), 980);
 
         // price is 40 and cannot decrease
         <FileKeysCountFee<Test>>::put(40);
-        FileKeysCount::put(20_000_000);
+        FileKeysCount::put(2_000_000);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
-        Market::on_initialize(37);
+        Market::on_initialize(2397);
         assert_eq!(Market::file_keys_count_fee(), 40);
 
         // price is 40 and will increase by 1
-        FileKeysCount::put(20_000_001);
+        FileKeysCount::put(2_000_001);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
-        Market::on_initialize(37);
+        Market::on_initialize(2397);
         assert_eq!(Market::file_keys_count_fee(), 41);
 
         <MinFileKeysCountFee<Test>>::put(80);
-        FileKeysCount::put(20_000_000);
+        FileKeysCount::put(2_000_000);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
-        Market::on_initialize(37);
+        Market::on_initialize(2397);
         assert_eq!(Market::file_keys_count_fee(), 80);
 
         // price is 80 and will increase by 1
-        FileKeysCount::put(20_000_001);
+        FileKeysCount::put(2_000_001);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
-        Market::on_initialize(37);
+        Market::on_initialize(2397);
         assert_eq!(Market::file_keys_count_fee(), 81);
     });
 }

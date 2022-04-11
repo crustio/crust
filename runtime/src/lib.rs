@@ -762,8 +762,8 @@ parameter_types! {
     pub const InitFileByteFee: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const InitFileKeysCountFee: Balance = MILLICENTS / 10;
     pub const StorageReferenceRatio: (u128, u128) = (50, 100); // 50/100 = 50%
-    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(6u64, 100000);
-    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(5u64, 100000);
+    pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(33u64, 10000);
+    pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(3u64, 1000);
     pub const StakingRatio: Perbill = Perbill::from_percent(72);
     pub const StorageRatio: Perbill = Perbill::from_percent(18);
     pub const MaximumFileSize: u64 = 8_589_934_592; // 8G = 8 * 1024 * 1024 * 1024

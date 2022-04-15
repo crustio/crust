@@ -214,6 +214,18 @@ fn testnet_genesis(
 		// of this.
 		aura: Default::default(),
 		aura_ext: Default::default(),
-		parachain_system: Default::default()
+		parachain_system: Default::default(),
+		council: parachain_runtime::CouncilConfig {
+            members: vec![],
+            phantom: Default::default(),
+        },
+        technical_committee: parachain_runtime::TechnicalCommitteeConfig {
+            members: vec![],
+            phantom: Default::default(),
+        },
+        technical_membership: Default::default(),
+        treasury: Default::default(),
+        democracy: Default::default(),
+        phragmen_election: Default::default(),
 	}
 }

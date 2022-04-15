@@ -55,6 +55,15 @@ pallet-proxy = { git = "https://github.com/paritytech/substrate", default-featur
 pallet-multisig = { git = "https://github.com/paritytech/substrate", default-features = false , branch = "polkadot-v0.9.16" }
 pallet-utility = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 
+# Governance
+pallet-collective = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
+pallet-membership = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
+pallet-treasury = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
+pallet-identity = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
+pallet-democracy = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
+pallet-elections-phragmen = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
+pallet-tips = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
+
 # Cumulus dependencies
 cumulus-pallet-aura-ext = { path = "../../cumulus/pallets/aura-ext", default-features = false }
 cumulus-pallet-parachain-system = { path = "../../cumulus/pallets/parachain-system", default-features = false }
@@ -110,6 +119,13 @@ std = [
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-scheduler/std",
 	"parachain-info/std",
+	"pallet-collective/std",
+	"pallet-membership/std",
+	"pallet-treasury/std",
+	"pallet-identity/std",
+	"pallet-democracy/std",
+	"pallet-elections-phragmen/std",
+	"pallet-tips/std",
 	"crust-parachain-primitives/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-pallet-xcmp-queue/std",

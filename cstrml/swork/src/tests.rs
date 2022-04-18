@@ -428,7 +428,7 @@ fn report_works_should_work() {
             });
 
             // Check same file all been confirmed
-            assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default(), FileInfo {
+            assert_eq!(Market::filesv2(&legal_wr_info.added_files[0].0).unwrap_or_default(), FileInfoV2 {
                 file_size: 134289408,
                 spower: 0,
                 expired_at: 1303,
@@ -436,15 +436,18 @@ fn report_works_should_work() {
                 amount: 1000,
                 prepaid: 0,
                 reported_replica_count: 1,
-                replicas: vec![Replica {
+                remaining_paid_count: 4,
+                replicas: BTreeMap::from_iter(vec![
+                    (reporter.clone(),
+                    Replica {
                     who: reporter.clone(),
                     valid_at: 303,
                     anchor: legal_pk.clone(),
                     is_reported: true,
                     created_at: Some(303)
-                }]
+                    })])
             });
-            assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default(), FileInfo {
+            assert_eq!(Market::filesv2(&legal_wr_info.added_files[1].0).unwrap_or_default(), FileInfoV2 {
                 file_size: 268578816,
                 spower: 0,
                 expired_at: 1303,
@@ -452,13 +455,17 @@ fn report_works_should_work() {
                 amount: 1000,
                 prepaid: 0,
                 reported_replica_count: 1,
-                replicas: vec![Replica {
+                remaining_paid_count: 4,
+                replicas: BTreeMap::from_iter(vec![
+                    (reporter.clone(),
+                    Replica {
                     who: reporter,
                     valid_at: 303,
                     anchor: legal_pk,
                     is_reported: true,
                     created_at: Some(303)
-                }]
+                    })
+                ])
             });
             assert_eq!(Swork::added_files_count(), 2);
         });
@@ -1944,8 +1951,8 @@ fn join_group_should_work_for_spower_in_work_report() {
                 alice_wr_info.sig
             ));
 
-            assert_eq!(Market::files(&file_a).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_a).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 13,
                     spower: 0,
                     expired_at: 1303,
@@ -1953,17 +1960,19 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![Replica {
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![
+                        (ferdie.clone(), Replica {
                         who: alice.clone(),
                         valid_at: 303,
                         anchor: a_pk.clone(),
                         is_reported: true,
                         created_at: Some(303)
-                    }]
+                    })])
                 }
             );
-            assert_eq!(Market::files(&file_b).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_b).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 7,
                     spower: 0,
                     expired_at: 1303,
@@ -1971,17 +1980,20 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![Replica {
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
+                        Replica {
                         who: alice.clone(),
                         valid_at: 303,
                         anchor: a_pk.clone(),
                         is_reported: true,
                         created_at: Some(303)
-                    }]
+                    })])
                 }
             );
-            assert_eq!(Market::files(&file_c).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_c).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 37,
                     spower: 0,
                     expired_at: 1303,
@@ -1989,13 +2001,15 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![Replica {
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(), Replica {
                         who: alice.clone(),
                         valid_at: 303,
                         anchor: a_pk.clone(),
                         is_reported: true,
                         created_at: Some(303)
-                    }]
+                    })])
                 }
             );
             assert_eq!(Swork::added_files_count(), 3);
@@ -2022,8 +2036,8 @@ fn join_group_should_work_for_spower_in_work_report() {
                 bob_wr_info.sig
             ));
 
-            assert_eq!(Market::files(&file_b).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_b).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 7,
                     spower: 0,
                     expired_at: 1303,
@@ -2031,19 +2045,21 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
-                        Replica {
-                            who: alice.clone(),
-                            valid_at: 303,
-                            anchor: a_pk.clone(),
-                            is_reported: true,
-                            created_at: Some(303)
-                        }
-                    ]
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                    ferdie.clone(),
+                    Replica {
+                        who: alice.clone(),
+                        valid_at: 303,
+                        anchor: a_pk.clone(),
+                        is_reported: true,
+                        created_at: Some(303)
+                    }
+                    )])
                 }
             );
-            assert_eq!(Market::files(&file_c).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_c).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 37,
                     spower: 0,
                     expired_at: 1303,
@@ -2051,7 +2067,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
@@ -2059,12 +2077,12 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
 
-            assert_eq!(Market::files(&file_d).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_d).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 55,
                     spower: 0,
                     expired_at: 1303,
@@ -2072,7 +2090,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
@@ -2080,11 +2100,11 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
-            assert_eq!(Market::files(&file_d).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_d).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 55,
                     spower: 0,
                     expired_at: 1303,
@@ -2092,7 +2112,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
@@ -2100,7 +2122,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
             assert_eq!(Swork::added_files_count(), 6);
@@ -2127,8 +2149,8 @@ fn join_group_should_work_for_spower_in_work_report() {
                 eve_wr_info.sig
             ));
 
-            assert_eq!(Market::files(&file_c).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_c).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 37,
                     spower: 0,
                     expired_at: 1303,
@@ -2136,7 +2158,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
@@ -2144,11 +2168,11 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
-            assert_eq!(Market::files(&file_d).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_d).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 55,
                     spower: 0,
                     expired_at: 1303,
@@ -2156,7 +2180,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
@@ -2164,12 +2190,12 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
 
-            assert_eq!(Market::files(&file_e).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_e).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 22,
                     spower: 0,
                     expired_at: 1303,
@@ -2177,7 +2203,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: eve.clone(),
                             valid_at: 303,
@@ -2185,7 +2213,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
@@ -2226,8 +2254,8 @@ fn join_group_should_work_for_spower_in_work_report() {
                 bob_wr_info.sig
             ));
 
-            assert_eq!(Market::files(&file_b).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_b).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 7,
                     spower: 0,
                     expired_at: 1303,
@@ -2235,7 +2263,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
@@ -2243,11 +2273,11 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
-            assert_eq!(Market::files(&file_c).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_c).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 37,
                     spower: 0,
                     expired_at: 1303,
@@ -2255,7 +2285,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
@@ -2263,12 +2295,12 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
 
-            assert_eq!(Market::files(&file_d).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_d).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 55,
                     spower: 0,
                     expired_at: 1303,
@@ -2276,7 +2308,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
@@ -2284,7 +2318,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
@@ -2310,8 +2344,8 @@ fn join_group_should_work_for_spower_in_work_report() {
                 eve_wr_info.files_root,
                 eve_wr_info.sig
             ));
-            assert_eq!(Market::files(&file_c).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_c).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 37,
                     spower: 0,
                     expired_at: 1303,
@@ -2319,7 +2353,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: alice.clone(),
                             valid_at: 303,
@@ -2327,11 +2363,11 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
-            assert_eq!(Market::files(&file_d).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_d).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 55,
                     spower: 0,
                     expired_at: 1303,
@@ -2339,7 +2375,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    replicas: vec![
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![(
+                        ferdie.clone(),
                         Replica {
                             who: bob.clone(),
                             valid_at: 303,
@@ -2347,12 +2385,12 @@ fn join_group_should_work_for_spower_in_work_report() {
                             is_reported: true,
                             created_at: Some(303)
                         }
-                    ]
+                    )])
                 }
             );
 
-            assert_eq!(Market::files(&file_e).unwrap_or_default(),
-                FileInfo {
+            assert_eq!(Market::filesv2(&file_e).unwrap_or_default(),
+                FileInfoV2 {
                     file_size: 22,
                     spower: 0,
                     expired_at: 1303,
@@ -2360,7 +2398,8 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 0,
-                    replicas: vec![]
+                    remaining_paid_count: 4,
+                    replicas: BTreeMap::from_iter(vec![])
                 }
             );
             assert_eq!(Swork::work_reports(&c_pk).unwrap(), WorkReport {
@@ -2374,7 +2413,6 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Swork::added_files_count(), 9);
             run_to_block(1500);
             let alice_wr_info = group_work_report_alice_1500();
-            assert_ok!(Market::do_file_migration(Origin::signed(eve.clone()), 10));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_c.clone()));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_d.clone()));
             assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_e.clone()));
@@ -2410,7 +2448,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 1,
-                    remaining_paid_count: 0,
+                    remaining_paid_count: 4,
                     replicas: BTreeMap::from_iter(vec![(ferdie.clone(), Replica {
                         who: alice.clone(),
                         valid_at: 303,
@@ -2447,7 +2485,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                     amount: 1000,
                     prepaid: 0,
                     reported_replica_count: 0,
-                    remaining_paid_count: 0,
+                    remaining_paid_count: 4,
                     replicas: BTreeMap::from_iter(vec![].into_iter())
                 }
             );
@@ -3450,7 +3488,7 @@ fn spower_delay_should_work() {
             });
 
             // Check same file all been confirmed
-            assert_eq!(Market::files(&legal_wr_info.added_files[0].0).unwrap_or_default(), FileInfo {
+            assert_eq!(Market::filesv2(&legal_wr_info.added_files[0].0).unwrap_or_default(), FileInfoV2 {
                 file_size: 134289408,
                 spower: 0,
                 expired_at: 1303,
@@ -3458,15 +3496,16 @@ fn spower_delay_should_work() {
                 amount: 1000,
                 prepaid: 0,
                 reported_replica_count: 1,
-                replicas: vec![Replica {
+                remaining_paid_count: 4,
+                replicas: BTreeMap::from_iter(vec![(reporter.clone(), Replica {
                     who: reporter.clone(),
                     valid_at: 303,
                     anchor: legal_pk.clone(),
                     is_reported: true,
                     created_at: Some(303)
-                }]
+                })])
             });
-            assert_eq!(Market::files(&legal_wr_info.added_files[1].0).unwrap_or_default(), FileInfo {
+            assert_eq!(Market::filesv2(&legal_wr_info.added_files[1].0).unwrap_or_default(), FileInfoV2 {
                 file_size: 268578816,
                 spower: 0,
                 expired_at: 1303,
@@ -3474,19 +3513,18 @@ fn spower_delay_should_work() {
                 amount: 1000,
                 prepaid: 0,
                 reported_replica_count: 1,
-                replicas: vec![Replica {
+                remaining_paid_count: 4,
+                replicas: BTreeMap::from_iter(vec![(reporter.clone(), Replica {
                     who: reporter.clone(),
                     valid_at: 303,
                     anchor: legal_pk.clone(),
                     is_reported: true,
                     created_at: Some(303)
-                }]
+                })])
             });
             assert_eq!(Swork::added_files_count(), 2);
 
             run_to_block(606);
-
-            assert_ok!(Market::do_file_migration(Origin::signed(reporter.clone()), 10));
 
             assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[0].0.clone()));
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {

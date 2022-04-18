@@ -3,7 +3,6 @@
 
 use frame_support::traits::{LockableCurrency, WithdrawReasons};
 use crate::{SworkerAnchor, MerkleRoot, BlockNumber, EraIndex};
-use sp_std::collections::btree_set::BTreeSet;
 use sp_runtime::{DispatchError, Perbill};
 
 /// A currency whose accounts can have liquidity restrictions.
@@ -33,7 +32,7 @@ pub trait SworkerInterface<AccountId> {
 pub trait MarketInterface<AccountId, Balance> {
 	// used for `added_files`
 	// return real spower of this file and whether this file is in the market system
-	fn upsert_replica(who: &AccountId, owner: AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber, members: &Option<BTreeSet<AccountId>>) -> (u64, bool);
+	fn upsert_replica(who: &AccountId, owner: AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber) -> (u64, bool);
 	// used for `delete_files`
 	// return real spower of this file and whether this file is in the market system
 	fn delete_replica(who: &AccountId, owner: AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> (u64, bool);

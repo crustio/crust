@@ -1059,15 +1059,13 @@ impl<T: Config> Module<T> {
         // 1. Loop changed files
         if is_added {
             for (cid, size, valid_at) in changed_files {
-                let mut members = None;
                 let mut owner = reporter.clone();
                 if let Some(identity) = Self::identities(reporter) {
                     if let Some(group_owner) = identity.group {
-                        members= Some(Self::groups(group_owner.clone()).members);
                         owner = group_owner;
                     }
                 };
-                let (added_spower, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, owner, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap(), &members);
+                let (added_spower, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, owner, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap());
                 changed_spower = changed_spower.saturating_add(added_spower);
                 if is_valid_cid {
                     changed_files_count += 1;

@@ -62,7 +62,6 @@ pub trait WeightInfo {
     fn place_storage_order() -> Weight;
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
-    fn do_file_migration(files_count: u32) -> Weight;
 }
 
 #[derive(Debug, PartialEq, Encode, Decode, Default, Clone)]

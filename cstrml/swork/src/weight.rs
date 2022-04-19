@@ -42,13 +42,13 @@ impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().writes(3 as Weight))
 	}
 	fn report_works(added: u32, deleted: u32) -> Weight {
-		(3_105_000_000 as Weight)
-			.saturating_add((515_000_000 as Weight).saturating_mul(added as Weight))
-			.saturating_add((287_000_000 as Weight).saturating_mul(deleted as Weight))
-			.saturating_add(T::DbWeight::get().reads(1 as Weight).saturating_mul(added as Weight))
-			.saturating_add(T::DbWeight::get().writes(1 as Weight).saturating_mul(added as Weight))
-			.saturating_add(T::DbWeight::get().reads(3 as Weight).saturating_mul(deleted as Weight))
-			.saturating_add(T::DbWeight::get().writes(3 as Weight).saturating_mul(deleted as Weight))
+		(3_505_000_000 as Weight)
+			.saturating_add((700_000_000 as Weight).saturating_mul(added as Weight))
+			.saturating_add((350_000_000 as Weight).saturating_mul(deleted as Weight))
+			.saturating_add(T::DbWeight::get().reads(2 as Weight).saturating_mul(added as Weight))
+			.saturating_add(T::DbWeight::get().writes(2 as Weight).saturating_mul(added as Weight))
+			.saturating_add(T::DbWeight::get().reads(2 as Weight).saturating_mul(deleted as Weight))
+			.saturating_add(T::DbWeight::get().writes(2 as Weight).saturating_mul(deleted as Weight))
 	}
 	fn create_group() -> Weight {
 		(58_000_000 as Weight)

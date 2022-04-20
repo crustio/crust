@@ -32,24 +32,19 @@ use sp_std::marker::PhantomData;
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 	fn place_storage_order() -> Weight {
-		(1_719_000_000 as Weight)
+		(719_000_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(16 as Weight))
 			.saturating_add(T::DbWeight::get().writes(9 as Weight))
 	}
 	fn calculate_reward() -> Weight {
-		(1_797_000_000 as Weight)
+		(297_000_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(12 as Weight))
 			.saturating_add(T::DbWeight::get().writes(8 as Weight))
+			.saturating_add(T::DbWeight::get().reads(50 as Weight)) // To check the work report for each replicas
 	}
 	fn reward_merchant() -> Weight {
 		(296_000_000 as Weight)
 			.saturating_add(T::DbWeight::get().reads(8 as Weight))
 			.saturating_add(T::DbWeight::get().writes(4 as Weight))
-	}
-	fn do_file_migration(files_count: u32) -> Weight {
-		(1_116_000_000 as Weight)
-				.saturating_add((900_000_000 as Weight).saturating_mul(files_count as Weight))
-				.saturating_add(T::DbWeight::get().reads(2 as Weight).saturating_mul(files_count as Weight))
-				.saturating_add(T::DbWeight::get().writes(2 as Weight).saturating_mul(files_count as Weight))
 	}
 }

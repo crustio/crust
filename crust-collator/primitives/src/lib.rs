@@ -101,3 +101,21 @@ pub type ReportSlot = u64;
 
 /// Market vendor's address info
 pub type AddressInfo = Vec<u8>;
+
+// Defines the trait to obtain a generic AssetType from a generic AssetId and viceversa
+pub trait AssetTypeGetter<AssetId, AssetType> {
+	// Get asset type from assetId
+	fn get_asset_type(asset_id: AssetId) -> Option<AssetType>;
+
+	// Get assetId from assetType
+	fn get_asset_id(asset_type: AssetType) -> Option<AssetId>;
+}
+
+// Defines the trait to obtain the units per second of a give asset_type for local execution
+// This parameter will be used to charge for fees upon asset_type deposit
+pub trait UnitsToWeightRatio<AssetType> {
+	// Whether payment in a particular asset_type is suppotrted
+	fn payment_is_supported(asset_type: AssetType) -> bool;
+	// Get units per second from asset type
+	fn get_units_per_second(asset_type: AssetType) -> Option<u128>;
+}

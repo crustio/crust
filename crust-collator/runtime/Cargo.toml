@@ -57,7 +57,7 @@ pallet-utility = { git = "https://github.com/paritytech/substrate", default-feat
 pallet-assets = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 
 # Moonbeam's pallet for managing assets
-pallet-asset-manager = { git = "https://github.com/PureStake/moonbeam", default-features = false, rev = "17c587fce945e400c9458a3763d3059b5f4d3161"}
+pallet-asset-manager = { path = "../pallets/asset-manager", default-features = false }
 
 # Governance
 pallet-collective = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }

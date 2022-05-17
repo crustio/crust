@@ -5,6 +5,11 @@ authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
 
 [dependencies]
+hex = { version = "0.4", default-features = false }
+log = "0.4"
+serde = { version = "1.0.101", optional = true, default-features = false, features = [ "derive" ] }
+sha3 = { version = "0.8", default-features = false }
+
 # Substrate dependencies
 sp-runtime = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
 sp-core = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
@@ -12,10 +17,24 @@ sp-core = { git = "https://github.com/paritytech/substrate", default-features = 
 frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
 sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16", default-features = false }
 
+parity-scale-codec = { version = "2.2", default-features = false, features = [ "derive" ] }
+scale-info = { version = "1.0", default-features = false, features = [ "derive" ] }
+
+# Polkadot / XCM
+xcm = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.16", default-features = false }
+xcm-builder = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.16", default-features = false }
+xcm-executor = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.16", default-features = false }
+
 [features]
 default = [ "std" ]
 std = [
+	"hex/std",
+	"parity-scale-codec/std",
+	"serde/std",
+	"sha3/std",
 	"sp-runtime/std",
-	"sp-core/std"
+	"sp-std/std",
+	"xcm-builder/std",
+	"xcm/std",
 ]
 test = []

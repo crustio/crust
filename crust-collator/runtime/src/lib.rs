@@ -26,7 +26,7 @@ mod impls;
 mod weights;
 pub use crust_parachain_primitives::{
     constants::{currency::*}, traits::*,
-    *
+    AssetId, *
 };
 use sp_core::{
     u32_trait::{_1, _2, _3, _4, _5}
@@ -52,7 +52,7 @@ pub use frame_support::{
 	construct_runtime, parameter_types, PalletId, match_type,
 	traits::{
 		Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, Imbalance,
-		LockIdentifier, EnsureOneOf, PrivilegeCmp, Currency, OnUnbalanced
+		LockIdentifier, EnsureOneOf, PrivilegeCmp, Currency, OnUnbalanced, Nothing
 	},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -65,6 +65,8 @@ use frame_system::{EnsureRoot};
 use sp_std::convert::TryFrom;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
+use sp_core::H256;
+use sp_runtime::traits::Hash as THash;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 
@@ -77,10 +79,10 @@ use xcm_builder::{
 	SovereignSignedViaLocation, EnsureXcmOrigin, AllowUnpaidExecutionFrom, ParentAsSuperuser,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds, IsConcrete, NativeAsset,
 	UsingComponents, SignedToAccountId32, SiblingParachainAsNative, AllowKnownQueryResponses,
-	AllowSubscriptionsFrom
+	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId
 };
 use xcm_executor::{
-	traits::ConvertOrigin,
+	traits::{ConvertOrigin, JustTry},
 	Config, XcmExecutor
 };
 use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
@@ -99,6 +101,8 @@ use impls::{CurrencyToVoteHandler, OneTenthFee, CurrencyAdapter as TransactionFe
 use cumulus_primitives_core::ParaId;
 use frame_support::pallet_prelude::*;
 use pallet_transaction_payment::RuntimeDispatchInfo;
+use smallvec::smallvec;
+use frame_support::weights::{WeightToFeePolynomial, WeightToFeeCoefficients, WeightToFeeCoefficient};
 
 type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 
@@ -298,7 +302,7 @@ impl WeightToFeePolynomial for WeightToFee {
 		smallvec![WeightToFeeCoefficient {
 			degree: 1,
 			coeff_frac: Perbill::zero(),
-			coeff_integer: currency::WEIGHT_FEE,
+			coeff_integer: 10u32.into(),
 			negative: false,
 		}]
 	}
@@ -482,12 +486,7 @@ parameter_types! {
 	// This is used to match it also against our Balances pallet when we receive such
 	// a MultiLocation: (Self Balances pallet index)
 	// We use the RELATIVE multilocation
-	pub SelfReserve: MultiLocation = MultiLocation {
-		parents:0,
-		interior: Junctions::X1(
-			PalletInstance(<Balances as PalletInfoAccess>::index() as u8)
-		)
-	};
+	pub SelfReserve: MultiLocation = MultiLocation::here();
 }
 
 type LocationToAccountId = (
@@ -623,7 +622,7 @@ parameter_types! {
 /// This is the struct that will handle the revenue from xcm fees
 /// We do not burn anything because we want to mimic exactly what
 /// the sovereign account has
-pub type XcmFeesToAccount = xcm_primitives::XcmFeesToAccount<
+pub type XcmFeesToAccount = crust_parachain_primitives::XcmFeesToAccount<
 	Assets,
 	(
 		ConvertedConcreteAssetId<
@@ -650,7 +649,7 @@ impl Config for XcmConfig {
 	type Barrier = Barrier;
 	type Weigher = XcmWeigher;
 	type Trader = (
-		UsingComponents<WeightToFee, LocalNetwork, AccountId, Balances, DealWithFees<Runtime>>,
+		UsingComponents<WeightToFee, LocalNetwork, AccountId, Balances, DealWithFees>,
 		FirstAssetTrader<AssetType, AssetManager, XcmFeesToAccount>,
 	);
 	type ResponseHandler = PolkadotXcm;
@@ -1211,14 +1210,13 @@ parameter_types! {
 	pub const AssetsStringLimit: u32 = 50;
 	pub const MetadataDepositBase: Balance = 0;
 	pub const MetadataDepositPerByte: Balance = 0;
-	pub const ExecutiveBody: BodyId = BodyId::Executive;
-	pub const AssetAccountDeposit: Balance = currency::deposit(1, 18);
+	pub const AssetAccountDeposit: Balance = 1 * DOLLARS;
 }
 
 /// We allow root and Chain council to execute privileged asset operations.
 pub type AssetsForceOrigin = EnsureOneOf<
 	EnsureRoot<AccountId>,
-	pallet_collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilInstance>,
+	pallet_collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>,
 >;
 
 impl pallet_assets::Config for Runtime {
@@ -1316,7 +1314,7 @@ impl pallet_asset_manager::AssetRegistrar<Runtime> for AssetRegistrar {
 		Assets::force_create(
 			Origin::root(),
 			asset,
-			AssetManager::account_id(),
+			sp_runtime::MultiAddress::Id(AssetManager::account_id()),
 			is_sufficient,
 			min_balance,
 		)?;
@@ -1368,18 +1366,6 @@ pub enum CurrencyId {
 	OtherReserve(AssetId),
 }
 
-impl AccountIdToCurrencyId<AccountId, CurrencyId> for Runtime {
-	fn account_to_currency_id(account: AccountId) -> Option<CurrencyId> {
-		match account {
-			// the self-reserve currency is identified by the pallet-balances address
-			a if a == H160::from_low_u64_be(2050).into() => Some(CurrencyId::SelfReserve),
-			// the rest of the currencies, by their corresponding erc20 address
-			_ => Runtime::account_to_asset_id(account)
-				.map(|asset_id| CurrencyId::OtherReserve(asset_id)),
-		}
-	}
-}
-
 // How to convert from CurrencyId to MultiLocation
 pub struct CurrencyIdtoMultiLocation<AssetXConverter>(sp_std::marker::PhantomData<AssetXConverter>);
 impl<AssetXConverter> sp_runtime::traits::Convert<CurrencyId, Option<MultiLocation>>
@@ -1393,9 +1379,8 @@ where
 			// the old anchoring here
 			// This is not a problem in either cases, since the view of the destination
 			// chain does not change
-			// TODO! change this to NewAnchoringSelfReserve once xtokens is adapted for it
 			CurrencyId::SelfReserve => {
-				let multi: MultiLocation = OldAnchoringSelfReserve::get();
+				let multi: MultiLocation = LocalNetwork::get();
 				Some(multi)
 			}
 			CurrencyId::OtherReserve(asset) => AssetXConverter::reverse_ref(asset).ok(),
@@ -1417,14 +1402,25 @@ parameter_types! {
 	};
 }
 
+pub struct AccountIdToMultiLocation;
+impl Convert<AccountId, MultiLocation> for AccountIdToMultiLocation {
+	fn convert(account: AccountId) -> MultiLocation {
+		X1(AccountId32 {
+			network: NetworkId::Any,
+			id: account.into(),
+		})
+		.into()
+	}
+}
+
 impl orml_xtokens::Config for Runtime {
 	type Event = Event;
 	type Balance = Balance;
 	type CurrencyId = CurrencyId;
-	type AccountIdToMultiLocation = AccountIdToMultiLocation<AccountId>;
+	type AccountIdToMultiLocation = AccountIdToMultiLocation;
 	type CurrencyIdConvert =
 		CurrencyIdtoMultiLocation<AsAssetType<AssetId, AssetType, AssetManager>>;
-	type XcmExecutor = XcmExecutor;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type SelfLocation = SelfLocation;
 	type Weigher = XcmWeigher;
 	type BaseXcmWeight = BaseXcmWeight;

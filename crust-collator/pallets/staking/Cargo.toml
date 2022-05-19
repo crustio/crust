@@ -11,8 +11,8 @@ repository = "https://github.com/paritytech/crust/"
 # third party dependencies
 serde = { optional = true, version = "1.0.116" }
 safe-mix = { default-features = false, version = "1.0.0" }
-codec = { package = "parity-scale-codec", default-features = false, features = ["derive"], version = "2.3.0" }
-scale-info = { version = "1.0.0", default-features = false, features = ["derive"] }
+codec = { package = "parity-scale-codec", default-features = false, features = ["derive"], version = "3.0.0" }
+scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
 
 # substrate frame dependencies
 frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }

@@ -49,14 +49,15 @@ use sp_version::RuntimeVersion;
 use sp_std::marker::PhantomData;
 use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
 pub use frame_support::{
-	construct_runtime, parameter_types, PalletId, match_type,
+	construct_runtime, parameter_types, PalletId, match_types,
 	traits::{
 		Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, Imbalance,
 		LockIdentifier, EnsureOneOf, PrivilegeCmp, Currency, OnUnbalanced, Nothing
 	},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
-		DispatchClass, IdentityFee, Weight,
+		DispatchClass, IdentityFee, Weight, ConstantMultiplier,
+		WeightToFeeCoefficient, WeightToFeeCoefficients, WeightToFeePolynomial,
 	},
 	StorageValue, RuntimeDebug,
 };
@@ -102,7 +103,6 @@ use cumulus_primitives_core::ParaId;
 use frame_support::pallet_prelude::*;
 use pallet_transaction_payment::RuntimeDispatchInfo;
 use smallvec::smallvec;
-use frame_support::weights::{WeightToFeePolynomial, WeightToFeeCoefficients, WeightToFeeCoefficient};
 
 type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 
@@ -310,7 +310,7 @@ impl WeightToFeePolynomial for WeightToFee {
 
 impl pallet_transaction_payment::Config for Runtime {
 	type OnChargeTransaction = pallet_transaction_payment::CurrencyAdapter<Balances, DealWithFees>;
-	type TransactionByteFee = TransactionByteFee;
+	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type WeightToFee = OneTenthFee<Balance>;
 	type FeeMultiplierUpdate = ();
 	type OperationalFeeMultiplier = OperationalFeeMultiplier;
@@ -597,7 +597,7 @@ parameter_types! {
 /// Xcm Weigher shared between multiple Xcm-related configs.
 pub type XcmWeigher = FixedWeightBounds<UnitWeightCost, Call, MaxInstructions>;
 
-match_type! {
+match_types! {
 	pub type ParentOrParentsUnitPlurality: impl Contains<MultiLocation> = {
 		MultiLocation { parents: 1, interior: Here } |
 		MultiLocation { parents: 1, interior: X1(Plurality { id: BodyId::Unit, .. }) }
@@ -710,6 +710,9 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type ChannelInfo = ParachainSystem;
 	type VersionWrapper = PolkadotXcm;
 	type ExecuteOverweightOrigin = frame_system::EnsureRoot<AccountId>;
+	type ControllerOrigin = EnsureRoot<AccountId>;
+	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
+	type WeightInfo = cumulus_pallet_xcmp_queue::weights::SubstrateWeight<Runtime>;
 }
 
 impl cumulus_ping::Config for Runtime {

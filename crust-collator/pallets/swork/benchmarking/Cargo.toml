@@ -9,7 +9,7 @@ repository = "https://github.com/paritytech/crust/"
 
 [dependencies]
 # third party dependencies
-codec = { default-features = false, package = "parity-scale-codec", features = ["derive"], version = "2.3.0" }
+codec = { default-features = false, package = "parity-scale-codec", features = ["derive"], version = "3.0.0" }
 serde = { optional = true, version = "1.0.116" }
 
 # substrate frame dependencies

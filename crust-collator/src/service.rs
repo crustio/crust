@@ -17,7 +17,6 @@
 use cumulus_client_consensus_aura::{
 	AuraConsensus, BuildAuraConsensusParams, SlotProportion,
 };
-use sc_client_api::ExecutorProvider;
 use cumulus_client_consensus_relay_chain::{
 	build_relay_chain_consensus, BuildRelayChainConsensusParams,
 };
@@ -41,8 +40,7 @@ use sp_trie::PrefixedMemoryDB;
 use sp_keystore::SyncCryptoStorePtr;
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 use sp_consensus::SlotData;
-use polkadot_service::NativeExecutionDispatch;
-use sc_executor::NativeElseWasmExecutor;
+use sc_executor::WasmExecutor;
 use cumulus_relay_chain_inprocess_interface::build_inprocess_relay_chain;
 use cumulus_relay_chain_interface::{RelayChainError, RelayChainInterface, RelayChainResult};
 use cumulus_relay_chain_rpc_interface::RelayChainRPCInterface;
@@ -50,19 +48,12 @@ use substrate_prometheus_endpoint::Registry;
 
 use polkadot_service::CollatorPair;
 
-pub struct CrustParachainRuntimeExecutor;
+#[cfg(not(feature = "runtime-benchmarks"))]
+type HostFunctions = sp_io::SubstrateHostFunctions;
 
-impl sc_executor::NativeExecutionDispatch for CrustParachainRuntimeExecutor {
-	type ExtendHostFunctions = ();
-
-	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-		parachain_runtime::api::dispatch(method, data)
-	}
-
-	fn native_version() -> sc_executor::NativeVersion {
-		parachain_runtime::native_version()
-	}
-}
+#[cfg(feature = "runtime-benchmarks")]
+type HostFunctions =
+	(sp_io::SubstrateHostFunctions, frame_benchmarking::benchmarking::HostFunctions);
 
 /// Starts a `ServiceBuilder` for a full service.
 ///
@@ -72,11 +63,11 @@ pub fn new_partial(
 	config: &Configuration,
 ) -> Result<
 	PartialComponents<
-		TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>,
+		TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
 		TFullBackend<Block>,
 		(),
-		sc_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
-		sc_transaction_pool::FullPool<Block, TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
+		sc_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
+		sc_transaction_pool::FullPool<Block, TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
 		(Option<Telemetry>, Option<TelemetryWorkerHandle>),
 	>,
 	sc_service::Error,
@@ -90,10 +81,11 @@ pub fn new_partial(
 		})
 		.transpose()?;
 
-	let executor = sc_executor::NativeElseWasmExecutor::<CrustParachainRuntimeExecutor>::new(
+	let executor = sc_executor::WasmExecutor::<HostFunctions>::new(
 			config.wasm_method,
 			config.default_heap_pages,
 			config.max_runtime_instances,
+			None,
 			config.runtime_cache_size,
 		);
 
@@ -150,7 +142,7 @@ pub fn new_partial(
 				Ok((time, slot))
 			},
 			registry: config.prometheus_registry().clone(),
-			can_author_with: sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
+			can_author_with: sp_consensus::AlwaysCanAuthor,
 			spawner: &task_manager.spawn_essential_handle(),
 			telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
 		})?;
@@ -171,14 +163,14 @@ pub fn new_partial(
 
 /// Build the import queue for the shell runtime.
 pub fn shell_build_import_queue(
-	client: Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
+	client: Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
 	config: &Configuration,
 	_: Option<TelemetryHandle>,
 	task_manager: &TaskManager,
 ) -> Result<
 	sc_consensus::DefaultImportQueue<
 		Block,
-		TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>,
+		TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
 	>,
 	sc_service::Error,
 > {
@@ -222,10 +214,10 @@ async fn start_node_impl<RB>(
 	collator_options: CollatorOptions,
 	id: ParaId,
 	rpc_ext_builder: RB,
-) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>)>
+) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>)>
 where
 	RB: Fn(
-			Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
+			Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
 		) -> Result<jsonrpc_core::IoHandler<sc_rpc::Metadata>, sc_service::Error>
 		+ Send
 		+ 'static,
@@ -366,7 +358,7 @@ pub async fn start_node(
 	polkadot_config: Configuration,
 	collator_options: CollatorOptions,
 	id: ParaId,
-) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>)> {
+) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>)> {
 	start_node_impl(
 		parachain_config,
 		polkadot_config,
@@ -378,7 +370,7 @@ pub async fn start_node(
 }
 
 pub fn build_aura_consensus(
-	client: Arc<TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>>,
+	client: Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
 	prometheus_registry: Option<&Registry>,
 	telemetry: Option<TelemetryHandle>,
 	task_manager: &TaskManager,
@@ -386,7 +378,7 @@ pub fn build_aura_consensus(
 	transaction_pool: Arc<
 		sc_transaction_pool::FullPool<
 			Block,
-			TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<CrustParachainRuntimeExecutor>>,
+			TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
 		>,
 	>,
 	sync_oracle: Arc<NetworkService<Block, Hash>>,

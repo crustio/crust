@@ -13,6 +13,7 @@ use frame_system::{ensure_signed, ensure_root, ensure_none};
 use codec::{Encode, Decode};
 #[cfg(feature = "std")]
 use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
+use sp_std::convert::TryInto;
 
 use sp_runtime::{
     RuntimeDebug, DispatchResult,

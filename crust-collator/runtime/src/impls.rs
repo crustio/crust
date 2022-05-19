@@ -77,7 +77,7 @@ pub struct CurrencyAdapter<C, R, OU>(PhantomData<(C, R, OU)>);
 impl<T, C, R, OU> OnChargeTransaction<T> for CurrencyAdapter<C, R, OU>
     where
         T: pallet_transaction_payment::Config,
-        T::TransactionByteFee: Get<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance>,
+        T::LengthToFee: Get<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance>,
         C: Currency<<T as frame_system::Config>::AccountId>,
         R: BenefitInterface<<T as frame_system::Config>::AccountId, <C as Currency<<T as frame_system::Config>::AccountId>>::Balance, NegativeImbalanceOf<C, T>>,
         C::PositiveImbalance:

@@ -20,6 +20,7 @@ codec = { package = "parity-scale-codec", version = "3.0.0" }
 structopt = "0.3.3"
 serde = { version = "1.0.119", features = ["derive"] }
 hex-literal = "0.3.4"
+clap = { version = "3.1", features = ["derive"] }
 
 # Parachain dependencies
 parachain-runtime = { package = "crust-parachain-runtime", path = "runtime" }

@@ -20,6 +20,7 @@ use cumulus_client_consensus_aura::{
 use cumulus_client_consensus_relay_chain::{
 	build_relay_chain_consensus, BuildRelayChainConsensusParams,
 };
+use cumulus_client_cli::CollatorOptions;
 use cumulus_client_network::BlockAnnounceValidator;
 use cumulus_client_service::{
 	prepare_node_config, start_collator, start_full_node, StartCollatorParams, StartFullNodeParams,
@@ -39,7 +40,6 @@ use sp_runtime::traits::BlakeTwo256;
 use sp_trie::PrefixedMemoryDB;
 use sp_keystore::SyncCryptoStorePtr;
 use std::{marker::PhantomData, sync::Arc, time::Duration};
-use sp_consensus::SlotData;
 use sc_executor::WasmExecutor;
 use cumulus_relay_chain_inprocess_interface::build_inprocess_relay_chain;
 use cumulus_relay_chain_interface::{RelayChainError, RelayChainInterface, RelayChainResult};
@@ -134,9 +134,9 @@ pub fn new_partial(
 				let time = sp_timestamp::InherentDataProvider::from_system_time();
 
 				let slot =
-					sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_duration(
+					sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_slot_duration(
 						*time,
-						slot_duration.slot_duration(),
+						slot_duration,
 					);
 
 				Ok((time, slot))
@@ -186,6 +186,7 @@ pub fn shell_build_import_queue(
 
 async fn build_relay_chain_interface(
 	polkadot_config: Configuration,
+	parachain_config: &Configuration,
 	telemetry_worker_handle: Option<TelemetryWorkerHandle>,
 	task_manager: &mut TaskManager,
 	collator_options: CollatorOptions,
@@ -193,14 +194,12 @@ async fn build_relay_chain_interface(
 	match collator_options.relay_chain_rpc_url {
 		Some(relay_chain_url) =>
 			Ok((Arc::new(RelayChainRPCInterface::new(relay_chain_url).await?) as Arc<_>, None)),
-		None => {
-			let relay_chain_local = build_inprocess_relay_chain(
-				polkadot_config,
-				telemetry_worker_handle,
-				task_manager,
-			)?;
-			Ok((relay_chain_local.0, Some(relay_chain_local.1)))
-		},
+		None => build_inprocess_relay_chain(
+			polkadot_config,
+			parachain_config,
+			telemetry_worker_handle,
+			task_manager,
+		),
 	}
 }
 
@@ -238,6 +237,7 @@ where
 
 	let (relay_chain_interface, collator_key) = build_relay_chain_interface(
 		polkadot_config,
+		&parachain_config,
 		telemetry_worker_handle,
 		&mut task_manager,
 		collator_options.clone(),
@@ -342,6 +342,7 @@ where
 			relay_chain_interface,
 			relay_chain_slot_duration,
 			import_queue,
+			collator_options,
 		};
 
 		start_full_node(params)?;
@@ -362,7 +363,7 @@ pub async fn start_node(
 	start_node_impl(
 		parachain_config,
 		polkadot_config,
-		collator_options
+		collator_options,
 		id,
 		|_| Ok(Default::default()),
 	)
@@ -420,9 +421,9 @@ pub fn build_aura_consensus(
 				let time = sp_timestamp::InherentDataProvider::from_system_time();
 
 				let slot =
-				sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_duration(
+				sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_slot_duration(
 					*time,
-					slot_duration.slot_duration(),
+					slot_duration,
 				);
 
 				let parachain_inherent = parachain_inherent.ok_or_else(|| {

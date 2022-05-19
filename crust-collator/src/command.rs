@@ -230,7 +230,7 @@ pub fn run() -> Result<()> {
 					backend,
 					..
 				} = crate::service::new_partial(&config)?;
-				Ok((cmd.run(client, backend), task_manager))
+				Ok((cmd.run(client, backend, None), task_manager))
 			})
 		}
 		Some(Subcommand::ExportGenesisState(params)) => {
@@ -299,7 +299,7 @@ pub fn run() -> Result<()> {
 				let id = ParaId::from(para_id);
 
 				let parachain_account =
-					AccountIdConversion::<polkadot_primitives::v0::AccountId>::into_account(&id);
+					AccountIdConversion::<polkadot_primitives::v2::AccountId>::into_account(&id);
 				let state_version = RelayChainCli::native_runtime_version(&config.chain_spec).state_version();
 				let block: Block =
 					generate_genesis_block(&config.chain_spec, state_version).map_err(|e| format!("{:?}", e))?;

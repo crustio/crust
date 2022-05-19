@@ -89,6 +89,8 @@ pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features 
 
 orml-xcm = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "fb171f1f5ae3c28e238e9455e1f5e079dc890fbe"}
 orml-xtokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "fb171f1f5ae3c28e238e9455e1f5e079dc890fbe"}
+orml-xcm-support = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "fb171f1f5ae3c28e238e9455e1f5e079dc890fbe"}
+orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "fb171f1f5ae3c28e238e9455e1f5e079dc890fbe"}
 
 [build-dependencies]
 substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
@@ -156,6 +158,8 @@ std = [
 	"pallet-proxy/std",
 	"orml-xcm/std",
 	"orml-xtokens/std",
+	"orml-xcm-support/std",
+	"orml-traits/std",
 	"pallet-asset-manager/std",
 	"claims/std",
 	# "swork/std",

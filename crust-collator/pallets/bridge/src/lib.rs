@@ -19,6 +19,7 @@ use sp_runtime::traits::{AccountIdConversion, Dispatchable};
 use sp_runtime::{RuntimeDebug};
 use sp_std::prelude::*;
 use sp_std::vec;
+use sp_std::convert::TryInto;
 use frame_support::pallet_prelude::Weight;
 
 use codec::{Decode, Encode, EncodeLike};

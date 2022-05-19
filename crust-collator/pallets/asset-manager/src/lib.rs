@@ -54,6 +54,7 @@ pub mod pallet {
 	use parity_scale_codec::HasCompact;
 	use sp_runtime::traits::{AccountIdConversion, AtLeast32BitUnsigned};
 	use sp_std::vec::Vec;
+	use sp_std::convert::TryInto;
 
 	#[pallet::pallet]
 	#[pallet::without_storage_info]

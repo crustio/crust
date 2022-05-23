@@ -230,6 +230,11 @@ impl<
 		weight: Weight,
 		payment: xcm_executor::Assets,
 	) -> Result<xcm_executor::Assets, XcmError> {
+		log::trace!(
+			target: "xcm::weight",
+			"FirstAssetTrader::buy_weight weight: {:?}, payment: {:?}",
+			weight, payment,
+		);
 		let first_asset = payment
 			.clone()
 			.fungible_assets_iter()

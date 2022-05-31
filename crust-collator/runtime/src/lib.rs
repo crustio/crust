@@ -766,9 +766,16 @@ impl cumulus_ping::Config for Runtime {
 //     type MaximumFileSize = MaximumFileSize;
 // }
 
-// impl xstorage::Config for Runtime {
-// 	type XcmpMessageSender = XcmRouter;
-// }
+impl xstorage::Config for Runtime {
+	type Event = Event;
+	type XcmpMessageSender = XcmRouter;
+	type AssetTransactor = CrustAssetTransactors;
+	type CurrencyId = CurrencyId;
+	type AccountIdToMultiLocation = AccountIdToMultiLocation;
+	type CurrencyIdToMultiLocation =
+		CurrencyIdtoMultiLocation<AsAssetType<AssetId, AssetType, AssetManager>>;
+	type StorageFeeOwner = EnsureRootOrHalfCouncil;
+}
 
 parameter_types! {
 	pub const UncleGenerations: u32 = 0;
@@ -943,12 +950,10 @@ parameter_types! {
     pub const ProposalLifetime: BlockNumber = 50400; // ~7 days
 }
 
-type MoreThanHalfCouncil = EnsureRoot<AccountId>;
-
 impl bridge::Config for Runtime {
 	type PalletId = BridgeClaimsPalletId;
     type Event = Event;
-    type BridgeCommitteeOrigin = MoreThanHalfCouncil;
+    type BridgeCommitteeOrigin = EnsureRootOrHalfCouncil;
     type Proposal = Call;
     type BridgeChainId = BridgeChainId;
     type ProposalLifetime = ProposalLifetime;
@@ -1497,7 +1502,6 @@ construct_runtime! {
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Storage, Event<T>, Origin},
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin},
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>},
-		// Xstorage: xstorage::{Pallet, Storage, Call},
 		OrmlXcm: orml_xcm::{Pallet, Call, Event<T>},
 
 		Utility: pallet_utility::{Pallet, Call, Event},
@@ -1531,6 +1535,9 @@ construct_runtime! {
 		Assets: pallet_assets::{Pallet, Call, Storage, Event<T>} = 124,
 		XTokens: orml_xtokens::{Pallet, Call, Storage, Event<T>} = 125,
 		AssetManager: pallet_asset_manager::{Pallet, Call, Storage, Event<T>} = 126,
+
+		// Crust
+		Xstorage: xstorage::{Pallet, Storage, Call, Event<T>} = 127,
 	}
 }
 

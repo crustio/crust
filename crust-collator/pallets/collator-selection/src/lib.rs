@@ -93,6 +93,7 @@ pub mod pallet {
 	use pallet_session::SessionManager;
 	use sp_staking::SessionIndex;
 	pub use crate::weights::WeightInfo;
+	use sp_std::convert::TryInto;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as SystemConfig>::AccountId>>::Balance;

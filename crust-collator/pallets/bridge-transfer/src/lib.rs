@@ -14,6 +14,7 @@ use sp_arithmetic::traits::SaturatedConversion;
 use sp_core::U256;
 use sp_std::prelude::*;
 use sp_runtime::traits::Saturating;
+use sp_std::convert::TryInto;
 
 #[cfg(test)]
 mod mock;

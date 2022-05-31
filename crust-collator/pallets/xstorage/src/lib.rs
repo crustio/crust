@@ -6,6 +6,7 @@ use sp_std::prelude::*;
 
 use xcm::v2::prelude::*;
 use codec::Encode;
+use sp_std::convert::TryInto;
 
 pub trait Config: frame_system::Config {
 	/// Something to send an HRMP message.

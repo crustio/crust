@@ -10,26 +10,26 @@ repository = "https://github.com/paritytech/crust/"
 [dependencies]
 serde = { default-features = false, version = "1.0.116" }
 serde_derive = { optional = true, version = "1.0.102" }
-codec = { package = "parity-scale-codec", default-features = false, version = "2.3.0" }
+codec = { package = "parity-scale-codec", default-features = false, version = "3.0.0" }
 rustc-hex = { default-features = false, version = "2.0.1" }
-scale-info = { version = "1.0.0", default-features = false, features = ["derive"] }
+scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
 
 # substrate frame dependencies
-frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
-frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
-sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
-sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
+frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
+frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
+sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
+sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
 primitives = { package = "crust-parachain-primitives", path = "../../primitives", default-features = false }
 
-frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16" }
+frame-benchmarking = { default-features = false, optional = true, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19" }
 
 [dev-dependencies]
-balances = { package = 'pallet-balances', git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.16" }
+balances = { package = 'pallet-balances', git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.19" }
 primitives = { package = "crust-parachain-primitives", path = "../../primitives", features = ["test"] }
-hex-literal = "0.3.1"
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.16"}
+hex-literal = "0.3.4"
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.19"}
 
 [features]
 default = ["std"]

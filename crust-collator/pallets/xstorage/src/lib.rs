@@ -77,6 +77,24 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		// The index cannot be changed.
+		#[pallet::weight(1_000_000)]
+		pub fn place_storage_order_through_parachain(
+			origin: OriginFor<T>,
+			cid: Vec<u8>,
+			size: u64
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			Self::deposit_event(Event::FileSuccess {
+				account: who,
+				cid,
+				size,
+			});
+
+			Ok(().into())
+		}
+
 		#[pallet::weight(1_000_000)]
 		pub fn place_storage_order(
 			origin: OriginFor<T>,

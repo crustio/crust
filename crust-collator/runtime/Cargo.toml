@@ -13,6 +13,7 @@ smallvec = "1.4.1"
 hex-literal = "0.3.4"
 
 xstorage = { path = "../pallets/xstorage", default-features = false }
+xstorage-client = { path = "../../../xstorage", package = "xstorage-client", default-features = false }
 claims = { package = "cstrml-claims", path = "../pallets/claims", default-features = false}
 pallet-collator-selection = { path = '../pallets/collator-selection', default-features = false }
 # swork = { package = "cstrml-swork", path = "../pallets/swork", default-features = false }
@@ -162,6 +163,7 @@ std = [
 	"orml-traits/std",
 	"pallet-asset-manager/std",
 	"claims/std",
+	"xstorage-client/std",
 	# "swork/std",
 	# "staking/std",
 	# "benefits/std",

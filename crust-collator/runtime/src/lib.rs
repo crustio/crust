@@ -85,8 +85,9 @@ use xcm_executor::{
 };
 use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use xcm::v1::{
-	AssetId::{Concrete},
+use xcm::latest::{
+	prelude::*,
+	AssetId::{Abstract, Concrete},
 	Fungibility::Fungible,
 	MultiAsset, MultiLocation,
 };
@@ -126,7 +127,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("crust-collator"),
 	impl_name: create_runtime_str!("crust-collator"),
 	authoring_version: 1,
-	spec_version: 13,
+	spec_version: 26,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -420,10 +421,10 @@ impl pallet_proxy::Config for Runtime {
 	type AnnouncementDepositFactor = AnnouncementDepositFactor;
 }
 
-// impl pallet_sudo::Config for Runtime {
-// 	type Call = Call;
-// 	type Event = Event;
-// }
+impl pallet_sudo::Config for Runtime {
+	type Call = Call;
+	type Event = Event;
+}
 
 parameter_types! {
 	pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) * RuntimeBlockWeights::get().max_block;
@@ -574,6 +575,33 @@ type LocalAssetTransactor = CurrencyAdapter<
 
 pub type CrustAssetTransactors = (LocalAssetTransactor, FungiblesTransactor);
 
+pub struct SiblingSignedAccountId32AsNative<Origin>(PhantomData<Origin>);
+impl<Origin: OriginTrait> ConvertOrigin<Origin>
+	for SiblingSignedAccountId32AsNative<Origin>
+where
+	Origin::AccountId: From<[u8; 32]>,
+{
+	fn convert_origin(
+		origin: impl Into<MultiLocation>,
+		kind: OriginKind,
+	) -> Result<Origin, MultiLocation> {
+		let origin = origin.into();
+		log::trace!(
+			target: "xcm::origin_conversion",
+			"SiblingSignedAccountId32AsNative origin: {:?}, kind: {:?}",
+			origin, kind,
+		);
+		match (kind, origin) {
+			(
+				OriginKind::Native,
+				MultiLocation { parents: 1, interior: Junctions::X2(Parachain(_), AccountId32 { id, network })},
+			) =>
+				Ok(Origin::signed(id.into())),
+			(_, origin) => Err(origin),
+		}
+	}
+}
+
 pub type XcmOriginToTransactDispatchOrigin = (
 	SovereignSignedViaLocation<LocationToAccountId, Origin>,
 	RelayChainAsNative<RelayChainOrigin, Origin>,
@@ -582,6 +610,7 @@ pub type XcmOriginToTransactDispatchOrigin = (
 	SignedAccountId32AsNative<RelayNetwork, Origin>,
 	// Xcm origins can be represented natively under the Xcm pallet's Xcm origin.
 	XcmPassthrough<Origin>,
+	SiblingSignedAccountId32AsNative<Origin>,
 );
 
 parameter_types! {
@@ -1471,6 +1500,25 @@ impl orml_xtokens::Config for Runtime {
 	type ReserveProvider = AbsoluteAndRelativeReserve<SelfLocationAbsolute>;
 }
 
+parameter_types! {
+	pub FeePerSecond: u128 = 1_000_000;
+}
+
+impl xstorage_client::Config for Runtime {
+	type Event = Event;
+	type XcmpMessageSender = XcmRouter;
+	type AssetTransactor = CrustAssetTransactors;
+	type CurrencyId = CurrencyId;
+	type AccountIdToMultiLocation = AccountIdToMultiLocation;
+	type CurrencyIdToMultiLocation =
+		CurrencyIdtoMultiLocation<AsAssetType<AssetId, AssetType, AssetManager>>;
+	type LocationInverter = LocationInverter<Ancestry>;
+	type CrustNativeToken = xstorage_client::primitives::CrustShadowLocation;
+	type SelfNativeToken = SelfLocation;
+	type FeePerSecond = FeePerSecond;
+	type Destination = xstorage_client::primitives::CsmMultiloaction;
+}
+
 construct_runtime! {
 	pub enum Runtime where
 		Block = Block,
@@ -1480,7 +1528,7 @@ construct_runtime! {
 		System: frame_system::{Pallet, Call, Storage, Config, Event<T>},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		// Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
 		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>, ValidateUnsigned, Config},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
@@ -1535,6 +1583,7 @@ construct_runtime! {
 
 		// Crust
 		Xstorage: xstorage::{Pallet, Storage, Call, Event<T>} = 127,
+		XstorageClient: xstorage_client::{Pallet, Storage, Call, Event<T>} = 128,
 	}
 }
 

@@ -17,9 +17,6 @@
 use cumulus_client_consensus_aura::{
 	AuraConsensus, BuildAuraConsensusParams, SlotProportion,
 };
-use cumulus_client_consensus_relay_chain::{
-	build_relay_chain_consensus, BuildRelayChainConsensusParams,
-};
 use cumulus_client_cli::CollatorOptions;
 use cumulus_client_network::BlockAnnounceValidator;
 use cumulus_client_service::{
@@ -35,11 +32,8 @@ use crust_parachain_primitives::Block;
 use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
 use sc_telemetry::{Telemetry, TelemetryHandle, TelemetryWorker, TelemetryWorkerHandle};
 use sc_network::NetworkService;
-use sp_core::Pair;
-use sp_runtime::traits::BlakeTwo256;
-use sp_trie::PrefixedMemoryDB;
 use sp_keystore::SyncCryptoStorePtr;
-use std::{marker::PhantomData, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use sc_executor::WasmExecutor;
 use cumulus_relay_chain_inprocess_interface::build_inprocess_relay_chain;
 use cumulus_relay_chain_interface::{RelayChainError, RelayChainInterface, RelayChainResult};
@@ -107,8 +101,6 @@ pub fn new_partial(
 			telemetry
 		});
 
-	let registry = config.prometheus_registry();
-
 	let transaction_pool = sc_transaction_pool::BasicPool::new_full(
 		config.transaction_pool.clone(),
 		config.role.is_authority().into(),
@@ -161,28 +153,28 @@ pub fn new_partial(
 	Ok(params)
 }
 
-/// Build the import queue for the shell runtime.
-pub fn shell_build_import_queue(
-	client: Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
-	config: &Configuration,
-	_: Option<TelemetryHandle>,
-	task_manager: &TaskManager,
-) -> Result<
-	sc_consensus::DefaultImportQueue<
-		Block,
-		TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
-	>,
-	sc_service::Error,
-> {
-	cumulus_client_consensus_relay_chain::import_queue(
-		client.clone(),
-		client,
-		|_, _| async { Ok(sp_timestamp::InherentDataProvider::from_system_time()) },
-		&task_manager.spawn_essential_handle(),
-		config.prometheus_registry().clone(),
-	)
-	.map_err(Into::into)
-}
+// /// Build the import queue for the shell runtime.
+// pub fn shell_build_import_queue(
+// 	client: Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
+// 	config: &Configuration,
+// 	_: Option<TelemetryHandle>,
+// 	task_manager: &TaskManager,
+// ) -> Result<
+// 	sc_consensus::DefaultImportQueue<
+// 		Block,
+// 		TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
+// 	>,
+// 	sc_service::Error,
+// > {
+// 	cumulus_client_consensus_relay_chain::import_queue(
+// 		client.clone(),
+// 		client,
+// 		|_, _| async { Ok(sp_timestamp::InherentDataProvider::from_system_time()) },
+// 		&task_manager.spawn_essential_handle(),
+// 		config.prometheus_registry().clone(),
+// 	)
+// 	.map_err(Into::into)
+// }
 
 async fn build_relay_chain_interface(
 	polkadot_config: Configuration,
@@ -212,7 +204,7 @@ async fn start_node_impl<RB>(
 	polkadot_config: Configuration,
 	collator_options: CollatorOptions,
 	id: ParaId,
-	rpc_ext_builder: RB,
+	_rpc_ext_builder: RB,
 ) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>)>
 where
 	RB: Fn(
@@ -266,7 +258,6 @@ where
 			warp_sync: None,
 		})?;
 
-	let rpc_client = client.clone();
 	let rpc_extensions_builder = {
 		let client = client.clone();
 		let transaction_pool = transaction_pool.clone();

@@ -38,18 +38,11 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 		.public()
 }
 
-/// Helper function to generate a crypto pair from seed
-pub fn get_pair_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
-	TPublic::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
-}
-
 /// Generate collator keys from seed.
 ///
 /// This function's return type must always match the session keys of the chain in tuple format.
 pub fn get_collator_keys_from_seed(seed: &str) -> AuraId {
-	get_pair_from_seed::<AuraId>(seed)
+	get_from_seed::<AuraId>(seed)
 }
 
 pub fn crust_shadow_session_keys(keys: AuraId) -> parachain_runtime::opaque::SessionKeys {
@@ -137,30 +130,31 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 		ChainType::Live,
 		move || {
 			testnet_genesis(
-				hex!["f8da9f475ca917478d54d8971c8838ab109a8e4bb85566e753deceec1044ef45"].into(),
+				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				vec![(
-					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").into(),
-					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").unchecked_into()
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					get_collator_keys_from_seed("Alice"),
 				),
 				(
-					hex!("7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348").into(),
-					hex!("7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348").unchecked_into()
+					get_account_id_from_seed::<sr25519::Public>("Bob"),
+					get_collator_keys_from_seed("Bob"),
 				),
 				(
-					hex!("869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c").into(),
-					hex!("869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c").unchecked_into()
+					get_account_id_from_seed::<sr25519::Public>("Charlie"),
+					get_collator_keys_from_seed("Charlie"),
 				),
 				(
-					hex!("7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65").into(),
-					hex!("7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65").unchecked_into()
+					get_account_id_from_seed::<sr25519::Public>("Dave"),
+					get_collator_keys_from_seed("Dave"),
 				),
 			],
 				vec![
-					hex!["f8da9f475ca917478d54d8971c8838ab109a8e4bb85566e753deceec1044ef45"].into(),
-					hex!["0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a"].into(),
-					hex!["7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348"].into(),
-					hex!["869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c"].into(),
-					hex!["7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65"].into()
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					get_account_id_from_seed::<sr25519::Public>("Bob"),
+					get_account_id_from_seed::<sr25519::Public>("Charlie"),
+					get_account_id_from_seed::<sr25519::Public>("Dave"),
+					get_account_id_from_seed::<sr25519::Public>("Eve"),
+					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 				],
 				id,
 			)
@@ -178,7 +172,7 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 }
 
 fn testnet_genesis(
-	root_key: AccountId,
+	_root_key: AccountId,
 	invulnerables: Vec<(AccountId, AuraId)>,
 	endowed_accounts: Vec<AccountId>,
 	id: ParaId,
@@ -193,7 +187,7 @@ fn testnet_genesis(
 			balances: endowed_accounts
 				.iter()
 				.cloned()
-				.map(|k| (k, 1 << 50))
+				.map(|k| (k, 1 << 60))
 				.collect(),
 		},
 		// sudo: parachain_runtime::SudoConfig { key: Some(root_key) },

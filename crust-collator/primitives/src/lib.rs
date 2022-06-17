@@ -25,23 +25,20 @@ use sp_runtime::{
 };
 
 use frame_support::{
-	traits::{tokens::fungibles::Mutate, Get, OriginTrait},
+	traits::{tokens::fungibles::Mutate, Get},
 	weights::{constants::WEIGHT_PER_SECOND, Weight},
 };
-use sp_runtime::traits::{CheckedConversion, Zero};
+use sp_runtime::traits::Zero;
 use sp_std::{borrow::Borrow, vec::Vec};
 use sp_std::{
-	convert::{TryFrom, TryInto},
 	marker::PhantomData,
 };
 use xcm::latest::{
 	AssetId as xcmAssetId, Error as XcmError, Fungibility,
-	Junction::{AccountKey20, Parachain},
-	Junctions::*,
-	MultiAsset, MultiLocation, NetworkId,
+	MultiAsset, MultiLocation,
 };
 use xcm_builder::TakeRevenue;
-use xcm_executor::traits::{FilterAssetLocation, MatchesFungible, MatchesFungibles, WeightTrader};
+use xcm_executor::traits::{MatchesFungibles, WeightTrader};
 
 pub mod constants;
 pub mod traits;

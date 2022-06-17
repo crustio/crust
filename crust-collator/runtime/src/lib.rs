@@ -33,9 +33,9 @@ use codec::{Decode, Encode, MaxEncodedLen};
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{BlakeTwo256, Block as BlockT, AccountIdLookup, Convert, SaturatedConversion, Zero, AccountIdConversion},
+	traits::{BlakeTwo256, Block as BlockT, AccountIdLookup, Convert, AccountIdConversion},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, FixedPointNumber, Perbill, Percent, Permill, Perquintill,
+	ApplyExtrinsicResult, Perbill, Percent, Permill,
 };
 use sp_std::{cmp::Ordering, prelude::*};
 #[cfg(feature = "std")]
@@ -44,7 +44,7 @@ use sp_version::RuntimeVersion;
 
 // A few exports that help ease life for downstream crates.
 use sp_std::marker::PhantomData;
-use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet};
+use sp_std::{convert::TryInto};
 pub use frame_support::{
 	construct_runtime, parameter_types, PalletId, match_types,
 	traits::{
@@ -75,27 +75,24 @@ use xcm_builder::{
 	AccountId32Aliases, CurrencyAdapter, LocationInverter, ParentIsPreset, RelayChainAsNative,
 	SiblingParachainConvertsVia, SignedAccountId32AsNative,
 	SovereignSignedViaLocation, EnsureXcmOrigin, AllowUnpaidExecutionFrom, ParentAsSuperuser,
-	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds, IsConcrete, NativeAsset,
+	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds,
 	UsingComponents, SignedToAccountId32, SiblingParachainAsNative, AllowKnownQueryResponses,
 	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId
 };
 use xcm_executor::{
-	traits::{ConvertOrigin, JustTry},
+	traits::{JustTry},
 	Config, XcmExecutor
 };
 use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
-use xcm::v0::Xcm;
-use frame_support::traits::Contains;
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use xcm::v1::{
-	prelude::*,
-	AssetId::{Abstract, Concrete},
+	AssetId::{Concrete},
 	Fungibility::Fungible,
 	MultiAsset, MultiLocation,
 };
 use sp_runtime::traits::CheckedConversion;
-use xcm_executor::traits::{FilterAssetLocation, MatchesFungible};
-use impls::{CurrencyToVoteHandler, OneTenthFee};
+use xcm_executor::traits::{MatchesFungible};
+use impls::OneTenthFee;
 use cumulus_primitives_core::ParaId;
 use frame_support::pallet_prelude::*;
 use pallet_transaction_payment::RuntimeDispatchInfo;
@@ -438,7 +435,7 @@ parameter_types! {
 pub struct OriginPrivilegeCmp;
 
 impl PrivilegeCmp<OriginCaller> for OriginPrivilegeCmp {
-	fn cmp_privilege(left: &OriginCaller, right: &OriginCaller) -> Option<Ordering> {
+	fn cmp_privilege(_left: &OriginCaller, _right: &OriginCaller) -> Option<Ordering> {
 		None
 	}
 }

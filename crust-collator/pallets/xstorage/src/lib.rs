@@ -10,12 +10,10 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 
 	use xcm::v2::prelude::*;
-	use codec::Encode;
 	use sp_std::convert::TryInto;
 	use sp_runtime::traits::{AccountIdConversion, Convert};
 
-	use xcm::{latest::prelude::*, VersionedMultiLocation};
-	use xcm_executor::traits::{InvertLocation, TransactAsset, WeightBounds};
+	use xcm_executor::traits::TransactAsset;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]

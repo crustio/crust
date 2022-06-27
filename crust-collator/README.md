@@ -20,7 +20,7 @@ fn rococo_local_testnet_genesis(wasm_binary: &[u8]) -> rococo_runtime::GenesisCo
                 ],
 ```
 
-Compile source code with command ```cargo build --release --features=real-overseer```
+Compile source code with command ```cargo build --release```
 
 After build, export new chain spec json file:
 
@@ -31,12 +31,12 @@ After build, export new chain spec json file:
 Then grab the crust blockchain source code:
 
 ```bash
-git clone https://github.com/paritytech/crust.git
+git clone https://github.com/crustio/crust.git
 cd crust
-git checkout parachain/rococo-v2
+git checkout parachain/shadow
 ```
 
-Compile source code with command ```cargo build --release --package crust-collator```
+Compile source code with command ```cargo build --release```
 
 ## Step1: build test spec and export parachain genesis and wasm data
 
@@ -74,17 +74,17 @@ Add ```RUST_LOG=debug RUST_BACKTRACE=1``` if you want see more details
  - run the first parachain collator
 
  ```sh
-./target/release/crust-collator --tmp --chain ./crust-collator/res/2012.json --parachain-id 2012 --port 40343 --ws-port 9953 --rpc-cors all --validator -lruntime=debug  -- --chain ../polkadot/rococo-custom.json
+./target/release/crust-collator --tmp --chain ./crust-collator/res/staging.json --port 40343 --ws-port 9953 --rpc-cors all --validator -lruntime=debug --alice -- --chain ../polkadot/rococo-custom.json
 ```
 
  - run the second parachain collator for the same parachain
 
  ```sh
-./target/release/crust-collator --tmp --chain ./crust-collator/res/2008.json --parachain-id 2008 --port 40342 --ws-port 9952 --rpc-cors all --validator -lruntime=debug  -- --chain ../polkadot/rococo-custom.json
+./target/release/crust-collator --tmp --chain ./crust-collator/res/staging.json --port 40342 --ws-port 9952 --rpc-cors all --validator -lruntime=debug --bob  -- --chain ../polkadot/rococo-custom.json
 ```
 
 ## Step4 Register your parachain into rococo local test
-submit the `paraSudoConfig:sudoParaScheduleInit` extrinsic to register para chain to the relay chain
+The paraid for the staging test network is 2012.
 
 ## Step5 Open channel and accept channel
 Ref to this [page](https://wiki.acala.network/build/development-guide/composable-chains/open-hrmp-channel)

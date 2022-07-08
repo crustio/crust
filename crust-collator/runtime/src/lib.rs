@@ -484,7 +484,7 @@ parameter_types! {
 	// a MultiLocation: (Self Balances pallet index)
 	// We use the RELATIVE multilocation
 	pub SelfReserve: MultiLocation = MultiLocation::here();
-	pub CheckingAccount: AccountId = PalletId(*b"checking").into_account();
+	pub CheckingAccount: AccountId = PalletId(*b"checking").into_account_truncating();
 }
 
 type LocationToAccountId = (
@@ -1448,8 +1448,8 @@ impl Convert<AccountId, MultiLocation> for AccountIdToMultiLocation {
 }
 
 parameter_type_with_key! {
-	pub ParachainMinFee: |_location: MultiLocation| -> u128 {
-		u128::MAX
+	pub ParachainMinFee: |_location: MultiLocation| -> Option<u128> {
+		Some(u128::MAX)
 	};
 }
 

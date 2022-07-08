@@ -13,7 +13,7 @@ path = "src/main.rs"
 derive_more = "0.15.0"
 exit-future = "0.1.4"
 futures = { version = "0.3.1", features = ["compat"] }
-log = "0.4.16"
+log = "0.4.17"
 parking_lot = "0.12.0"
 trie-root = "0.15.2"
 codec = { package = "parity-scale-codec", version = "3.0.0" }
@@ -58,7 +58,7 @@ substrate-prometheus-endpoint = { git = "https://github.com/paritytech/substrate
 sp-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.24" }
 
 # RPC related dependencies
-jsonrpc-core = "18.0.0"
+jsonrpsee = { version = "0.13.1", features = ["server"] }
 sc-transaction-pool-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.24" }
 frame-rpc-system = { package = "substrate-frame-rpc-system", git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.24" }
 pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.24" }

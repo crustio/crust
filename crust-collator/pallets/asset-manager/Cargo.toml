@@ -7,7 +7,7 @@ version = "0.1.0"
 # Thanks for the moonbeam's team. Due to the dependencies issues, just copy the code into our project and keep all the information
 
 [dependencies]
-log = { version = "0.4.16", default-features = false }
+log = { version = "0.4.17", default-features = false }
 serde = { version = "1.0.124", optional = true }
 
 # Moonbeam

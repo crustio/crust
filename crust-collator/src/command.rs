@@ -23,7 +23,6 @@ use cumulus_primitives_core::ParaId;
 use cumulus_client_service::genesis::generate_genesis_block;
 use log::info;
 use parachain_runtime::Block;
-use polkadot_parachain::primitives::AccountIdConversion;
 use sc_cli::{
 	ChainSpec, CliConfiguration, DefaultConfigurationValues, ImportParams, KeystoreParams,
 	NetworkParams, Result, RuntimeVersion, SharedParams, SubstrateCli,
@@ -33,7 +32,7 @@ use sc_service::{
 	PartialComponents,
 };
 use sp_core::hexdisplay::HexDisplay;
-use sp_runtime::traits::Block as BlockT;
+use sp_runtime::traits::{AccountIdConversion, Block as BlockT};
 use std::{io::Write, net::SocketAddr};
 
 fn load_spec(
@@ -300,8 +299,8 @@ pub fn run() -> Result<()> {
 				let id = ParaId::from(para_id);
 
 				let parachain_account =
-					AccountIdConversion::<polkadot_primitives::v2::AccountId>::into_account(&id);
-				let state_version = RelayChainCli::native_runtime_version(&config.chain_spec).state_version();
+					AccountIdConversion::<polkadot_primitives::v2::AccountId>::into_account_truncating(&id);
+				let state_version = Cli::native_runtime_version(&config.chain_spec).state_version();
 				let block: Block =
 					generate_genesis_block(&config.chain_spec, state_version).map_err(|e| format!("{:?}", e))?;
 				let genesis_state = format!("0x{:?}", HexDisplay::from(&block.header().encode()));

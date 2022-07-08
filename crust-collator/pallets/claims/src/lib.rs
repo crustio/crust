@@ -341,7 +341,7 @@ impl<T: Config> Module<T> {
     // The claim pot account
     pub fn claim_pot() -> T::AccountId {
         // "modl" ++ "crclaims" ++ "clai" is 16 bytes
-        T::PalletId::get().into_account()
+        T::PalletId::get().into_account_truncating()
     }
 
     // Constructs the message that Ethereum RPC's `personal_sign` and `eth_sign` would sign.

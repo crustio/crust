@@ -41,6 +41,7 @@ use cumulus_relay_chain_rpc_interface::RelayChainRPCInterface;
 use substrate_prometheus_endpoint::Registry;
 
 use polkadot_service::CollatorPair;
+use jsonrpsee::RpcModule;
 
 #[cfg(not(feature = "runtime-benchmarks"))]
 type HostFunctions = sp_io::SubstrateHostFunctions;
@@ -191,6 +192,7 @@ async fn build_relay_chain_interface(
 			parachain_config,
 			telemetry_worker_handle,
 			task_manager,
+			None
 		),
 	}
 }
@@ -209,7 +211,7 @@ async fn start_node_impl<RB>(
 where
 	RB: Fn(
 			Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
-		) -> Result<jsonrpc_core::IoHandler<sc_rpc::Metadata>, sc_service::Error>
+		) -> Result<jsonrpsee::RpcModule<()>, sc_service::Error>
 		+ Send
 		+ 'static,
 {
@@ -258,7 +260,7 @@ where
 			warp_sync: None,
 		})?;
 
-	let rpc_extensions_builder = {
+	let rpc_builder = {
 		let client = client.clone();
 		let transaction_pool = transaction_pool.clone();
 
@@ -269,13 +271,13 @@ where
 				deny_unsafe,
 			};
 
-			Ok(rpc::create_full(deps))
+			rpc::create_full(deps).map_err(Into::into)
 		})
 	};
 	let force_authoring = parachain_config.force_authoring;
 
 	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
-		rpc_extensions_builder,
+		rpc_builder,
 		client: client.clone(),
 		transaction_pool: transaction_pool.clone(),
 		task_manager: &mut task_manager,
@@ -356,7 +358,7 @@ pub async fn start_node(
 		polkadot_config,
 		collator_options,
 		id,
-		|_| Ok(Default::default()),
+		|_| Ok(RpcModule::new(())),
 	)
 	.await
 }

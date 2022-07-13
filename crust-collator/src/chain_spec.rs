@@ -109,6 +109,7 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 					hex!["7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65"].into()
 				],
 				id,
+				vec![],
 			)
 		},
 		vec![],
@@ -157,6 +158,14 @@ pub fn staging_test_net(id: ParaId) -> ChainSpec {
 					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 				],
 				id,
+				vec![
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					get_account_id_from_seed::<sr25519::Public>("Bob"),
+					get_account_id_from_seed::<sr25519::Public>("Charlie"),
+					get_account_id_from_seed::<sr25519::Public>("Dave"),
+					get_account_id_from_seed::<sr25519::Public>("Eve"),
+					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+				],
 			)
 		},
 		Vec::new(),
@@ -176,6 +185,7 @@ fn testnet_genesis(
 	invulnerables: Vec<(AccountId, AuraId)>,
 	endowed_accounts: Vec<AccountId>,
 	id: ParaId,
+	council_accounts: Vec<AccountId>,
 ) -> parachain_runtime::GenesisConfig {
 	parachain_runtime::GenesisConfig {
 		system: parachain_runtime::SystemConfig {
@@ -210,7 +220,7 @@ fn testnet_genesis(
 		aura_ext: Default::default(),
 		parachain_system: Default::default(),
 		council: parachain_runtime::CouncilConfig {
-            members: vec![],
+            members: council_accounts,
             phantom: Default::default(),
         },
         technical_committee: parachain_runtime::TechnicalCommitteeConfig {

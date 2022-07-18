@@ -25,8 +25,8 @@ use sp_runtime::{
 };
 
 use frame_support::{
-	traits::{tokens::fungibles::Mutate, Get},
-	weights::{constants::WEIGHT_PER_SECOND, Weight},
+	traits::{tokens::fungibles::Mutate, Get, Contains},
+	weights::{constants::WEIGHT_PER_SECOND, Weight}, ensure
 };
 use sp_runtime::traits::Zero;
 use sp_std::{borrow::Borrow, vec::Vec};
@@ -35,10 +35,11 @@ use sp_std::{
 };
 use xcm::latest::{
 	AssetId as xcmAssetId, Error as XcmError, Fungibility,
-	MultiAsset, MultiLocation,
+	MultiAsset, MultiLocation, prelude::{BuyExecution, DescendOrigin, WithdrawAsset},
+	WeightLimit::{Limited, Unlimited}, Xcm,
 };
 use xcm_builder::TakeRevenue;
-use xcm_executor::traits::{MatchesFungibles, WeightTrader};
+use xcm_executor::traits::{MatchesFungibles, WeightTrader, ShouldExecute};
 
 pub mod constants;
 pub mod traits;
@@ -333,6 +334,54 @@ impl<
 	fn drop(&mut self) {
 		if let Some((id, amount, _)) = self.1.clone() {
 			R::take_revenue((id, amount).into());
+		}
+	}
+}
+
+pub struct AllowDescendOriginFromLocal<T>(PhantomData<T>);
+impl<T: Contains<MultiLocation>> ShouldExecute for AllowDescendOriginFromLocal<T> {
+	fn should_execute<Call>(
+		origin: &MultiLocation,
+		message: &mut Xcm<Call>,
+		max_weight: Weight,
+		_weight_credit: &mut Weight,
+	) -> Result<(), ()> {
+		log::trace!(
+			target: "xcm::barriers",
+			"AllowDescendOriginFromLocal origin:
+			{:?}, message: {:?}, max_weight: {:?}, weight_credit: {:?}",
+			origin, message, max_weight, _weight_credit,
+		);
+		ensure!(T::contains(origin), ());
+		let mut iter = message.0.iter_mut();
+		// Make sure the first instruction is DescendOrigin
+		iter.next()
+			.filter(|instruction| matches!(instruction, DescendOrigin(_)))
+			.ok_or(())?;
+
+		// Then WithdrawAsset
+		iter.next()
+			.filter(|instruction| matches!(instruction, WithdrawAsset(_)))
+			.ok_or(())?;
+
+		// Then BuyExecution
+		let i = iter.next().ok_or(())?;
+		match i {
+			BuyExecution {
+				weight_limit: Limited(ref mut weight),
+				..
+			} if *weight >= max_weight => {
+				*weight = max_weight;
+				Ok(())
+			}
+			BuyExecution {
+				ref mut weight_limit,
+				..
+			} if weight_limit == &Unlimited => {
+				*weight_limit = Limited(max_weight);
+				Ok(())
+			}
+			_ => Err(()),
 		}
 	}
 }

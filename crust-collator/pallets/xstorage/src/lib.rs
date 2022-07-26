@@ -160,3 +160,35 @@ pub mod pallet {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	use frame_support::parameter_types;
+	use xcm::latest::prelude::*;
+	use xcm::latest::{Junction, NetworkId::Any, NetworkId};
+	use xcm_builder::{
+		Account32Hash
+	};
+	use xcm_executor::traits::Convert;
+	pub use crust_parachain_primitives::{
+		constants::{currency::*}, traits::*,
+		AssetId, *
+	};
+	use codec::Encode;
+
+	fn account20() -> Junction {
+		AccountKey20 { network: Any, key: [35,44,156,153,241,115,33,39,211,198,18,135,234,216,198,58,169,206,63,43] }
+	}
+	#[test]
+	fn convert_location() {
+		parameter_types! {
+			pub const RelayNetwork: NetworkId = NetworkId::Kusama;
+		}
+
+		let input = MultiLocation::new(1, X2(Parachain(1000), account20()));
+		let output = hex::encode(Account32Hash::<RelayNetwork, AccountId>::convert_ref(&input).unwrap().encode());
+		assert_eq!(output, "52187e90170451d33f17bdafdcb3e568204b882971373473482e298390339849");
+	}
+}

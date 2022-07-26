@@ -28,6 +28,9 @@ polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch =
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.24", default-features = false }
 polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.24" }
+xcm-builder = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.24" }
+crust-parachain-primitives = { path = "../../primitives", default-features = false }
+hex = "0.4.2"
 
 [features]
 default = ["std"]

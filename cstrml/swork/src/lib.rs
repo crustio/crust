@@ -484,11 +484,16 @@ decl_module! {
         #[weight = 1000]
         pub fn register_new_tee_pubkey(
             origin,
-            pubkey: sr25519::Public,
+            pubkey_vec: Vec<u8>,
         ) -> DispatchResult {
             // This ensures that the function can only be called via unsigned transaction.
             let _ = ensure_root(origin)?;
-            let mut allowed_tee_public_keys = Self::allowed_tee_public_keys();();
+            let mut allowed_tee_public_keys = Self::allowed_tee_public_keys();
+            let mut pubkey_arr = [0u8; 32];
+            for (&x, p) in pubkey_vec.iter().zip(pubkey_arr.iter_mut()) {
+                *p = x;
+            }
+            let pubkey = sr25519::Public::from_raw(pubkey_arr);
             allowed_tee_public_keys.push(pubkey);
             AllowedTeePublicKeys::put(allowed_tee_public_keys);
             Ok(())

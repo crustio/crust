@@ -52,17 +52,8 @@ fn register_v2_should_work() {
             AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
                 .expect("valid ss58 address");
         let register_info_v2 = legal_register_info_v2();
-        let mut public_array = [0u8; 32];
-        for (&x, p) in hex::decode("2ec91af63632573a5b051376cdeb79730261e696117e68c67aa298d519f0c77c").unwrap().iter().zip(public_array.iter_mut()) {
-            *p = x;
-        }
-        let public = sr25519::Public::from_raw(public_array);
-        assert_ok!(Swork::register_new_tee_pubkey(Origin::root(), public));
-        for (&x, p) in hex::decode("328846691dd2401b2a62b123daea0e6f626cb4919dc560797645d26e3273a57a").unwrap().iter().zip(public_array.iter_mut()) {
-            *p = x;
-        }
-        let public = sr25519::Public::from_raw(public_array);
-        assert_ok!(Swork::register_new_tee_pubkey(Origin::root(), public));
+        assert_ok!(Swork::register_new_tee_pubkey(Origin::root(), hex::decode("2ec91af63632573a5b051376cdeb79730261e696117e68c67aa298d519f0c77c").unwrap()));
+        assert_ok!(Swork::register_new_tee_pubkey(Origin::root(), hex::decode("328846691dd2401b2a62b123daea0e6f626cb4919dc560797645d26e3273a57a").unwrap()));
         assert_ok!(Swork::register_with_deauth_chain(
             Origin::signed(applier.clone()),
             register_info_v2.account_id,

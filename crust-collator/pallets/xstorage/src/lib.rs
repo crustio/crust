@@ -77,6 +77,24 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		// The index cannot be changed.
+		#[pallet::weight(1_000_000)]
+		pub fn place_storage_order_through_parachain(
+			origin: OriginFor<T>,
+			cid: Vec<u8>,
+			size: u64
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			Self::deposit_event(Event::FileSuccess {
+				account: who,
+				cid,
+				size,
+			});
+
+			Ok(().into())
+		}
+
 		#[pallet::weight(1_000_000)]
 		pub fn place_storage_order(
 			origin: OriginFor<T>,
@@ -140,5 +158,37 @@ pub mod pallet {
 		pub fn account_id() -> T::AccountId {
 			PALLET_ID.into_account_truncating()
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	use frame_support::parameter_types;
+	use xcm::latest::prelude::*;
+	use xcm::latest::{Junction, NetworkId::Any, NetworkId};
+	use xcm_builder::{
+		Account32Hash
+	};
+	use xcm_executor::traits::Convert;
+	pub use crust_parachain_primitives::{
+		constants::{currency::*}, traits::*,
+		AssetId, *
+	};
+	use codec::Encode;
+
+	fn account20() -> Junction {
+		AccountKey20 { network: Any, key: [35,44,156,153,241,115,33,39,211,198,18,135,234,216,198,58,169,206,63,43] }
+	}
+	#[test]
+	fn convert_location() {
+		parameter_types! {
+			pub const RelayNetwork: NetworkId = NetworkId::Kusama;
+		}
+
+		let input = MultiLocation::new(1, X2(Parachain(1000), account20()));
+		let output = hex::encode(Account32Hash::<RelayNetwork, AccountId>::convert_ref(&input).unwrap().encode());
+		assert_eq!(output, "52187e90170451d33f17bdafdcb3e568204b882971373473482e298390339849");
 	}
 }

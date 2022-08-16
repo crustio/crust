@@ -77,7 +77,7 @@ use xcm_builder::{
 	SovereignSignedViaLocation, EnsureXcmOrigin, AllowUnpaidExecutionFrom, ParentAsSuperuser,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds,
 	UsingComponents, SignedToAccountId32, SiblingParachainAsNative, AllowKnownQueryResponses,
-	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId
+	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId, Account32Hash
 };
 use xcm_executor::{
 	traits::{JustTry},
@@ -85,8 +85,9 @@ use xcm_executor::{
 };
 use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use xcm::v1::{
-	AssetId::{Concrete},
+use xcm::latest::{
+	prelude::*,
+	AssetId::{Abstract, Concrete},
 	Fungibility::Fungible,
 	MultiAsset, MultiLocation,
 };
@@ -491,6 +492,7 @@ type LocationToAccountId = (
 	ParentIsPreset<AccountId>,
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	AccountId32Aliases<RelayNetwork, AccountId>,
+	Account32Hash<RelayNetwork, AccountId>,
 );
 
 pub trait NativeAssetChecker {
@@ -574,6 +576,33 @@ type LocalAssetTransactor = CurrencyAdapter<
 
 pub type CrustAssetTransactors = (LocalAssetTransactor, FungiblesTransactor);
 
+// pub struct SiblingSignedAccountId32AsNative<Origin>(PhantomData<Origin>);
+// impl<Origin: OriginTrait> ConvertOrigin<Origin>
+// 	for SiblingSignedAccountId32AsNative<Origin>
+// where
+// 	Origin::AccountId: From<[u8; 32]>,
+// {
+// 	fn convert_origin(
+// 		origin: impl Into<MultiLocation>,
+// 		kind: OriginKind,
+// 	) -> Result<Origin, MultiLocation> {
+// 		let origin = origin.into();
+// 		log::trace!(
+// 			target: "xcm::origin_conversion",
+// 			"SiblingSignedAccountId32AsNative origin: {:?}, kind: {:?}",
+// 			origin, kind,
+// 		);
+// 		match (kind, origin) {
+// 			(
+// 				OriginKind::Native,
+// 				MultiLocation { parents: 1, interior: Junctions::X2(Parachain(_), AccountId32 { id, network })},
+// 			) =>
+// 				Ok(Origin::signed(id.into())),
+// 			(_, origin) => Err(origin),
+// 		}
+// 	}
+// }
+
 pub type XcmOriginToTransactDispatchOrigin = (
 	SovereignSignedViaLocation<LocationToAccountId, Origin>,
 	RelayChainAsNative<RelayChainOrigin, Origin>,
@@ -610,6 +639,7 @@ pub type Barrier = (
 	AllowKnownQueryResponses<PolkadotXcm>,
 	// Subscriptions for version tracking are OK.
 	AllowSubscriptionsFrom<Everything>,
+	crust_parachain_primitives::AllowDescendOriginFromLocal<Everything>,
 );
 
 parameter_types! {
@@ -1364,7 +1394,7 @@ impl pallet_asset_manager::Config for Runtime {
 	type AssetRegistrarMetadata = AssetRegistrarMetadata;
 	type AssetType = AssetType;
 	type AssetRegistrar = AssetRegistrar;
-	type AssetModifierOrigin = EnsureRoot<AccountId>;
+	type AssetModifierOrigin = AssetsForceOrigin;
 	type WeightInfo = pallet_asset_manager::weights::SubstrateWeight<Runtime>;
 }
 
@@ -1471,6 +1501,25 @@ impl orml_xtokens::Config for Runtime {
 	type ReserveProvider = AbsoluteAndRelativeReserve<SelfLocationAbsolute>;
 }
 
+// parameter_types! {
+// 	pub FeePerSecond: u128 = 1_000_000;
+// }
+
+// impl xstorage_client::Config for Runtime {
+// 	type Event = Event;
+// 	type XcmpMessageSender = XcmRouter;
+// 	type AssetTransactor = CrustAssetTransactors;
+// 	type CurrencyId = CurrencyId;
+// 	type AccountIdToMultiLocation = AccountIdToMultiLocation;
+// 	type CurrencyIdToMultiLocation =
+// 		CurrencyIdtoMultiLocation<AsAssetType<AssetId, AssetType, AssetManager>>;
+// 	type LocationInverter = LocationInverter<Ancestry>;
+// 	type CrustNativeToken = xstorage_client::primitives::CrustShadowLocation;
+// 	type SelfNativeToken = SelfLocation;
+// 	type FeePerSecond = FeePerSecond;
+// 	type Destination = xstorage_client::primitives::CsmMultiloaction;
+// }
+
 construct_runtime! {
 	pub enum Runtime where
 		Block = Block,
@@ -1535,6 +1584,7 @@ construct_runtime! {
 
 		// Crust
 		Xstorage: xstorage::{Pallet, Storage, Call, Event<T>} = 127,
+		// XstorageClient: xstorage_client::{Pallet, Storage, Call, Event<T>} = 128,
 	}
 }
 

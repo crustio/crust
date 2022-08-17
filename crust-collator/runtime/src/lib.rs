@@ -24,6 +24,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 mod impls;
 mod weights;
+use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 pub use crust_parachain_primitives::{
     constants::{currency::*}, traits::*,
     AssetId, *
@@ -49,7 +50,7 @@ pub use frame_support::{
 	construct_runtime, parameter_types, PalletId, match_types,
 	traits::{
 		Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, Imbalance,
-		LockIdentifier, EnsureOneOf, PrivilegeCmp, Currency, OnUnbalanced, Nothing
+		LockIdentifier, EitherOfDiverse, PrivilegeCmp, Currency, OnUnbalanced, Nothing
 	},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -86,8 +87,7 @@ use xcm_executor::{
 use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use xcm::latest::{
-	prelude::*,
-	AssetId::{Abstract, Concrete},
+	AssetId::Concrete,
 	Fungibility::Fungible,
 	MultiAsset, MultiLocation,
 };
@@ -307,6 +307,7 @@ impl WeightToFeePolynomial for WeightToFee {
 }
 
 impl pallet_transaction_payment::Config for Runtime {
+	type Event = Event;
 	type OnChargeTransaction = pallet_transaction_payment::CurrencyAdapter<Balances, DealWithFees>;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type WeightToFee = OneTenthFee<Balance>;
@@ -469,6 +470,7 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 	type ReservedDmpWeight = ReservedDmpWeight;
 	type XcmpMessageHandler = XcmpQueue;
 	type ReservedXcmpWeight = ReservedXcmpWeight;
+	type CheckAssociatedRelayNumber = RelayNumberStrictlyIncreases;
 }
 
 impl parachain_info::Config for Runtime {}
@@ -854,7 +856,7 @@ parameter_types! {
 }
 
 /// We allow root and the Relay Chain council to execute privileged collator selection operations.
-pub type CollatorSelectionUpdateOrigin = EnsureOneOf<
+pub type CollatorSelectionUpdateOrigin = EitherOfDiverse<
 	EnsureRoot<AccountId>,
 	EnsureXcm<IsMajorityOfBody<RelayLocation, ExecutiveBody>>,
 >;
@@ -998,7 +1000,7 @@ impl bridge_transfer::Config for Runtime {
     type BridgeTokenId = BridgeTokenId;
 }
 
-type EnsureRootOrHalfCouncil = EnsureOneOf<
+type EnsureRootOrHalfCouncil = EitherOfDiverse<
     EnsureRoot<AccountId>,
     pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
 >;
@@ -1103,11 +1105,11 @@ parameter_types! {
 impl pallet_treasury::Config for Runtime {
     type PalletId = TreasuryPalletId;
     type Currency = Balances;
-    type ApproveOrigin = EnsureOneOf<
+    type ApproveOrigin = EitherOfDiverse<
         EnsureRoot<AccountId>,
         pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 3, 5>,
     >;
-    type RejectOrigin = EnsureOneOf<
+    type RejectOrigin = EitherOfDiverse<
         EnsureRoot<AccountId>,
         pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
     >;
@@ -1122,6 +1124,7 @@ impl pallet_treasury::Config for Runtime {
     type SpendFunds = ();
     type WeightInfo = pallet_treasury::weights::SubstrateWeight<Runtime>;
     type MaxApprovals = MaxApprovals;
+	type SpendOrigin = frame_support::traits::NeverEnsureOrigin<Balance>;
 }
 
 parameter_types! {
@@ -1153,41 +1156,41 @@ impl pallet_democracy::Config for Runtime {
     type VoteLockingPeriod = EnactmentPeriod; // Same as EnactmentPeriod
     type MinimumDeposit = MinimumDeposit;
     /// A straight majority of the council can decide what their next motion is.
-    type ExternalOrigin = EnsureOneOf<
+    type ExternalOrigin = EitherOfDiverse<
         pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 2>,
         frame_system::EnsureRoot<AccountId>,
     >;
     /// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
-    type ExternalMajorityOrigin = EnsureOneOf<
+    type ExternalMajorityOrigin = EitherOfDiverse<
         pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 2>,
         frame_system::EnsureRoot<AccountId>,
     >;
     /// A unanimous council can have the next scheduled referendum be a straight default-carries
     /// (NTB) vote.
-    type ExternalDefaultOrigin = EnsureOneOf<
+    type ExternalDefaultOrigin = EitherOfDiverse<
         pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 1>,
         frame_system::EnsureRoot<AccountId>,
     >;
     /// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
     /// be tabled immediately and with a shorter voting/enactment period.
-    type FastTrackOrigin = EnsureOneOf<
+    type FastTrackOrigin = EitherOfDiverse<
         pallet_collective::EnsureProportionAtLeast<AccountId, TechnicalCollective, 2, 3>,
         frame_system::EnsureRoot<AccountId>,
     >;
-    type InstantOrigin = EnsureOneOf<
+    type InstantOrigin = EitherOfDiverse<
         pallet_collective::EnsureProportionAtLeast<AccountId, TechnicalCollective, 1, 1>,
         frame_system::EnsureRoot<AccountId>,
     >;
     type InstantAllowed = InstantAllowed;
     type FastTrackVotingPeriod = FastTrackVotingPeriod;
     // To cancel a proposal which has been passed, 2/3 of the council must agree to it.
-    type CancellationOrigin = EnsureOneOf<
+    type CancellationOrigin = EitherOfDiverse<
         pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>,
         EnsureRoot<AccountId>,
     >;
     // To cancel a proposal before it has been passed, the technical committee must be unanimous or
     // Root must agree.
-    type CancelProposalOrigin = EnsureOneOf<
+    type CancelProposalOrigin = EitherOfDiverse<
         pallet_collective::EnsureProportionAtLeast<AccountId, TechnicalCollective, 1, 1>,
         EnsureRoot<AccountId>,
     >;
@@ -1253,7 +1256,7 @@ parameter_types! {
 }
 
 /// We allow root and Chain council to execute privileged asset operations.
-pub type AssetsForceOrigin = EnsureOneOf<
+pub type AssetsForceOrigin = EitherOfDiverse<
 	EnsureRoot<AccountId>,
 	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
 >;
@@ -1532,7 +1535,7 @@ construct_runtime! {
 		// Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
 		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>, ValidateUnsigned, Config},
-		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
+		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config, Call},
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
 

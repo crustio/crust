@@ -20,7 +20,7 @@ use crate::{
 };
 use codec::Encode;
 use cumulus_primitives_core::ParaId;
-use cumulus_client_service::genesis::generate_genesis_block;
+use cumulus_client_cli::generate_genesis_block;
 use log::info;
 use parachain_runtime::Block;
 use sc_cli::{
@@ -33,7 +33,7 @@ use sc_service::{
 };
 use sp_core::hexdisplay::HexDisplay;
 use sp_runtime::traits::{AccountIdConversion, Block as BlockT};
-use std::{io::Write, net::SocketAddr};
+use std::net::SocketAddr;
 
 fn load_spec(
 	id: &str
@@ -127,7 +127,7 @@ impl SubstrateCli for RelayChainCli {
 	}
 
 	fn load_spec(&self, id: &str) -> std::result::Result<Box<dyn sc_service::ChainSpec>, String> {
-		polkadot_cli::Cli::from_iter([RelayChainCli::executable_name().to_string()].iter())
+		polkadot_cli::Cli::from_iter([RelayChainCli::executable_name()].iter())
 			.load_spec(id)
 	}
 
@@ -136,14 +136,6 @@ impl SubstrateCli for RelayChainCli {
 	}
 }
 
-fn extract_genesis_wasm(chain_spec: &Box<dyn sc_service::ChainSpec>) -> Result<Vec<u8>> {
-	let mut storage = chain_spec.build_storage()?;
-
-	storage
-		.top
-		.remove(sp_core::storage::well_known_keys::CODE)
-		.ok_or_else(|| "Could not find wasm file in genesis state!".into())
-}
 
 /// Parse command line arguments into service configuration.
 pub fn run() -> Result<()> {
@@ -206,7 +198,7 @@ pub fn run() -> Result<()> {
 			runner.sync_run(|config| {
 				let polkadot_cli = RelayChainCli::new(
 					&config,
-					[RelayChainCli::executable_name().to_string()]
+					[RelayChainCli::executable_name()]
 						.iter()
 						.chain(cli.relaychain_args.iter()),
 				);
@@ -233,52 +225,20 @@ pub fn run() -> Result<()> {
 				Ok((cmd.run(client, backend, None), task_manager))
 			})
 		}
-		Some(Subcommand::ExportGenesisState(params)) => {
-			let mut builder = sc_cli::LoggerBuilder::new("");
-			builder.with_profiling(sc_tracing::TracingReceiver::Log, "");
-			let _ = builder.init();
-
-
-			let spec = load_spec(&params.chain.clone().unwrap_or_default())?;
-			let state_version = Cli::native_runtime_version(&spec).state_version();
-			let block: Block = generate_genesis_block(&load_spec(
-				&params.chain.clone().unwrap_or_default()
-			)?, state_version)?;
-			let raw_header = block.header().encode();
-			let output_buf = if params.raw {
-				raw_header
-			} else {
-				format!("0x{:?}", HexDisplay::from(&block.header().encode())).into_bytes()
-			};
-
-			if let Some(output) = &params.output {
-				std::fs::write(output, output_buf)?;
-			} else {
-				std::io::stdout().write_all(&output_buf)?;
-			}
-
-			Ok(())
+		Some(Subcommand::ExportGenesisState(cmd)) => {
+			let runner = cli.create_runner(cmd)?;
+			runner.sync_run(|_config| {
+				let spec = cli.load_spec(&cmd.shared_params.chain.clone().unwrap_or_default())?;
+				let state_version = Cli::native_runtime_version(&spec).state_version();
+				cmd.run::<Block>(&*spec, state_version)
+			})
 		}
-		Some(Subcommand::ExportGenesisWasm(params)) => {
-			let mut builder = sc_cli::LoggerBuilder::new("");
-			builder.with_profiling(sc_tracing::TracingReceiver::Log, "");
-			let _ = builder.init();
-
-			let raw_wasm_blob =
-				extract_genesis_wasm(&cli.load_spec(&params.chain.clone().unwrap_or_default())?)?;
-			let output_buf = if params.raw {
-				raw_wasm_blob
-			} else {
-				format!("0x{:?}", HexDisplay::from(&raw_wasm_blob)).into_bytes()
-			};
-
-			if let Some(output) = &params.output {
-				std::fs::write(output, output_buf)?;
-			} else {
-				std::io::stdout().write_all(&output_buf)?;
-			}
-
-			Ok(())
+		Some(Subcommand::ExportGenesisWasm(cmd)) => {
+			let runner = cli.create_runner(cmd)?;
+			runner.sync_run(|_config| {
+				let spec = cli.load_spec(&cmd.shared_params.chain.clone().unwrap_or_default())?;
+				cmd.run(&*spec)
+			})
 		}
 		None => {
 			let runner = cli.create_runner(&cli.run.normalize())?;
@@ -291,7 +251,7 @@ pub fn run() -> Result<()> {
 
 				let polkadot_cli = RelayChainCli::new(
 					&config,
-					[RelayChainCli::executable_name().to_string()]
+					[RelayChainCli::executable_name()]
 						.iter()
 						.chain(cli.relaychain_args.iter()),
 				);
@@ -302,7 +262,7 @@ pub fn run() -> Result<()> {
 					AccountIdConversion::<polkadot_primitives::v2::AccountId>::into_account_truncating(&id);
 				let state_version = Cli::native_runtime_version(&config.chain_spec).state_version();
 				let block: Block =
-					generate_genesis_block(&config.chain_spec, state_version).map_err(|e| format!("{:?}", e))?;
+					generate_genesis_block(&*config.chain_spec, state_version).map_err(|e| format!("{:?}", e))?;
 				let genesis_state = format!("0x{:?}", HexDisplay::from(&block.header().encode()));
 
 				let tokio_handle = config.tokio_handle.clone();

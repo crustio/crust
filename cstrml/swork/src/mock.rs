@@ -356,34 +356,6 @@ pub fn legal_register_info_v2() -> RegisterInfoV2 {
     }
 }
 
-
-// pub fn legal_register_info_v2() -> RegisterInfoV2 {
-//     let applier: AccountId =
-//     AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
-//         .expect("valid ss58 address");
-//
-//     let code = hex::decode("30386536613362323664633563343366313930633566363961353263626164643433633836363931616463396632663934393636383534373030613132376563").unwrap();
-//     let tee_pubkey = hex::decode("30ad744cf6fe0d1e28d344bdf5aa9984d48b15b540c130d0a6199ca11353add77e2d32b985a66c2d7c5a962b1a96e1fb13d71287d72d092546d974ae2105d9f9").unwrap();
-//     let pubkeys = vec![
-//         hex::decode("2ec91af63632573a5b051376cdeb79730261e696117e68c67aa298d519f0c77c").unwrap(),
-//         hex::decode("328846691dd2401b2a62b123daea0e6f626cb4919dc560797645d26e3273a57a").unwrap()
-//     ];
-//     let signatures = vec![
-//         hex::decode("7a5ce102505869cd53e2850e715adde6f890e1da997935f09bd3d83c7146bf76fdf7643566e81161f2c8bda50150543ce11e1af11f7943a23d21f574593fcd8e").unwrap(),
-//         hex::decode("1289517c0586b8eea5926e28de52e9206a71dbc6472af39fa7dd77d25963455e2d30a57acd76b94839584a2c20d2ac6796e33a4c8cbf75025e709a97e8eb9980").unwrap()
-//     ];
-//     let tee_signature = hex::decode("ae1a7a845945bb758df54b25681b76e1fe70b488f78b69f3fae687a89c3c0240c923174f680eb1e721c8d689064eefb690db55a62d596e4ee8cda8166cbe6f1f").unwrap();
-//
-//     RegisterInfoV2 {
-//         code,
-//         account_id: applier,
-//         pubkeys,
-//         signatures,
-//         tee_pubkey,
-//         tee_signature
-//     }
-// }
-
 pub fn another_legal_register_info() -> RegisterInfo {
     let applier: AccountId =
         AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")

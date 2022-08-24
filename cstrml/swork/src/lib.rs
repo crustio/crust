@@ -181,7 +181,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
 }
 
 /// The module's configuration trait.
-pub trait Config: system::Config  {
+pub trait Config: system::Config {
     /// The payment balance.
     /// TODO: remove this for abstracting MarketInterface into sWorker self
     type Currency: ReservableCurrency<Self::AccountId>;

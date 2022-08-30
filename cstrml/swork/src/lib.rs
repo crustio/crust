@@ -395,9 +395,6 @@ decl_module! {
         pub fn set_code(origin, new_code: SworkerCode, expire_block: T::BlockNumber) {
             // TODO: enable democracy
             ensure_root(origin)?;
-            if let Some(old_expired_block) = Self::codes(&new_code) {
-                ensure!(expire_block < old_expired_block, Error::<T>::InvalidExpiredBlock);
-            }
             <Codes<T>>::insert(&new_code, &expire_block);
             Self::deposit_event(RawEvent::SetCodeSuccess(new_code, expire_block));
         }

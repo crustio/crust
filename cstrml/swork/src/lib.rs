@@ -15,6 +15,7 @@ use frame_support::{
         Weight, DispatchClass, Pays
     }
 };
+use sp_core::sr25519;
 pub use frame_support::storage::PrefixIterator;
 use sp_runtime::traits::{StaticLookup, Zero};
 use sp_std::{str, convert::TryInto, prelude::*, collections::btree_set::BTreeSet};
@@ -114,6 +115,15 @@ pub struct Identity<AccountId> {
 pub struct Group<AccountId: Ord + PartialOrd> {
     pub members: BTreeSet<AccountId>,
     pub allowlist: BTreeSet<AccountId>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct RegisterPayload<Public, AccountId> {
+    code: Vec<u8>,
+    who: AccountId,
+    pubkey: Vec<u8>,
+    public: Public
 }
 
 /// An event handler for reporting works
@@ -259,6 +269,9 @@ decl_storage! {
 
         /// Added files count in the past one period(one hour)
         pub AddedFilesCount get(fn added_files_count): u32 = 0;
+
+        /// Allowed decentrailized tee chain's pubkeys
+        pub AllowedTeePublicKeys get(fn allowed_tee_public_keys): Vec<sr25519::Public>;
     }
     add_extra_genesis {
         config(init_codes):
@@ -315,7 +328,9 @@ decl_error! {
         /// Illegal work report. This should never happen.
         IllegalWorkReport,
         /// Code has not been expired
-        CodeNotExpired
+        CodeNotExpired,
+        /// Tee signature is not valid
+        InvalidTeeSignature
     }
 }
 
@@ -459,6 +474,63 @@ decl_module! {
 
             // 6. Emit event
             Self::deposit_event(RawEvent::RegisterSuccess(who, pk));
+
+            Ok(())
+        }
+
+        #[weight = 1000]
+        pub fn register_new_tee_pubkey(
+            origin,
+            pubkey_vec: Vec<u8>,
+        ) -> DispatchResult {
+            // This ensures that the function can only be called via unsigned transaction.
+            let _ = ensure_root(origin)?;
+            let mut allowed_tee_public_keys = Self::allowed_tee_public_keys();
+            let mut pubkey_arr = [0u8; 32];
+            for (&x, p) in pubkey_vec.iter().zip(pubkey_arr.iter_mut()) {
+                *p = x;
+            }
+            let pubkey = sr25519::Public::from_raw(pubkey_arr);
+            allowed_tee_public_keys.push(pubkey);
+            AllowedTeePublicKeys::put(allowed_tee_public_keys);
+            Ok(())
+        }
+
+        #[weight = T::WeightInfo::register()]
+        pub fn register_with_deauth_chain(
+            origin,
+            applier: T::AccountId,
+            code: Vec<u8>,
+            pubkeys: Vec<Vec<u8>>,
+            signatures: Vec<Vec<u8>>,
+            tee_pubkey: SworkerPubKey,
+            tee_signature: SworkerSignature
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // 1. Ensure who is applier
+            ensure!(&who == &applier, Error::<T>::IllegalApplier);
+
+            // 2. Ensure who cannot be group owner
+            ensure!(!<Groups<T>>::contains_key(&who), Error::<T>::GroupOwnerForbidden);
+
+            // 3. Ensure code is valid
+            let legal_codes = Self::get_legal_codes();
+            ensure!(legal_codes.contains(&code), Error::<T>::IllegalIdentity);
+
+            // 4. Do the tee code verification
+            let account_id = applier.encode();
+            let is_valid = Self::register_payload_sig_check(&account_id, &code, &pubkeys, &signatures, &tee_pubkey, &tee_signature);
+            ensure!(is_valid, Error::<T>::IllegalIdentity);
+
+            // 5. Verify decentralized authentication chain signature
+            ensure!(Self::verify_deauth_chain_signature(&pubkeys, &signatures, &tee_pubkey, &code, applier).is_ok(), Error::<T>::InvalidTeeSignature);
+
+            // 6. Insert the pk and code
+            Self::insert_pk_info(tee_pubkey.clone(), code);
+
+            // 7. Emit event
+            Self::deposit_event(RawEvent::RegisterSuccess(who, tee_pubkey));
 
             Ok(())
         }
@@ -1166,16 +1238,7 @@ impl<T: Config> Module<T> {
         isv_body: &ISVBody,
         sig: &SworkerSignature
     ) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
-        let curr_bn = <system::Module<T>>::block_number();
-        let legal_codes = <Codes<T>>::iter().filter_map(
-            |(key, bn)| {
-                if bn > curr_bn {
-                    Some(key)
-                } else {
-                    None
-                }
-            }
-        ).collect();
+        let legal_codes = Self::get_legal_codes();
         let applier = account_id.encode();
 
         utils::verify_identity(
@@ -1186,6 +1249,19 @@ impl<T: Config> Module<T> {
             sig,
             &legal_codes,
         )
+    }
+
+    fn get_legal_codes() -> Vec<SworkerCode> {
+        let curr_bn = <system::Module<T>>::block_number();
+        <Codes<T>>::iter().filter_map(
+            |(key, bn)| {
+                if bn > curr_bn {
+                    Some(key)
+                } else {
+                    None
+                }
+            }
+        ).collect()
     }
 
     /// This function is judging if the work report sworker code is legal,
@@ -1265,6 +1341,70 @@ impl<T: Config> Module<T> {
         ].concat();
 
         utils::verify_p256_sig(curr_pk, &data, sig)
+    }
+
+    fn register_payload_sig_check(
+        account_id: &Vec<u8>,
+        code: &Vec<u8>,
+        pubkeys: &Vec<Vec<u8>>,
+        signatures: &Vec<Vec<u8>>,
+        tee_pubkey: &SworkerPubKey,
+        tee_signature: &SworkerSignature
+    ) -> bool {
+        // 1. Construct register payload data
+        //{
+        //    code: Vec<u8>,
+        //    account_id: u64, -> Vec<u8>
+        //    tee_pubkey: Vec<u8>,
+        //    pubkeys: Vec<Vec<u8>>
+        //    signatures: Vec<Vec<u8>>,
+
+        let mut data: Vec<u8> = [
+            &code[..],
+            &account_id[..],
+            &tee_pubkey[..]
+        ].concat();
+
+        for (pubkey, signature) in pubkeys.iter().zip(signatures.iter()) {
+            data.extend(pubkey.clone());
+            data.extend(signature.clone());
+        }
+
+        utils::verify_p256_sig(tee_pubkey, &data, tee_signature)
+    }
+
+    fn verify_deauth_chain_signature(
+        pubkeys: &Vec<Vec<u8>>,
+        signatures: &Vec<Vec<u8>>,
+        tee_pubkey: &SworkerPubKey,
+        code: &Vec<u8>,
+        who: T::AccountId
+    ) -> DispatchResult {
+        let allowed_tee_public_keys = Self::allowed_tee_public_keys();
+        for (pubkey_vec, signature_vec) in pubkeys.iter().zip(signatures.iter()) {
+            let mut public_array = [0u8; 32];
+            for (&x, p) in pubkey_vec.iter().zip(public_array.iter_mut()) {
+                *p = x;
+            }
+            let public = sr25519::Public::from_raw(public_array);
+            let mut signature_array = [0u8; 64];
+            for (&x, p) in signature_vec.iter().zip(signature_array.iter_mut()) {
+                *p = x;
+            }
+            let signature = sr25519::Signature::from_raw(signature_array);
+            let payload = RegisterPayload {
+                code: code.clone(),
+                who: who.clone(),
+                pubkey: tee_pubkey.clone(),
+                public: sp_runtime::MultiSigner::from(public.clone()),
+            };
+            ensure!(allowed_tee_public_keys.contains(&public), "public key is not allowed");
+            let signature_valid = payload.using_encoded(|payload| {
+                sp_io::crypto::sr25519_verify(&signature, payload, &public)
+            });
+            ensure!(signature_valid, "sinature is not valid");
+        }
+        Ok(())
     }
 
     fn get_current_block_number() -> BlockNumber {

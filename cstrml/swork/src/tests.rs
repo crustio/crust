@@ -42,6 +42,36 @@ fn register_should_work() {
     });
 }
 
+/// Register test cases
+#[test]
+fn register_v2_should_work() {
+    ExtBuilder::default()
+        .build()
+        .execute_with(|| {
+        let applier: AccountId =
+            AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+                .expect("valid ss58 address");
+        let register_info_v2 = legal_register_info_v2();
+        assert_ok!(Swork::register_new_tee_pubkey(Origin::root(), hex::decode("2ec91af63632573a5b051376cdeb79730261e696117e68c67aa298d519f0c77c").unwrap()));
+        assert_ok!(Swork::register_new_tee_pubkey(Origin::root(), hex::decode("328846691dd2401b2a62b123daea0e6f626cb4919dc560797645d26e3273a57a").unwrap()));
+        assert_ok!(Swork::register_with_deauth_chain(
+            Origin::signed(applier.clone()),
+            register_info_v2.account_id,
+            register_info_v2.code.clone(),
+            register_info_v2.pubkeys,
+            register_info_v2.signatures,
+            register_info_v2.tee_pubkey.clone(),
+            register_info_v2.tee_signature
+        ));
+
+        assert_eq!(Swork::identities(applier).is_none(), true);
+        assert_eq!(Swork::pub_keys(register_info_v2.tee_pubkey), PKInfo {
+            code: register_info_v2.code,
+            anchor: None
+        });
+    });
+}
+
 #[test]
 fn clear_expired_code_should_work() {
     ExtBuilder::default()

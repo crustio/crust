@@ -74,6 +74,15 @@ pub struct RegisterInfo {
     pub sig: SworkerSignature
 }
 
+pub struct RegisterInfoV2 {
+    pub code: SworkerCode,
+    pub account_id: AccountId,
+    pub pubkeys: Vec<Vec<u8>>,
+    pub signatures: Vec<Vec<u8>>,
+    pub tee_pubkey: SworkerPubKey,
+    pub tee_signature: SworkerSignature
+}
+
 pub struct ReportWorksInfo {
     pub curr_pk: SworkerPubKey,
     pub prev_pk: SworkerPubKey,
@@ -269,8 +278,9 @@ impl ExtBuilder {
             .unwrap();
 
         let fake_code = hex::decode("00").unwrap();
+        let code_v2 = hex::decode("fa92206144337c2dbe1796191249629691bf298c37958a10875478d08b124984").unwrap();
         swork::GenesisConfig::<Test> {
-            init_codes: vec![(self.code, self.expired_bn), (fake_code, 10000)],
+            init_codes: vec![(self.code, self.expired_bn), (fake_code, 10000), (code_v2, 10000)],
         }.assimilate_storage(&mut t).unwrap();
 
         let mut ext: sp_io::TestExternalities = t.into();
@@ -316,6 +326,33 @@ pub fn legal_register_info() -> RegisterInfo {
         account_id: applier,
         isv_body: isv_body.to_vec(),
         sig
+    }
+}
+
+pub fn legal_register_info_v2() -> RegisterInfoV2 {
+    let applier: AccountId =
+    AccountId::from_ss58check("5FqazaU79hjpEMiWTWZx81VjsYFst15eBuSBKdQLgQibD7CX")
+        .expect("valid ss58 address");
+
+    let code = hex::decode("fa92206144337c2dbe1796191249629691bf298c37958a10875478d08b124984").unwrap();
+    let tee_pubkey = hex::decode("cca7d9944a007f69c994bfc207e0b759554ca1925cedf2df472db2566eeab2b30caf1bb709cac5d1bcaf0ce9e200e78563141b4ff11198c784df06e9311231b2").unwrap();
+    let pubkeys = vec![
+        hex::decode("2ec91af63632573a5b051376cdeb79730261e696117e68c67aa298d519f0c77c").unwrap(),
+        hex::decode("328846691dd2401b2a62b123daea0e6f626cb4919dc560797645d26e3273a57a").unwrap()
+    ];
+    let signatures = vec![
+        hex::decode("bcc91748987d0dd4d3bca5f966893b19697c5a845ea0bbe94e4ad8239ed9c1181148f6f787739b384b97ef0884626d4875d929b1a4edafbdd324d9012c40598f").unwrap(),
+        hex::decode("0ce6257d4e140c7a803618458aa6297b2c99f9782a53a7fd9ab6eb6d05a1ce02b1ad25c358ba4377a08ae7a34d6051ccf0407f5ead63368ab8f37f0444d2b687").unwrap()
+    ];
+    let tee_signature = hex::decode("9a7169bc80af11e1d4fba323fea2de861a40dae738982ef143de75f20388d290c229c441b03bc7615168c71efb3c16937e1366b1fcb4b52467a52f13880664fe").unwrap();
+
+    RegisterInfoV2 {
+        code,
+        account_id: applier,
+        pubkeys,
+        signatures,
+        tee_pubkey,
+        tee_signature
     }
 }
 

@@ -6,7 +6,7 @@ use sp_core::{Pair, Public, sr25519, crypto::UncheckedInto};
 use crust_runtime::{
     AuthorityDiscoveryId, BalancesConfig, GenesisConfig, ImOnlineId,
     AuthorityDiscoveryConfig, SessionConfig, SessionKeys, StakerStatus,
-    StakingConfig, IndicesConfig, SystemConfig, SworkConfig, SudoConfig,
+    StakingConfig, IndicesConfig, SystemConfig, SworkConfig,
     WASM_BINARY, LocksConfig
 };
 use cstrml_staking::Forcing;
@@ -206,9 +206,9 @@ fn testnet_genesis(
     const ENDOWMENT: u128 = 1_000_000 * CRUS;
     const STASH: u128 = 20_000 * CRUS;
     GenesisConfig {
-        pallet_sudo: Some(SudoConfig {
-            key: endowed_accounts[0].clone(),
-        }),
+        // pallet_sudo: Some(SudoConfig {
+        //     key: endowed_accounts[0].clone(),
+        // }),
         frame_system: Some(SystemConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
@@ -314,9 +314,9 @@ fn rocky_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     const STASH: u128 = 1_250_000 * CRUS;
 
     GenesisConfig {
-        pallet_sudo: Some(SudoConfig {
-            key: endowed_accounts[0].clone(),
-        }),
+        // pallet_sudo: Some(SudoConfig {
+        //     key: endowed_accounts[0].clone(),
+        // }),
         frame_system: Some(SystemConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),
@@ -611,9 +611,9 @@ fn mainnet_staging_testnet_config_genesis(wasm_binary: &[u8]) -> GenesisConfig {
     const STASH: u128 = 10 * CRUS;
 
     GenesisConfig {
-        pallet_sudo: Some(SudoConfig {
-            key: endowed_accounts[0].clone(),
-        }),
+        // pallet_sudo: Some(SudoConfig {
+        //     key: endowed_accounts[0].clone(),
+        // }),
         frame_system: Some(SystemConfig {
             code: wasm_binary.to_vec(),
             changes_trie_config: Default::default(),

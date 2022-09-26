@@ -732,10 +732,10 @@ impl pallet_transaction_payment::Config for Runtime {
     TargetedFeeAdjustment<Self, TargetBlockFullness, AdjustmentVariable, MinimumMultiplier>;
 }
 
-impl pallet_sudo::Config for Runtime {
-    type Event = Event;
-    type Call = Call;
-}
+// impl pallet_sudo::Config for Runtime {
+//     type Event = Event;
+//     type Call = Call;
+// }
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 8; // 8 report slot == 8 hours
@@ -901,7 +901,7 @@ construct_runtime! {
         Locks: locks::{Module, Call, Storage, Config<T>, Event<T>},
 
         // Sudo. Last module. Usable initially, but removed once governance enabled.
-        Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
+        // Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
         // Multisig module. Late addition.
         Multisig: pallet_multisig::{Module, Call, Storage, Event<T>},
 

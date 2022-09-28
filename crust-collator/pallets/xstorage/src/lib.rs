@@ -177,9 +177,11 @@ mod tests {
 		AssetId, *
 	};
 	use codec::Encode;
+	use hex_literal::hex;
 
 	fn account20() -> Junction {
-		AccountKey20 { network: Any, key: [35,44,156,153,241,115,33,39,211,198,18,135,234,216,198,58,169,206,63,43] }
+		// AccountKey20 { network: Any, key: [35,44,156,153,241,115,33,39,211,198,18,135,234,216,198,58,169,206,63,43] }
+		AccountKey20 { network: Any, key: hex!("173023992F5DD374193963cbD3F5F7eA6d3eAf15").into() }
 	}
 	#[test]
 	fn convert_location() {
@@ -189,6 +191,6 @@ mod tests {
 
 		let input = MultiLocation::new(1, X2(Parachain(1000), account20()));
 		let output = hex::encode(Account32Hash::<RelayNetwork, AccountId>::convert_ref(&input).unwrap().encode());
-		assert_eq!(output, "52187e90170451d33f17bdafdcb3e568204b882971373473482e298390339849");
+		assert_eq!(output, "39391a315541eb4aa52c745b78e35aefcecf1a0ff1525e94e63b4dd006f81846");
 	}
 }

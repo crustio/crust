@@ -81,7 +81,7 @@ use xcm_builder::{
 	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId, Account32Hash
 };
 use xcm_executor::{
-	traits::{JustTry},
+	traits::{JustTry, ConvertOrigin},
 	Config, XcmExecutor
 };
 use pallet_xcm::{XcmPassthrough, EnsureXcm, IsMajorityOfBody};
@@ -578,32 +578,32 @@ type LocalAssetTransactor = CurrencyAdapter<
 
 pub type CrustAssetTransactors = (LocalAssetTransactor, FungiblesTransactor);
 
-// pub struct SiblingSignedAccountId32AsNative<Origin>(PhantomData<Origin>);
-// impl<Origin: OriginTrait> ConvertOrigin<Origin>
-// 	for SiblingSignedAccountId32AsNative<Origin>
-// where
-// 	Origin::AccountId: From<[u8; 32]>,
-// {
-// 	fn convert_origin(
-// 		origin: impl Into<MultiLocation>,
-// 		kind: OriginKind,
-// 	) -> Result<Origin, MultiLocation> {
-// 		let origin = origin.into();
-// 		log::trace!(
-// 			target: "xcm::origin_conversion",
-// 			"SiblingSignedAccountId32AsNative origin: {:?}, kind: {:?}",
-// 			origin, kind,
-// 		);
-// 		match (kind, origin) {
-// 			(
-// 				OriginKind::Native,
-// 				MultiLocation { parents: 1, interior: Junctions::X2(Parachain(_), AccountId32 { id, network })},
-// 			) =>
-// 				Ok(Origin::signed(id.into())),
-// 			(_, origin) => Err(origin),
-// 		}
-// 	}
-// }
+pub struct SiblingSignedAccountId32AsNative<Origin>(PhantomData<Origin>);
+impl<Origin: OriginTrait> ConvertOrigin<Origin>
+	for SiblingSignedAccountId32AsNative<Origin>
+where
+	Origin::AccountId: From<[u8; 32]>,
+{
+	fn convert_origin(
+		origin: impl Into<MultiLocation>,
+		kind: OriginKind,
+	) -> Result<Origin, MultiLocation> {
+		let origin = origin.into();
+		log::trace!(
+			target: "xcm::origin_conversion",
+			"SiblingSignedAccountId32AsNative origin: {:?}, kind: {:?}",
+			origin, kind,
+		);
+		match (kind, origin) {
+			(
+				OriginKind::Native,
+				MultiLocation { parents: 1, interior: Junctions::X2(Parachain(_), AccountId32 { id, network: _ })},
+			) =>
+				Ok(Origin::signed(id.into())),
+			(_, origin) => Err(origin),
+		}
+	}
+}
 
 pub type XcmOriginToTransactDispatchOrigin = (
 	SovereignSignedViaLocation<LocationToAccountId, Origin>,
@@ -613,6 +613,7 @@ pub type XcmOriginToTransactDispatchOrigin = (
 	SignedAccountId32AsNative<RelayNetwork, Origin>,
 	// Xcm origins can be represented natively under the Xcm pallet's Xcm origin.
 	XcmPassthrough<Origin>,
+	SiblingSignedAccountId32AsNative<Origin>,
 );
 
 parameter_types! {

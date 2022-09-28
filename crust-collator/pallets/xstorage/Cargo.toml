@@ -31,6 +31,7 @@ polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot", bra
 xcm-builder = { git = "https://github.com/paritytech/polkadot", branch = "release-v0.9.27" }
 crust-parachain-primitives = { path = "../../primitives", default-features = false }
 hex = "0.4.2"
+hex-literal = "0.3.4"
 
 [features]
 default = ["std"]

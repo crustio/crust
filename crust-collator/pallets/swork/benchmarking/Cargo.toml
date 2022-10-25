@@ -10,7 +10,7 @@ repository = "https://github.com/paritytech/crust/"
 [dependencies]
 # third party dependencies
 codec = { default-features = false, package = "parity-scale-codec", features = ["derive"], version = "3.0.0" }
-serde = { optional = true, version = "1.0.140" }
+serde = { optional = true, version = "1.0.145" }
 
 # substrate frame dependencies
 frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }

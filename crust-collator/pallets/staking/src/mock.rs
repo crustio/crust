@@ -131,8 +131,8 @@ parameter_types! {
 
 impl frame_system::Config for Test {
     type BaseCallFilter = ();
-    type Origin = Origin;
-    type Call = Call;
+    type RuntimeOrigin = RuntimeOrigin;
+    type RuntimeCall = RuntimeCall;
     type Index = u64;
     type BlockNumber = BlockNumber;
     type Hash = H256;
@@ -140,7 +140,7 @@ impl frame_system::Config for Test {
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
-    type Event = ();
+    type RuntimeEvent = ();
     type BlockHashCount = BlockHashCount;
     type DbWeight = RocksDbWeight;
     type Version = ();
@@ -160,7 +160,7 @@ parameter_types! {
 impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
-    type Event = ();
+    type RuntimeEvent = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
@@ -178,7 +178,7 @@ sp_runtime::impl_opaque_keys! {
 	}
 }
 impl pallet_session::Config for Test {
-    type Event = ();
+    type RuntimeEvent = ();
     type ValidatorId = AccountId;
     type ValidatorIdOf = crate::StashOf<Test>;
     type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
@@ -266,7 +266,7 @@ parameter_types! {
 
 impl swork::Config for Test {
     type Currency = Balances;
-    type Event = ();
+    type RuntimeEvent = ();
     type PunishmentSlots = PunishmentSlots;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
@@ -291,7 +291,7 @@ impl Config for Test {
     type UnixTime = Timestamp;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
-    type Event = ();
+    type RuntimeEvent = ();
     type Slash = ();
     type Reward = ();
     type Randomness = TestRandomness;
@@ -318,12 +318,12 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
-		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-		Staking: staking::{Module, Call, Config<T>, Storage, Event<T>},
-		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
-		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
+		System: frame_system::{Module, RuntimeCall, Config, Storage, RuntimeEvent<T>},
+		Timestamp: pallet_timestamp::{Module, RuntimeCall, Storage, Inherent},
+		Balances: balances::{Module, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
+		Staking: staking::{Module, RuntimeCall, Config<T>, Storage, RuntimeEvent<T>},
+		Session: pallet_session::{Module, RuntimeCall, Storage, RuntimeEvent, Config<T>},
+		Swork: swork::{Module, RuntimeCall, Storage, RuntimeEvent<T>, Config<T>},
 	}
 );
 
@@ -609,13 +609,13 @@ pub fn bond_validator(acc: u128, val: Balance) {
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
     assert_ok!(Staking::bond(
-        Origin::signed(acc + 1),
+        RuntimeOrigin::signed(acc + 1),
         acc,
         val
     ));
     assert_ok!(set_payee(acc, RewardDestination::Controller));
     Staking::upsert_stake_limit(&(acc + 1), u128::max_value());
-    assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
+    assert_ok!(Staking::validate(RuntimeOrigin::signed(acc), ValidatorPrefs::default()));
 }
 
 pub fn bond_guarantor(acc: u128, val: Balance, targets: Vec<(u128, Balance)>) {
@@ -623,13 +623,13 @@ pub fn bond_guarantor(acc: u128, val: Balance, targets: Vec<(u128, Balance)>) {
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
     assert_ok!(Staking::bond(
-        Origin::signed(acc + 1),
+        RuntimeOrigin::signed(acc + 1),
         acc,
         val
     ));
     assert_ok!(set_payee(acc, RewardDestination::Controller));
     for target in targets {
-        assert_ok!(Staking::guarantee(Origin::signed(acc), target));
+        assert_ok!(Staking::guarantee(RuntimeOrigin::signed(acc), target));
     }
 }
 
@@ -731,10 +731,10 @@ pub fn start_era_with_new_workloads(era_index: EraIndex, with_reward: bool, own_
 }
 
 pub fn payout_all_stakers(era_index: EraIndex) {
-    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap_or_default();
-    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap_or_default();
-    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap_or_default();
-    Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap_or_default();
+    Staking::reward_stakers(RuntimeOrigin::signed(10), 11, era_index).unwrap_or_default();
+    Staking::reward_stakers(RuntimeOrigin::signed(10), 21, era_index).unwrap_or_default();
+    Staking::reward_stakers(RuntimeOrigin::signed(10), 31, era_index).unwrap_or_default();
+    Staking::reward_stakers(RuntimeOrigin::signed(10), 41, era_index).unwrap_or_default();
 }
 
 fn init_swork_setup() {

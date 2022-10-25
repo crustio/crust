@@ -8,7 +8,7 @@ authors = ["Crust Developers"]
 edition = "2018"
 
 [dependencies]
-serde = { version = "1.0.140", optional = true }
+serde = { version = "1.0.145", optional = true }
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false }
 sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30", default-features = false }
 sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30", default-features = false }
@@ -17,7 +17,7 @@ sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-
 
 frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30", default-features = false }
 frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30", default-features = false }
-scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
+scale-info = { version = "2.2.0", default-features = false, features = ["derive"] }
 
 cumulus-primitives-core = { path = "../../../cumulus/primitives/core", default-features = false }
 

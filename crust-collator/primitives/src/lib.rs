@@ -340,9 +340,9 @@ impl<
 
 pub struct AllowDescendOriginFromLocal<T>(PhantomData<T>);
 impl<T: Contains<MultiLocation>> ShouldExecute for AllowDescendOriginFromLocal<T> {
-	fn should_execute<Call>(
+	fn should_execute<RuntimeCall>(
 		origin: &MultiLocation,
-		message: &mut Xcm<Call>,
+		message: &mut Xcm<RuntimeCall>,
 		max_weight: Weight,
 		_weight_credit: &mut Weight,
 	) -> Result<(), ()> {

@@ -16,7 +16,7 @@
 
 #![cfg(feature = "runtime-benchmarks")]
 
-use crate::{Call, Config, Pallet};
+use crate::{RuntimeCall, Config, Pallet};
 use frame_benchmarking::{benchmarks, impl_benchmark_test_suite};
 use frame_system::RawOrigin;
 use xcm::latest::prelude::*;

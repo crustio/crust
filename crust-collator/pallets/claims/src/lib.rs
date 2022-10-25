@@ -39,7 +39,7 @@ pub trait Config: frame_system::Config {
     type PalletId: Get<PalletId>;
 
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+    type RuntimeEvent: From<RuntimeEvent<Self>> + Into<<Self as frame_system::Config>::RuntimeEvent>;
 
     /// The payment balance.
     type Currency: Currency<Self::AccountId>;
@@ -132,7 +132,7 @@ impl<'de> Deserialize<'de> for EthereumTxHash {
 }
 
 decl_event!(
-    pub enum Event<T> where
+    pub enum RuntimeEvent<T> where
         Balance = BalanceOf<T>,
         AccountId = <T as frame_system::Config>::AccountId
     {
@@ -199,7 +199,7 @@ decl_storage! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
         type Error = Error<T>;
 
         fn deposit_event() = default;
@@ -411,18 +411,18 @@ impl From<ValidityError> for u8 {
 }
 
 impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
-    type Call = Call<T>;
+    type RuntimeCall = RuntimeCall<T>;
 
-    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+    fn validate_unsigned(_source: TransactionSource, call: &Self::RuntimeCall) -> TransactionValidity {
         const PRIORITY: u64 = 100;
 
         let (maybe_signer, tx) = match call {
-            Call::claim {dest, tx, sig} => {
+            RuntimeCall::claim {dest, tx, sig} => {
                 let data = dest.using_encoded(to_ascii_hex);
                 let tx_data = tx.using_encoded(to_ascii_hex);
                 (Self::eth_recover(&sig, &data, &tx_data), tx)
             }
-            _ => return Err(InvalidTransaction::Call.into()),
+            _ => return Err(InvalidTransaction::RuntimeCall.into()),
         };
 
         let signer = maybe_signer

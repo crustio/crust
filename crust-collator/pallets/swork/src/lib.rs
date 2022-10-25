@@ -177,7 +177,7 @@ pub trait Config: system::Config {
     type Currency: ReservableCurrency<Self::AccountId>;
 
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
+    type RuntimeEvent: From<RuntimeEvent<Self>> + Into<<Self as system::Config>::RuntimeEvent>;
 
     /// Punishment duration if someone offline. It's the count of REPORT_SLOT
     type PunishmentSlots: Get<u32>;
@@ -320,7 +320,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
         type Error = Error<T>;
 
         /// The punishment duration if someone offline
@@ -1290,7 +1290,7 @@ impl<T: Config> Module<T> {
 }
 
 decl_event!(
-    pub enum Event<T>
+    pub enum RuntimeEvent<T>
     where
         AccountId = <T as system::Config>::AccountId,
         BlockNumber = <T as system::Config>::BlockNumber,

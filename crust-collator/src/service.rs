@@ -135,7 +135,6 @@ pub fn new_partial(
 				Ok((time, slot))
 			},
 			registry: config.prometheus_registry().clone(),
-			can_author_with: sp_consensus::AlwaysCanAuthor,
 			spawner: &task_manager.spawn_essential_handle(),
 			telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
 		})?;

@@ -373,7 +373,7 @@ pub trait Config: system::Config {
     type BenefitInterface: BenefitInterface<Self::AccountId, BalanceOf<Self>, NegativeImbalanceOf<Self>>;
 
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as system::Config>::Event>;
+    type RuntimeEvent: From<RuntimeEvent<Self>> + Into<<Self as system::Config>::RuntimeEvent>;
 
     /// File duration.
     type FileDuration: Get<BlockNumber>;
@@ -491,7 +491,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
         type Error = Error<T>;
 
         // Initializing events
@@ -1203,7 +1203,7 @@ impl<T: Config> Module<T> {
 }
 
 decl_event!(
-    pub enum Event<T>
+    pub enum RuntimeEvent<T>
     where
         AccountId = <T as system::Config>::AccountId,
         Balance = BalanceOf<T>

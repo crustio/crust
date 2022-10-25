@@ -72,7 +72,7 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{
-		dispatch::DispatchResultWithPostInfo,
+		dispatch::{DispatchClass, DispatchResultWithPostInfo},
 		pallet_prelude::*,
 		inherent::Vec,
 		traits::{
@@ -86,8 +86,7 @@ pub mod pallet {
 		sp_runtime::{
 			RuntimeDebug,
 			traits::{AccountIdConversion, CheckedSub, Zero, Saturating},
-		},
-		weights::DispatchClass,
+		}
 	};
 	use core::ops::Div;
 	use pallet_session::SessionManager;
@@ -111,13 +110,13 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Overarching event type.
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<RuntimeEvent<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// The currency mechanism.
 		type Currency: ReservableCurrency<Self::AccountId>;
 
-		/// Origin that can dictate updating parameters of this pallet.
-		type UpdateOrigin: EnsureOrigin<Self::Origin>;
+		/// RuntimeOrigin that can dictate updating parameters of this pallet.
+		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// Account Identifier from which the internal Pot is generated.
 		type PotId: Get<PalletId>;
@@ -228,7 +227,7 @@ pub mod pallet {
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {
+	pub enum RuntimeEvent<T: Config> {
 		NewInvulnerables(Vec<T::AccountId>),
 		NewDesiredCandidates(u32),
 		NewCandidacyBond(BalanceOf<T>),
@@ -266,7 +265,7 @@ pub mod pallet {
 				);
 			}
 			<Invulnerables<T>>::put(&new);
-			Self::deposit_event(Event::NewInvulnerables(new));
+			Self::deposit_event(RuntimeEvent::NewInvulnerables(new));
 			Ok(().into())
 		}
 
@@ -280,7 +279,7 @@ pub mod pallet {
 				);
 			}
 			<DesiredCandidates<T>>::put(&max);
-			Self::deposit_event(Event::NewDesiredCandidates(max));
+			Self::deposit_event(RuntimeEvent::NewDesiredCandidates(max));
 			Ok(().into())
 		}
 
@@ -288,7 +287,7 @@ pub mod pallet {
 		pub fn set_candidacy_bond(origin: OriginFor<T>, bond: BalanceOf<T>) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 			<CandidacyBond<T>>::put(&bond);
-			Self::deposit_event(Event::NewCandidacyBond(bond));
+			Self::deposit_event(RuntimeEvent::NewCandidacyBond(bond));
 			Ok(().into())
 		}
 
@@ -317,7 +316,7 @@ pub mod pallet {
 					}
 				})?;
 
-			Self::deposit_event(Event::CandidateAdded(who, deposit));
+			Self::deposit_event(RuntimeEvent::CandidateAdded(who, deposit));
 			Ok(Some(T::WeightInfo::register_as_candidate(current_count as u32)).into())
 		}
 
@@ -345,7 +344,7 @@ pub mod pallet {
 				<LastAuthoredBlock<T>>::remove(who.clone());
 				Ok(candidates.len())
 			});
-			Self::deposit_event(Event::CandidateRemoved(who.clone()));
+			Self::deposit_event(RuntimeEvent::CandidateRemoved(who.clone()));
 			current_count
 		}
 

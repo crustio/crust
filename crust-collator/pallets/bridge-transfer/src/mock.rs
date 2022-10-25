@@ -28,11 +28,11 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		Balances: balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		Bridge: bridge::{Pallet, Call, Storage, Event<T>},
-		BridgeTransfer: bridge_transfer::{Pallet, Call, Storage, Event<T>},
-		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+		System: frame_system::{Pallet, RuntimeCall, Config, Storage, RuntimeEvent<T>},
+		Balances: balances::{Pallet, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
+		Bridge: bridge::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>},
+		BridgeTransfer: bridge_transfer::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>},
+		Timestamp: pallet_timestamp::{Pallet, RuntimeCall, Storage, Inherent},
 	}
 );
 
@@ -47,8 +47,8 @@ parameter_types! {
 
 impl frame_system::Config for Test {
 	type BaseCallFilter = ();
-	type Origin = Origin;
-	type Call = Call;
+	type RuntimeOrigin = RuntimeOrigin;
+	type RuntimeCall = RuntimeCall;
 	type Index = u64;
 	type BlockNumber = u64;
 	type Hash = H256;
@@ -56,7 +56,7 @@ impl frame_system::Config for Test {
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type BlockHashCount = BlockHashCount;
 	type DbWeight = ();
 	type Version = ();
@@ -83,7 +83,7 @@ ord_parameter_types! {
 impl balances::Config for Test {
 	type Balance = u64;
 	type DustRemoval = ();
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
 	type WeightInfo = ();
@@ -96,9 +96,9 @@ parameter_types! {
 }
 
 impl bridge::Config for Test {
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type BridgeCommitteeOrigin = frame_system::EnsureRoot<Self::AccountId>;
-	type Proposal = Call;
+	type Proposal = RuntimeCall;
 	type BridgeChainId = TestChainId;
 	type ProposalLifetime = ProposalLifetime;
 }
@@ -109,7 +109,7 @@ parameter_types! {
 }
 
 impl Config for Test {
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type BridgeOrigin = bridge::EnsureBridge<Test>;
 	type Currency = Balances;
 	type BridgeTokenId = BridgeTokenId;
@@ -142,24 +142,24 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	ext
 }
 
-fn last_event() -> Event {
+fn last_event() -> RuntimeEvent {
 	system::Pallet::<Test>::events()
 		.pop()
 		.map(|e| e.event)
-		.expect("Event expected")
+		.expect("RuntimeEvent expected")
 }
 
-pub fn expect_event<E: Into<Event>>(e: E) {
+pub fn expect_event<E: Into<RuntimeEvent>>(e: E) {
 	assert_eq!(last_event(), e.into());
 }
 
 // // Asserts that the event was emitted at some point.
-// pub fn event_exists<E: Into<Event>>(e: E) {
-// 	let actual: Vec<Event> = system::Pallet::<Test>::events()
+// pub fn event_exists<E: Into<RuntimeEvent>>(e: E) {
+// 	let actual: Vec<RuntimeEvent> = system::Pallet::<Test>::events()
 // 		.iter()
 // 		.map(|e| e.event.clone())
 // 		.collect();
-// 	let e: Event = e.into();
+// 	let e: RuntimeEvent = e.into();
 // 	let mut exists = false;
 // 	for evt in actual {
 // 		if evt == e {
@@ -172,8 +172,8 @@ pub fn expect_event<E: Into<Event>>(e: E) {
 
 // Checks events against the latest. A contiguous set of events must be provided. They must
 // include the most recent event, but do not have to include every past event.
-pub fn assert_events(mut expected: Vec<Event>) {
-	let mut actual: Vec<Event> = system::Pallet::<Test>::events()
+pub fn assert_events(mut expected: Vec<RuntimeEvent>) {
+	let mut actual: Vec<RuntimeEvent> = system::Pallet::<Test>::events()
 		.iter()
 		.map(|e| e.event.clone())
 		.collect();

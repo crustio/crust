@@ -10,8 +10,8 @@ repository = "https://github.com/paritytech/crust/"
 [dependencies]
 # third-party dependencies
 codec = { default-features = false, package = "parity-scale-codec", features = ["derive"], version = "3.0.0" }
-serde = { optional = true, version = "1.0.140" }
-scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
+serde = { optional = true, version = "1.0.145" }
+scale-info = { version = "2.2.0", default-features = false, features = ["derive"] }
 
 # primitives
 sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }

@@ -98,8 +98,8 @@ impl system::Config for Test {
     type BaseCallFilter = ();
     type BlockWeights = BlockWeights;
     type BlockLength = ();
-    type Origin = Origin;
-    type Call = Call;
+    type RuntimeOrigin = RuntimeOrigin;
+    type RuntimeCall = RuntimeCall;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
@@ -107,7 +107,7 @@ impl system::Config for Test {
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
-    type Event = ();
+    type RuntimeEvent = ();
     type BlockHashCount = BlockHashCount;
     type DbWeight = RocksDbWeight;
     type Version = ();
@@ -122,7 +122,7 @@ impl system::Config for Test {
 impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
-    type Event = ();
+    type RuntimeEvent = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
@@ -151,7 +151,7 @@ impl market::Config for Test {
     type Currency = balances::Module<Self>;
     type SworkerInterface = Swork;
     type BenefitInterface = TestBenefitInterface;
-    type Event = ();
+    type RuntimeEvent = ();
     /// File duration.
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
@@ -213,7 +213,7 @@ parameter_types! {
 
 impl Config for Test {
     type Currency = balances::Module<Self>;
-    type Event = ();
+    type RuntimeEvent = ();
     type PunishmentSlots = PunishmentSlots;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
@@ -231,10 +231,10 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
-		Market: market::{Module, Call, Storage, Event<T>, Config},
+		System: frame_system::{Module, RuntimeCall, Config, Storage, RuntimeEvent<T>},
+		Balances: balances::{Module, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
+		Swork: swork::{Module, RuntimeCall, Storage, RuntimeEvent<T>, Config<T>},
+		Market: market::{Module, RuntimeCall, Storage, RuntimeEvent<T>, Config},
 	}
 );
 
@@ -275,8 +275,8 @@ impl ExtBuilder {
 
         let mut ext: sp_io::TestExternalities = t.into();
         ext.execute_with(|| {
-            assert_ok!(Market::set_enable_market(Origin::root(), true));
-            assert_ok!(Market::set_base_fee(Origin::root(), 1000));
+            assert_ok!(Market::set_enable_market(RuntimeOrigin::root(), true));
+            assert_ok!(Market::set_base_fee(RuntimeOrigin::root(), 1000));
         });
 
         ext

@@ -23,7 +23,7 @@ fn register_should_work() {
         let register_info = legal_register_info();
 
         assert_ok!(Swork::register(
-            Origin::signed(applier.clone()),
+            RuntimeOrigin::signed(applier.clone()),
             register_info.ias_sig,
             register_info.ias_cert,
             register_info.account_id,
@@ -52,10 +52,10 @@ fn clear_expired_code_should_work() {
                     .expect("valid ss58 address");
             let test_code = hex::decode("12").unwrap();
             run_to_block(600);
-            assert_ok!(Swork::set_code(Origin::root(), test_code.clone(), 1300));
+            assert_ok!(Swork::set_code(RuntimeOrigin::root(), test_code.clone(), 1300));
             assert_noop!(
                 Swork::clear_expired_code(
-                    Origin::signed(applier.clone()),
+                    RuntimeOrigin::signed(applier.clone()),
                     test_code.clone()
                 ),
                 DispatchError::Module {
@@ -65,7 +65,7 @@ fn clear_expired_code_should_work() {
                 }
             );
             run_to_block(1301);
-            assert_ok!(Swork::clear_expired_code(Origin::signed(applier.clone()), test_code.clone()));
+            assert_ok!(Swork::clear_expired_code(RuntimeOrigin::signed(applier.clone()), test_code.clone()));
             assert_eq!(Swork::codes(test_code.clone()).is_none(), true);
         });
 }
@@ -83,7 +83,7 @@ fn register_pk_with_another_code_should_work() {
             let register_info = legal_register_info();
 
             assert_ok!(Swork::register(
-                Origin::signed(applier.clone()),
+                RuntimeOrigin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
                 register_info.account_id,
@@ -106,7 +106,7 @@ fn register_pk_with_another_code_should_work() {
 
             assert_noop!(
                 Swork::register(
-                    Origin::signed(applier.clone()),
+                    RuntimeOrigin::signed(applier.clone()),
                     register_info.ias_sig,
                     register_info.ias_cert,
                     register_info.account_id,
@@ -121,11 +121,11 @@ fn register_pk_with_another_code_should_work() {
             );
 
             let register_info = another_legal_register_info();
-            assert_ok!(Swork::set_code(Origin::root(), legal_code.clone(), 10000));
+            assert_ok!(Swork::set_code(RuntimeOrigin::root(), legal_code.clone(), 10000));
 
             assert_noop!(
                 Swork::set_code(
-                    Origin::root(),
+                    RuntimeOrigin::root(),
                     legal_code.clone(),
                     20000
                 ),
@@ -137,7 +137,7 @@ fn register_pk_with_another_code_should_work() {
             );
 
             assert_ok!(Swork::register(
-                Origin::signed(applier.clone()),
+                RuntimeOrigin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
                 register_info.account_id,
@@ -166,7 +166,7 @@ fn register_should_failed_with_unmatched_reporter() {
 
         assert_noop!(
             Swork::register(
-                Origin::signed(applier.clone()),
+                RuntimeOrigin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
                 register_info.account_id,
@@ -196,7 +196,7 @@ fn register_should_failed_with_illegal_cert() {
 
         assert_noop!(
             Swork::register(
-                Origin::signed(applier.clone()),
+                RuntimeOrigin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
                 register_info.account_id,
@@ -228,7 +228,7 @@ fn register_should_failed_with_illegal_isv_body() {
 
         assert_noop!(
             Swork::register(
-                Origin::signed(applier.clone()),
+                RuntimeOrigin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
                 register_info.account_id,
@@ -259,7 +259,7 @@ fn register_should_failed_with_illegal_id_sig() {
 
         assert_noop!(
             Swork::register(
-                Origin::signed(applier.clone()),
+                RuntimeOrigin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
                 register_info.account_id,
@@ -290,7 +290,7 @@ fn register_should_failed_with_illegal_ias_sig() {
 
         assert_noop!(
             Swork::register(
-                Origin::signed(applier.clone()),
+                RuntimeOrigin::signed(applier.clone()),
                 register_info.ias_sig,
                 register_info.ias_cert,
                 register_info.account_id,
@@ -319,7 +319,7 @@ fn register_should_failed_with_wrong_code() {
 
             assert_noop!(
                 Swork::register(
-                    Origin::signed(applier.clone()),
+                    RuntimeOrigin::signed(applier.clone()),
                     register_info.ias_sig,
                     register_info.ias_cert,
                     register_info.account_id,
@@ -350,7 +350,7 @@ fn register_should_failed_with_outdated_code() {
 
             assert_noop!(
                 Swork::register(
-                    Origin::signed(applier.clone()),
+                    RuntimeOrigin::signed(applier.clone()),
                     register_info.ias_sig,
                     register_info.ias_cert,
                     register_info.account_id,
@@ -395,7 +395,7 @@ fn report_works_should_work() {
             assert_eq!(Swork::spower(), 0);
 
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -492,7 +492,7 @@ fn report_works_for_invalid_cids_should_work() {
             assert_eq!(Swork::spower(), 0);
 
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -547,7 +547,7 @@ fn report_works_should_work_without_files() {
             assert_eq!(Swork::spower(), 0);
 
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -583,7 +583,7 @@ fn report_works_should_work_with_added_and_deleted_files() {
             register(&legal_pk, LegalCode::get());
 
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -605,7 +605,7 @@ fn report_works_should_work_with_added_and_deleted_files() {
             let legal_wr_info_with_added_and_deleted_files = legal_work_report_with_added_and_deleted_files();
             assert_ok!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     legal_wr_info_with_added_and_deleted_files.curr_pk,
                     legal_wr_info_with_added_and_deleted_files.prev_pk,
                     legal_wr_info_with_added_and_deleted_files.block_number,
@@ -635,7 +635,7 @@ fn report_works_should_failed_with_not_registered() {
 
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(illegal_reporter),
+                    RuntimeOrigin::signed(illegal_reporter),
                     legal_wr_info.curr_pk,
                     legal_wr_info.prev_pk,
                     legal_wr_info.block_number,
@@ -675,7 +675,7 @@ fn report_works_should_failed_with_illegal_code() {
 
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     legal_wr_info.curr_pk,
                     legal_wr_info.prev_pk,
                     legal_wr_info.block_number,
@@ -713,7 +713,7 @@ fn report_works_should_failed_with_wrong_timing() {
 
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     illegal_wr_info.curr_pk,
                     illegal_wr_info.prev_pk,
                     illegal_wr_info.block_number,
@@ -752,7 +752,7 @@ fn report_works_should_failed_with_illegal_sig() {
 
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     illegal_wr_info.curr_pk,
                     illegal_wr_info.prev_pk,
                     illegal_wr_info.block_number,
@@ -801,7 +801,7 @@ fn report_works_should_failed_with_illegal_file_transition() {
 
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     illegal_wr_info.curr_pk,
                     illegal_wr_info.prev_pk,
                     illegal_wr_info.block_number,
@@ -848,7 +848,7 @@ fn incremental_report_should_work_without_change() {
             });
 
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -897,7 +897,7 @@ fn incremental_report_should_work_with_files_change() {
             add_live_files(&reporter, &legal_pk);
 
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -946,7 +946,7 @@ fn incremental_report_should_failed_with_root_change() {
 
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     illegal_wr_info.curr_pk,
                     illegal_wr_info.prev_pk,
                     illegal_wr_info.block_number,
@@ -994,7 +994,7 @@ fn incremental_report_should_failed_with_wrong_file_size_change() {
 
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     illegal_wr_info.curr_pk,
                     illegal_wr_info.prev_pk,
                     illegal_wr_info.block_number,
@@ -1050,7 +1050,7 @@ fn update_identities_should_work() {
 
             // 2. Report works in slot 300
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -1166,7 +1166,7 @@ fn ab_upgrade_should_work() {
 
             // 2. Report works with sWorker A
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 a_wr_info.curr_pk,
                 a_wr_info.prev_pk,
                 a_wr_info.block_number,
@@ -1203,7 +1203,7 @@ fn ab_upgrade_should_work() {
 
             // 6. Report works with sWorker B
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 b_wr_info_1.curr_pk,
                 b_wr_info_1.prev_pk,
                 b_wr_info_1.block_number,
@@ -1240,7 +1240,7 @@ fn ab_upgrade_should_work() {
 
             // 10. B normally report with A's pk(and with files changing), it should be ok
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 b_wr_info_2.curr_pk,
                 b_wr_info_2.prev_pk,
                 b_wr_info_2.block_number,
@@ -1298,7 +1298,7 @@ fn ab_upgrade_expire_should_work() {
 
             // 2. Report works still worked
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 wr_info_300.curr_pk,
                 wr_info_300.prev_pk,
                 wr_info_300.block_number,
@@ -1318,7 +1318,7 @@ fn ab_upgrade_expire_should_work() {
             // 4. Report works should failed due to the expired time
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter.clone()),
+                    RuntimeOrigin::signed(reporter.clone()),
                     wr_info_600.curr_pk,
                     wr_info_600.prev_pk,
                     wr_info_600.block_number,
@@ -1365,7 +1365,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
             // 1. Report A
             run_to_block(303);
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 a_wr_info.curr_pk,
                 a_wr_info.prev_pk,
                 a_wr_info.block_number,
@@ -1389,7 +1389,7 @@ fn ab_upgrade_should_failed_with_files_size_unmatch() {
             // 4. Report works with sWorker B will failed
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter.clone()),
+                    RuntimeOrigin::signed(reporter.clone()),
                     b_wr_info.curr_pk,
                     b_wr_info.prev_pk,
                     b_wr_info.block_number,
@@ -1437,17 +1437,17 @@ fn create_and_join_group_should_work() {
 
             // Alice create a group and be the owner
             assert_ok!(Swork::create_group(
-                Origin::signed(alice.clone())
+                RuntimeOrigin::signed(alice.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 bob.clone()
             ));
 
             // Bob join the alice's group
             assert_ok!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ));
 
@@ -1490,7 +1490,7 @@ fn group_allowlist_should_work() {
             });
 
             assert_noop!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 bob.clone()
             ),
             DispatchError::Module {
@@ -1500,7 +1500,7 @@ fn group_allowlist_should_work() {
             });
 
             assert_noop!(Swork::remove_member_from_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 bob.clone()
             ),
             DispatchError::Module {
@@ -1511,21 +1511,21 @@ fn group_allowlist_should_work() {
 
             // Alice create a group and be the owner
             assert_ok!(Swork::create_group(
-                Origin::signed(alice.clone())
+                RuntimeOrigin::signed(alice.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 bob.clone()
             ));
 
             assert_ok!(Swork::remove_member_from_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 bob.clone()
             ));
 
             assert_noop!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ),
             DispatchError::Module {
@@ -1535,13 +1535,13 @@ fn group_allowlist_should_work() {
             });
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 bob.clone()
             ));
 
             // Bob join the alice's group
             assert_ok!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ));
 
@@ -1552,11 +1552,11 @@ fn group_allowlist_should_work() {
             });
 
             assert_ok!(Swork::create_group(
-                Origin::signed(ferdie.clone())
+                RuntimeOrigin::signed(ferdie.clone())
             ));
 
             assert_noop!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 bob.clone()
             ),
             DispatchError::Module {
@@ -1566,28 +1566,28 @@ fn group_allowlist_should_work() {
             });
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 charlie.clone()
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 dave.clone()
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 eve.clone()
             ));
 
             // alice has been removed
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 one.clone()
             ));
 
             assert_noop!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 ferdie.clone()
             ),
             DispatchError::Module {
@@ -1609,11 +1609,11 @@ fn create_group_should_fail_due_to_invalid_situations() {
 
             // Alice create a group and be the owner
             assert_ok!(Swork::create_group(
-                Origin::signed(alice.clone())
+                RuntimeOrigin::signed(alice.clone())
             ));
 
             assert_noop!(Swork::create_group(
-                Origin::signed(alice.clone())
+                RuntimeOrigin::signed(alice.clone())
             ),
             DispatchError::Module {
                 index: 2,
@@ -1624,7 +1624,7 @@ fn create_group_should_fail_due_to_invalid_situations() {
             register_identity(&alice, &a_pk, &a_pk);
 
             assert_noop!(Swork::create_group(
-                Origin::signed(alice.clone())
+                RuntimeOrigin::signed(alice.clone())
             ),
             DispatchError::Module {
                 index: 2,
@@ -1646,12 +1646,12 @@ fn register_should_fail_due_to_reporter_is_group_owner() {
 
             // Alice create a group and be the owner
             assert_ok!(Swork::create_group(
-                Origin::signed(applier.clone())
+                RuntimeOrigin::signed(applier.clone())
             ));
 
             assert_noop!(
                 Swork::register(
-                    Origin::signed(applier.clone()),
+                    RuntimeOrigin::signed(applier.clone()),
                     register_info.ias_sig,
                     register_info.ias_cert,
                     register_info.account_id,
@@ -1683,11 +1683,11 @@ fn report_works_should_fail_due_to_reporter_is_group_owner() {
             add_not_live_files();
             // Alice create a group and be the owner
             assert_ok!(Swork::create_group(
-                Origin::signed(reporter.clone())
+                RuntimeOrigin::signed(reporter.clone())
             ));
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter.clone()),
+                    RuntimeOrigin::signed(reporter.clone()),
                     legal_wr_info.curr_pk,
                     legal_wr_info.prev_pk,
                     legal_wr_info.block_number,
@@ -1725,7 +1725,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
 
             // bob's identity doesn't exist
             assert_noop!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ),
             DispatchError::Module {
@@ -1751,7 +1751,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
 
             // alice is not the owner of the group
             assert_noop!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ),
             DispatchError::Module {
@@ -1762,12 +1762,12 @@ fn join_group_should_fail_due_to_invalid_situations() {
 
             // Alice create a group and be the owner
             assert_ok!(Swork::create_group(
-                Origin::signed(alice.clone())
+                RuntimeOrigin::signed(alice.clone())
             ));
 
             // bob's spower is not 0
             assert_noop!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ),
             DispatchError::Module {
@@ -1777,13 +1777,13 @@ fn join_group_should_fail_due_to_invalid_situations() {
             });
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 bob.clone()
             ));
 
             // bob's spower is not 0
             assert_noop!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ),
             DispatchError::Module {
@@ -1802,37 +1802,37 @@ fn join_group_should_fail_due_to_invalid_situations() {
             });
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 charlie.clone()
             ));
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 dave.clone()
             ));
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 eve.clone()
             ));
 
             // Bob join the alice's group
             assert_ok!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ));
             assert_ok!(Swork::join_group(
-                Origin::signed(charlie.clone()),
+                RuntimeOrigin::signed(charlie.clone()),
                 alice.clone()
             ));
             assert_ok!(Swork::join_group(
-                Origin::signed(dave.clone()),
+                RuntimeOrigin::signed(dave.clone()),
                 alice.clone()
             ));
             assert_ok!(Swork::join_group(
-                Origin::signed(eve.clone()),
+                RuntimeOrigin::signed(eve.clone()),
                 alice.clone()
             ));
             assert_noop!(Swork::join_group(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 alice.clone()
             ),
             DispatchError::Module {
@@ -1849,7 +1849,7 @@ fn join_group_should_fail_due_to_invalid_situations() {
 
             // bob already joined a group
             assert_noop!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 alice.clone()
             ),
             DispatchError::Module {
@@ -1894,36 +1894,36 @@ fn join_group_should_work_for_spower_in_work_report() {
 
             // alice, bob and eve become a group
             assert_ok!(Swork::create_group(
-                Origin::signed(ferdie.clone())
+                RuntimeOrigin::signed(ferdie.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 alice.clone()
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 bob.clone()
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 eve.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 ferdie.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 ferdie.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(eve.clone()),
+                RuntimeOrigin::signed(eve.clone()),
                 ferdie.clone()
             ));
 
@@ -1931,7 +1931,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
                 alice_wr_info.prev_pk,
                 alice_wr_info.block_number,
@@ -2010,7 +2010,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_ok!(Swork::report_works(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
                 bob_wr_info.prev_pk,
                 bob_wr_info.block_number,
@@ -2116,7 +2116,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_ok!(Swork::report_works(
-                Origin::signed(eve.clone()),
+                RuntimeOrigin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
                 eve_wr_info.prev_pk,
                 eve_wr_info.block_number,
@@ -2216,7 +2216,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Swork::added_files_count(), 9);
             run_to_block(603);
             assert_ok!(Swork::report_works(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
                 bob_wr_info.prev_pk,
                 bob_wr_info.block_number,
@@ -2301,7 +2301,7 @@ fn join_group_should_work_for_spower_in_work_report() {
             });
             assert_eq!(Swork::added_files_count(), 9);
             assert_ok!(Swork::report_works(
-                Origin::signed(eve.clone()),
+                RuntimeOrigin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
                 eve_wr_info.prev_pk,
                 eve_wr_info.block_number,
@@ -2379,9 +2379,9 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Swork::added_files_count(), 9);
             run_to_block(1500);
             let alice_wr_info = group_work_report_alice_1500();
-            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_c.clone()));
-            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_d.clone()));
-            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_e.clone()));
+            assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(eve.clone()), file_c.clone()));
+            assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(eve.clone()), file_d.clone()));
+            assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(eve.clone()), file_e.clone()));
             // A, B still open, C, D, E already close. Trash I is full. Trash II has one file. Now we report works of alice to close A, B as well.
             assert_eq!(Market::files(&file_c), None);
             assert_eq!(Market::files(&file_d), None);
@@ -2405,7 +2405,7 @@ fn join_group_should_work_for_spower_in_work_report() {
                 reported_files_root: hex::decode("11").unwrap()
             });
             assert_ok!(Swork::report_works(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
                 alice_wr_info.prev_pk,
                 alice_wr_info.block_number,
@@ -2422,8 +2422,8 @@ fn join_group_should_work_for_spower_in_work_report() {
             // delete won't call calculate payout anymore and won't close the file
             assert_eq!(Market::files(&file_a).is_some(), true);
             assert_eq!(Market::files(&file_b).is_some(), true);
-            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_a.clone()));
-            assert_ok!(Market::calculate_reward(Origin::signed(eve.clone()), file_b.clone()));
+            assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(eve.clone()), file_a.clone()));
+            assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(eve.clone()), file_b.clone()));
             assert_eq!(Market::files(&file_a), None);
             assert_eq!(Market::files(&file_b), None);
 
@@ -2475,36 +2475,36 @@ fn join_group_should_work_for_stake_limit() {
 
             // alice, bob and eve become a group
             assert_ok!(Swork::create_group(
-                Origin::signed(ferdie.clone())
+                RuntimeOrigin::signed(ferdie.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 alice.clone()
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 bob.clone()
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 eve.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 ferdie.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 ferdie.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(eve.clone()),
+                RuntimeOrigin::signed(eve.clone()),
                 ferdie.clone()
             ));
 
@@ -2513,7 +2513,7 @@ fn join_group_should_work_for_stake_limit() {
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
                 alice_wr_info.prev_pk,
                 alice_wr_info.block_number,
@@ -2527,7 +2527,7 @@ fn join_group_should_work_for_stake_limit() {
                 alice_wr_info.sig
             ));
             assert_ok!(Swork::report_works(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
                 bob_wr_info.prev_pk,
                 bob_wr_info.block_number,
@@ -2541,7 +2541,7 @@ fn join_group_should_work_for_stake_limit() {
                 bob_wr_info.sig
             ));
             assert_ok!(Swork::report_works(
-                Origin::signed(eve.clone()),
+                RuntimeOrigin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
                 eve_wr_info.prev_pk,
                 eve_wr_info.block_number,
@@ -2582,7 +2582,7 @@ fn quit_group_should_work_for_stake_limit() {
 
             assert_noop!(
                 Swork::quit_group(
-                    Origin::signed(alice.clone())
+                    RuntimeOrigin::signed(alice.clone())
                 ),
                 DispatchError::Module {
                     index: 2,
@@ -2598,7 +2598,7 @@ fn quit_group_should_work_for_stake_limit() {
             register_identity(&alice, &a_pk, &a_pk);
             assert_noop!(
                 Swork::quit_group(
-                    Origin::signed(alice.clone())
+                    RuntimeOrigin::signed(alice.clone())
                 ),
                 DispatchError::Module {
                     index: 2,
@@ -2609,16 +2609,16 @@ fn quit_group_should_work_for_stake_limit() {
 
             // alice, bob and eve become a group
             assert_ok!(Swork::create_group(
-                Origin::signed(ferdie.clone())
+                RuntimeOrigin::signed(ferdie.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 alice.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 ferdie.clone()
             ));
 
@@ -2627,7 +2627,7 @@ fn quit_group_should_work_for_stake_limit() {
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
                 alice_wr_info.prev_pk,
                 alice_wr_info.block_number,
@@ -2644,7 +2644,7 @@ fn quit_group_should_work_for_stake_limit() {
             run_to_block(603);
 
             assert_ok!(Swork::quit_group(
-                Origin::signed(alice.clone())
+                RuntimeOrigin::signed(alice.clone())
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
             update_spower_info();
@@ -2673,7 +2673,7 @@ fn kick_out_should_work_for_stake_limit() {
 
             assert_noop!(
                 Swork::kick_out(
-                    Origin::signed(ferdie.clone()),
+                    RuntimeOrigin::signed(ferdie.clone()),
                     alice.clone()
                 ),
                 DispatchError::Module {
@@ -2692,31 +2692,31 @@ fn kick_out_should_work_for_stake_limit() {
             register_identity(&bob, &b_pk, &b_pk);
             // alice and ferdie become a group
             assert_ok!(Swork::create_group(
-                Origin::signed(ferdie.clone())
+                RuntimeOrigin::signed(ferdie.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 alice.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 ferdie.clone()
             ));
 
             // bob and eve become a group
             assert_ok!(Swork::create_group(
-                Origin::signed(eve.clone())
+                RuntimeOrigin::signed(eve.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(eve.clone()),
+                RuntimeOrigin::signed(eve.clone()),
                 bob.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(bob.clone()),
+                RuntimeOrigin::signed(bob.clone()),
                 eve.clone()
             ));
 
@@ -2725,7 +2725,7 @@ fn kick_out_should_work_for_stake_limit() {
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
                 alice_wr_info.prev_pk,
                 alice_wr_info.block_number,
@@ -2743,7 +2743,7 @@ fn kick_out_should_work_for_stake_limit() {
 
             assert_noop!(
                 Swork::kick_out(
-                    Origin::signed(ferdie.clone()),
+                    RuntimeOrigin::signed(ferdie.clone()),
                     bob.clone()
                 ),
                 DispatchError::Module {
@@ -2754,7 +2754,7 @@ fn kick_out_should_work_for_stake_limit() {
             );
 
             assert_ok!(Swork::kick_out(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 alice.clone()
             ));
             assert_eq!(Swork::groups(ferdie.clone()), Group { members: BTreeSet::from_iter(vec![].into_iter()), allowlist: BTreeSet::from_iter(vec![].into_iter()) });
@@ -2788,16 +2788,16 @@ fn punishment_by_offline_should_work_for_stake_limit() {
 
             // alice join the ferdie's group
             assert_ok!(Swork::create_group(
-                Origin::signed(ferdie.clone())
+                RuntimeOrigin::signed(ferdie.clone())
             ));
 
             assert_ok!(Swork::add_member_into_allowlist(
-                Origin::signed(ferdie.clone()),
+                RuntimeOrigin::signed(ferdie.clone()),
                 alice.clone()
             ));
 
             assert_ok!(Swork::join_group(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 ferdie.clone()
             ));
 
@@ -2806,7 +2806,7 @@ fn punishment_by_offline_should_work_for_stake_limit() {
             add_not_live_files();
             // A report works in 303
             assert_ok!(Swork::report_works(
-                Origin::signed(alice.clone()),
+                RuntimeOrigin::signed(alice.clone()),
                 alice_wr_info.curr_pk,
                 alice_wr_info.prev_pk,
                 alice_wr_info.block_number,
@@ -2959,7 +2959,7 @@ fn basic_check_should_work() {
             legal_wr_info.free = 2_251_799_813_685_248;
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter.clone()),
+                    RuntimeOrigin::signed(reporter.clone()),
                     legal_wr_info.curr_pk,
                     legal_wr_info.prev_pk,
                     legal_wr_info.block_number,
@@ -2984,7 +2984,7 @@ fn basic_check_should_work() {
             legal_wr_info.spower = 9_007_199_254_740_992;
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter.clone()),
+                    RuntimeOrigin::signed(reporter.clone()),
                     legal_wr_info.curr_pk,
                     legal_wr_info.prev_pk,
                     legal_wr_info.block_number,
@@ -3011,7 +3011,7 @@ fn basic_check_should_work() {
             }
             assert_noop!(
                 Swork::report_works(
-                    Origin::signed(reporter),
+                    RuntimeOrigin::signed(reporter),
                     legal_wr_info.curr_pk,
                     legal_wr_info.prev_pk,
                     legal_wr_info.block_number,
@@ -3391,7 +3391,7 @@ fn spower_delay_should_work() {
             assert_eq!(Swork::spower(), 0);
 
             assert_ok!(Swork::report_works(
-                Origin::signed(reporter.clone()),
+                RuntimeOrigin::signed(reporter.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -3461,7 +3461,7 @@ fn spower_delay_should_work() {
 
             run_to_block(606);
 
-            assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[0].0.clone()));
+            assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(reporter.clone()), legal_wr_info.added_files[0].0.clone()));
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 spower: Market::calculate_spower(134289408, 1) + 268578816,
@@ -3471,7 +3471,7 @@ fn spower_delay_should_work() {
                 reported_files_root: hex::decode("11").unwrap()
             });
 
-            assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[1].0.clone()));
+            assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(reporter.clone()), legal_wr_info.added_files[1].0.clone()));
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 spower: Market::calculate_spower(134289408, 1) + Market::calculate_spower(268578816, 1),

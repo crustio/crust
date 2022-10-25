@@ -51,7 +51,7 @@ pub trait WeightInfo {
 }
 
 pub trait Config: frame_system::Config {
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+    type RuntimeEvent: From<RuntimeEvent<Self>> + Into<<Self as frame_system::Config>::RuntimeEvent>;
     type Currency: ReservableCurrency<Self::AccountId>;
     // The amount for one report work extrinsic
     type BenefitReportWorkCost: Get<BalanceOf<Self>>;
@@ -66,7 +66,7 @@ pub trait Config: frame_system::Config {
 }
 
 decl_event!(
-    pub enum Event<T> where
+    pub enum RuntimeEvent<T> where
         Balance = BalanceOf<T>,
         AccountId = <T as frame_system::Config>::AccountId
     {
@@ -326,7 +326,7 @@ decl_storage! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
         type Error = Error<T>;
 
         fn deposit_event() = default;

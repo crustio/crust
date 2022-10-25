@@ -38,7 +38,7 @@ fn place_storage_order_should_work() {
 
         <FileKeysCountFee<Test>>::put(1000);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(), FileInfo {
@@ -80,7 +80,7 @@ fn place_storage_order_should_fail_due_to_too_large_file_size() {
         add_collateral(&merchant, 60);
 
         assert_noop!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ),
         DispatchError::Module {
@@ -118,7 +118,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
 
         // 1. New storage order
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -141,7 +141,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
 
         // 2. Add amount for sOrder not begin should work
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -167,7 +167,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         register(&legal_pk, LegalCode::get());
         run_to_block(400);
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -226,7 +226,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         // 3. Extend duration should work
         run_to_block(600);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -252,7 +252,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         // 4. Extend replicas should work
         run_to_block(800);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 200, vec![]
         ));
 
@@ -308,7 +308,7 @@ fn do_calculate_reward_should_work() {
 
         // 1. New storage order
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -336,7 +336,7 @@ fn do_calculate_reward_should_work() {
 
         // 2. Report this file's work, let file begin
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -417,7 +417,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         add_collateral(&merchant, 60_000);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -442,7 +442,7 @@ fn do_calculate_reward_should_fail_due_to_insufficient_collateral() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -561,7 +561,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -586,7 +586,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -831,7 +831,7 @@ fn do_calculate_reward_should_work_in_complex_timeline() {
         });
 
         run_to_block(1803);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(merchant.clone()), cid.clone()));
 
         assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
             collateral: 6_000_000,
@@ -870,7 +870,7 @@ fn do_calculate_reward_should_fail_due_to_not_live() {
         add_collateral(&merchant, 6000);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -950,7 +950,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -979,7 +979,7 @@ fn do_calculate_reward_should_work_for_more_replicas() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -1138,7 +1138,7 @@ fn do_calculate_reward_should_only_pay_the_groups() {
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -1177,7 +1177,7 @@ fn do_calculate_reward_should_only_pay_the_groups() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -1336,7 +1336,7 @@ fn insert_replica_should_work_for_complex_scenario() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -1448,7 +1448,7 @@ fn insert_replica_should_work_for_complex_scenario() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -1702,7 +1702,7 @@ fn update_file_byte_fee_per_blocks_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -1718,7 +1718,7 @@ fn update_file_byte_fee_per_blocks_should_work() {
         Market::on_initialize(17);
         assert_eq!(Market::file_byte_fee(), 990);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         // 26 + 3 % 10 is not zero
@@ -1740,7 +1740,7 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         let _ = Balances::make_free_balance_be(&source, 20000);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -1755,7 +1755,7 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         Market::on_initialize(17);
         assert_eq!(Market::file_keys_count_fee(), 990);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         // 26 + 3 % 10 is not zero
@@ -1769,7 +1769,7 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         <FileKeysCountFee<Test>>::put(40);
         FileKeysCount::put(20_000_000);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         Market::on_initialize(37);
@@ -1778,7 +1778,7 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         // price is 40 and will increase by 1
         FileKeysCount::put(20_000_001);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         Market::on_initialize(37);
@@ -1811,7 +1811,7 @@ fn withdraw_staking_pot_should_work() {
         add_collateral(&merchant, 60);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -1864,7 +1864,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
 
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(
-                Origin::signed(source.clone()), cid.clone(),
+                RuntimeOrigin::signed(source.clone()), cid.clone(),
                 file_size, 0, vec![]
             ));
             assert_eq!(Market::files(&cid).unwrap_or_default(),
@@ -1943,7 +1943,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         add_collateral(&merchant, 6000);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid1.clone(),
+            RuntimeOrigin::signed(source.clone()), cid1.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Market::files(&cid1).unwrap_or_default(),
@@ -1986,7 +1986,7 @@ fn double_place_storage_order_file_size_check_should_work() {
 
         // 80 < 100 => throw an error
         assert_noop!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid1.clone(), 80, 0, vec![]),
+            RuntimeOrigin::signed(source.clone()), cid1.clone(), 80, 0, vec![]),
             DispatchError::Module {
                 index: 3,
                 error: 1,
@@ -1996,7 +1996,7 @@ fn double_place_storage_order_file_size_check_should_work() {
 
         // 12000000 > 100. Only need amount for 100
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid1.clone(),
+            RuntimeOrigin::signed(source.clone()), cid1.clone(),
             12000000, 0, vec![]
         ));
 
@@ -2049,7 +2049,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -2074,7 +2074,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -2166,7 +2166,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         run_to_block(1803);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 1500, true);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(),
@@ -2236,7 +2236,7 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -2261,7 +2261,7 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -2371,7 +2371,7 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         run_to_block(1203);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(),
@@ -2410,7 +2410,7 @@ fn dynamic_spower_should_work() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -2496,7 +2496,7 @@ fn delete_spower_should_work() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -2573,15 +2573,15 @@ fn reward_liquidator_should_work() {
             add_collateral(who, 6_000_000);
         }
 
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
         assert_noop!(
-            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+            Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()),
             DispatchError::Module {
                 index: 3,
                 error: 2,
@@ -2596,7 +2596,7 @@ fn reward_liquidator_should_work() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -2612,7 +2612,7 @@ fn reward_liquidator_should_work() {
 
         // // Calculate reward cannot work in the middle of the file
         // assert_noop!(
-        //     Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+        //     Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()),
         //     DispatchError::Module {
         //         index: 3,
         //         error: 6,
@@ -2621,30 +2621,30 @@ fn reward_liquidator_should_work() {
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 4644);
         assert_eq!(Market::files(&cid).is_none(), true);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
 
         run_to_block(4000); // 3503 - 4503 => no reward to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 4644);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
         add_who_into_replica(&cid, file_size, merchant.clone(), legal_pk.clone(), None, None);
 
         run_to_block(8000); // file_keys_count 6000 => all reward to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 27864);
     });
 }
@@ -2663,7 +2663,7 @@ fn reward_merchant_should_work() {
         add_collateral(&merchant, 180);
         add_reward(&merchant, 120);
 
-        assert_ok!(Market::reward_merchant(Origin::signed(merchant.clone())));
+        assert_ok!(Market::reward_merchant(RuntimeOrigin::signed(merchant.clone())));
         assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
             collateral: 180,
             reward: 0
@@ -2672,7 +2672,7 @@ fn reward_merchant_should_work() {
         assert_eq!(Balances::free_balance(&storage_pot), 1);
         assert_noop!(
             Market::reward_merchant(
-                Origin::signed(merchant)
+                RuntimeOrigin::signed(merchant)
             ),
             DispatchError::Module {
                 index: 3,
@@ -2683,7 +2683,7 @@ fn reward_merchant_should_work() {
 
         assert_noop!(
             Market::reward_merchant(
-                Origin::signed(alice)
+                RuntimeOrigin::signed(alice)
             ),
             DispatchError::Module {
                 index: 3,
@@ -2715,15 +2715,15 @@ fn set_global_switch_should_work() {
         add_collateral(&merchant, 60);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_ok!(Market::set_enable_market(
-            Origin::root(),
+            RuntimeOrigin::root(),
             false
         ));
         assert_noop!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ),
         DispatchError::Module {
@@ -2763,7 +2763,7 @@ fn renew_file_should_work() {
         }
 
         assert_noop!(
-            Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
+            Market::add_prepaid(RuntimeOrigin::signed(source.clone()), cid.clone(), 400_000),
             DispatchError::Module {
                 index: 3,
                 error: 6,
@@ -2771,7 +2771,7 @@ fn renew_file_should_work() {
         });
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Balances::free_balance(&reserved_pot), 13900);
@@ -2783,7 +2783,7 @@ fn renew_file_should_work() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -2797,7 +2797,7 @@ fn renew_file_should_work() {
                 legal_wr_info.sig
         ));
 
-        assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
+        assert_ok!(Market::add_prepaid(RuntimeOrigin::signed(source.clone()), cid.clone(), 400_000));
         update_spower_info();
         assert_eq!(Market::files(&cid).unwrap_or_default(),
             FileInfo {
@@ -2820,7 +2820,7 @@ fn renew_file_should_work() {
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(),
             FileInfo {
@@ -2846,7 +2846,7 @@ fn renew_file_should_work() {
         assert_eq!(Balances::free_balance(&reserved_pot), 27800);
 
         run_to_block(8000); // expired_on 2303 => all reward to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 59440); // 41796 + 11144 + 6500
         assert_eq!(Market::files(&cid).unwrap_or_default(),
             FileInfo {
@@ -2868,7 +2868,7 @@ fn renew_file_should_work() {
         );
         assert_eq!(Balances::free_balance(&reserved_pot), 41700);
         run_to_block(9000); // expired_on 3303 => all reward to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&charlie), 59440); // 41796 + 11144 + 6500
         assert_eq!(Market::files(&cid).is_none(), true);
         assert_eq!(Balances::free_balance(&reserved_pot), 191920); // 41700 + 127000 + 23220
@@ -2904,7 +2904,7 @@ fn renew_onging_file_should_not_work() {
         }
 
         assert_noop!(
-            Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
+            Market::add_prepaid(RuntimeOrigin::signed(source.clone()), cid.clone(), 400_000),
             DispatchError::Module {
                 index: 3,
                 error: 6,
@@ -2912,7 +2912,7 @@ fn renew_onging_file_should_not_work() {
         });
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Balances::free_balance(&reserved_pot), 13900);
@@ -2924,7 +2924,7 @@ fn renew_onging_file_should_not_work() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -2938,7 +2938,7 @@ fn renew_onging_file_should_not_work() {
                 legal_wr_info.sig
         ));
 
-        assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
+        assert_ok!(Market::add_prepaid(RuntimeOrigin::signed(source.clone()), cid.clone(), 400_000));
         update_spower_info();
         assert_eq!(Market::files(&cid).unwrap_or_default(),
            FileInfo {
@@ -2961,7 +2961,7 @@ fn renew_onging_file_should_not_work() {
 
         run_to_block(503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(),
            FileInfo {
@@ -3006,10 +3006,10 @@ fn change_base_fee_should_work() {
         add_collateral(&merchant, 60);
 
         // Change base fee to 10000
-        assert_ok!(Market::set_base_fee(Origin::root(), 50000));
+        assert_ok!(Market::set_base_fee(RuntimeOrigin::root(), 50000));
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -3037,7 +3037,7 @@ fn change_base_fee_should_work() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-            Origin::signed(merchant.clone()),
+            RuntimeOrigin::signed(merchant.clone()),
             legal_wr_info.curr_pk,
             legal_wr_info.prev_pk,
             legal_wr_info.block_number,
@@ -3051,7 +3051,7 @@ fn change_base_fee_should_work() {
             legal_wr_info.sig
         ));
 
-        assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 200_000));
+        assert_ok!(Market::add_prepaid(RuntimeOrigin::signed(source.clone()), cid.clone(), 200_000));
         update_spower_info();
         assert_eq!(Market::files(&cid).unwrap_or_default(),
             FileInfo {
@@ -3073,7 +3073,7 @@ fn change_base_fee_should_work() {
         );
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(source.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(source.clone()), cid.clone()));
 
         assert_eq!(Market::files(&cid).unwrap_or_default(),
             FileInfo {
@@ -3121,7 +3121,7 @@ fn storage_pot_should_be_balanced() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Balances::free_balance(&storage_pot), 23221);
@@ -3131,7 +3131,7 @@ fn storage_pot_should_be_balanced() {
         let legal_pk = legal_wr_info.curr_pk.clone();
         register(&legal_pk, LegalCode::get());
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -3145,20 +3145,20 @@ fn storage_pot_should_be_balanced() {
                 legal_wr_info.sig
         ));
 
-        assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
+        assert_ok!(Market::add_prepaid(RuntimeOrigin::signed(source.clone()), cid.clone(), 400_000));
         assert_eq!(Balances::free_balance(&storage_pot), 423221);
 
         run_to_block(2503);
         // 20% would be rewarded to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 305297); // 423221 - 1000 - 6500 - 105780 (129000 * 0.82) - 4644 (20%)
 
         run_to_block(8000); // expired_on 6000 => all reward to liquidator charlie
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 150221); // 305297 - 1000 - 6500 - 105780 (129000 * 0.82) - 23220 (100%) - 18576 (80%)
 
         run_to_block(9000);
-        assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(charlie.clone()), cid.clone()));
         assert_eq!(Balances::free_balance(&storage_pot), 1);
         assert_eq!(Balances::free_balance(&reserved_pot), 191920); // 41700 + 127000 + 23220
     });
@@ -3200,7 +3200,7 @@ fn one_owner_should_work() {
         add_collateral(&zikun, 6_000_000);
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -3216,7 +3216,7 @@ fn one_owner_should_work() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -3286,7 +3286,7 @@ fn no_bonded_owner_should_work() {
         // merchant doesn't have any collateral
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -3302,7 +3302,7 @@ fn no_bonded_owner_should_work() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-                Origin::signed(merchant.clone()),
+                RuntimeOrigin::signed(merchant.clone()),
                 legal_wr_info.curr_pk,
                 legal_wr_info.prev_pk,
                 legal_wr_info.block_number,
@@ -3355,7 +3355,7 @@ fn max_replicas_and_groups_should_work() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -3418,7 +3418,7 @@ fn update_spower_info_should_work() {
 
         for cid in file_lists.clone().iter() {
             assert_ok!(Market::place_storage_order(
-                Origin::signed(source.clone()), cid.clone(),
+                RuntimeOrigin::signed(source.clone()), cid.clone(),
                 file_size, 0, vec![]
             ));
         }
@@ -3547,7 +3547,7 @@ fn place_storage_order_with_discount_should_work() {
 
         <FileKeysCountFee<Test>>::put(1000);
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(),
@@ -3570,7 +3570,7 @@ fn place_storage_order_with_discount_should_work() {
         set_discount_ratio(1, 10); // 10% discount
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(),
@@ -3594,7 +3594,7 @@ fn place_storage_order_with_discount_should_work() {
         set_discount_ratio(1, 5); // 10% discount
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source.clone()), cid.clone(),
+            RuntimeOrigin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
         ));
         assert_eq!(Market::files(&cid).unwrap_or_default(),
@@ -3645,7 +3645,7 @@ fn spower_delay_should_work() {
         }
 
         assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
+            RuntimeOrigin::signed(source), cid.clone(),
             file_size, 0, vec![]
         ));
 
@@ -3670,7 +3670,7 @@ fn spower_delay_should_work() {
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
-            Origin::signed(merchant.clone()),
+            RuntimeOrigin::signed(merchant.clone()),
             legal_wr_info.curr_pk,
             legal_wr_info.prev_pk,
             legal_wr_info.block_number,
@@ -3915,7 +3915,7 @@ fn spower_delay_should_work() {
         });
 
         run_to_block(1803);
-        assert_ok!(Market::calculate_reward(Origin::signed(merchant.clone()), cid.clone()));
+        assert_ok!(Market::calculate_reward(RuntimeOrigin::signed(merchant.clone()), cid.clone()));
 
         assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
             collateral: 6_000_000,

@@ -104,11 +104,11 @@ impl<AccountId, BlockNumber: Default> Default for ProposalVotes<AccountId, Block
 pub trait Config: system::Config {
 	/// The bridge's module id, used for deriving its sovereign account ID.
 	type PalletId: Get<PalletId>;
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-	/// Origin used to administer the pallet
-	type BridgeCommitteeOrigin: EnsureOrigin<Self::Origin>;
+	type RuntimeEvent: From<RuntimeEvent<Self>> + Into<<Self as frame_system::Config>::RuntimeEvent>;
+	/// RuntimeOrigin used to administer the pallet
+	type BridgeCommitteeOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 	/// Proposed dispatchable call
-	type Proposal: Parameter + Dispatchable<Origin = Self::Origin> + EncodeLike + GetDispatchInfo;
+	type Proposal: Parameter + Dispatchable<RuntimeOrigin = Self::RuntimeOrigin> + EncodeLike + GetDispatchInfo;
 	/// The identifier for this chain.
 	/// This must be unique and must not collide with existing IDs within a set of bridged chains.
 	type BridgeChainId: Get<u8>;
@@ -117,7 +117,7 @@ pub trait Config: system::Config {
 }
 
 decl_event! {
-	pub enum Event<T> where <T as frame_system::Config>::AccountId, ResourceId = [u8; 32] {
+	pub enum RuntimeEvent<T> where <T as frame_system::Config>::AccountId, ResourceId = [u8; 32] {
 		/// Vote threshold has changed (new_threshold)
 		RelayerThresholdChanged(u32),
 		/// Chain now available for transfers (chain_id)
@@ -225,7 +225,7 @@ decl_storage! {
 }
 
 decl_module! {
-	pub struct Module<T: Config> for enum Call where origin: T::Origin {
+	pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
 		type Error = Error<T>;
 
 		const ChainIdentity: u8 = T::BridgeChainId::get();
@@ -647,13 +647,13 @@ impl<T: Config> Module<T> {
 
 /// Simple ensure origin for the bridge account
 pub struct EnsureBridge<T>(sp_std::marker::PhantomData<T>);
-impl<T: Config> EnsureOrigin<T::Origin> for EnsureBridge<T> {
+impl<T: Config> EnsureOrigin<T::RuntimeOrigin> for EnsureBridge<T> {
 	type Success = T::AccountId;
-	fn try_origin(o: T::Origin) -> Result<Self::Success, T::Origin> {
+	fn try_origin(o: T::RuntimeOrigin) -> Result<Self::Success, T::RuntimeOrigin> {
 		let bridge_id = T::PalletId::get().into_account_truncating();
 		o.into().and_then(|o| match o {
 			system::RawOrigin::Signed(who) if who == bridge_id => Ok(bridge_id),
-			r => Err(T::Origin::from(r)),
+			r => Err(T::RuntimeOrigin::from(r)),
 		})
 	}
 }

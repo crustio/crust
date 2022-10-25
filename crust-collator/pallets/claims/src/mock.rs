@@ -18,8 +18,8 @@ impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type BlockWeights = ();
     type BlockLength = ();
-    type Origin = Origin;
-    type Call = Call;
+    type RuntimeOrigin = RuntimeOrigin;
+    type RuntimeCall = RuntimeCall;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
@@ -27,7 +27,7 @@ impl frame_system::Config for Test {
     type AccountId = u64;
     type Lookup = IdentityLookup<u64>;
     type Header = Header;
-    type Event = ();
+    type RuntimeEvent = ();
     type BlockHashCount = BlockHashCount;
     type DbWeight = ();
     type Version = ();
@@ -46,7 +46,7 @@ parameter_types! {
 impl balances::Config for Test {
     type Balance = u64;
     type DustRemoval = ();
-    type Event = ();
+    type RuntimeEvent = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
@@ -59,7 +59,7 @@ parameter_types!{
 }
 impl Config for Test {
     type PalletId = ClaimPalletId;
-    type Event = ();
+    type RuntimeEvent = ();
     type Currency = Balances;
     type Prefix = Prefix;
 }
@@ -72,9 +72,9 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-        CrustClaims: claims::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+		System: frame_system::{Module, RuntimeCall, Config, Storage, RuntimeEvent<T>},
+		Balances: balances::{Module, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
+        CrustClaims: claims::{Module, RuntimeCall, Storage, RuntimeEvent<T>, ValidateUnsigned},
 	}
 );
 

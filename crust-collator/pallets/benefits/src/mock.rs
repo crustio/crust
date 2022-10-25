@@ -23,8 +23,8 @@ impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type BlockWeights = ();
     type BlockLength = ();
-    type Origin = Origin;
-    type Call = Call;
+    type RuntimeOrigin = RuntimeOrigin;
+    type RuntimeCall = RuntimeCall;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
@@ -32,7 +32,7 @@ impl frame_system::Config for Test {
     type AccountId = AccountId;
     type Lookup = IdentityLookup<AccountId>;
     type Header = Header;
-    type Event = ();
+    type RuntimeEvent = ();
     type BlockHashCount = BlockHashCount;
     type DbWeight = ();
     type Version = ();
@@ -51,7 +51,7 @@ parameter_types! {
 impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
-    type Event = ();
+    type RuntimeEvent = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
@@ -66,7 +66,7 @@ parameter_types! {
 }
 
 impl Config for Test {
-    type Event = ();
+    type RuntimeEvent = ();
     type Currency = Balances;
     type BenefitReportWorkCost = BenefitReportWorkCost;
     type BenefitsLimitRatio = BenefitsLimitRatio;
@@ -83,9 +83,9 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, Call, Config, Storage, Event<T>},
-		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
-        Benefits: benefits::{Module, Call, Storage, Event<T>},
+		System: frame_system::{Module, RuntimeCall, Config, Storage, RuntimeEvent<T>},
+		Balances: balances::{Module, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
+        Benefits: benefits::{Module, RuntimeCall, Storage, RuntimeEvent<T>},
 	}
 );
 

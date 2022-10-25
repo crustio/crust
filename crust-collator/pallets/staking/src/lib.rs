@@ -472,7 +472,7 @@ decl_storage! {
             let mut gensis_total_stakes: BalanceOf<T> = Zero::zero();
             for &(ref stash, ref controller, balance, ref status) in &config.stakers {
                 let _ = <Module<T>>::bond(
-                    T::RuntimeOrigin::from(Some(stash.clone()).into()),
+                    T::Origin::from(Some(stash.clone()).into()),
                     T::Lookup::unlookup(controller.clone()),
                     balance
                 );
@@ -483,14 +483,14 @@ decl_storage! {
                 let _ = match status {
                     StakerStatus::Validator => {
                         <Module<T>>::validate(
-                            T::RuntimeOrigin::from(Some(controller.clone()).into()),
+                            T::Origin::from(Some(controller.clone()).into()),
                             Default::default(),
                         )
                     },
                     StakerStatus::Guarantor(votes) => {
                         for (target, vote) in votes {
                             <Module<T>>::guarantee(
-                                T::RuntimeOrigin::from(Some(controller.clone()).into()),
+                                T::Origin::from(Some(controller.clone()).into()),
                                 (T::Lookup::unlookup(target.clone()), vote.clone()),
                             ).ok();
                         }
@@ -573,7 +573,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
+    pub struct Module<T: Config> for enum RuntimeCall where origin: T::Origin {
         /// Number of eras that staked funds must remain bonded for.
         const BondingDuration: EraIndex = T::BondingDuration::get();
         
@@ -629,8 +629,8 @@ decl_module! {
         /// unless the `origin` falls below _existential deposit_ and gets removed as dust.
         /// ------------------
         /// DB Weight:
-        /// - Read: Bonded, Ledger, [RuntimeOrigin Account], Current Era, Locks
-        /// - Write: Bonded, Payee, [RuntimeOrigin Account], Ledger, Locks
+        /// - Read: Bonded, Ledger, [Origin Account], Current Era, Locks
+        /// - Write: Bonded, Payee, [Origin Account], Ledger, Locks
         /// # </weight>
         #[weight = T::WeightInfo::bond()]
         fn bond(origin,
@@ -694,8 +694,8 @@ decl_module! {
         /// - One DB entry.
         /// ------------
         /// DB Weight:
-        /// - Read: Bonded, Ledger, [RuntimeOrigin Account], Locks
-        /// - Write: [RuntimeOrigin Account], Locks, Ledger
+        /// - Read: Bonded, Ledger, [Origin Account], Locks
+        /// - Write: [Origin Account], Locks, Ledger
         /// # </weight>
         #[weight = T::WeightInfo::bond_extra()]
         fn bond_extra(origin, #[compact] max_additional: BalanceOf<T>) {
@@ -742,8 +742,8 @@ decl_module! {
         /// - One DB entry.
         /// ----------
         /// DB Weight:
-        /// - Read: Ledger, Current Era, Locks, [RuntimeOrigin Account]
-        /// - Write: [RuntimeOrigin Account], Locks, Ledger
+        /// - Read: Ledger, Current Era, Locks, [Origin Account]
+        /// - Write: [Origin Account], Locks, Ledger
         /// </weight>
         #[weight = T::WeightInfo::unbond()]
         fn unbond(origin, #[compact] value: BalanceOf<T>) {
@@ -793,8 +793,8 @@ decl_module! {
 		/// - Storage changes: Can't increase storage, only decrease it.
 		/// ---------------
 		/// - DB Weight:
-		///     - Reads: EraElectionStatus, Ledger, Locks, [RuntimeOrigin Account]
-		///     - Writes: [RuntimeOrigin Account], Locks, Ledger
+		///     - Reads: EraElectionStatus, Ledger, Locks, [Origin Account]
+		///     - Writes: [Origin Account], Locks, Ledger
 		/// # </weight>
 		#[weight = T::WeightInfo::rebond(MAX_UNLOCKING_CHUNKS as u32)]
 		fn rebond(origin, #[compact] value: BalanceOf<T>) -> DispatchResultWithPostInfo {
@@ -835,11 +835,11 @@ decl_module! {
         /// ---------------
         /// Complexity O(S) where S is the number of slashing spans to remove
         /// Update:
-        /// - Reads: EraElectionStatus, Ledger, Current Era, Locks, [RuntimeOrigin Account]
-        /// - Writes: [RuntimeOrigin Account], Locks, Ledger
+        /// - Reads: EraElectionStatus, Ledger, Current Era, Locks, [Origin Account]
+        /// - Writes: [Origin Account], Locks, Ledger
         /// Kill:
-        /// - Reads: EraElectionStatus, Ledger, Current Era, Bonded, [RuntimeOrigin Account], Locks
-        /// - Writes: Bonded, Slashing Spans (if S > 0), Ledger, Payee, Validators, Guarantors, [RuntimeOrigin Account], Locks
+        /// - Reads: EraElectionStatus, Ledger, Current Era, Bonded, [Origin Account], Locks
+        /// - Writes: Bonded, Slashing Spans (if S > 0), Ledger, Payee, Validators, Guarantors, [Origin Account], Locks
         /// - Writes Each: SpanSlash * S
         /// NOTE: Weight annotation is the kill scenario, we refund otherwise.
         /// # </weight>

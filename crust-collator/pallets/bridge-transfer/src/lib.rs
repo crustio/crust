@@ -29,7 +29,7 @@ pub trait Config: system::Config + bridge::Config {
 	type RuntimeEvent: From<RuntimeEvent<Self>> + Into<<Self as frame_system::Config>::RuntimeEvent>;
 
 	/// Specifies the origin check provided by the bridge for calls that can only be called by the bridge pallet
-	type BridgeOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
+	type BridgeOrigin: EnsureOrigin<Self::Origin, Success = Self::AccountId>;
 
 	/// The currency mechanism.
 	type Currency: Currency<Self::AccountId>;
@@ -65,7 +65,7 @@ decl_error! {
 }
 
 decl_module! {
-	pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
+	pub struct Module<T: Config> for enum RuntimeCall where origin: T::Origin {
 		type Error = Error<T>;
 		//
 		// Initiation calls. These start a bridge transfer.

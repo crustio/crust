@@ -326,7 +326,7 @@ decl_storage! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum RuntimeCall where origin: T::RuntimeOrigin {
+    pub struct Module<T: Config> for enum RuntimeCall where origin: T::Origin {
         type Error = Error<T>;
 
         fn deposit_event() = default;

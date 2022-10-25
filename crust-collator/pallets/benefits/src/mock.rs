@@ -23,7 +23,7 @@ impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type BlockWeights = ();
     type BlockLength = ();
-    type RuntimeOrigin = RuntimeOrigin;
+    type Origin = Origin;
     type RuntimeCall = RuntimeCall;
     type Index = u64;
     type BlockNumber = u64;

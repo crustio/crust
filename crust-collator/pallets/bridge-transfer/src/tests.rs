@@ -5,7 +5,7 @@
 
 use super::mock::{
 	assert_events, balances, expect_event, new_test_ext, Balances, Bridge,
-	BridgeTransfer, RuntimeCall, RuntimeEvent, RuntimeOrigin, ProposalLifetime, ENDOWED_BALANCE, RELAYER_A,
+	BridgeTransfer, RuntimeCall, RuntimeEvent, Origin, ProposalLifetime, ENDOWED_BALANCE, RELAYER_A,
 	RELAYER_B, RELAYER_C, BridgeTokenId
 };
 
@@ -48,15 +48,15 @@ fn transfer_native() {
 		let amount: u64 = 100;
 		let recipient = vec![99];
 
-		assert_ok!(Bridge::whitelist_chain(RuntimeOrigin::root(), dest_chain.clone()));
+		assert_ok!(Bridge::whitelist_chain(Origin::root(), dest_chain.clone()));
 		assert_ok!(BridgeTransfer::sudo_change_fee(
-			RuntimeOrigin::root(),
+			Origin::root(),
 			2,
 			2,
 			dest_chain.clone()
 		));
 		assert_ok!(BridgeTransfer::transfer_native(
-			RuntimeOrigin::signed(RELAYER_A),
+			Origin::signed(RELAYER_A),
 			amount.clone(),
 			recipient.clone(),
 			dest_chain,
@@ -81,7 +81,7 @@ fn transfer() {
 		assert_eq!(Balances::free_balance(&bridge_id), ENDOWED_BALANCE);
 		// Transfer and check result
 		assert_ok!(BridgeTransfer::transfer(
-			RuntimeOrigin::signed(Bridge::account_id()),
+			Origin::signed(Bridge::account_id()),
 			RELAYER_A,
 			10,
 			resource_id,
@@ -106,16 +106,16 @@ fn create_sucessful_transfer_proposal() {
 		let resource = b"BridgeTransfer.transfer".to_vec();
 		let proposal = make_transfer_proposal(RELAYER_A, 10);
 
-		assert_ok!(Bridge::set_threshold(RuntimeOrigin::root(), TEST_THRESHOLD,));
-		assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_A));
-		assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_B));
-		assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_C));
-		assert_ok!(Bridge::whitelist_chain(RuntimeOrigin::root(), src_id));
-		assert_ok!(Bridge::set_resource(RuntimeOrigin::root(), r_id, resource));
+		assert_ok!(Bridge::set_threshold(Origin::root(), TEST_THRESHOLD,));
+		assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_A));
+		assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_B));
+		assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_C));
+		assert_ok!(Bridge::whitelist_chain(Origin::root(), src_id));
+		assert_ok!(Bridge::set_resource(Origin::root(), r_id, resource));
 
 		// Create proposal (& vote)
 		assert_ok!(Bridge::acknowledge_proposal(
-			RuntimeOrigin::signed(RELAYER_A),
+			Origin::signed(RELAYER_A),
 			prop_id,
 			src_id,
 			r_id,
@@ -132,7 +132,7 @@ fn create_sucessful_transfer_proposal() {
 
 		// Second relayer votes against
 		assert_ok!(Bridge::reject_proposal(
-			RuntimeOrigin::signed(RELAYER_B),
+			Origin::signed(RELAYER_B),
 			prop_id,
 			src_id,
 			r_id,
@@ -149,7 +149,7 @@ fn create_sucessful_transfer_proposal() {
 
 		// Third relayer votes in favour
 		assert_ok!(Bridge::acknowledge_proposal(
-			RuntimeOrigin::signed(RELAYER_C),
+			Origin::signed(RELAYER_C),
 			prop_id,
 			src_id,
 			r_id,

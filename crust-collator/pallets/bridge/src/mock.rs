@@ -43,7 +43,7 @@ parameter_types! {
 
 impl frame_system::Config for Test {
 	type BaseCallFilter = ();
-	type RuntimeOrigin = RuntimeOrigin;
+	type Origin = Origin;
 	type RuntimeCall = RuntimeCall;
 	type Index = u64;
 	type BlockNumber = u64;
@@ -129,16 +129,16 @@ pub fn new_test_ext_initialized(
 	let mut t = new_test_ext();
 	t.execute_with(|| {
 		// Set and check threshold
-		assert_ok!(Bridge::set_threshold(RuntimeOrigin::root(), TEST_THRESHOLD));
+		assert_ok!(Bridge::set_threshold(Origin::root(), TEST_THRESHOLD));
 		assert_eq!(Bridge::relayer_threshold(), TEST_THRESHOLD);
 		// Add relayers
-		assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_A));
-		assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_B));
-		assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_C));
+		assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_A));
+		assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_B));
+		assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_C));
 		// Whitelist chain
-		assert_ok!(Bridge::whitelist_chain(RuntimeOrigin::root(), src_id));
+		assert_ok!(Bridge::whitelist_chain(Origin::root(), src_id));
 		// Set and check resource ID mapped to some junk data
-		assert_ok!(Bridge::set_resource(RuntimeOrigin::root(), r_id, resource));
+		assert_ok!(Bridge::set_resource(Origin::root(), r_id, resource));
 		assert_eq!(Bridge::resource_exists(r_id), true);
 	});
 	t

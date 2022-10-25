@@ -115,8 +115,8 @@ pub mod pallet {
 		/// The currency mechanism.
 		type Currency: ReservableCurrency<Self::AccountId>;
 
-		/// RuntimeOrigin that can dictate updating parameters of this pallet.
-		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		/// Origin that can dictate updating parameters of this pallet.
+		type UpdateOrigin: EnsureOrigin<Self::Origin>;
 
 		/// Account Identifier from which the internal Pot is generated.
 		type PotId: Get<PalletId>;

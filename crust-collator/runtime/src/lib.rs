@@ -218,7 +218,7 @@ impl frame_system::Config for Runtime {
 	/// The ubiquitous event type.
 	type RuntimeEvent = RuntimeEvent;
 	/// The ubiquitous origin type.
-	type RuntimeOrigin = RuntimeOrigin;
+	type Origin = Origin;
 	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
 	type BlockHashCount = BlockHashCount;
 	/// Runtime version.
@@ -446,7 +446,7 @@ impl PrivilegeCmp<OriginCaller> for OriginPrivilegeCmp {
 
 impl pallet_scheduler::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type RuntimeOrigin = RuntimeOrigin;
+    type Origin = Origin;
     type PalletsOrigin = OriginCaller;
     type RuntimeCall = RuntimeCall;
     type MaximumWeight = MaximumSchedulerWeight;
@@ -481,7 +481,7 @@ parameter_types! {
 	pub const RelayLocation: MultiLocation = MultiLocation::parent();
 	pub const LocalNetwork: MultiLocation = MultiLocation::here();
 	pub const RelayNetwork: NetworkId = NetworkId::Kusama;
-	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::RuntimeOrigin::Relay.into();
+	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 
 	// Self Reserve location, defines the multilocation identifiying the self-reserve currency
@@ -580,16 +580,16 @@ type LocalAssetTransactor = CurrencyAdapter<
 
 pub type CrustAssetTransactors = (LocalAssetTransactor, FungiblesTransactor);
 
-pub struct SiblingSignedAccountId32AsNative<RuntimeOrigin>(PhantomData<RuntimeOrigin>);
-impl<RuntimeOrigin: OriginTrait> ConvertOrigin<RuntimeOrigin>
-	for SiblingSignedAccountId32AsNative<RuntimeOrigin>
+pub struct SiblingSignedAccountId32AsNative<Origin>(PhantomData<Origin>);
+impl<Origin: OriginTrait> ConvertOrigin<Origin>
+	for SiblingSignedAccountId32AsNative<Origin>
 where
-	RuntimeOrigin::AccountId: From<[u8; 32]>,
+	Origin::AccountId: From<[u8; 32]>,
 {
 	fn convert_origin(
 		origin: impl Into<MultiLocation>,
 		kind: OriginKind,
-	) -> Result<RuntimeOrigin, MultiLocation> {
+	) -> Result<Origin, MultiLocation> {
 		let origin = origin.into();
 		log::trace!(
 			target: "xcm::origin_conversion",
@@ -601,21 +601,21 @@ where
 				OriginKind::Native,
 				MultiLocation { parents: 1, interior: Junctions::X2(Parachain(_), AccountId32 { id, network: _ })},
 			) =>
-				Ok(RuntimeOrigin::signed(id.into())),
+				Ok(Origin::signed(id.into())),
 			(_, origin) => Err(origin),
 		}
 	}
 }
 
 pub type XcmOriginToTransactDispatchOrigin = (
-	SovereignSignedViaLocation<LocationToAccountId, RuntimeOrigin>,
-	RelayChainAsNative<RelayChainOrigin, RuntimeOrigin>,
-	SiblingParachainAsNative<cumulus_pallet_xcm::RuntimeOrigin, RuntimeOrigin>,
-	ParentAsSuperuser<RuntimeOrigin>,
-	SignedAccountId32AsNative<RelayNetwork, RuntimeOrigin>,
+	SovereignSignedViaLocation<LocationToAccountId, Origin>,
+	RelayChainAsNative<RelayChainOrigin, Origin>,
+	SiblingParachainAsNative<cumulus_pallet_xcm::Origin, Origin>,
+	ParentAsSuperuser<Origin>,
+	SignedAccountId32AsNative<RelayNetwork, Origin>,
 	// Xcm origins can be represented natively under the Xcm pallet's Xcm origin.
-	XcmPassthrough<RuntimeOrigin>,
-	SiblingSignedAccountId32AsNative<RuntimeOrigin>,
+	XcmPassthrough<Origin>,
+	SiblingSignedAccountId32AsNative<Origin>,
 );
 
 parameter_types! {
@@ -695,7 +695,7 @@ impl Config for XcmConfig {
 }
 
 pub type LocalOriginToLocation = (
-	SignedToAccountId32<RuntimeOrigin, AccountId, RelayNetwork>,
+	SignedToAccountId32<Origin, AccountId, RelayNetwork>,
 );
 
 /// The means for routing XCM messages which are not for local execution into the right message
@@ -709,16 +709,16 @@ pub type XcmRouter = (
 
 impl pallet_xcm::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type SendXcmOrigin = EnsureXcmOrigin<RuntimeOrigin, LocalOriginToLocation>;
+	type SendXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
 	type XcmRouter = XcmRouter;
-	type ExecuteXcmOrigin = EnsureXcmOrigin<RuntimeOrigin, LocalOriginToLocation>;
+	type ExecuteXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
 	type XcmExecuteFilter = Everything;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type XcmTeleportFilter = Everything;
 	type XcmReserveTransferFilter = Everything;
 	type Weigher = FixedWeightBounds<UnitWeightCost, RuntimeCall, MaxInstructions>;
 	type LocationInverter = LocationInverter<Ancestry>;
-	type RuntimeOrigin = RuntimeOrigin;
+	type Origin = Origin;
 	type RuntimeCall = RuntimeCall;
 	const VERSION_DISCOVERY_QUEUE_SIZE: u32 = 100;
 	type AdvertisedXcmVersion = pallet_xcm::CurrentXcmVersion;
@@ -753,7 +753,7 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 
 impl cumulus_ping::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type RuntimeOrigin = RuntimeOrigin;
+	type Origin = Origin;
 	type RuntimeCall = RuntimeCall;
 	type XcmSender = XcmRouter;
 }
@@ -1016,7 +1016,7 @@ parameter_types! {
 
 type CouncilCollective = pallet_collective::Instance1;
 impl pallet_collective::Config<CouncilCollective> for Runtime {
-    type RuntimeOrigin = RuntimeOrigin;
+    type Origin = Origin;
     type Proposal = RuntimeCall;
     type RuntimeEvent = RuntimeEvent;
     type MotionDuration = CouncilMotionDuration;
@@ -1068,7 +1068,7 @@ parameter_types! {
 
 type TechnicalCollective = pallet_collective::Instance2;
 impl pallet_collective::Config<TechnicalCollective> for Runtime {
-    type RuntimeOrigin = RuntimeOrigin;
+    type Origin = Origin;
     type Proposal = RuntimeCall;
     type RuntimeEvent = RuntimeEvent;
     type MotionDuration = TechnicalMotionDuration;
@@ -1357,7 +1357,7 @@ impl pallet_asset_manager::AssetRegistrar<Runtime> for AssetRegistrar {
 		is_sufficient: bool,
 	) -> DispatchResult {
 		Assets::force_create(
-			RuntimeOrigin::root(),
+			Origin::root(),
 			asset,
 			sp_runtime::MultiAddress::Id(AssetManager::account_id()),
 			is_sufficient,
@@ -1375,7 +1375,7 @@ impl pallet_asset_manager::AssetRegistrar<Runtime> for AssetRegistrar {
 
 		// Lastly, the metadata
 		Assets::force_set_metadata(
-			RuntimeOrigin::root(),
+			Origin::root(),
 			asset,
 			metadata.name,
 			metadata.symbol,
@@ -1551,8 +1551,8 @@ construct_runtime! {
 
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>},
-		PolkadotXcm: pallet_xcm::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>, RuntimeOrigin},
-		CumulusXcm: cumulus_pallet_xcm::{Pallet, RuntimeCall, RuntimeEvent<T>, RuntimeOrigin},
+		PolkadotXcm: pallet_xcm::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>, Origin},
+		CumulusXcm: cumulus_pallet_xcm::{Pallet, RuntimeCall, RuntimeEvent<T>, Origin},
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>},
 		OrmlXcm: orml_xcm::{Pallet, RuntimeCall, RuntimeEvent<T>},
 
@@ -1576,9 +1576,9 @@ construct_runtime! {
 		// Governance
 		Identity: pallet_identity::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>} = 116,
 		Democracy: pallet_democracy::{Pallet, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>} = 117,
-		Council: pallet_collective::<Instance1>::{Pallet, RuntimeCall, Storage, RuntimeOrigin<T>, RuntimeEvent<T>, Config<T>} = 118,
+		Council: pallet_collective::<Instance1>::{Pallet, RuntimeCall, Storage, Origin<T>, RuntimeEvent<T>, Config<T>} = 118,
 		Treasury: pallet_treasury::{Pallet, RuntimeCall, Storage, Config, RuntimeEvent<T>} = 119,
-		TechnicalCommittee: pallet_collective::<Instance2>::{Pallet, RuntimeCall, Storage, RuntimeOrigin<T>, RuntimeEvent<T>, Config<T>} = 120,
+		TechnicalCommittee: pallet_collective::<Instance2>::{Pallet, RuntimeCall, Storage, Origin<T>, RuntimeEvent<T>, Config<T>} = 120,
 		TechnicalMembership: pallet_membership::<Instance1>::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>, Config<T>} = 121,
 		PhragmenElection: pallet_elections_phragmen::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>, Config<T>} = 122,
 		Tips: pallet_tips::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>} = 123,

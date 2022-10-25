@@ -10,25 +10,25 @@ repository = "https://github.com/paritytech/crust/"
 [dependencies]
 # third party dependencies
 codec = { default-features = false, package = "parity-scale-codec", features = ["derive"], version = "3.0.0" }
-serde = { optional = true, version = "1.0.145" }
+serde = { optional = true, version = "1.0.144" }
 
 # substrate frame dependencies
-frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }
-frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }
+frame-support = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
+frame-system = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 
 # substrate primitives
-sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }
-sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }
+sp-core = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
+sp-io = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30", default-features = false }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29", default-features = false }
 
 # crust runtime modules
 primitives = { package = "crust-parachain-primitives", path = "../../../primitives", default-features = false }
 market = { package = "cstrml-market", path = "../../market", default-features = false }
 swork = { package = "cstrml-swork", path = "../../swork", default-features = false }
-balances = { package = 'pallet-balances', git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.30" }
+balances = { package = 'pallet-balances', git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.29" }
 
 [features]
 default = ["std"]
@@ -50,5 +50,5 @@ std = [
 
 [dev-dependencies]
 hex = "0.4.2"
-keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.30" }
+keyring = { package = "sp-keyring", git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 primitives = { package = "crust-parachain-primitives", path = "../../../primitives", features = ["test"] }

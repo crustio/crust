@@ -48,7 +48,7 @@ impl system::Config for Test {
     type BaseCallFilter = ();
     type BlockWeights = BlockWeights;
     type BlockLength = ();
-    type RuntimeOrigin = RuntimeOrigin;
+    type Origin = Origin;
     type RuntimeCall = RuntimeCall;
     type Index = u64;
     type BlockNumber = u64;
@@ -200,8 +200,8 @@ impl ExtBuilder {
 
         let mut ext: sp_io::TestExternalities = t.into();
         ext.execute_with(|| {
-            assert_ok!(Market::set_enable_market(RuntimeOrigin::root(), true));
-            assert_ok!(Market::set_base_fee(RuntimeOrigin::root(), 1000));
+            assert_ok!(Market::set_enable_market(Origin::root(), true));
+            assert_ok!(Market::set_base_fee(Origin::root(), 1000));
         });
 
         ext

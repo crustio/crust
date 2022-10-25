@@ -131,7 +131,7 @@ parameter_types! {
 
 impl frame_system::Config for Test {
     type BaseCallFilter = ();
-    type RuntimeOrigin = RuntimeOrigin;
+    type Origin = Origin;
     type RuntimeCall = RuntimeCall;
     type Index = u64;
     type BlockNumber = BlockNumber;
@@ -609,13 +609,13 @@ pub fn bond_validator(acc: u128, val: Balance) {
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
     assert_ok!(Staking::bond(
-        RuntimeOrigin::signed(acc + 1),
+        Origin::signed(acc + 1),
         acc,
         val
     ));
     assert_ok!(set_payee(acc, RewardDestination::Controller));
     Staking::upsert_stake_limit(&(acc + 1), u128::max_value());
-    assert_ok!(Staking::validate(RuntimeOrigin::signed(acc), ValidatorPrefs::default()));
+    assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
 }
 
 pub fn bond_guarantor(acc: u128, val: Balance, targets: Vec<(u128, Balance)>) {
@@ -623,13 +623,13 @@ pub fn bond_guarantor(acc: u128, val: Balance, targets: Vec<(u128, Balance)>) {
     // a + 1 = stash
     let _ = Balances::make_free_balance_be(&(acc + 1), val);
     assert_ok!(Staking::bond(
-        RuntimeOrigin::signed(acc + 1),
+        Origin::signed(acc + 1),
         acc,
         val
     ));
     assert_ok!(set_payee(acc, RewardDestination::Controller));
     for target in targets {
-        assert_ok!(Staking::guarantee(RuntimeOrigin::signed(acc), target));
+        assert_ok!(Staking::guarantee(Origin::signed(acc), target));
     }
 }
 
@@ -731,10 +731,10 @@ pub fn start_era_with_new_workloads(era_index: EraIndex, with_reward: bool, own_
 }
 
 pub fn payout_all_stakers(era_index: EraIndex) {
-    Staking::reward_stakers(RuntimeOrigin::signed(10), 11, era_index).unwrap_or_default();
-    Staking::reward_stakers(RuntimeOrigin::signed(10), 21, era_index).unwrap_or_default();
-    Staking::reward_stakers(RuntimeOrigin::signed(10), 31, era_index).unwrap_or_default();
-    Staking::reward_stakers(RuntimeOrigin::signed(10), 41, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 11, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 21, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 31, era_index).unwrap_or_default();
+    Staking::reward_stakers(Origin::signed(10), 41, era_index).unwrap_or_default();
 }
 
 fn init_swork_setup() {

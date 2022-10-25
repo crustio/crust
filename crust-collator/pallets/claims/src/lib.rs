@@ -4,49 +4,25 @@
 //! Module to process claims from Ethereum addresses.
 #![cfg_attr(not(feature = "std"), no_std)]
 use sp_std::prelude::*;
-use sp_io::{hashing::keccak_256, crypto::secp256k1_ecdsa_recover};
-use frame_support::{
-    decl_event, decl_storage, decl_module, decl_error, ensure, PalletId,
-    traits::{Currency, Get, ExistenceRequirement::AllowDeath}
-};
-use frame_system::{ensure_signed, ensure_root, ensure_none};
 use codec::{Encode, Decode};
 #[cfg(feature = "std")]
 use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
-use sp_std::convert::TryInto;
 
-use sp_runtime::{
-    RuntimeDebug, DispatchResult,
-    transaction_validity::{
-        TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
-    },
-    traits::{
-        Zero, StaticLookup, Saturating, AccountIdConversion
-    },
-};
+use sp_runtime::{RuntimeDebug};
+use frame_support::ensure;
+use sp_io::{hashing::keccak_256, crypto::secp256k1_ecdsa_recover};
+pub use pallet::*;
+use frame_support::traits::ExistenceRequirement::AllowDeath;
+use sp_runtime::traits::Get;
+use frame_support::traits::Currency;
+use sp_runtime::DispatchResult;
+use sp_runtime::traits::AccountIdConversion;
 
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
-
-/// The balance type of this module.
-pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-
-pub trait Config: frame_system::Config {
-    /// The claim's module id, used for deriving its sovereign account ID.
-    type PalletId: Get<PalletId>;
-
-    /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-
-    /// The payment balance.
-    type Currency: Currency<Self::AccountId>;
-
-    /// The constant used for ethereum signature.
-    type Prefix: Get<&'static [u8]>;
-}
 
 /// An Ethereum address (i.e. 20 bytes, used to represent an Ethereum account).
 ///
@@ -131,30 +107,77 @@ impl<'de> Deserialize<'de> for EthereumTxHash {
     }
 }
 
-decl_event!(
-    pub enum Event<T> where
-        Balance = BalanceOf<T>,
-        AccountId = <T as frame_system::Config>::AccountId
-    {
-        /// Init pot success
-        InitPot(AccountId, Balance),
-        /// Someone be the new superior
-        SuperiorChanged(AccountId),
-        /// Someone be the new miner
-        MinerChanged(AccountId),
-        /// Set limit successfully
-        SetLimitSuccess(Balance),
-        /// Mint claims successfully
-        MintSuccess(EthereumTxHash, EthereumAddress, Balance),
-        /// Someone claimed some CRUs. [who, ethereum_address, amount]
-        Claimed(AccountId, EthereumAddress, Balance),
-        /// Ethereum address was bonded to account. [who, ethereum_address]
-        BondEthSuccess(AccountId, EthereumAddress),
-    }
-);
+#[frame_support::pallet]
+pub mod pallet {
+    use crate::{
+        EthereumTxHash,
+        EcdsaSignature, to_ascii_hex,
+        EthereumAddress,
+        ValidityError};
+	use sp_std::prelude::*;
+    use sp_std::convert::TryInto;
+	use frame_support::{pallet_prelude::*, PalletId};
+	use frame_system::pallet_prelude::*;
+    use sp_runtime::{
+        transaction_validity::{
+            TransactionLongevity, TransactionValidity, ValidTransaction, InvalidTransaction, TransactionSource,
+        },
+        traits::{
+            StaticLookup, Saturating
+        },
+    };
+    use frame_support::{
+        traits::{Currency, Get}
+    };
 
-decl_error! {
-    pub enum Error for Module<T: Config> {
+    /// The balance type of this module.
+    pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+    
+
+	#[pallet::pallet]
+	#[pallet::generate_store(pub(super) trait Store)]
+	#[pallet::without_storage_info]
+	pub struct Pallet<T>(_);
+
+    /// Configuration trait.
+	#[pallet::config]
+	pub trait Config: frame_system::Config {
+        /// The claim's module id, used for deriving its sovereign account ID.
+        #[pallet::constant]
+        type PalletId: Get<PalletId>;
+
+        /// The overarching event type.
+        type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+        /// The payment balance.
+        type Currency: Currency<Self::AccountId>;
+
+        /// The constant used for ethereum signature.
+        #[pallet::constant]
+        type Prefix: Get<&'static [u8]>;
+	}
+
+	#[pallet::event]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	pub enum Event<T: Config> {
+        /// Init pot success
+        InitPot(T::AccountId, BalanceOf<T>),
+        /// Someone be the new superior
+        SuperiorChanged(T::AccountId),
+        /// Someone be the new miner
+        MinerChanged(T::AccountId),
+        /// Set limit successfully
+        SetLimitSuccess(BalanceOf<T>),
+        /// Mint claims successfully
+        MintSuccess(EthereumTxHash, EthereumAddress, BalanceOf<T>),
+        /// Someone claimed some CRUs. [who, ethereum_address, amount]
+        Claimed(T::AccountId, EthereumAddress, BalanceOf<T>),
+        /// Ethereum address was bonded to account. [who, ethereum_address]
+        BondEthSuccess(T::AccountId, EthereumAddress),
+    }
+
+    #[pallet::error]
+	pub enum Error<T> {
         /// Superior not exist, should set it first
         IllegalSuperior,
         /// Miner is not exist, should set it first
@@ -173,58 +196,46 @@ decl_error! {
         SignatureNotMatch,
         /// Exceed claim limitation
         ExceedClaimLimit,
-    }
-}
+	}
 
-decl_storage! {
-    // A macro for the Storage config, and its implementation, for this module.
-    // This allows for type-safe usage of the Substrate storage database, so you can
-    // keep things around between blocks.
-    trait Store for Module<T: Config> as Claims {
-        /// Claim limit determinate how many CRUs can be claimed
-        ClaimLimit get(fn claim_limit): BalanceOf<T> = Zero::zero();
+    #[pallet::storage]
+	#[pallet::getter(fn claim_limit)]
+	pub(super) type ClaimLimit<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
-        /// The claim transaction mapping relationship in ethereum
-        Claims get(fn claims): map hasher(identity) EthereumTxHash => Option<(EthereumAddress, BalanceOf<T>)>;
+    #[pallet::storage]
+	#[pallet::getter(fn claims)]
+	pub(super) type Claims<T: Config> = StorageMap<_, Identity, EthereumTxHash, (EthereumAddress, BalanceOf<T>), OptionQuery>;
 
-        /// Mark if the claim transaction has already been claimed
-        Claimed get(fn claimed): map hasher(identity) EthereumTxHash => bool;
+    #[pallet::storage]
+	#[pallet::getter(fn claimed)]
+	pub(super) type Claimed<T: Config> = StorageMap<_, Identity, EthereumTxHash, bool, ValueQuery>;
 
-        /// [who] can set the claim limit
-        Superior get(fn superior): Option<T::AccountId>;
+    #[pallet::storage]
+	#[pallet::getter(fn superior)]
+	pub(super) type Superior<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
-        /// [who] can mint the claims
-        Miner get(fn miner): Option<T::AccountId>;
-    }
-}
+    #[pallet::storage]
+	#[pallet::getter(fn miner)]
+	pub(super) type Miner<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
-decl_module! {
-    pub struct Module<T: Config> for enum Call where origin: T::Origin {
-        type Error = Error<T>;
 
-        fn deposit_event() = default;
-
-        /// The Prefix that is used in signed Ethereum messages for this network
-        const Prefix: &[u8] = T::Prefix::get();
-
-        /// The claim's module id, used for deriving its sovereign account ID.
-        const PalletId: PalletId = T::PalletId::get();
-
+    #[pallet::call]
+	impl<T: Config> Pallet<T> {
         /// Change superior
         ///
         /// The dispatch origin for this call must be _Root_.
         ///
         /// Parameter:
         /// - `new_superior`: The new superior's address
-        #[weight = 1000]
-        fn change_superior(origin, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+        #[pallet::weight(1000)]
+        pub fn change_superior(origin: OriginFor<T>, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
             let new_superior = T::Lookup::lookup(new_superior)?;
 
             Superior::<T>::put(new_superior.clone());
 
-            Self::deposit_event(RawEvent::SuperiorChanged(new_superior));
+            Self::deposit_event(Event::SuperiorChanged(new_superior));
 
             Ok(())
         }
@@ -235,15 +246,15 @@ decl_module! {
         ///
         /// Parameters:
         /// - `new_miner`: The new miner's address
-        #[weight = 1000]
-        fn change_miner(origin, new_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+        #[pallet::weight(1000)]
+        pub fn change_miner(origin: OriginFor<T>, new_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
             let new_miner = T::Lookup::lookup(new_miner)?;
 
             Miner::<T>::put(new_miner.clone());
 
-            Self::deposit_event(RawEvent::MinerChanged(new_miner));
+            Self::deposit_event(Event::MinerChanged(new_miner));
             Ok(())
         }
 
@@ -253,8 +264,8 @@ decl_module! {
         ///
         /// Parameters:
         /// - `limit`: The claim CRUs limit
-        #[weight = 1000]
-        fn set_claim_limit(origin, limit: BalanceOf<T>) -> DispatchResult {
+        #[pallet::weight(1000)]
+        pub fn set_claim_limit(origin: OriginFor<T>, limit: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_superior = Self::superior();
 
@@ -267,7 +278,7 @@ decl_module! {
             // 3. Set claim limit
             ClaimLimit::<T>::put(limit);
 
-            Self::deposit_event(RawEvent::SetLimitSuccess(limit));
+            Self::deposit_event(Event::SetLimitSuccess(limit));
             Ok(())
         }
 
@@ -279,8 +290,8 @@ decl_module! {
         /// - `tx`: The claim ethereum tx hash
         /// - `who`: The claimer ethereum address
         /// - `value`: The amount of this tx, should be less than claim_limit
-        #[weight = 1000]
-        fn mint_claim(origin, tx: EthereumTxHash, who: EthereumAddress, value: BalanceOf<T>) -> DispatchResult {
+        #[pallet::weight(1000)]
+        pub fn mint_claim(origin: OriginFor<T>, tx: EthereumTxHash, who: EthereumAddress, value: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_miner = Self::miner();
 
@@ -298,17 +309,17 @@ decl_module! {
 
             // 5. Save into claims
             Claims::<T>::insert(tx.clone(), (who.clone(), value.clone()));
-            Claimed::insert(tx, false);
+            Claimed::<T>::insert(tx, false);
 
             // 6. Reduce claim limit
             ClaimLimit::<T>::mutate(|l| *l = l.saturating_sub(value));
 
-            Self::deposit_event(RawEvent::MintSuccess(tx, who, value));
+            Self::deposit_event(Event::MintSuccess(tx, who, value));
             Ok(())
         }
 
-        #[weight = 0]
-        fn claim(origin, dest: T::AccountId, tx: EthereumTxHash, sig: EcdsaSignature) -> DispatchResult {
+        #[pallet::weight(0)]
+        pub fn claim(origin: OriginFor<T>, dest: T::AccountId, tx: EthereumTxHash, sig: EcdsaSignature) -> DispatchResult {
             let _ = ensure_none(origin)?;
 
             // 1. Check the tx already be mint and not be claimed
@@ -324,20 +335,50 @@ decl_module! {
             Self::process_claim(tx, signer, dest)
         }
     }
-}
 
-/// Converts the given binary data into ASCII-encoded hex. It will be twice the length.
-fn to_ascii_hex(data: &[u8]) -> Vec<u8> {
-    let mut r = Vec::with_capacity(data.len() * 2);
-    let mut push_nibble = |n| r.push(if n < 10 { b'0' + n } else { b'a' - 10 + n });
-    for &b in data.iter() {
-        push_nibble(b / 16);
-        push_nibble(b % 16);
+    #[pallet::validate_unsigned]
+	impl<T: Config> ValidateUnsigned for Pallet<T> {
+        type Call = Call<T>;
+
+        fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+            const PRIORITY: u64 = 100;
+    
+            let (maybe_signer, tx) = match call {
+                Call::claim {dest, tx, sig} => {
+                    let data = dest.using_encoded(to_ascii_hex);
+                    let tx_data = tx.using_encoded(to_ascii_hex);
+                    (Self::eth_recover(&sig, &data, &tx_data), tx)
+                }
+                _ => return Err(InvalidTransaction::Call.into()),
+            };
+    
+            let signer = maybe_signer
+                .ok_or(InvalidTransaction::Custom(ValidityError::InvalidEthereumSignature.into()))?;
+    
+            let e = InvalidTransaction::Custom(ValidityError::SignerHasNoClaim.into());
+            ensure!(<Claims<T>>::contains_key(&tx), e);
+    
+            let e = InvalidTransaction::Custom(ValidityError::SignatureNotMatch.into());
+            let (claimer, _) = Self::claims(&tx).unwrap();
+            ensure!(claimer == signer, e);
+    
+            let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
+            ensure!(!Self::claimed(&tx), e);
+    
+            Ok(ValidTransaction {
+                priority: PRIORITY,
+                requires: vec![],
+                provides: vec![("claims", signer).encode()],
+                longevity: TransactionLongevity::max_value(),
+                propagate: true,
+            })
+        }
+
     }
-    r
 }
 
-impl<T: Config> Module<T> {
+
+impl<T: Config> Pallet<T> {
     // The claim pot account
     pub fn claim_pot() -> T::AccountId {
         // "modl" ++ "crclaims" ++ "clai" is 16 bytes
@@ -379,16 +420,27 @@ impl<T: Config> Module<T> {
             T::Currency::transfer(&Self::claim_pot(), &dest, amount, AllowDeath)?;
 
             // 3. Mark it be claimed
-            Claimed::insert(tx, true);
+            Claimed::<T>::insert(tx, true);
 
             // Let's deposit an event to let the outside world know who claimed money
-            Self::deposit_event(RawEvent::Claimed(dest, signer, amount));
+            Self::deposit_event(Event::Claimed(dest, signer, amount));
 
             Ok(())
         } else {
             Err(Error::<T>::SignerHasNoClaim)?
         }
     }
+}
+
+/// Converts the given binary data into ASCII-encoded hex. It will be twice the length.
+fn to_ascii_hex(data: &[u8]) -> Vec<u8> {
+    let mut r = Vec::with_capacity(data.len() * 2);
+    let mut push_nibble = |n| r.push(if n < 10 { b'0' + n } else { b'a' - 10 + n });
+    for &b in data.iter() {
+        push_nibble(b / 16);
+        push_nibble(b % 16);
+    }
+    r
 }
 
 /// Custom validity errors used in Polkadot while validating transactions.
@@ -407,43 +459,5 @@ pub enum ValidityError {
 impl From<ValidityError> for u8 {
     fn from(err: ValidityError) -> Self {
         err as u8
-    }
-}
-
-impl<T: Config> sp_runtime::traits::ValidateUnsigned for Module<T> {
-    type Call = Call<T>;
-
-    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-        const PRIORITY: u64 = 100;
-
-        let (maybe_signer, tx) = match call {
-            Call::claim {dest, tx, sig} => {
-                let data = dest.using_encoded(to_ascii_hex);
-                let tx_data = tx.using_encoded(to_ascii_hex);
-                (Self::eth_recover(&sig, &data, &tx_data), tx)
-            }
-            _ => return Err(InvalidTransaction::Call.into()),
-        };
-
-        let signer = maybe_signer
-            .ok_or(InvalidTransaction::Custom(ValidityError::InvalidEthereumSignature.into()))?;
-
-        let e = InvalidTransaction::Custom(ValidityError::SignerHasNoClaim.into());
-        ensure!(<Claims<T>>::contains_key(&tx), e);
-
-        let e = InvalidTransaction::Custom(ValidityError::SignatureNotMatch.into());
-        let (claimer, _) = Self::claims(&tx).unwrap();
-        ensure!(claimer == signer, e);
-
-        let e = InvalidTransaction::Custom(ValidityError::AlreadyBeClaimed.into());
-        ensure!(!Self::claimed(&tx), e);
-
-        Ok(ValidTransaction {
-            priority: PRIORITY,
-            requires: vec![],
-            provides: vec![("claims", signer).encode()],
-            longevity: TransactionLongevity::max_value(),
-            propagate: true,
-        })
     }
 }

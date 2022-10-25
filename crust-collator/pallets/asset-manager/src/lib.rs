@@ -38,7 +38,6 @@ use frame_support::pallet;
 pub use pallet::*;
 #[cfg(any(test, feature = "runtime-benchmarks"))]
 mod benchmarks;
-pub mod migrations;
 #[cfg(test)]
 pub mod mock;
 #[cfg(test)]
@@ -190,7 +189,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Register new asset with the asset manager
-		#[pallet::weight(T::WeightInfo::register_asset())]
+		#[pallet::weight(T::WeightInfo::register_foreign_asset())]
 		pub fn register_asset(
 			origin: OriginFor<T>,
 			asset: T::AssetType,

@@ -26,7 +26,7 @@ use sp_runtime::{
 
 use frame_support::{
 	traits::{tokens::fungibles::Mutate, Get, Contains},
-	weights::{constants::WEIGHT_PER_SECOND, Weight}, ensure
+	weights::{constants::WEIGHT_PER_SECOND}, ensure
 };
 use sp_runtime::traits::Zero;
 use sp_std::{borrow::Borrow, vec::Vec};
@@ -210,7 +210,7 @@ pub struct FirstAssetTrader<
 	AssetIdInfoGetter: UnitsToWeightRatio<AssetType>,
 	R: TakeRevenue,
 >(
-	Weight,
+	u64,
 	Option<(MultiLocation, u128, u128)>,
 	PhantomData<(AssetType, AssetIdInfoGetter, R)>,
 );
@@ -225,7 +225,7 @@ impl<
 	}
 	fn buy_weight(
 		&mut self,
-		weight: Weight,
+		weight: u64,
 		payment: xcm_executor::Assets,
 	) -> Result<xcm_executor::Assets, XcmError> {
 		log::trace!(
@@ -253,7 +253,7 @@ impl<
 				if let Some(units_per_second) = AssetIdInfoGetter::get_units_per_second(asset_type)
 				{
 					let amount = units_per_second.saturating_mul(weight as u128)
-						/ (WEIGHT_PER_SECOND as u128);
+						/ (WEIGHT_PER_SECOND.ref_time() as u128);
 
 					// We dont need to proceed if the amount is 0
 					// For cases (specially tests) where the asset is very cheap with respect
@@ -304,11 +304,11 @@ impl<
 		}
 	}
 
-	fn refund_weight(&mut self, weight: Weight) -> Option<MultiAsset> {
+	fn refund_weight(&mut self, weight: u64) -> Option<MultiAsset> {
 		if let Some((id, prev_amount, units_per_second)) = self.1.clone() {
 			let weight = weight.min(self.0);
 			self.0 -= weight;
-			let amount = units_per_second * (weight as u128) / (WEIGHT_PER_SECOND as u128);
+			let amount = units_per_second * (weight as u128) / (WEIGHT_PER_SECOND.ref_time() as u128);
 			self.1 = Some((
 				id.clone(),
 				prev_amount.saturating_sub(amount),
@@ -343,8 +343,8 @@ impl<T: Contains<MultiLocation>> ShouldExecute for AllowDescendOriginFromLocal<T
 	fn should_execute<Call>(
 		origin: &MultiLocation,
 		message: &mut Xcm<Call>,
-		max_weight: Weight,
-		_weight_credit: &mut Weight,
+		max_weight: u64,
+		_weight_credit: &mut u64,
 	) -> Result<(), ()> {
 		log::trace!(
 			target: "xcm::barriers",

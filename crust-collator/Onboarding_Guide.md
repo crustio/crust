@@ -10,7 +10,7 @@ xstorage = { git = "https://github.com/paritytech/crust", branch = "parachain/sh
 pub struct Preparator;
 impl xstorage::PrepareStorageOrder for Preparator {
 	fn prepare_storage_order(cid: Vec<u8>, size: u64) -> Vec<u8> {
-		RuntimeCall::Xstorage(xstorage::RuntimeCall::inner_place_storage_order(cid, size)).encode()
+		Call::Xstorage(xstorage::Call::inner_place_storage_order(cid, size)).encode()
 	}
 }
 

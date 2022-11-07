@@ -44,7 +44,7 @@ fn registering_works() {
 			AssetManager::asset_type_id(MockAssetType::MockAsset(1)).unwrap(),
 			1
 		);
-		expect_events(vec![crate::RuntimeEvent::AssetRegistered {
+		expect_events(vec![crate::Event::AssetRegistered {
 			asset_id: 1,
 			asset: MockAssetType::MockAsset(1),
 			metadata: 0u32,
@@ -105,12 +105,12 @@ fn test_root_can_change_units_per_second() {
 		assert!(AssetManager::supported_fee_payment_assets().contains(&MockAssetType::MockAsset(1)));
 
 		expect_events(vec![
-			crate::RuntimeEvent::AssetRegistered {
+			crate::Event::AssetRegistered {
 				asset_id: 1,
 				asset: MockAssetType::MockAsset(1),
 				metadata: 0,
 			},
-			crate::RuntimeEvent::UnitsPerSecondChanged {
+			crate::Event::UnitsPerSecondChanged {
 				asset_type: MockAssetType::MockAsset(1),
 				units_per_second: 200,
 			},
@@ -202,16 +202,16 @@ fn test_root_can_change_asset_id_type() {
 		assert!(AssetManager::asset_type_id(MockAssetType::MockAsset(1)).is_none());
 
 		expect_events(vec![
-			crate::RuntimeEvent::AssetRegistered {
+			crate::Event::AssetRegistered {
 				asset_id: 1,
 				asset: MockAssetType::MockAsset(1),
 				metadata: 0,
 			},
-			crate::RuntimeEvent::UnitsPerSecondChanged {
+			crate::Event::UnitsPerSecondChanged {
 				asset_type: MockAssetType::MockAsset(1),
 				units_per_second: 200,
 			},
-			crate::RuntimeEvent::AssetTypeChanged {
+			crate::Event::AssetTypeChanged {
 				asset_id: 1,
 				new_asset_type: MockAssetType::MockAsset(2),
 			},
@@ -257,16 +257,16 @@ fn test_change_units_per_second_after_setting_it_once() {
 		assert!(AssetManager::supported_fee_payment_assets().contains(&MockAssetType::MockAsset(1)));
 
 		expect_events(vec![
-			crate::RuntimeEvent::AssetRegistered {
+			crate::Event::AssetRegistered {
 				asset_id: 1,
 				asset: MockAssetType::MockAsset(1),
 				metadata: 0,
 			},
-			crate::RuntimeEvent::UnitsPerSecondChanged {
+			crate::Event::UnitsPerSecondChanged {
 				asset_type: MockAssetType::MockAsset(1),
 				units_per_second: 200,
 			},
-			crate::RuntimeEvent::UnitsPerSecondChanged {
+			crate::Event::UnitsPerSecondChanged {
 				asset_type: MockAssetType::MockAsset(1),
 				units_per_second: 100,
 			},
@@ -309,16 +309,16 @@ fn test_root_can_change_units_per_second_and_then_remove() {
 		);
 
 		expect_events(vec![
-			crate::RuntimeEvent::AssetRegistered {
+			crate::Event::AssetRegistered {
 				asset_id: 1,
 				asset: MockAssetType::MockAsset(1),
 				metadata: 0,
 			},
-			crate::RuntimeEvent::UnitsPerSecondChanged {
+			crate::Event::UnitsPerSecondChanged {
 				asset_type: MockAssetType::MockAsset(1),
 				units_per_second: 200,
 			},
-			crate::RuntimeEvent::SupportedAssetRemoved {
+			crate::Event::SupportedAssetRemoved {
 				asset_type: MockAssetType::MockAsset(1),
 			},
 		]);
@@ -676,16 +676,16 @@ fn test_root_can_remove_asset_association() {
 		assert!(AssetManager::asset_type_units_per_second(MockAssetType::MockAsset(1)).is_none());
 
 		expect_events(vec![
-			crate::RuntimeEvent::AssetRegistered {
+			crate::Event::AssetRegistered {
 				asset_id: 1,
 				asset: MockAssetType::MockAsset(1),
 				metadata: 0,
 			},
-			crate::RuntimeEvent::UnitsPerSecondChanged {
+			crate::Event::UnitsPerSecondChanged {
 				asset_type: MockAssetType::MockAsset(1),
 				units_per_second: 200,
 			},
-			crate::RuntimeEvent::AssetRemoved {
+			crate::Event::AssetRemoved {
 				asset_id: 1,
 				asset_type: MockAssetType::MockAsset(1),
 			},
@@ -718,12 +718,12 @@ fn test_removing_without_asset_units_per_second_does_not_panic() {
 		assert!(AssetManager::asset_type_units_per_second(MockAssetType::MockAsset(1)).is_none());
 
 		expect_events(vec![
-			crate::RuntimeEvent::AssetRegistered {
+			crate::Event::AssetRegistered {
 				asset_id: 1,
 				asset: MockAssetType::MockAsset(1),
 				metadata: 0,
 			},
-			crate::RuntimeEvent::AssetRemoved {
+			crate::Event::AssetRemoved {
 				asset_id: 1,
 				asset_type: MockAssetType::MockAsset(1),
 			},

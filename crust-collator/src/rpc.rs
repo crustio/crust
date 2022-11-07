@@ -30,7 +30,7 @@ use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use crust_parachain_primitives::{AccountId, Balance, Block, Index as Nonce};
 
 /// A type representing all RPC extensions.
-pub type RpcExtension = jsonrpsee::RpcModule<()>;
+use jsonrpsee::RpcModule;
 
 /// Full client dependencies
 pub struct FullDeps<C, P> {
@@ -43,7 +43,7 @@ pub struct FullDeps<C, P> {
 }
 
 /// Instantiate all RPC extensions.
-pub fn create_full<C, P>(deps: FullDeps<C, P>) -> Result<RpcExtension, Box<dyn std::error::Error + Send + Sync>>
+pub fn create_full<C, P>(deps: FullDeps<C, P>) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
 	C: ProvideRuntimeApi<Block>
 		+ HeaderBackend<Block>
@@ -60,7 +60,7 @@ where
 	use frame_rpc_system::{System, SystemApiServer};
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
 
-	let mut module = RpcExtension::new(());
+	let mut module = RpcModule::new(());
 	let FullDeps { client, pool, deny_unsafe } = deps;
 
 	module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;

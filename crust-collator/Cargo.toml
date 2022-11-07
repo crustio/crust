@@ -42,6 +42,7 @@ sc-telemetry = { git = "https://github.com/paritytech/substrate", branch = "polk
 sc-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 sp-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 sc-network = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
+sc-network-common = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 sc-basic-authorship = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 sp-timestamp = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 sp-blockchain = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
@@ -58,7 +59,7 @@ substrate-prometheus-endpoint = { git = "https://github.com/paritytech/substrate
 sp-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 
 # RPC related dependencies
-jsonrpsee = { version = "0.14.0", features = ["server"] }
+jsonrpsee = { version = "0.15.0", default-features = false, features = [ "macros", "server" ] }
 sc-transaction-pool-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 frame-rpc-system = { package = "substrate-frame-rpc-system", git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }
 pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.29" }

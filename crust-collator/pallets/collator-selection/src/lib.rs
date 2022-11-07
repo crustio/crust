@@ -72,7 +72,8 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{
-		dispatch::{DispatchClass, DispatchResultWithPostInfo},
+		weights::DispatchClass,
+		dispatch::{DispatchResultWithPostInfo},
 		pallet_prelude::*,
 		inherent::Vec,
 		traits::{
@@ -110,7 +111,7 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Overarching event type.
-		type RuntimeEvent: From<RuntimeEvent<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
 		/// The currency mechanism.
 		type Currency: ReservableCurrency<Self::AccountId>;
@@ -227,7 +228,7 @@ pub mod pallet {
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum RuntimeEvent<T: Config> {
+	pub enum Event<T: Config> {
 		NewInvulnerables(Vec<T::AccountId>),
 		NewDesiredCandidates(u32),
 		NewCandidacyBond(BalanceOf<T>),
@@ -265,7 +266,7 @@ pub mod pallet {
 				);
 			}
 			<Invulnerables<T>>::put(&new);
-			Self::deposit_event(RuntimeEvent::NewInvulnerables(new));
+			Self::deposit_event(Event::NewInvulnerables(new));
 			Ok(().into())
 		}
 
@@ -279,7 +280,7 @@ pub mod pallet {
 				);
 			}
 			<DesiredCandidates<T>>::put(&max);
-			Self::deposit_event(RuntimeEvent::NewDesiredCandidates(max));
+			Self::deposit_event(Event::NewDesiredCandidates(max));
 			Ok(().into())
 		}
 
@@ -287,7 +288,7 @@ pub mod pallet {
 		pub fn set_candidacy_bond(origin: OriginFor<T>, bond: BalanceOf<T>) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 			<CandidacyBond<T>>::put(&bond);
-			Self::deposit_event(RuntimeEvent::NewCandidacyBond(bond));
+			Self::deposit_event(Event::NewCandidacyBond(bond));
 			Ok(().into())
 		}
 
@@ -316,7 +317,7 @@ pub mod pallet {
 					}
 				})?;
 
-			Self::deposit_event(RuntimeEvent::CandidateAdded(who, deposit));
+			Self::deposit_event(Event::CandidateAdded(who, deposit));
 			Ok(Some(T::WeightInfo::register_as_candidate(current_count as u32)).into())
 		}
 
@@ -344,7 +345,7 @@ pub mod pallet {
 				<LastAuthoredBlock<T>>::remove(who.clone());
 				Ok(candidates.len())
 			});
-			Self::deposit_event(RuntimeEvent::CandidateRemoved(who.clone()));
+			Self::deposit_event(Event::CandidateRemoved(who.clone()));
 			current_count
 		}
 

@@ -39,9 +39,9 @@ construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
-		System: frame_system::{Pallet, RuntimeCall, Config, Storage, RuntimeEvent<T>},
-		Balances: pallet_balances::{Pallet, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
-		AssetManager: pallet_asset_manager::{Pallet, RuntimeCall, Storage, RuntimeEvent<T>},
+		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		AssetManager: pallet_asset_manager::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -53,7 +53,7 @@ impl frame_system::Config for Test {
 	type BlockWeights = ();
 	type BlockLength = ();
 	type Origin = Origin;
-	type RuntimeCall = RuntimeCall;
+	type Call = Call;
 	type Index = u64;
 	type BlockNumber = u64;
 	type Hash = H256;
@@ -61,7 +61,7 @@ impl frame_system::Config for Test {
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type RuntimeEvent = RuntimeEvent;
+	type Event = Event;
 	type BlockHashCount = BlockHashCount;
 	type DbWeight = ();
 	type Version = ();
@@ -82,7 +82,7 @@ parameter_types! {
 impl pallet_balances::Config for Test {
 	type Balance = u64;
 	type DustRemoval = ();
-	type RuntimeEvent = RuntimeEvent;
+	type Event = Event;
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
 	type WeightInfo = ();
@@ -160,7 +160,7 @@ impl AssetRegistrar<Test> for MockAssetPalletRegistrar {
 }
 
 impl Config for Test {
-	type RuntimeEvent = RuntimeEvent;
+	type Event = Event;
 	type Balance = u64;
 	type AssetId = u32;
 	type AssetRegistrarMetadata = u32;
@@ -180,12 +180,12 @@ pub(crate) fn new_test_ext() -> sp_io::TestExternalities {
 	ext
 }
 
-pub(crate) fn events() -> Vec<super::RuntimeEvent<Test>> {
+pub(crate) fn events() -> Vec<super::Event<Test>> {
 	System::events()
 		.into_iter()
 		.map(|r| r.event)
 		.filter_map(|e| {
-			if let RuntimeEvent::AssetManager(inner) = e {
+			if let Event::AssetManager(inner) = e {
 				Some(inner)
 			} else {
 				None
@@ -194,6 +194,6 @@ pub(crate) fn events() -> Vec<super::RuntimeEvent<Test>> {
 		.collect::<Vec<_>>()
 }
 
-pub fn expect_events(e: Vec<super::RuntimeEvent<Test>>) {
+pub fn expect_events(e: Vec<super::Event<Test>>) {
 	assert_eq!(events(), e);
 }

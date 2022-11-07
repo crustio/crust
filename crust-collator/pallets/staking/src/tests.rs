@@ -1642,7 +1642,7 @@ fn bond_extra_works() {
         // Give account 11 some large free balance greater than total
         let _ = Balances::make_free_balance_be(&11, 1500);
 
-        // RuntimeCall the bond_extra function from controller, add only 100
+        // Call the bond_extra function from controller, add only 100
         assert_ok!(Staking::bond_extra(Origin::signed(11), 100));
         // There should be 100 more `total` and `active` in the ledger
         assert_eq!(
@@ -1656,7 +1656,7 @@ fn bond_extra_works() {
             })
         );
 
-        // RuntimeCall the bond_extra function with a large number, should handle it
+        // Call the bond_extra function with a large number, should handle it
         assert_ok!(Staking::bond_extra(Origin::signed(11), u128::max_value()));
         // The full amount of the funds should now be in the total and active
         assert_eq!(
@@ -1674,7 +1674,7 @@ fn bond_extra_works() {
         // Give account 11 some large free balance greater than total
         let _ = Balances::make_free_balance_be(&11, 1000000);
 
-        // RuntimeCall the bond_extra function from controller, add only 100
+        // Call the bond_extra function from controller, add only 100
         assert_ok!(Staking::bond_extra(Origin::signed(11), u128::max_value()));
         // There is no limits
         assert_eq!(

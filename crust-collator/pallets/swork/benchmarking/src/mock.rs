@@ -49,7 +49,7 @@ impl system::Config for Test {
     type BlockWeights = BlockWeights;
     type BlockLength = ();
     type Origin = Origin;
-    type RuntimeCall = RuntimeCall;
+    type Call = Call;
     type Index = u64;
     type BlockNumber = u64;
     type Hash = H256;
@@ -57,7 +57,7 @@ impl system::Config for Test {
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
-    type RuntimeEvent = ();
+    type Event = ();
     type BlockHashCount = BlockHashCount;
     type DbWeight = RocksDbWeight;
     type Version = ();
@@ -72,7 +72,7 @@ impl system::Config for Test {
 impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
-    type RuntimeEvent = ();
+    type Event = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
@@ -101,7 +101,7 @@ impl market::Config for Test {
     type Currency = balances::Module<Self>;
     type SworkerInterface = Swork;
     type BenefitInterface = TestBenefitInterface;
-    type RuntimeEvent = ();
+    type Event = ();
     /// File duration.
     type FileDuration = FileDuration;
     type LiquidityDuration = LiquidityDuration;
@@ -157,7 +157,7 @@ parameter_types! {
 
 impl swork::Config for Test {
     type Currency = balances::Module<Self>;
-    type RuntimeEvent = ();
+    type Event = ();
     type PunishmentSlots = PunishmentSlots;
     type Works = TestWorksInterface;
     type MarketInterface = Market;
@@ -177,10 +177,10 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, RuntimeCall, Config, Storage, RuntimeEvent<T>},
-		Balances: balances::{Module, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
-		Swork: swork::{Module, RuntimeCall, Storage, RuntimeEvent<T>, Config<T>},
-		Market: market::{Module, RuntimeCall, Storage, RuntimeEvent<T>, Config},
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
+		Market: market::{Module, Call, Storage, Event<T>, Config},
 	}
 );
 

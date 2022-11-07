@@ -43,9 +43,9 @@ macro_rules! whitelist {
 	};
 }
 
-fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
+fn assert_last_event<T: Config>(generic_event: <T as Config>::Event) {
 	let events = frame_system::Pallet::<T>::events();
-	let system_event: <T as frame_system::Config>::RuntimeEvent = generic_event.into();
+	let system_event: <T as frame_system::Config>::Event = generic_event.into();
 	// compare to the last event record
 	let EventRecord { event, .. } = &events[events.len() - 1];
 	assert_eq!(event, &system_event);
@@ -73,7 +73,7 @@ benchmarks! {
 		);
 	}
 	verify {
-		assert_last_event::<T>(RuntimeEvent::NewInvulnerables(new_invulnerables).into());
+		assert_last_event::<T>(Event::NewInvulnerables(new_invulnerables).into());
 	}
 
 	set_desired_candidates {
@@ -85,7 +85,7 @@ benchmarks! {
 		);
 	}
 	verify {
-		assert_last_event::<T>(RuntimeEvent::NewDesiredCandidates(max).into());
+		assert_last_event::<T>(Event::NewDesiredCandidates(max).into());
 	}
 
 	set_candidacy_bond {
@@ -97,7 +97,7 @@ benchmarks! {
 		);
 	}
 	verify {
-		assert_last_event::<T>(RuntimeEvent::NewCandidacyBond(bond).into());
+		assert_last_event::<T>(Event::NewCandidacyBond(bond).into());
 	}
 
 	// worse case is when we have all the max-candidate slots filled except one, and we fill that
@@ -115,7 +115,7 @@ benchmarks! {
 
 	}: _(RawOrigin::Signed(caller.clone()))
 	verify {
-		assert_last_event::<T>(RuntimeEvent::CandidateAdded(caller, bond / 2u32.into()).into());
+		assert_last_event::<T>(Event::CandidateAdded(caller, bond / 2u32.into()).into());
 	}
 
 	// worse case is the last candidate leaving.
@@ -129,7 +129,7 @@ benchmarks! {
 		whitelist!(leaving);
 	}: _(RawOrigin::Signed(leaving.clone()))
 	verify {
-		assert_last_event::<T>(RuntimeEvent::CandidateRemoved(leaving).into());
+		assert_last_event::<T>(Event::CandidateRemoved(leaving).into());
 	}
 
 	// worse case is paying a non-existing candidate account.

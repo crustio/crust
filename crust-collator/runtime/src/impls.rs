@@ -84,7 +84,7 @@ impl<T, C, R, OU> OnChargeTransaction<T> for CurrencyAdapter<C, R, OU>
         C::NegativeImbalance:
         Imbalance<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance, Opposite = C::PositiveImbalance>,
         OU: OnUnbalanced<NegativeImbalanceOf<C, T>>,
-        T::RuntimeCall: GetCallMetadata,
+        T::Call: GetCallMetadata,
 {
     type LiquidityInfo = Option<NegativeImbalanceOf<C, T>>;
     type Balance = <C as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -94,8 +94,8 @@ impl<T, C, R, OU> OnChargeTransaction<T> for CurrencyAdapter<C, R, OU>
     /// Note: The `fee` already includes the `tip`.
     fn withdraw_fee(
         who: &T::AccountId,
-        call: &T::RuntimeCall,
-        _info: &DispatchInfoOf<T::RuntimeCall>,
+        call: &T::Call,
+        _info: &DispatchInfoOf<T::Call>,
         fee: Self::Balance,
         tip: Self::Balance,
     ) -> Result<Self::LiquidityInfo, TransactionValidityError> {
@@ -130,8 +130,8 @@ impl<T, C, R, OU> OnChargeTransaction<T> for CurrencyAdapter<C, R, OU>
     /// Note: The `fee` already includes the `tip`.
     fn correct_and_deposit_fee(
         who: &T::AccountId,
-        _dispatch_info: &DispatchInfoOf<T::RuntimeCall>,
-        _post_info: &PostDispatchInfoOf<T::RuntimeCall>,
+        _dispatch_info: &DispatchInfoOf<T::Call>,
+        _post_info: &PostDispatchInfoOf<T::Call>,
         corrected_fee: Self::Balance,
         tip: Self::Balance,
         already_withdrawn: Self::LiquidityInfo,
@@ -149,7 +149,7 @@ impl<T, C, R, OU> OnChargeTransaction<T> for CurrencyAdapter<C, R, OU>
                 .offset(refund_imbalance)
                 .same()
                 .map_err(|_| TransactionValidityError::Invalid(InvalidTransaction::Payment))?;
-            // RuntimeCall someone else to handle the imbalance (fee and tip separately)
+            // Call someone else to handle the imbalance (fee and tip separately)
             let imbalances = adjusted_paid.split(tip);
             OU::on_unbalanceds(Some(imbalances.0).into_iter().chain(Some(imbalances.1)));
         }

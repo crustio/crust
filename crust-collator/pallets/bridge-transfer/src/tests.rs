@@ -5,7 +5,7 @@
 
 use super::mock::{
 	assert_events, balances, expect_event, new_test_ext, Balances, Bridge,
-	BridgeTransfer, RuntimeCall, RuntimeEvent, Origin, ProposalLifetime, ENDOWED_BALANCE, RELAYER_A,
+	BridgeTransfer, Call, Event, Origin, ProposalLifetime, ENDOWED_BALANCE, RELAYER_A,
 	RELAYER_B, RELAYER_C, BridgeTokenId
 };
 
@@ -28,9 +28,9 @@ fn blake2_128(data: &[u8]) -> [u8; 16] {
 
 const TEST_THRESHOLD: u32 = 2;
 
-fn make_transfer_proposal(to: u64, amount: u64) -> RuntimeCall {
+fn make_transfer_proposal(to: u64, amount: u64) -> Call {
 	let resource_id = BridgeTokenId::get();
-	RuntimeCall::BridgeTransfer(crate::RuntimeCall::transfer { to: to, amount: amount.into(), _rid: resource_id })
+	Call::BridgeTransfer(crate::Call::transfer { to: to, amount: amount.into(), _rid: resource_id })
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn transfer() {
 		assert_eq!(Balances::free_balance(&bridge_id), ENDOWED_BALANCE - 10);
 		assert_eq!(Balances::free_balance(RELAYER_A), ENDOWED_BALANCE + 10);
 
-		assert_events(vec![RuntimeEvent::balances(balances::RuntimeEvent::Transfer(
+		assert_events(vec![Event::balances(balances::Event::Transfer(
 			Bridge::account_id(),
 			RELAYER_A,
 			10,
@@ -171,16 +171,16 @@ fn create_sucessful_transfer_proposal() {
 		);
 
 		assert_events(vec![
-			RuntimeEvent::bridge(bridge::RawEvent::VoteFor(src_id, prop_id, RELAYER_A)),
-			RuntimeEvent::bridge(bridge::RawEvent::VoteAgainst(src_id, prop_id, RELAYER_B)),
-			RuntimeEvent::bridge(bridge::RawEvent::VoteFor(src_id, prop_id, RELAYER_C)),
-			RuntimeEvent::bridge(bridge::RawEvent::ProposalApproved(src_id, prop_id)),
-			RuntimeEvent::balances(balances::RuntimeEvent::Transfer(
+			Event::bridge(bridge::RawEvent::VoteFor(src_id, prop_id, RELAYER_A)),
+			Event::bridge(bridge::RawEvent::VoteAgainst(src_id, prop_id, RELAYER_B)),
+			Event::bridge(bridge::RawEvent::VoteFor(src_id, prop_id, RELAYER_C)),
+			Event::bridge(bridge::RawEvent::ProposalApproved(src_id, prop_id)),
+			Event::balances(balances::Event::Transfer(
 				Bridge::account_id(),
 				RELAYER_A,
 				10,
 			)),
-			RuntimeEvent::bridge(bridge::RawEvent::ProposalSucceeded(src_id, prop_id)),
+			Event::bridge(bridge::RawEvent::ProposalSucceeded(src_id, prop_id)),
 		]);
 	})
 }

@@ -38,7 +38,6 @@ use frame_support::pallet;
 pub use pallet::*;
 #[cfg(any(test, feature = "runtime-benchmarks"))]
 mod benchmarks;
-pub mod migrations;
 #[cfg(test)]
 pub mod mock;
 #[cfg(test)]
@@ -99,7 +98,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		type RuntimeEvent: From<RuntimeEvent<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
 		/// The Asset Id. This will be used to register the asset in Assets
 		type AssetId: Member + Parameter + Default + Copy + HasCompact + MaxEncodedLen;
@@ -133,7 +132,7 @@ pub mod pallet {
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(crate) fn deposit_event)]
-	pub enum RuntimeEvent<T: Config> {
+	pub enum Event<T: Config> {
 		/// New asset with the asset manager is registered
 		AssetRegistered {
 			asset_id: T::AssetId,
@@ -190,7 +189,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Register new asset with the asset manager
-		#[pallet::weight(T::WeightInfo::register_asset())]
+		#[pallet::weight(T::WeightInfo::register_foreign_asset())]
 		pub fn register_asset(
 			origin: OriginFor<T>,
 			asset: T::AssetType,
@@ -211,7 +210,7 @@ pub mod pallet {
 			AssetIdType::<T>::insert(&asset_id, &asset);
 			AssetTypeId::<T>::insert(&asset, &asset_id);
 
-			Self::deposit_event(RuntimeEvent::AssetRegistered {
+			Self::deposit_event(Event::AssetRegistered {
 				asset_id,
 				asset,
 				metadata,
@@ -250,7 +249,7 @@ pub mod pallet {
 
 			AssetTypeUnitsPerSecond::<T>::insert(&asset_type, &units_per_second);
 
-			Self::deposit_event(RuntimeEvent::UnitsPerSecondChanged {
+			Self::deposit_event(Event::UnitsPerSecondChanged {
 				asset_type,
 				units_per_second,
 			});
@@ -307,7 +306,7 @@ pub mod pallet {
 				AssetTypeUnitsPerSecond::<T>::insert(&new_asset_type, units);
 			}
 
-			Self::deposit_event(RuntimeEvent::AssetTypeChanged {
+			Self::deposit_event(Event::AssetTypeChanged {
 				asset_id,
 				new_asset_type,
 			});
@@ -341,7 +340,7 @@ pub mod pallet {
 			// Remove
 			AssetTypeUnitsPerSecond::<T>::remove(&asset_type);
 
-			Self::deposit_event(RuntimeEvent::SupportedAssetRemoved { asset_type });
+			Self::deposit_event(Event::SupportedAssetRemoved { asset_type });
 			Ok(())
 		}
 
@@ -380,7 +379,7 @@ pub mod pallet {
 			// Insert
 			SupportedFeePaymentAssets::<T>::put(supported_assets);
 
-			Self::deposit_event(RuntimeEvent::AssetRemoved {
+			Self::deposit_event(Event::AssetRemoved {
 				asset_id,
 				asset_type,
 			});

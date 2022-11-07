@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
 use frame_support::pallet;
+
 pub use pallet::*;
 
 #[pallet]
@@ -27,7 +27,7 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Overarching event type.
-		type RuntimeEvent: From<RuntimeEvent<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
 		type XcmpMessageSender: SendXcm;
 
@@ -57,7 +57,7 @@ pub mod pallet {
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(crate) fn deposit_event)]
-	pub enum RuntimeEvent<T: Config> {
+	pub enum Event<T: Config> {
 		/// New asset with the asset manager is registered
 		FileSuccess {
 			account: T::AccountId,
@@ -86,7 +86,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			Self::deposit_event(RuntimeEvent::FileSuccess {
+			Self::deposit_event(Event::FileSuccess {
 				account: who,
 				cid,
 				size,
@@ -122,7 +122,7 @@ pub mod pallet {
 			T::AssetTransactor::internal_transfer_asset(&fee.clone().into(), &origin_as_mult, &dest_as_mult)
 				.map_err(|_| Error::<T>::UnableToTransferStorageFee)?;
 
-			Self::deposit_event(RuntimeEvent::FileSuccess {
+			Self::deposit_event(Event::FileSuccess {
 				account: who,
 				cid,
 				size,
@@ -144,7 +144,7 @@ pub mod pallet {
 
 			<StorageFeePerCurrency<T>>::insert(currency_id.clone(), amount);
 
-			Self::deposit_event(RuntimeEvent::StorageFeeRegistered {
+			Self::deposit_event(Event::StorageFeeRegistered {
 				currency_id,
 				amount,
 			});

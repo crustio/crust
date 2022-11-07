@@ -132,7 +132,7 @@ parameter_types! {
 impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type Origin = Origin;
-    type RuntimeCall = RuntimeCall;
+    type Call = Call;
     type Index = u64;
     type BlockNumber = BlockNumber;
     type Hash = H256;
@@ -140,7 +140,7 @@ impl frame_system::Config for Test {
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
-    type RuntimeEvent = ();
+    type Event = ();
     type BlockHashCount = BlockHashCount;
     type DbWeight = RocksDbWeight;
     type Version = ();
@@ -160,7 +160,7 @@ parameter_types! {
 impl balances::Config for Test {
     type Balance = Balance;
     type DustRemoval = ();
-    type RuntimeEvent = ();
+    type Event = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
@@ -178,7 +178,7 @@ sp_runtime::impl_opaque_keys! {
 	}
 }
 impl pallet_session::Config for Test {
-    type RuntimeEvent = ();
+    type Event = ();
     type ValidatorId = AccountId;
     type ValidatorIdOf = crate::StashOf<Test>;
     type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
@@ -266,7 +266,7 @@ parameter_types! {
 
 impl swork::Config for Test {
     type Currency = Balances;
-    type RuntimeEvent = ();
+    type Event = ();
     type PunishmentSlots = PunishmentSlots;
     type Works = TestStaking;
     type MarketInterface = TestStaking;
@@ -291,7 +291,7 @@ impl Config for Test {
     type UnixTime = Timestamp;
     type CurrencyToVote = CurrencyToVoteHandler;
     type RewardRemainder = ();
-    type RuntimeEvent = ();
+    type Event = ();
     type Slash = ();
     type Reward = ();
     type Randomness = TestRandomness;
@@ -318,12 +318,12 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Module, RuntimeCall, Config, Storage, RuntimeEvent<T>},
-		Timestamp: pallet_timestamp::{Module, RuntimeCall, Storage, Inherent},
-		Balances: balances::{Module, RuntimeCall, Storage, Config<T>, RuntimeEvent<T>},
-		Staking: staking::{Module, RuntimeCall, Config<T>, Storage, RuntimeEvent<T>},
-		Session: pallet_session::{Module, RuntimeCall, Storage, RuntimeEvent, Config<T>},
-		Swork: swork::{Module, RuntimeCall, Storage, RuntimeEvent<T>, Config<T>},
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
+		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Staking: staking::{Module, Call, Config<T>, Storage, Event<T>},
+		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
+		Swork: swork::{Module, Call, Storage, Event<T>, Config<T>},
 	}
 );
 

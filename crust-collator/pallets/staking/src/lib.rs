@@ -303,7 +303,7 @@ pub trait Config: frame_system::Config {
     type RewardRemainder: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
     /// The overarching event type.
-    type RuntimeEvent: From<RuntimeEvent<Self>> + Into<<Self as frame_system::Config>::RuntimeEvent>;
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
     /// Handler for the unbalanced increment when rewarding a staker.
     type Reward: OnUnbalanced<PositiveImbalanceOf<Self>>;
@@ -504,7 +504,7 @@ decl_storage! {
 }
 
 decl_event!(
-    pub enum RuntimeEvent<T> where
+    pub enum Event<T> where
         Balance = BalanceOf<T>,
         <T as frame_system::Config>::AccountId
     {
@@ -573,7 +573,7 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum RuntimeCall where origin: T::Origin {
+    pub struct Module<T: Config> for enum Call where origin: T::Origin {
         /// Number of eras that staked funds must remain bonded for.
         const BondingDuration: EraIndex = T::BondingDuration::get();
         
@@ -722,7 +722,7 @@ decl_module! {
         /// the funds out of management ready for transfer.
         ///
         /// No more than a limited number of unlocking chunks (see `MAX_UNLOCKING_CHUNKS`)
-        /// can co-exists at the same time. In that case, [`RuntimeCall::withdraw_unbonded`] need
+        /// can co-exists at the same time. In that case, [`Call::withdraw_unbonded`] need
         /// to be called first to remove some of the chunks (if possible).
         ///
         /// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
@@ -730,7 +730,7 @@ decl_module! {
         ///
         /// Emits `Unbonded`.
         ///
-        /// See also [`RuntimeCall::withdraw_unbonded`].
+        /// See also [`Call::withdraw_unbonded`].
         ///
         /// # <weight>
         /// - Independent of the arguments. Limited but potentially exploitable complexity.
@@ -824,7 +824,7 @@ decl_module! {
         ///
         /// Emits `Withdrawn`.
         ///
-        /// See also [`RuntimeCall::unbond`].
+        /// See also [`Call::unbond`].
         ///
         /// # <weight>
         /// - Could be dependent on the `origin` argument and how much `unlocking` chunks exist.

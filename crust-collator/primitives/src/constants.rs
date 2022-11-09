@@ -31,7 +31,7 @@ pub mod time {
     //	pub const MILLISECS_PER_BLOCK: Moment = 1000;
     pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
     // Alpha
-    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 10 * MINUTES;
+    pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 1 * HOURS;
     // Mainnet
     //	pub const EPOCH_DURATION_IN_BLOCKS: BlockNumber = 4 * HOURS;
     // Testnet
@@ -54,8 +54,45 @@ pub mod fee {
     pub const TARGET_BLOCK_FULLNESS: Perbill = Perbill::from_percent(25);
 }
 
+pub mod staking {
+    use crate::Balance;
+    // The reward decrease ratio per year
+    pub const REWARD_DECREASE_RATIO: (Balance, Balance) = (88, 100);
+    // The minimal reward ratio
+    pub const MIN_REWARD_RATIO: (Balance, Balance) = (28, 1000);
+    // The start year for extra reward
+    pub const EXTRA_REWARD_START_YEAR: u64 = 4;
+}
+
 pub mod swork {
     use super::time::*;
 
+    // Use different settings in the test
+    #[cfg(feature = "test")]
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64 * 3;
+    #[cfg(not(feature = "test"))]
+    pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
+
+    pub const UPDATE_OFFSET: u32 = (REPORT_SLOT / 3) as u32;
+    pub const END_OFFSET: u32 = 1;
+}
+
+pub mod market {
+    pub const BASE_FEE_UPDATE_SLOT: u32 = 600;
+    pub const BASE_FEE_UPDATE_OFFSET: u32 = 22;
+
+    pub const PRICE_UPDATE_SLOT: u32 = 10;
+    pub const PRICE_UPDATE_OFFSET: u32 = 3;
+    pub const FILES_COUNT_REFERENCE: u32 = 20_000_000; // 20_000_000 / 50_000_000 = 40%
+
+    pub const SPOWER_UPDATE_SLOT: u32 = 100;
+    pub const SPOWER_UPDATE_OFFSET: u32 = 7;
+    pub const MAX_PENDING_FILES: usize = 20;
+
+
+    // Use different settings in the test
+    #[cfg(feature = "test")]
+    pub const COLLATERAL_RATIO: u32 = 10;
+    #[cfg(not(feature = "test"))]
+    pub const COLLATERAL_RATIO: u32 = 1;
 }

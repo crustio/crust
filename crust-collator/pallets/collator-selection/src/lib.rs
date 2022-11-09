@@ -72,7 +72,8 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{
-		dispatch::DispatchResultWithPostInfo,
+		weights::DispatchClass,
+		dispatch::{DispatchResultWithPostInfo},
 		pallet_prelude::*,
 		inherent::Vec,
 		traits::{
@@ -86,13 +87,13 @@ pub mod pallet {
 		sp_runtime::{
 			RuntimeDebug,
 			traits::{AccountIdConversion, CheckedSub, Zero, Saturating},
-		},
-		weights::DispatchClass,
+		}
 	};
 	use core::ops::Div;
 	use pallet_session::SessionManager;
 	use sp_staking::SessionIndex;
 	pub use crate::weights::WeightInfo;
+	use sp_std::convert::TryInto;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as SystemConfig>::AccountId>>::Balance;
@@ -150,6 +151,7 @@ pub mod pallet {
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
+	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
 	/// The invulnerable, fixed collators.
@@ -332,7 +334,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Get a unique, inaccessible account id from the `PotId`.
 		pub fn account_id() -> T::AccountId {
-			T::PotId::get().into_account()
+			T::PotId::get().into_account_truncating()
 		}
 		/// Removes a candidate if they exist and sends them back their deposit
 		fn try_remove_candidate(who: &T::AccountId) -> Result<usize, DispatchError> {

@@ -66,7 +66,7 @@ function build_bin {
   echo_c 33 "Using build dir: $BUILD_DIR"
 
   log_success "Preparing docker build image, running docker pull"
-  docker pull crustio/crust-env:${TOOLCHAIN_VER}
+  docker pull paritytech/crust-env:${TOOLCHAIN_VER}
   if [ $? -ne 0 ]; then
     echo "Failed to pull docker image."
     exit 1
@@ -91,7 +91,7 @@ function build_bin {
   CMD="$CMD cargo build --release;"
 
   log_info "Building command: $CMD"
-  docker run --workdir /opt/crust --cidfile $CIDFILE -i -t --env CARGO_HOME=/opt/cache $RUN_OPTS crustio/crust-env:${TOOLCHAIN_VER} /bin/bash -c "$CMD"
+  docker run --workdir /opt/crust --cidfile $CIDFILE -i -t --env CARGO_HOME=/opt/cache $RUN_OPTS paritytech/crust-env:${TOOLCHAIN_VER} /bin/bash -c "$CMD"
   CID=`cat $CIDFILE`
   log_info "Cleanup temp container $CID"
   docker rm $CID

@@ -1,4 +1,4 @@
-# Crust &middot; [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcrustio%2Fcrust%2Fbadge&style=flat)](https://github.com/crustio/crust/actions?query=workflow%3A%22Crust+CI%22) [![Substrate version](https://img.shields.io/badge/Substrate-2.0.0-blue?logo=Parity%20Substrate)](https://substrate.dev/) [![GitHub license](https://img.shields.io/github/license/crustio/crust)](LICENSE)
+# Crust &middot; [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcrustio%2Fcrust%2Fbadge&style=flat)](https://github.com/paritytech/crust/actions?query=workflow%3A%22Crust+CI%22) [![Substrate version](https://img.shields.io/badge/Substrate-2.0.0-blue?logo=Parity%20Substrate)](https://substrate.dev/) [![GitHub license](https://img.shields.io/github/license/paritytech/crust)](LICENSE)
 
 <a href='https://web3.foundation/'><img width='160' alt='Funded by web3 foundation' src='docs/img/web3f_grants_badge.png'></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='https://builders.parity.io/'><img width='180' src='docs/img/sbp_grants_badge.png'></a>
 
@@ -6,7 +6,7 @@ Implementation of a [Crust protocol](https://crust.network) node with [substrate
 
 ## Join to play
 
-Go to our [Crust Node](https://github.com/crustio/crust-node), follow the README.
+Go to our [Crust Node](https://github.com/paritytech/crust-node), follow the README.
 
 ## Building
 
@@ -34,7 +34,7 @@ cargo build --release
 
 ### Build from docker
 
-Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust) to see how to build and run crust with docker.
+Refer [this](https://github.com/paritytech/crust/tree/master/docker#dockerize-crust) to see how to build and run crust with docker.
 
 ## Network
 
@@ -44,7 +44,7 @@ Refer [this](https://github.com/crustio/crust/tree/master/docker#dockerize-crust
 ./target/release/crust --chain=maxwell
 ```
 
-Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Maxwell-1.0-User-Guide).
+Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/paritytech/crust/wiki/Maxwell-1.0-User-Guide).
 
 ### 2. Connect to rocky
 
@@ -54,7 +54,7 @@ Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github
 ./target/release/crust --chain=rocky
 ```
 
-Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/crustio/crust/wiki/Join-Crust-Rocky).
+Get the bootnodes from *Crust Network Team*, see more from [wiki](https://github.com/paritytech/crust/wiki/Join-Crust-Rocky).
 
 ### 3. Run as dev
 
@@ -103,8 +103,8 @@ Additional CLI usage options are available and may be shown by running `cargo ru
 
 ## Contribution
 
-Please follow the contributions guidelines as outlined in [docs/CONTRIBUTION.md](https://github.com/crustio/crust/blob/master/docs/CONTRIBUTION.md). In all communications and contributions, this project follows the [Contributor Covenant Code of Conduct](https://github.com/paritytech/substrate/blob/master/docs/CODE_OF_CONDUCT.adoc).
+Please follow the contributions guidelines as outlined in [docs/CONTRIBUTION.md](https://github.com/paritytech/crust/blob/master/docs/CONTRIBUTION.md). In all communications and contributions, this project follows the [Contributor Covenant Code of Conduct](https://github.com/paritytech/substrate/blob/master/docs/CODE_OF_CONDUCT.adoc).
 
 ## License
 
-[GPL V3.0](https://github.com/crustio/crust/blob/master/LICENSE)
+[GPL V3.0](https://github.com/paritytech/crust/blob/master/LICENSE)

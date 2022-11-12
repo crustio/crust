@@ -33,7 +33,7 @@ pub mod pallet {
     use frame_support::{
         pallet_prelude::*,
         traits::{
-            Currency,
+            Currency, WithdrawReasons,
             ExistenceRequirement::AllowDeath,
         },
     };
@@ -43,6 +43,7 @@ pub mod pallet {
     use sp_core::U256;
     use sp_std::convert::TryInto;
     use sp_std::vec::Vec;
+    use sp_runtime::traits::StaticLookup;
     use cstrml_bridge as bridge;
 
     #[pallet::pallet]
@@ -54,6 +55,14 @@ pub mod pallet {
     #[pallet::getter(fn bridge_fee)]
     pub type BridgeFee<T: Config> =
         StorageMap<_, Blake2_256, u8, (BalanceOf<T>, u32), ValueQuery>;
+
+    #[pallet::storage]
+	#[pallet::getter(fn bridge_limit)]
+	pub(super) type BridgeLimit<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+    #[pallet::storage]
+	#[pallet::getter(fn superior)]
+	pub(super) type Superior<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
     /// Configure the pallet by specifying the parameters and types on which it depends.
     #[pallet::config]
@@ -80,6 +89,10 @@ pub mod pallet {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         FeeUpdated(u8, BalanceOf<T>, u32),
+        /// Someone be the new superior
+        SuperiorChanged(T::AccountId),
+        /// Set limit successfully
+        SetLimitSuccess(BalanceOf<T>),
     }
 
     // Errors inform users that something went wrong.
@@ -90,7 +103,10 @@ pub mod pallet {
 		InvalidPayload,
 		InvalidFeeOption,
 		FeeOptionsMissiing,
-		LessThanFee
+		LessThanFee,
+        /// Superior not exist, should set it first
+        IllegalSuperior,
+        ExceedBridgeLimit
     }
 
     // Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -108,12 +124,42 @@ pub mod pallet {
 			Ok(())
 		}
 
+        #[pallet::weight(1000)]
+        pub fn change_superior(origin: OriginFor<T>, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
+            ensure_root(origin)?;
+
+            let new_superior = T::Lookup::lookup(new_superior)?;
+
+            Superior::<T>::put(new_superior.clone());
+
+            Self::deposit_event(Event::SuperiorChanged(new_superior));
+
+            Ok(())
+        }
+
+        #[pallet::weight(1000)]
+        pub fn set_bridge_limit(origin: OriginFor<T>, limit: BalanceOf<T>) -> DispatchResult {
+            let signer = ensure_signed(origin)?;
+            let maybe_superior = Self::superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::IllegalSuperior);
+
+            // 2. Check if signer is superior
+            ensure!(Some(&signer) == maybe_superior.as_ref(), Error::<T>::IllegalSuperior);
+
+            // 3. Set claim limit
+            BridgeLimit::<T>::put(limit);
+
+            Self::deposit_event(Event::SetLimitSuccess(limit));
+            Ok(())
+        }
+
 		/// Transfers some amount of the native token to some recipient on a (whitelisted) destination chain.
 		#[pallet::weight(195_000_000)]
 		pub fn transfer_native(origin: OriginFor<T>, amount: BalanceOf<T>, recipient: Vec<u8>, dest_id: u8) -> DispatchResult {
 			let source = ensure_signed(origin)?;
 			ensure!(<bridge::Pallet<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
-			let bridge_id = <bridge::Pallet<T>>::account_id();
 			ensure!(BridgeFee::<T>::contains_key(&dest_id), Error::<T>::FeeOptionsMissiing);
 			let (min_fee, fee_scale) = Self::bridge_fee(dest_id);
 			let fee_estimated = amount * fee_scale.into() / 1000u32.into();
@@ -123,7 +169,7 @@ pub mod pallet {
 				min_fee
 			};
 			ensure!(amount > fee, Error::<T>::LessThanFee);
-			T::Currency::transfer(&source, &bridge_id, amount.into(), AllowDeath)?;
+			T::Currency::withdraw(&source, amount.into(), WithdrawReasons::all(), AllowDeath)?;
 
 			<bridge::Pallet<T>>::transfer_fungible(dest_id, T::BridgeTokenId::get(), recipient, U256::from(amount.saturating_sub(fee).saturated_into::<u128>()))
 		}
@@ -135,8 +181,10 @@ pub mod pallet {
 		/// Executes a simple currency transfer using the bridge account as the source
 		#[pallet::weight(195_000_000)]
 		pub fn transfer(origin: OriginFor<T>, to: T::AccountId, amount: BalanceOf<T>, _rid: [u8; 32]) -> DispatchResult {
-			let source = T::BridgeOrigin::ensure_origin(origin)?;
-			<T as Config>::Currency::transfer(&source, &to, amount.into(), AllowDeath)?;
+			let _source = T::BridgeOrigin::ensure_origin(origin)?;
+            // 1. Check bridge limit
+            ensure!(Self::bridge_limit() >= amount, Error::<T>::ExceedBridgeLimit);
+			<T as Config>::Currency::deposit_creating(&to, amount.into());
 			Ok(())
 		}
 

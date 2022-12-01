@@ -993,8 +993,8 @@ impl bridge::Config for Runtime {
 }
 
 parameter_types! {
-    // bridge::derive_resource_id(1, &bridge::hashing::blake2_128(b"CSM"));
-    pub const BridgeTokenId: [u8; 32] = hex_literal::hex!("00000000000000000000000000000098aef84ac01d96413445cf3dc4d5c44c01");
+    // bridge::derive_resource_id(1, &bridge::hashing::blake2_128(b"CRU"));
+    pub const BridgeTokenId: [u8; 32] = hex_literal::hex!("000000000000000000000000000000608d1bc9a2d146ebc94667c336721b2801");
 }
 
 impl bridge_transfer::Config for Runtime {

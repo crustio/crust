@@ -72,7 +72,8 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{
-		dispatch::DispatchResultWithPostInfo,
+		weights::DispatchClass,
+		dispatch::{DispatchResultWithPostInfo},
 		pallet_prelude::*,
 		inherent::Vec,
 		traits::{
@@ -86,8 +87,7 @@ pub mod pallet {
 		sp_runtime::{
 			RuntimeDebug,
 			traits::{AccountIdConversion, CheckedSub, Zero, Saturating},
-		},
-		weights::DispatchClass,
+		}
 	};
 	use core::ops::Div;
 	use pallet_session::SessionManager;

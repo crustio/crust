@@ -32,12 +32,13 @@ use crust_parachain_primitives::Block;
 use sc_service::{Configuration, PartialComponents, TFullBackend, TFullClient, TaskManager};
 use sc_telemetry::{Telemetry, TelemetryHandle, TelemetryWorker, TelemetryWorkerHandle};
 use sc_network::NetworkService;
+use sc_network_common::service::NetworkBlock;
 use sp_keystore::SyncCryptoStorePtr;
 use std::{sync::Arc, time::Duration};
 use sc_executor::WasmExecutor;
 use cumulus_relay_chain_inprocess_interface::build_inprocess_relay_chain;
 use cumulus_relay_chain_interface::{RelayChainError, RelayChainInterface, RelayChainResult};
-use cumulus_relay_chain_rpc_interface::RelayChainRPCInterface;
+use cumulus_relay_chain_rpc_interface::{create_client_and_start_worker, RelayChainRpcInterface};
 use substrate_prometheus_endpoint::Registry;
 
 use polkadot_service::CollatorPair;
@@ -135,8 +136,8 @@ pub fn new_partial(
 				Ok((time, slot))
 			},
 			registry: config.prometheus_registry().clone(),
-			can_author_with: sp_consensus::AlwaysCanAuthor,
 			spawner: &task_manager.spawn_essential_handle(),
+			can_author_with: sp_consensus::AlwaysCanAuthor,
 			telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
 		})?;
 
@@ -185,8 +186,10 @@ async fn build_relay_chain_interface(
 	collator_options: CollatorOptions,
 ) -> RelayChainResult<(Arc<(dyn RelayChainInterface + 'static)>, Option<CollatorPair>)> {
 	match collator_options.relay_chain_rpc_url {
-		Some(relay_chain_url) =>
-			Ok((Arc::new(RelayChainRPCInterface::new(relay_chain_url).await?) as Arc<_>, None)),
+		Some(relay_chain_url) => {
+			let client = create_client_and_start_worker(relay_chain_url, task_manager).await?;
+			Ok((Arc::new(RelayChainRpcInterface::new(client)) as Arc<_>, None))
+		},
 		None => build_inprocess_relay_chain(
 			polkadot_config,
 			parachain_config,

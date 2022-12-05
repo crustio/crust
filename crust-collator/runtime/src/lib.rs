@@ -492,7 +492,7 @@ parameter_types! {
 	pub SelfReserve: MultiLocation = MultiLocation::here();
 	pub CheckingAccount: AccountId = PalletId(*b"checking").into_account_truncating();
 }
-use xcm_executor::traits::{Convert as LocationConvert, InvertLocation};
+use xcm_executor::traits::Convert as LocationConvert;
 pub struct SiblingAccountId32Aliases<Network, AccountId>(PhantomData<(Network, AccountId)>);
 impl<Network: Get<NetworkId>, AccountId: From<[u8; 32]> + Into<[u8; 32]> + Clone>
 	LocationConvert<MultiLocation, AccountId> for SiblingAccountId32Aliases<Network, AccountId>
@@ -510,26 +510,6 @@ impl<Network: Get<NetworkId>, AccountId: From<[u8; 32]> + Into<[u8; 32]> + Clone
 
 	fn reverse(account: AccountId) -> Result<MultiLocation, AccountId> {
 		Err(account)
-	}
-}
-
-pub struct SiblingAccountId32Aliases<Network, AccountId>(PhantomData<(Network, AccountId)>);
-impl<Network: Get<NetworkId>, AccountId: From<[u8; 32]> + Into<[u8; 32]> + Clone>
-	Convert<MultiLocation, AccountId> for SiblingAccountId32Aliases<Network, AccountId>
-{
-	fn convert_ref(location: impl Borrow<MultiLocation>) -> Result<AccountId, ()> {
-		let id = match location {
-			MultiLocation {
-				parents: 1,
-				interior: Junctions::X2(Parachain(_), AccountId32 { id, network: _ })
-			} => id,
-			_ => return Err(location),
-		}
-		Ok(id.into())
-	}
-
-	fn reverse_ref(_: impl Borrow<AccountId>) -> Result<MultiLocation, ()> {
-		Err(())
 	}
 }
 

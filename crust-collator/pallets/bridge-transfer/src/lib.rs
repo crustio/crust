@@ -184,6 +184,7 @@ pub mod pallet {
 			let _source = T::BridgeOrigin::ensure_origin(origin)?;
             // 1. Check bridge limit
             ensure!(Self::bridge_limit() >= amount, Error::<T>::ExceedBridgeLimit);
+            BridgeLimit::<T>::mutate(|l| *l = l.saturating_sub(amount));
 			<T as Config>::Currency::deposit_creating(&to, amount.into());
 			Ok(())
 		}

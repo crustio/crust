@@ -252,7 +252,7 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: u128 = 10 * CENTS;
+	pub const ExistentialDeposit: u128 = 10 * MILLICENTS;
 	pub const TransferFee: u128 = 0;
 	pub const CreationFee: u128 = 0;
 	pub const TransactionByteFee: u128 = 1;
@@ -1028,11 +1028,11 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 }
 
 parameter_types! {
-    pub const CandidacyBond: Balance = 100 * DOLLARS;
+    pub const CandidacyBond: Balance = 10 * DOLLARS;
     // 1 storage item created, key size is 32 bytes, value size is 16+16.
-    pub const VotingBondBase: Balance = 10 * DOLLARS;
+    pub const VotingBondBase: Balance = 1 * DOLLARS;
     // additional data per vote is 32 bytes (account id).
-    pub const VotingBondFactor: Balance = 1 * DOLLARS;
+    pub const VotingBondFactor: Balance = 10 * CENTS;
     /// Daily council elections
     pub const TermDuration: BlockNumber = 3 * DAYS;
     pub const DesiredMembers: u32 = 7;
@@ -1135,11 +1135,11 @@ impl pallet_treasury::Config for Runtime {
 }
 
 parameter_types! {
-    pub const LaunchPeriod: BlockNumber = 7 * DAYS;
+    pub const LaunchPeriod: BlockNumber = 3 * DAYS;
     pub const VotingPeriod: BlockNumber = 7 * DAYS;
     pub const FastTrackVotingPeriod: BlockNumber = 3 * HOURS;
     pub const InstantAllowed: bool = true;
-    pub const MinimumDeposit: Balance = 10 * DOLLARS;
+    pub const MinimumDeposit: Balance = 1 * DOLLARS;
     pub const EnactmentPeriod: BlockNumber = 8 * DAYS;
     pub const CooloffPeriod: BlockNumber = 7 * DAYS;
     pub const MaxVotes: u32 = 100;
@@ -1150,7 +1150,7 @@ parameter_types! {
 	pub const PreimageMaxSize: u32 = 4096 * 1024;
 	pub const PreimageBaseDeposit: Balance = 1 * DOLLARS;
 	// One cent: $10,000 / MB
-	pub const PreimageByteDeposit: Balance = 1 * CENTS;
+	pub const PreimageByteDeposit: Balance = 10 * MILLICENTS;
 }
 
 impl pallet_democracy::Config for Runtime {

@@ -130,7 +130,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("polkadot-crust-parachain"),
 	impl_name: create_runtime_str!("polkadot-crust-parachain"),
 	authoring_version: 1,
-	spec_version: 2,
+	spec_version: 4,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -196,7 +196,7 @@ parameter_types! {
 		})
 		.avg_block_initialization(AVERAGE_ON_INITIALIZE_RATIO)
 		.build_or_panic();
-	pub const SS58Prefix: u8 = 66;
+	pub const SS58Prefix: u8 = 88;
 }
 
 impl frame_system::Config for Runtime {
@@ -252,7 +252,7 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: u128 = 10 * CENTS;
+	pub const ExistentialDeposit: u128 = 10 * MILLICENTS;
 	pub const TransferFee: u128 = 0;
 	pub const CreationFee: u128 = 0;
 	pub const TransactionByteFee: u128 = 1;
@@ -993,8 +993,8 @@ impl bridge::Config for Runtime {
 }
 
 parameter_types! {
-    // bridge::derive_resource_id(1, &bridge::hashing::blake2_128(b"CSM"));
-    pub const BridgeTokenId: [u8; 32] = hex_literal::hex!("00000000000000000000000000000098aef84ac01d96413445cf3dc4d5c44c01");
+    // bridge::derive_resource_id(1, &bridge::hashing::blake2_128(b"CRU"));
+    pub const BridgeTokenId: [u8; 32] = hex_literal::hex!("000000000000000000000000000000608d1bc9a2d146ebc94667c336721b2801");
 }
 
 impl bridge_transfer::Config for Runtime {
@@ -1028,11 +1028,11 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 }
 
 parameter_types! {
-    pub const CandidacyBond: Balance = 100 * DOLLARS;
+    pub const CandidacyBond: Balance = 10 * DOLLARS;
     // 1 storage item created, key size is 32 bytes, value size is 16+16.
-    pub const VotingBondBase: Balance = 10 * DOLLARS;
+    pub const VotingBondBase: Balance = 1 * DOLLARS;
     // additional data per vote is 32 bytes (account id).
-    pub const VotingBondFactor: Balance = 1 * DOLLARS;
+    pub const VotingBondFactor: Balance = 10 * CENTS;
     /// Daily council elections
     pub const TermDuration: BlockNumber = 3 * DAYS;
     pub const DesiredMembers: u32 = 7;
@@ -1135,11 +1135,11 @@ impl pallet_treasury::Config for Runtime {
 }
 
 parameter_types! {
-    pub const LaunchPeriod: BlockNumber = 7 * DAYS;
+    pub const LaunchPeriod: BlockNumber = 3 * DAYS;
     pub const VotingPeriod: BlockNumber = 7 * DAYS;
     pub const FastTrackVotingPeriod: BlockNumber = 3 * HOURS;
     pub const InstantAllowed: bool = true;
-    pub const MinimumDeposit: Balance = 10 * DOLLARS;
+    pub const MinimumDeposit: Balance = 1 * DOLLARS;
     pub const EnactmentPeriod: BlockNumber = 8 * DAYS;
     pub const CooloffPeriod: BlockNumber = 7 * DAYS;
     pub const MaxVotes: u32 = 100;
@@ -1150,7 +1150,7 @@ parameter_types! {
 	pub const PreimageMaxSize: u32 = 4096 * 1024;
 	pub const PreimageBaseDeposit: Balance = 1 * DOLLARS;
 	// One cent: $10,000 / MB
-	pub const PreimageByteDeposit: Balance = 1 * CENTS;
+	pub const PreimageByteDeposit: Balance = 10 * MILLICENTS;
 }
 
 impl pallet_democracy::Config for Runtime {

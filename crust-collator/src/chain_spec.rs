@@ -38,6 +38,10 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 		.public()
 }
 
+pub fn polkadot_parachain_config() -> Result<ChainSpec, String> {
+    ChainSpec::from_json_bytes(&include_bytes!("../res/polkadot-init.json")[..])
+}
+
 /// Generate collator keys from seed.
 ///
 /// This function's return type must always match the session keys of the chain in tuple format.

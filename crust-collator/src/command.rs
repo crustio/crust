@@ -51,6 +51,7 @@ fn load_spec(
 		"2008" => Ok(Box::new(chain_spec::get_chain_spec(2008.into()))),
 		"2012" => Ok(Box::new(chain_spec::get_chain_spec(2012.into()))),
 		"staging" => Ok(Box::new(chain_spec::staging_test_net(2012.into()))),
+		"crust-parachain" => Ok(Box::new(chain_spec::polkadot_parachain_config()?)),
 		path => Ok(Box::new(chain_spec::ChainSpec::from_json_file(
 			path.into(),
 		)?)),

@@ -12,7 +12,7 @@
   "telemetryEndpoints": null,
   "protocolId": "crust-parachain",
   "properties": {
-    "ss58Format": 66,
+    "ss58Format": 88,
     "tokenDecimals": 12,
     "tokenSymbol": "CRU"
   },

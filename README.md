@@ -73,6 +73,12 @@ Please refer [this](https://github.com/crustio/crust/tree/mainnet/docker#dockeri
 ./target/release/crust --chain mainnet
 ```
 
+To speed up the synchronization process, please add the following parameters.
+
+```shell
+--execution=wasm --wasm-execution=compiled
+```
+
 ### 2. Connect to maxwell
 
 > Please checkout the branch `release/0.11.1`, then build and connect to maxwell

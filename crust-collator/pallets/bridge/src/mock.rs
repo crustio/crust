@@ -59,7 +59,7 @@ impl pallet_balances::Config for MockRuntime {
     type AccountStore = System;
     type Balance = Balance;
     type DustRemoval = ();
-    type Event = Event;
+    type RuntimeEvent = RuntimeEvent;
     type ExistentialDeposit = ExistentialDeposit;
     type MaxLocks = ();
     type MaxReserves = ();
@@ -77,7 +77,7 @@ impl frame_system::Config for MockRuntime {
     type BlockWeights = ();
     type Call = Call;
     type DbWeight = ();
-    type Event = Event;
+    type RuntimeEvent = RuntimeEvent;
     type Hash = H256;
     type Hashing = BlakeTwo256;
     type Header = Header;
@@ -115,7 +115,7 @@ parameter_types! {
 impl pallet_chainbridge::Config for MockRuntime {
     type BridgeCommitteeOrigin = EnsureSignedBy<TestUserId, u64>;
     type BridgeChainId = TestChainId;
-    type Event = Event;
+    type RuntimeEvent = RuntimeEvent;
     type PalletId = ChainBridgePalletId;
     type Proposal = Call;
     type ProposalLifetime = ProposalLifetime;

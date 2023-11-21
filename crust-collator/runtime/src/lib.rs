@@ -48,12 +48,12 @@ use sp_std::marker::PhantomData;
 use sp_std::{convert::TryInto};
 pub use frame_support::{
 	construct_runtime, parameter_types, PalletId, match_types,
+	dispatch::DispatchClass,
 	traits::{
 		Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, Imbalance,
 		LockIdentifier, EitherOfDiverse, PrivilegeCmp, Currency, OnUnbalanced, Nothing
 	},
 	weights::{
-		DispatchClass,
 		constants::WEIGHT_PER_SECOND,
 		IdentityFee, Weight, ConstantMultiplier,
 		WeightToFeeCoefficient, WeightToFeeCoefficients, WeightToFeePolynomial,

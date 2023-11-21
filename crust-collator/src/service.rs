@@ -120,7 +120,6 @@ pub fn new_partial(
 		_,
 		_,
 		_,
-		_,
 		>(cumulus_client_consensus_aura::ImportQueueParams {
 			block_import: client.clone(),
 			client: client.clone(),
@@ -137,7 +136,6 @@ pub fn new_partial(
 			},
 			registry: config.prometheus_registry().clone(),
 			spawner: &task_manager.spawn_essential_handle(),
-			can_author_with: sp_consensus::AlwaysCanAuthor,
 			telemetry: telemetry.as_ref().map(|t| t.handle()).clone(),
 		})?;
 

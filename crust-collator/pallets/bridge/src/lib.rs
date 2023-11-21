@@ -67,11 +67,11 @@ pub mod pallet {
     pub trait Config: frame_system::Config {
         type RuntimeEvent: From<Event<Self>>
             + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        /// Origin used to administer the pallet
-        type BridgeCommitteeOrigin: EnsureOrigin<Self::Origin>;
+        /// RuntimeOrigin used to administer the pallet
+        type BridgeCommitteeOrigin: EnsureOrigin<Self::RuntimeOrigin>;
         /// Proposed dispatchable call
         type Proposal: Parameter
-            + Dispatchable<Origin = Self::Origin>
+            + Dispatchable<RuntimeOrigin = Self::RuntimeOrigin>
             + EncodeLike
             + GetDispatchInfo;
         /// The identifier for this chain.
@@ -735,17 +735,17 @@ pub fn derive_resource_id(chain: u8, id: &[u8]) -> [u8; 32] {
 /// Simple ensure origin for the bridge account
 pub struct EnsureBridge<T>(sp_std::marker::PhantomData<T>);
 
-impl<T: Config> EnsureOrigin<T::Origin> for EnsureBridge<T> {
+impl<T: Config> EnsureOrigin<T::RuntimeOrigin> for EnsureBridge<T> {
     type Success = T::AccountId;
 
-    fn try_origin(o: T::Origin) -> Result<Self::Success, T::Origin> {
+    fn try_origin(o: T::RuntimeOrigin) -> Result<Self::Success, T::RuntimeOrigin> {
         let bridge_id = T::PalletId::get().into_account_truncating();
         o.into().and_then(|o| {
             match o {
                 frame_system::RawOrigin::Signed(who) if who == bridge_id => {
                     Ok(bridge_id)
                 }
-                r => Err(T::Origin::from(r)),
+                r => Err(T::RuntimeOrigin::from(r)),
             }
         })
     }
@@ -755,8 +755,8 @@ impl<T: Config> EnsureOrigin<T::Origin> for EnsureBridge<T> {
     ///
     /// ** Should be used for benchmarking only!!! **
     #[cfg(feature = "runtime-benchmarks")]
-    fn successful_origin() -> T::Origin {
-        T::Origin::from(frame_system::Origin::Signed(<Pallet<T>>::account_id()))
+    fn successful_origin() -> T::RuntimeOrigin {
+        T::RuntimeOrigin::from(frame_system::RuntimeOrigin::Signed(<Pallet<T>>::account_id()))
     }
     */
 }

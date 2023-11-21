@@ -43,8 +43,8 @@ pub mod pallet {
 		/// Convert `T::AccountId` to `MultiLocation`.
 		type AccountIdToMultiLocation: Convert<Self::AccountId, MultiLocation>;
 
-		/// Origin that is allowed to create and modify storage fee information
-		type StorageFeeOwner: EnsureOrigin<Self::Origin>;
+		/// RuntimeOrigin that is allowed to create and modify storage fee information
+		type StorageFeeOwner: EnsureOrigin<Self::RuntimeOrigin>;
 	}
 
 	/// An error that can occur while executing the mapping pallet's logic.

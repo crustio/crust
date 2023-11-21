@@ -59,7 +59,7 @@ impl system::Config for Test {
 	type BlockWeights = ();
 	type BlockLength = ();
 	type DbWeight = ();
-	type Origin = Origin;
+	type RuntimeOrigin = RuntimeOrigin;
 	type Call = Call;
 	type Index = u64;
 	type BlockNumber = u64;

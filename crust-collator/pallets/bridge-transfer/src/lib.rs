@@ -67,7 +67,7 @@ pub mod pallet {
 
         /// Specifies the origin check provided by the bridge for calls that can only be called by
         /// the bridge pallet
-        type BridgeOrigin: EnsureOrigin<Self::Origin, Success = Self::AccountId>;
+        type BridgeOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
 
         /// The currency mechanism
         type Currency: Currency<Self::AccountId>;

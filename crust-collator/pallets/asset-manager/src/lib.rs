@@ -115,8 +115,8 @@ pub mod pallet {
 		/// The trait we use to register Assets
 		type AssetRegistrar: AssetRegistrar<Self>;
 
-		/// Origin that is allowed to create and modify asset information
-		type AssetModifierOrigin: EnsureOrigin<Self::Origin>;
+		/// RuntimeOrigin that is allowed to create and modify asset information
+		type AssetModifierOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		type WeightInfo: WeightInfo;
 	}

@@ -21,7 +21,7 @@ use crate::{
 use codec::Encode;
 use cumulus_primitives_core::ParaId;
 use cumulus_client_cli::generate_genesis_block;
-use log::info;
+use log::{info, warn};
 use parachain_runtime::Block;
 use sc_cli::{
 	ChainSpec, CliConfiguration, DefaultConfigurationValues, ImportParams, KeystoreParams,
@@ -277,7 +277,9 @@ pub fn run() -> Result<()> {
 				info!("Parachain Account: {}", parachain_account);
 				info!("Parachain genesis state: {}", genesis_state);
 				info!("Is collating: {}", if config.role.is_authority() { "yes" } else { "no" });
-
+				if collator_options.relay_chain_rpc_url.is_some() && cli.relay_chain_args.len() > 0 {
+					warn!("Detected relay chain node arguments together with --relay-chain-rpc-url. This command starts a minimal Polkadot node that only uses a network-related subset of all relay chain CLI options.");
+				}
 				crate::service::start_node(config, polkadot_config, collator_options, id)
 					.await
 					.map(|r| r.0)

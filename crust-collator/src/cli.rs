@@ -51,20 +51,20 @@ pub enum Subcommand {
 }
 
 #[derive(Debug, Parser)]
-#[clap(
+#[command(
 	propagate_version = true,
 	args_conflicts_with_subcommands = true,
 	subcommand_negates_reqs = true
 )]
 pub struct Cli {
-	#[clap(subcommand)]
+	#[command(subcommand)]
 	pub subcommand: Option<Subcommand>,
 
-	#[clap(flatten)]
+	#[command(flatten)]
 	pub run: cumulus_client_cli::RunCmd,
 
 	/// Relay chain arguments
-	#[clap(raw = true, conflicts_with = "relay-chain-rpc-url")]
+	#[arg(raw = true, conflicts_with = "relay-chain-rpc-url")]
 	pub relaychain_args: Vec<String>,
 }
 

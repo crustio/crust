@@ -24,7 +24,9 @@ use cumulus_client_service::{
 };
 
 use crate::rpc;
-use cumulus_client_consensus_common::ParachainConsensus;
+use cumulus_client_consensus_common::{
+	ParachainBlockImport as TParachainBlockImport, ParachainConsensus,
+};
 use crust_parachain_primitives::Hash;
 use cumulus_primitives_core::ParaId;
 use parachain_runtime::RuntimeApi;
@@ -51,6 +53,31 @@ type HostFunctions = sp_io::SubstrateHostFunctions;
 type HostFunctions =
 	(sp_io::SubstrateHostFunctions, frame_benchmarking::benchmarking::HostFunctions);
 
+
+/// Native executor type.
+pub struct ParachainNativeExecutor;
+
+impl sc_executor::NativeExecutionDispatch for ParachainNativeExecutor {
+	type ExtendHostFunctions = frame_benchmarking::benchmarking::HostFunctions;
+
+	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
+		parachain_template_runtime::api::dispatch(method, data)
+	}
+
+	fn native_version() -> sc_executor::NativeVersion {
+		parachain_template_runtime::native_version()
+	}
+}
+
+type ParachainExecutor = NativeElseWasmExecutor<ParachainNativeExecutor>;
+
+type ParachainClient = TFullClient<Block, RuntimeApi, ParachainExecutor>;
+
+type ParachainBackend = TFullBackend<Block>;
+
+type ParachainBlockImport = TParachainBlockImport<Arc<ParachainClient>>;
+
+
 /// Starts a `ServiceBuilder` for a full service.
 ///
 /// Use this macro if you don't actually need the full service, but just the builder in order to
@@ -59,12 +86,12 @@ pub fn new_partial(
 	config: &Configuration,
 ) -> Result<
 	PartialComponents<
-		TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
-		TFullBackend<Block>,
+		ParachainClient,
+		ParachainBackend,
 		(),
-		sc_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
-		sc_transaction_pool::FullPool<Block, TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
-		(Option<Telemetry>, Option<TelemetryWorkerHandle>),
+		sc_consensus::DefaultImportQueue<Block, ParachainClient>,
+		sc_transaction_pool::FullPool<Block, ParachainClient>,
+		(ParachainBlockImport, Option<Telemetry>, Option<TelemetryWorkerHandle>),
 	>,
 	sc_service::Error,
 > {
@@ -111,6 +138,8 @@ pub fn new_partial(
 		client.clone(),
 	);
 
+	let block_import = ParachainBlockImport::new(client.clone());
+
 	let slot_duration = cumulus_client_consensus_aura::slot_duration(&*client)?;
 
 	let import_queue = cumulus_client_consensus_aura::import_queue::<
@@ -121,8 +150,8 @@ pub fn new_partial(
 		_,
 		_,
 		>(cumulus_client_consensus_aura::ImportQueueParams {
-			block_import: client.clone(),
-			client: client.clone(),
+			block_import,
+			client,
 			create_inherent_data_providers: move |_, _| async move {
 				let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 
@@ -147,7 +176,7 @@ pub fn new_partial(
 		task_manager,
 		transaction_pool,
 		select_chain: (),
-		other: (telemetry, telemetry_worker_handle),
+		other: (block_import, telemetry, telemetry_worker_handle),
 	};
 
 	Ok(params)
@@ -155,14 +184,14 @@ pub fn new_partial(
 
 // /// Build the import queue for the shell runtime.
 // pub fn shell_build_import_queue(
-// 	client: Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
+// 	client: Arc<ParachainClient>,
 // 	config: &Configuration,
 // 	_: Option<TelemetryHandle>,
 // 	task_manager: &TaskManager,
 // ) -> Result<
 // 	sc_consensus::DefaultImportQueue<
 // 		Block,
-// 		TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
+// 		ParachainClient,
 // 	>,
 // 	sc_service::Error,
 // > {
@@ -207,10 +236,10 @@ async fn start_node_impl<RB>(
 	collator_options: CollatorOptions,
 	id: ParaId,
 	_rpc_ext_builder: RB,
-) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>)>
+) -> sc_service::error::Result<(TaskManager, Arc<ParachainClient>)>
 where
 	RB: Fn(
-			Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
+			Arc<ParachainClient>,
 		) -> Result<jsonrpsee::RpcModule<()>, sc_service::Error>
 		+ Send
 		+ 'static,
@@ -219,7 +248,7 @@ where
 
 	let params = new_partial(&parachain_config)?;
 
-	let (mut telemetry, telemetry_worker_handle) = params.other;
+	let (block_import, mut telemetry, telemetry_worker_handle) = params.other;
 
 	let client = params.client.clone();
 	let backend = params.backend.clone();
@@ -296,6 +325,7 @@ where
 	if validator {
 		let parachain_consensus = build_aura_consensus(
 			client.clone(),
+			block_import,
 			prometheus_registry.as_ref(),
 			telemetry.as_ref().map(|t| t.handle()),
 			&task_manager,
@@ -348,7 +378,7 @@ pub async fn start_node(
 	polkadot_config: Configuration,
 	collator_options: CollatorOptions,
 	id: ParaId,
-) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>)> {
+) -> sc_service::error::Result<(TaskManager, Arc<ParachainClient>)> {
 	start_node_impl(
 		parachain_config,
 		polkadot_config,
@@ -360,7 +390,8 @@ pub async fn start_node(
 }
 
 pub fn build_aura_consensus(
-	client: Arc<TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>>,
+	client: Arc<ParachainClient>,
+	block_import: ParachainBlockImport,
 	prometheus_registry: Option<&Registry>,
 	telemetry: Option<TelemetryHandle>,
 	task_manager: &TaskManager,
@@ -368,7 +399,7 @@ pub fn build_aura_consensus(
 	transaction_pool: Arc<
 		sc_transaction_pool::FullPool<
 			Block,
-			TFullClient<Block, RuntimeApi, WasmExecutor<HostFunctions>>,
+			ParachainClient,
 		>,
 	>,
 	sync_oracle: Arc<NetworkService<Block, Hash>>,
@@ -423,8 +454,8 @@ pub fn build_aura_consensus(
 				Ok((slot, timestamp, parachain_inherent))
 			}
 		},
-		block_import: client.clone(),
-		para_client: client.clone(),
+		block_import,
+		para_client: client,
 		backoff_authoring_blocks: Option::<()>::None,
 		sync_oracle,
 		keystore,

@@ -259,7 +259,7 @@ pub fn run() -> Result<()> {
 				let id = ParaId::from(para_id);
 
 				let parachain_account =
-					AccountIdConversion::<polkadot_primitives::v2::AccountId>::into_account_truncating(&id);
+					AccountIdConversion::<polkadot_primitives::AccountId>::into_account_truncating(&id);
 				let state_version = Cli::native_runtime_version(&config.chain_spec).state_version();
 				let block: Block =
 					generate_genesis_block(&*config.chain_spec, state_version).map_err(|e| format!("{:?}", e))?;
@@ -277,7 +277,7 @@ pub fn run() -> Result<()> {
 				info!("Parachain Account: {}", parachain_account);
 				info!("Parachain genesis state: {}", genesis_state);
 				info!("Is collating: {}", if config.role.is_authority() { "yes" } else { "no" });
-				if collator_options.relay_chain_rpc_url.is_some() && cli.relay_chain_args.len() > 0 {
+				if !collator_options.relay_chain_rpc_urls.is_empty() && cli.relay_chain_args.len() > 0 {
 					warn!("Detected relay chain node arguments together with --relay-chain-rpc-url. This command starts a minimal Polkadot node that only uses a network-related subset of all relay chain CLI options.");
 				}
 				crate::service::start_node(config, polkadot_config, collator_options, id)

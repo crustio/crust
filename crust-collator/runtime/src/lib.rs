@@ -51,10 +51,11 @@ pub use frame_support::{
 	dispatch::DispatchClass,
 	traits::{
 		Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, Imbalance,
-		LockIdentifier, EitherOfDiverse, PrivilegeCmp, Currency, OnUnbalanced, Nothing
+		LockIdentifier, EitherOfDiverse, PrivilegeCmp, Currency, OnUnbalanced, Nothing,
+		ConstU32, ConstU64, ConstU8, ConstU16
 	},
 	weights::{
-		constants::WEIGHT_PER_SECOND,
+		constants::WEIGHT_REF_TIME_PER_SECOND,
 		IdentityFee, Weight, ConstantMultiplier,
 		WeightToFeeCoefficient, WeightToFeeCoefficients, WeightToFeePolynomial,
 	},
@@ -169,7 +170,7 @@ const AVERAGE_ON_INITIALIZE_RATIO: Perbill = Perbill::from_percent(10);
 /// by  Operational  extrinsics.
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 /// We allow for 2 seconds of compute with a 6 second average block time.
-const MAXIMUM_BLOCK_WEIGHT: Weight = WEIGHT_PER_SECOND.saturating_mul(2).set_proof_size(cumulus_primitives_core::relay_chain::v2::MAX_POV_SIZE as u64);;
+const MAXIMUM_BLOCK_WEIGHT: Weight = WEIGHT_REF_TIME_PER_SECOND.saturating_mul(2).set_proof_size(cumulus_primitives_core::relay_chain::MAX_POV_SIZE as u64);;
 
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 250;
@@ -237,26 +238,17 @@ impl frame_system::Config for Runtime {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
-parameter_types! {
-	pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
-}
-
 impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
 	type Moment = u64;
 	type OnTimestampSet = ();
-	type MinimumPeriod = MinimumPeriod;
+	type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
 	type WeightInfo = weights::pallet_timestamp::WeightInfo<Runtime>;
 }
 
 parameter_types! {
 	pub const ExistentialDeposit: u128 = 10 * CENTS;
-	pub const TransferFee: u128 = 0;
-	pub const CreationFee: u128 = 0;
 	pub const TransactionByteFee: u128 = 1;
-	pub const MaxLocks: u32 = 50;
-	pub const MaxReserves: u32 = 50;
-	pub const OperationalFeeMultiplier: u8 = 5;
 }
 
 impl pallet_balances::Config for Runtime {
@@ -268,8 +260,8 @@ impl pallet_balances::Config for Runtime {
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
 	type WeightInfo = weights::pallet_balances::WeightInfo<Runtime>;
-	type MaxLocks = MaxLocks;
-	type MaxReserves = MaxReserves;
+	type MaxLocks = ConstU32<50>;
+	type MaxReserves = ConstU32<50>;
 	type ReserveIdentifier = [u8; 8];
 }
 
@@ -313,7 +305,7 @@ impl pallet_transaction_payment::Config for Runtime {
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type WeightToFee = OneTenthFee<Balance>;
 	type FeeMultiplierUpdate = ();
-	type OperationalFeeMultiplier = OperationalFeeMultiplier;
+	type OperationalFeeMultiplier = ConstU8<5>;
 }
 
 parameter_types! {
@@ -321,7 +313,6 @@ parameter_types! {
 	pub const DepositBase: Balance = 100 * CENTS;
 	// Additional storage item size of 32 bytes.
 	pub const DepositFactor: Balance = 1 * CENTS;
-	pub const MaxSignatories: u16 = 100;
 }
 
 impl pallet_multisig::Config for Runtime {
@@ -330,7 +321,7 @@ impl pallet_multisig::Config for Runtime {
 	type Currency = Balances;
 	type DepositBase = DepositBase;
 	type DepositFactor = DepositFactor;
-	type MaxSignatories = MaxSignatories;
+	type MaxSignatories = ConstU16<100>;
 	type WeightInfo = weights::pallet_multisig::WeightInfo<Runtime>;
 }
 
@@ -346,10 +337,8 @@ parameter_types! {
 	pub const ProxyDepositBase: Balance = 100 * CENTS;
 	// Additional storage item size of 33 bytes.
 	pub const ProxyDepositFactor: Balance = 1 * CENTS;
-	pub const MaxProxies: u16 = 32;
 	pub const AnnouncementDepositBase: Balance = 100 * CENTS;
 	pub const AnnouncementDepositFactor: Balance = 1 * CENTS;
-	pub const MaxPending: u16 = 32;
 }
 
 /// The type used to represent the kinds of proxying allowed.
@@ -415,9 +404,9 @@ impl pallet_proxy::Config for Runtime {
 	type ProxyType = ProxyType;
 	type ProxyDepositBase = ProxyDepositBase;
 	type ProxyDepositFactor = ProxyDepositFactor;
-	type MaxProxies = MaxProxies;
+	type MaxProxies = ConstU16<32>;
 	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
-	type MaxPending = MaxPending;
+	type MaxPending = ConstU16<32>;
 	type CallHasher = BlakeTwo256;
 	type AnnouncementDepositBase = AnnouncementDepositBase;
 	type AnnouncementDepositFactor = AnnouncementDepositFactor;
@@ -769,6 +758,7 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type ControllerOrigin = EnsureRoot<AccountId>;
 	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
 	type WeightInfo = cumulus_pallet_xcmp_queue::weights::SubstrateWeight<Runtime>;
+	type PriceForSiblingDelivery = ();
 }
 
 impl cumulus_ping::Config for Runtime {

@@ -75,9 +75,6 @@ cumulus-client-network = { path = "../cumulus/client/network" }
 cumulus-primitives-core = { path = "../cumulus/primitives/core" }
 cumulus-primitives-parachain-inherent = { path = "../cumulus/primitives/parachain-inherent" }
 cumulus-relay-chain-interface = { path = "../cumulus/client/relay-chain-interface" }
-cumulus-relay-chain-inprocess-interface = { path = "../cumulus/client/relay-chain-inprocess-interface" }
-cumulus-relay-chain-rpc-interface = { path = "../cumulus/client/relay-chain-rpc-interface" }
-cumulus-relay-chain-minimal-node = { path = "../cumulus/client/relay-chain-minimal-node" }
 
 # Polkadot dependencies
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0" }

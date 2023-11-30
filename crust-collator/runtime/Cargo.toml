@@ -94,7 +94,7 @@ orml-xcm-support = { git = "https://github.com/open-web3-stack/open-runtime-modu
 orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "44fda4432b71f49ee59a650cf4775db895ab97af"}
 
 [build-dependencies]
-substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0", optional = true }
 
 [features]
 default = [ "std" ]

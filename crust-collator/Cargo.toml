@@ -41,8 +41,8 @@ sc-service = { git = "https://github.com/paritytech/substrate", branch = "polkad
 sc-telemetry = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sc-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sp-transaction-pool = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+sc-network-sync = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sc-network = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
-sc-network-common = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sc-basic-authorship = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sp-timestamp = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sp-blockchain = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
@@ -71,14 +71,12 @@ cumulus-client-consensus-relay-chain = { path = "../cumulus/client/consensus/rel
 cumulus-client-consensus-common = { path = "../cumulus/client/consensus/common" }
 cumulus-client-collator = { path = "../cumulus/client/collator" }
 cumulus-client-service = { path = "../cumulus/client/service" }
-cumulus-client-network = { path = "../cumulus/client/network" }
 cumulus-primitives-core = { path = "../cumulus/primitives/core" }
 cumulus-primitives-parachain-inherent = { path = "../cumulus/primitives/parachain-inherent" }
 cumulus-relay-chain-interface = { path = "../cumulus/client/relay-chain-interface" }
 
 # Polkadot dependencies
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0" }
-polkadot-service = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0" }
 polkadot-cli = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0" }
 polkadot-parachain = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0" }
 

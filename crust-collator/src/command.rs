@@ -18,21 +18,19 @@ use crate::{
 	chain_spec,
 	cli::{Cli, RelayChainCli, Subcommand},
 };
-use codec::Encode;
 use cumulus_primitives_core::ParaId;
-use cumulus_client_cli::generate_genesis_block;
 use log::{info, warn};
 use parachain_runtime::Block;
 use sc_cli::{
 	ChainSpec, CliConfiguration, DefaultConfigurationValues, ImportParams, KeystoreParams,
-	NetworkParams, Result, RuntimeVersion, SharedParams, SubstrateCli,
+	NetworkParams, Result, SharedParams, SubstrateCli,
 };
 use sc_service::{
 	config::{BasePath, PrometheusConfig},
 	PartialComponents,
 };
 use sp_core::hexdisplay::HexDisplay;
-use sp_runtime::traits::{AccountIdConversion, Block as BlockT};
+use sp_runtime::traits::{AccountIdConversion};
 use std::net::SocketAddr;
 
 fn load_spec(
@@ -91,10 +89,6 @@ impl SubstrateCli for Cli {
 	fn load_spec(&self, id: &str) -> std::result::Result<Box<dyn sc_service::ChainSpec>, String> {
 		load_spec(id)
 	}
-
-	fn native_runtime_version(_: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-		&parachain_runtime::VERSION
-	}
 }
 
 impl SubstrateCli for RelayChainCli {
@@ -130,10 +124,6 @@ impl SubstrateCli for RelayChainCli {
 		polkadot_cli::Cli::from_iter([RelayChainCli::executable_name()].iter())
 			.load_spec(id)
 	}
-
-	fn native_runtime_version(chain_spec: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-		polkadot_cli::Cli::native_runtime_version(chain_spec)
-	}
 }
 
 
@@ -145,7 +135,7 @@ pub fn run() -> Result<()> {
 		Some(Subcommand::BuildSpec(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run(config.chain_spec, config.network))
-		}
+		},
 		Some(Subcommand::CheckBlock(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
@@ -157,7 +147,7 @@ pub fn run() -> Result<()> {
 				} = crate::service::new_partial(&config)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
-		}
+		},
 		Some(Subcommand::ExportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
@@ -168,7 +158,7 @@ pub fn run() -> Result<()> {
 				} = crate::service::new_partial(&config)?;
 				Ok((cmd.run(client, config.database), task_manager))
 			})
-		}
+		},
 		Some(Subcommand::ExportState(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
@@ -179,7 +169,7 @@ pub fn run() -> Result<()> {
 				} = crate::service::new_partial(&config)?;
 				Ok((cmd.run(client, config.chain_spec), task_manager))
 			})
-		}
+		},
 		Some(Subcommand::ImportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
@@ -191,7 +181,7 @@ pub fn run() -> Result<()> {
 				} = crate::service::new_partial(&config)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
-		}
+		},
 		Some(Subcommand::PurgeChain(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 
@@ -212,7 +202,7 @@ pub fn run() -> Result<()> {
 
 				cmd.run(config, polkadot_config)
 			})
-		}
+		},
 		Some(Subcommand::Revert(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
@@ -224,30 +214,38 @@ pub fn run() -> Result<()> {
 				} = crate::service::new_partial(&config)?;
 				Ok((cmd.run(client, backend, None), task_manager))
 			})
-		}
+		},
 		Some(Subcommand::ExportGenesisState(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			runner.sync_run(|_config| {
-				let spec = cli.load_spec(&cmd.shared_params.chain.clone().unwrap_or_default())?;
-				let state_version = Cli::native_runtime_version(&spec).state_version();
-				cmd.run::<Block>(&*spec, state_version)
+			runner.sync_run(|config| {
+				let partials = new_partial(&config)?;
+
+				cmd.run(&*config.chain_spec, &*partials.client)
 			})
-		}
+		},
 		Some(Subcommand::ExportGenesisWasm(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|_config| {
 				let spec = cli.load_spec(&cmd.shared_params.chain.clone().unwrap_or_default())?;
 				cmd.run(&*spec)
 			})
-		}
+		},
 		None => {
 			let runner = cli.create_runner(&cli.run.normalize())?;
 			let collator_options = cli.run.collator_options();
 
 			runner.run_node_until_exit(|config| async move {
+
+				let hwbench = (!cli.no_hardware_benchmarks)
+					.then_some(config.database.path().map(|database_path| {
+						let _ = std::fs::create_dir_all(database_path);
+						sc_sysinfo::gather_hwbench(Some(database_path))
+					}))
+					.flatten();
+
 				let para_id = chain_spec::Extensions::try_get(&*config.chain_spec)
 				.map(|e| e.para_id)
-				.ok_or_else(|| "Could not find parachain extension in chain-spec.")?;
+				.ok_or("Could not find parachain extension in chain-spec.")?;
 
 				let polkadot_cli = RelayChainCli::new(
 					&config,
@@ -259,11 +257,9 @@ pub fn run() -> Result<()> {
 				let id = ParaId::from(para_id);
 
 				let parachain_account =
-					AccountIdConversion::<polkadot_primitives::AccountId>::into_account_truncating(&id);
-				let state_version = Cli::native_runtime_version(&config.chain_spec).state_version();
-				let block: Block =
-					generate_genesis_block(&*config.chain_spec, state_version).map_err(|e| format!("{:?}", e))?;
-				let genesis_state = format!("0x{:?}", HexDisplay::from(&block.header().encode()));
+					AccountIdConversion::<polkadot_primitives::AccountId>::into_account_truncating(
+						&id,
+					);
 
 				let tokio_handle = config.tokio_handle.clone();
 				let polkadot_config = SubstrateCli::create_configuration(
@@ -273,14 +269,19 @@ pub fn run() -> Result<()> {
 				)
 				.map_err(|err| format!("Relay chain argument error: {}", err))?;
 
-				info!("Parachain id: {:?}", id);
-				info!("Parachain Account: {}", parachain_account);
-				info!("Parachain genesis state: {}", genesis_state);
+				info!("Parachain Account: {parachain_account}");
+
 				info!("Is collating: {}", if config.role.is_authority() { "yes" } else { "no" });
-				if !collator_options.relay_chain_rpc_urls.is_empty() && cli.relay_chain_args.len() > 0 {
-					warn!("Detected relay chain node arguments together with --relay-chain-rpc-url. This command starts a minimal Polkadot node that only uses a network-related subset of all relay chain CLI options.");
+				if !collator_options.relay_chain_rpc_urls.is_empty() &&
+					!cli.relay_chain_args.is_empty()
+				{
+					warn!(
+						"Detected relay chain node arguments together with --relay-chain-rpc-url. \
+						   This command starts a minimal Polkadot node that only uses a \
+						   network-related subset of all relay chain CLI options."
+					);
 				}
-				crate::service::start_node(config, polkadot_config, collator_options, id)
+				crate::service::start_node(config, polkadot_config, collator_options, id, hwbench)
 					.await
 					.map(|r| r.0)
 					.map_err(Into::into)
@@ -294,12 +295,8 @@ impl DefaultConfigurationValues for RelayChainCli {
 		30334
 	}
 
-	fn rpc_ws_listen_port() -> u16 {
+	fn rpc_listen_port() -> u16 {
 		9945
-	}
-
-	fn rpc_http_listen_port() -> u16 {
-		9934
 	}
 
 	fn prometheus_listen_port() -> u16 {
@@ -331,16 +328,8 @@ impl CliConfiguration<Self> for RelayChainCli {
 			.or_else(|| self.base_path.clone().map(Into::into)))
 	}
 
-	fn rpc_http(&self, default_listen_port: u16) -> Result<Option<SocketAddr>> {
-		self.base.base.rpc_http(default_listen_port)
-	}
-
-	fn rpc_ipc(&self) -> Result<Option<String>> {
-		self.base.base.rpc_ipc()
-	}
-
-	fn rpc_ws(&self, default_listen_port: u16) -> Result<Option<SocketAddr>> {
-		self.base.base.rpc_ws(default_listen_port)
+	fn rpc_addr(&self, default_listen_port: u16) -> Result<Option<SocketAddr>> {
+		self.base.base.rpc_addr(default_listen_port)
 	}
 
 	fn prometheus_config(&self, default_listen_port: u16, chain_spec: &Box<dyn ChainSpec>,) -> Result<Option<PrometheusConfig>> {
@@ -382,8 +371,8 @@ impl CliConfiguration<Self> for RelayChainCli {
 		self.base.base.rpc_methods()
 	}
 
-	fn rpc_ws_max_connections(&self) -> Result<Option<usize>> {
-		self.base.base.rpc_ws_max_connections()
+	fn rpc_max_connections(&self) -> Result<u32> {
+		self.base.base.rpc_max_connections()
 	}
 
 	fn rpc_cors(&self, is_dev: bool) -> Result<Option<Vec<String>>> {

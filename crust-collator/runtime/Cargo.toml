@@ -5,12 +5,12 @@ authors = ["Parity Technologies <admin@parity.io>"]
 edition = '2018'
 
 [dependencies]
-serde = { version = "1.0.144", optional = true, features = ["derive"] }
+serde = { version = "1.0.171", optional = true, features = ["derive"] }
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = ["derive"] }
-log = { version = "0.4.17", default-features = false }
-scale-info = { version = "2.2.0", default-features = false, features = ["derive"] }
-smallvec = "1.4.1"
-hex-literal = "0.3.4"
+log = { version = "0.4.19", default-features = false }
+scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
+smallvec = "1.11.0
+hex-literal = "0.4.1"
 
 xstorage = { path = "../pallets/xstorage", default-features = false }
 # xstorage-client = { path = "../../../xstorage", package = "xstorage-client", default-features = false }
@@ -88,10 +88,10 @@ xcm-builder = { git = "https://github.com/paritytech/polkadot", default-features
 xcm-executor = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v1.0.0" }
 pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v1.0.0" }
 
-orml-xcm = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "44fda4432b71f49ee59a650cf4775db895ab97af"}
-orml-xtokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "44fda4432b71f49ee59a650cf4775db895ab97af"}
-orml-xcm-support = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "44fda4432b71f49ee59a650cf4775db895ab97af"}
-orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "44fda4432b71f49ee59a650cf4775db895ab97af"}
+orml-xcm = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "2b41f29e749fda52522cb4c7ea0e47f517f6a59d"}
+orml-xtokens = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "2b41f29e749fda52522cb4c7ea0e47f517f6a59d"}
+orml-xcm-support = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "2b41f29e749fda52522cb4c7ea0e47f517f6a59d"}
+orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "2b41f29e749fda52522cb4c7ea0e47f517f6a59d"}
 
 [build-dependencies]
 substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0", optional = true }

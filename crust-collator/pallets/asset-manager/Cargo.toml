@@ -7,8 +7,8 @@ version = "0.1.0"
 # Thanks for the moonbeam's team. Due to the dependencies issues, just copy the code into our project and keep all the information
 
 [dependencies]
-log = { version = "0.4.17", default-features = false }
-serde = { version = "1.0.144", optional = true }
+log = { version = "0.4.19", default-features = false }
+serde = { version = "1.0.171", optional = true }
 
 # Moonbeam
 primitives = { package = "crust-parachain-primitives", path = "../../primitives", default-features = false }
@@ -17,7 +17,7 @@ primitives = { package = "crust-parachain-primitives", path = "../../primitives"
 frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0", default-features = false }
 frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0", default-features = false }
 parity-scale-codec = { version = "3.0.0", default-features = false, features = [ "derive" ] }
-scale-info = { version = "2.2.0", default-features = false, features = [ "derive" ] }
+scale-info = { version = "2.9.0", default-features = false, features = [ "derive" ] }
 sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0", default-features = false }
 sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0", default-features = false }
 sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0", default-features = false }

@@ -43,6 +43,7 @@ pub mod mock;
 #[cfg(test)]
 pub mod tests;
 pub mod weights;
+pub mod migration;
 
 #[pallet]
 pub mod pallet {
@@ -189,12 +190,13 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 
-		fn on_runtime_upgrade() -> Weight {
+		pub fn on_runtime_upgrade() -> Weight {
 			log::warn!("Performing on_runtime_upgrade");
-			XcmV2ToV3AssetManager<Config>::on_runtime_upgrade();
+			XcmV2ToV3AssetManager::<Config>::on_runtime_upgrade();
 			// Consume all block weight to ensure no user transactions inclusion.
 			T::BlockWeights::get().max_block
 		}
+
 		/// Register new asset with the asset manager
 		#[pallet::weight(T::WeightInfo::register_foreign_asset())]
 		pub fn register_asset(

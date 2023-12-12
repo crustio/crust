@@ -3,17 +3,20 @@ use frame_support::pallet;
 
 pub use pallet::*;
 
+pub mod weights;
+
 #[pallet]
 pub mod pallet {
 	use sp_std::prelude::*;
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
 
-	use xcm::v2::prelude::*;
+	use xcm::latest::prelude::*;
 	use sp_std::convert::TryInto;
 	use sp_runtime::traits::{AccountIdConversion, Convert};
 
 	use xcm_executor::traits::TransactAsset;
+	use crate::weights::WeightInfo;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -45,6 +48,8 @@ pub mod pallet {
 
 		/// RuntimeOrigin that is allowed to create and modify storage fee information
 		type StorageFeeOwner: EnsureOrigin<Self::RuntimeOrigin>;
+
+		type WeightInfo: WeightInfo;
 	}
 
 	/// An error that can occur while executing the mapping pallet's logic.
@@ -78,7 +83,8 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		// The index cannot be changed.
-		#[pallet::weight(1_000_000)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(T::WeightInfo::default_xstorage_weight())]
 		pub fn place_storage_order_through_parachain(
 			origin: OriginFor<T>,
 			cid: Vec<u8>,
@@ -95,7 +101,8 @@ pub mod pallet {
 			Ok(().into())
 		}
 
-		#[pallet::weight(1_000_000)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::default_xstorage_weight())]
 		pub fn place_storage_order(
 			origin: OriginFor<T>,
 			cid: Vec<u8>,
@@ -131,7 +138,8 @@ pub mod pallet {
 			Ok(().into())
 		}
 
-		#[pallet::weight(1_000_000)]
+		#[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::default_xstorage_weight())]
 		pub fn register_storage_fee(
 			origin: OriginFor<T>,
 			currency_id: T::CurrencyId,

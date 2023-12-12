@@ -72,12 +72,10 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{
-		weights::DispatchClass,
-		dispatch::{DispatchResultWithPostInfo},
+		dispatch::{DispatchResultWithPostInfo, DispatchClass},
 		pallet_prelude::*,
-		inherent::Vec,
 		traits::{
-			Currency, ReservableCurrency, EnsureOrigin, ExistenceRequirement::KeepAlive,
+			Currency, ReservableCurrency, EnsureOrigin, ExistenceRequirement::KeepAlive, GenesisBuild
 		},
 		PalletId,
 	};
@@ -93,7 +91,7 @@ pub mod pallet {
 	use pallet_session::SessionManager;
 	use sp_staking::SessionIndex;
 	pub use crate::weights::WeightInfo;
-	use sp_std::convert::TryInto;
+	use sp_std::{convert::TryInto, vec::Vec};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as SystemConfig>::AccountId>>::Balance;
@@ -134,7 +132,7 @@ pub mod pallet {
 		type MaxInvulnerables: Get<u32>;
 
 		// Will be kicked if block is not produced in threshold.
-		type KickThreshold: Get<Self::BlockNumber>;
+		type KickThreshold: Get<BlockNumberFor<Self>>;
 
 		/// The weight information of this pallet.
 		type WeightInfo: WeightInfo;
@@ -171,7 +169,7 @@ pub mod pallet {
 	/// Last block authored by collator.
 	#[pallet::storage]
 	#[pallet::getter(fn last_authored_block)]
-	pub type LastAuthoredBlock<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, T::BlockNumber, ValueQuery>;
+	pub type LastAuthoredBlock<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, BlockNumberFor<T>, ValueQuery>;
 
 	/// Desired number of candidates.
 	///
@@ -253,6 +251,7 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::set_invulnerables(new.len() as u32))]
 		pub fn set_invulnerables(
 			origin: OriginFor<T>,
@@ -270,6 +269,7 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::set_desired_candidates())]
 		pub fn set_desired_candidates(origin: OriginFor<T>, max: u32) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
@@ -284,6 +284,7 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+		#[pallet::call_index(2)]
 		#[pallet::weight(T::WeightInfo::set_candidacy_bond())]
 		pub fn set_candidacy_bond(origin: OriginFor<T>, bond: BalanceOf<T>) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
@@ -292,6 +293,7 @@ pub mod pallet {
 			Ok(().into())
 		}
 
+		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::register_as_candidate(T::MaxCandidates::get()))]
 		pub fn register_as_candidate(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
@@ -321,6 +323,7 @@ pub mod pallet {
 			Ok(Some(T::WeightInfo::register_as_candidate(current_count as u32)).into())
 		}
 
+		#[pallet::call_index(4)]
 		#[pallet::weight(T::WeightInfo::leave_intent(T::MaxCandidates::get()))]
 		pub fn leave_intent(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
@@ -384,7 +387,7 @@ pub mod pallet {
 	/// Keep track of number of authored blocks per authority, uncles are counted as well since
 	/// they're a valid proof of being online.
 	impl<T: Config + pallet_authorship::Config>
-		pallet_authorship::EventHandler<T::AccountId, T::BlockNumber> for Pallet<T>
+		pallet_authorship::EventHandler<T::AccountId, BlockNumberFor<T>> for Pallet<T>
 	{
 		fn note_author(author: T::AccountId) {
 			let pot = Self::account_id();
@@ -399,10 +402,6 @@ pub mod pallet {
 				T::WeightInfo::note_author(),
 				DispatchClass::Mandatory,
 			);
-		}
-
-		fn note_uncle(_author: T::AccountId, _age: T::BlockNumber) {
-			//TODO can we ignore this?
 		}
 	}
 

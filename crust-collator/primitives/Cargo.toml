@@ -25,6 +25,8 @@ xcm = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0
 xcm-builder = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0", default-features = false }
 xcm-executor = { git = "https://github.com/paritytech/polkadot", branch = "release-v1.0.0", default-features = false }
 
+cumulus-primitives-core = { path = "../../cumulus/primitives/core", default-features = false }
+
 [features]
 default = [ "std" ]
 std = [
@@ -36,5 +38,6 @@ std = [
 	"sp-std/std",
 	"xcm-builder/std",
 	"xcm/std",
+	"cumulus-primitives-core/std"
 ]
 test = []

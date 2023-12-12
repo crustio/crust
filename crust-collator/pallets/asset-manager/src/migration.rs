@@ -1,4 +1,4 @@
-use crate::{AssetIdType, AssetTypeId, AssetTypeUnitsPerSecond, Config, SupportedFeePaymentAssets};
+use super::{AssetIdType, AssetTypeId, AssetTypeUnitsPerSecond, Config, SupportedFeePaymentAssets};
 #[cfg(feature = "try-runtime")]
 use frame_support::storage::{generator::StorageValue, migration::get_storage_value};
 use frame_support::{

@@ -505,7 +505,6 @@ impl pallet_aura::Config for Runtime {
 
 impl cumulus_pallet_aura_ext::Config for Runtime {}
 
-impl pallet_randomness_collective_flip::Config for Runtime {}
 
 parameter_types! {
 	pub const PotId: PalletId = PalletId(*b"PotStake");
@@ -632,6 +631,7 @@ impl claims::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type Prefix = Prefix;
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -646,6 +646,7 @@ impl bridge::Config for Runtime {
     type Proposal = RuntimeCall;
     type BridgeChainId = BridgeChainId;
     type ProposalLifetime = ProposalLifetime;
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -658,6 +659,7 @@ impl bridge_transfer::Config for Runtime {
     type BridgeOrigin = bridge::EnsureBridge<Runtime>;
     type Currency = Balances;
     type BridgeTokenId = BridgeTokenId;
+	type WeightInfo = ();
 }
 
 type EnsureRootOrHalfCouncil = EitherOfDiverse<
@@ -1101,8 +1103,7 @@ pub type Barrier = (
 		),
 		UniversalLocation,
 		ConstU32<8>,
-	>,
-	crust_parachain_primitives::AllowDescendOriginFromLocal<Everything>,
+	>
 );
 
 parameter_types! {
@@ -1245,6 +1246,7 @@ impl xstorage::Config for Runtime {
 	type CurrencyIdToMultiLocation =
 		CurrencyIdtoMultiLocation<AsAssetType<AssetId, AssetType, AssetManager>>;
 	type StorageFeeOwner = EnsureRootOrHalfCouncil;
+	type WeightInfo = ();
 }
 
 // These parameters dont matter much as this will only be called by root with the forced arguments
@@ -1548,7 +1550,6 @@ construct_runtime! {
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		// Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
-		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
 		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>, ValidateUnsigned, Config},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config, Call},

@@ -37,6 +37,7 @@ sp-transaction-pool = { git = "https://github.com/paritytech/substrate", default
 sp-inherents = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
 sp-consensus-aura = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
 sp-arithmetic = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
+sp-staking ={ git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0", features=["serde"] }
 
 frame-support = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
 frame-executive = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
@@ -55,7 +56,7 @@ pallet-proxy = { git = "https://github.com/paritytech/substrate", default-featur
 pallet-multisig = { git = "https://github.com/paritytech/substrate", default-features = false , branch = "polkadot-v1.0.0" }
 pallet-utility = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
 pallet-assets = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
-
+pallet-preimage = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v1.0.0" }
 # Moonbeam's pallet for managing assets
 pallet-asset-manager = { path = "../pallets/asset-manager", default-features = false }
 
@@ -114,6 +115,7 @@ std = [
 	"sp-block-builder/std",
 	"sp-transaction-pool/std",
 	"sp-inherents/std",
+	"sp-staking/std",
 	"frame-support/std",
 	"frame-executive/std",
 	"frame-system/std",
@@ -133,6 +135,7 @@ std = [
 	"pallet-elections-phragmen/std",
 	"pallet-tips/std",
 	"pallet-assets/std",
+	"pallet-preimage/std",
 	"crust-parachain-primitives/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-pallet-xcmp-queue/std",

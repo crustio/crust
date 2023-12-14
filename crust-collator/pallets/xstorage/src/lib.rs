@@ -14,6 +14,7 @@ pub mod pallet {
 	use xcm::latest::prelude::*;
 	use sp_std::convert::TryInto;
 	use sp_runtime::traits::{AccountIdConversion, Convert};
+	use xcm::latest::{XcmContext};
 
 	use xcm_executor::traits::TransactAsset;
 	use crate::weights::WeightInfo;
@@ -125,8 +126,9 @@ pub mod pallet {
 			// Convert origin to multilocation
 			let origin_as_mult = T::AccountIdToMultiLocation::convert(who.clone());
 			let dest_as_mult = T::AccountIdToMultiLocation::convert(Self::account_id());
+			let ctx = XcmContext { origin: None, message_id: XcmHash::default(), topic: None };
 
-			T::AssetTransactor::internal_transfer_asset(&fee.clone().into(), &origin_as_mult, &dest_as_mult)
+			T::AssetTransactor::internal_transfer_asset(&fee.clone().into(), &origin_as_mult, &dest_as_mult, &ctx)
 				.map_err(|_| Error::<T>::UnableToTransferStorageFee)?;
 
 			Self::deposit_event(Event::FileSuccess {

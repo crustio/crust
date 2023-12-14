@@ -189,15 +189,8 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-
-		pub fn on_runtime_upgrade() -> Weight {
-			log::warn!("Performing on_runtime_upgrade");
-			XcmV2ToV3AssetManager::<Config>::on_runtime_upgrade();
-			// Consume all block weight to ensure no user transactions inclusion.
-			T::BlockWeights::get().max_block
-		}
-
 		/// Register new asset with the asset manager
+		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register_foreign_asset())]
 		pub fn register_asset(
 			origin: OriginFor<T>,
@@ -228,6 +221,7 @@ pub mod pallet {
 		}
 
 		/// Change the amount of units we are charging per execution second for a given AssetType
+		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::set_asset_units_per_second(*num_assets_weight_hint))]
 		pub fn set_asset_units_per_second(
 			origin: OriginFor<T>,
@@ -268,6 +262,7 @@ pub mod pallet {
 		/// Change the xcm type mapping for a given assetId
 		/// We also change this if the previous units per second where pointing at the old
 		/// assetType
+		#[pallet::call_index(2)]
 		#[pallet::weight(T::WeightInfo::change_existing_asset_type(*num_assets_weight_hint))]
 		pub fn change_existing_asset_type(
 			origin: OriginFor<T>,
@@ -322,6 +317,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::remove_supported_asset(*num_assets_weight_hint))]
 		pub fn remove_supported_asset(
 			origin: OriginFor<T>,
@@ -353,6 +349,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(4)]
 		/// Remove a given assetId -> assetType association
 		#[pallet::weight(T::WeightInfo::remove_existing_asset_type(*num_assets_weight_hint))]
 		pub fn remove_existing_asset_type(

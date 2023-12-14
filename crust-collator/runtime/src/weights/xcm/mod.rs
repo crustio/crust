@@ -17,7 +17,7 @@
 mod pallet_xcm_benchmarks_fungible;
 mod pallet_xcm_benchmarks_generic;
 
-use crate::{xcm_config::MaxAssetsIntoHolding, Runtime};
+use crate::{MaxAssetsIntoHolding, Runtime};
 use frame_support::weights::Weight;
 use pallet_xcm_benchmarks_fungible::WeightInfo as XcmFungibleWeight;
 use pallet_xcm_benchmarks_generic::WeightInfo as XcmGeneric;

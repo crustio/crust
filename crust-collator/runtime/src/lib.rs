@@ -52,7 +52,7 @@ pub use frame_support::{
 	traits::{
 		Randomness, OriginTrait, IsInVec, Everything, InstanceFilter, Imbalance,
 		LockIdentifier, EitherOfDiverse, PrivilegeCmp, Currency, OnUnbalanced, Nothing,
-		ConstU32, ConstU64, ConstU8, ConstU16, ConstBool, AsEnsureOriginWithArg, LinearStoragePrice
+		ConstU32, ConstU64, ConstU8, ConstU16, ConstBool, AsEnsureOriginWithArg
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND,
@@ -102,7 +102,7 @@ use smallvec::smallvec;
 use orml_xcm_support::MultiNativeAsset;
 use orml_traits::location::{RelativeReserveProvider, Reserve};
 use orml_traits::parameter_type_with_key;
-pub type XcmV2Weight = xcm::v2::Weight;
+pub type XcmV3Weight = xcm::v3::Weight;
 
 type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 
@@ -778,6 +778,8 @@ impl pallet_preimage::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type ManagerOrigin = EnsureRoot<AccountId>;
+	type BaseDeposit = PreimageBaseDeposit;
+	type ByteDeposit = PreimageByteDeposit;
 }
 
 impl pallet_treasury::Config for Runtime {
@@ -938,12 +940,12 @@ parameter_types! {
 	pub CheckingAccount: AccountId = PalletId(*b"checking").into_account_truncating();
 }
 use xcm_executor::traits::ConvertLocation as LocationConvert;
-pub struct SiblingAccountId32Aliases<Network, AccountId>(PhantomData<(Network, AccountId)>);
-impl<Network: Get<NetworkId>, AccountId: From<[u8; 32]> + Into<[u8; 32]> + Clone>
-	LocationConvert<AccountId> for SiblingAccountId32Aliases<Network, AccountId>
+pub struct SiblingAccountId32Aliases<AccountId>(PhantomData<(AccountId)>);
+impl<AccountId: From<[u8; 32]> + Into<[u8; 32]> + Clone>
+	LocationConvert<AccountId> for SiblingAccountId32Aliases<AccountId>
 {
 	fn convert_location(location: &MultiLocation) -> Option<AccountId> {
-		let id = match location {
+		let id = match *location {
 			MultiLocation {
 				parents: 1,
 				interior: Junctions::X2(Parachain(_), AccountId32 { id, network: _ })
@@ -958,14 +960,13 @@ type LocationToAccountId = (
 	ParentIsPreset<AccountId>,
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	AccountId32Aliases<RelayNetwork, AccountId>,
-	SiblingAccountId32Aliases<RelayNetwork, AccountId>,
+	SiblingAccountId32Aliases<AccountId>,
 	Account32Hash<RelayNetwork, AccountId>,
 );
 
 pub trait NativeAssetChecker {
 	fn is_native_asset(asset: &MultiAsset) -> bool;
 	fn is_native_asset_id(id: &MultiLocation) -> bool;
-	fn native_asset_id() -> MultiLocation;
 }
 
 pub struct NativeAssetFilter<T>(PhantomData<T>);
@@ -981,13 +982,12 @@ impl<T: Get<ParaId>> NativeAssetChecker for NativeAssetFilter<T> {
 	fn is_native_asset_id(id: &MultiLocation) -> bool {
 		let native_locations = [
 			MultiLocation::here(),
-			(1, X1(Parachain(T::get().into()))).into(),
+			Multilocation {
+				parents: 1,
+				interior: Junctions::X1(Parachain(T::get().into()))
+			}
 		];
 		native_locations.contains(id)
-	}
-
-	fn native_asset_id() -> MultiLocation {
-		(1, X1(Parachain(T::get().into()))).into()
 	}
 }
 
@@ -1023,9 +1023,9 @@ pub type FungiblesTransactor = FungiblesAdapter<
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
 	AccountId,
 	// We dont allow teleports.
-	Nothing,
+	NoChecking,
 	// We dont track any teleports
-	CheckingAccount,
+	(),
 >;
 
 type LocalAssetTransactor = CurrencyAdapter<
@@ -1038,7 +1038,7 @@ type LocalAssetTransactor = CurrencyAdapter<
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
 	AccountId,
 	// We don't track any teleports.
-	CheckingAccount,
+	(),
 >;
 
 pub type CrustAssetTransactors = (LocalAssetTransactor, FungiblesTransactor);
@@ -1385,7 +1385,7 @@ impl pallet_asset_manager::AssetRegistrar<Runtime> for AssetRegistrar {
 	) -> DispatchResult {
 		Assets::force_create(
 			RuntimeOrigin::root(),
-			asset,
+			asset.into(),
 			sp_runtime::MultiAddress::Id(AssetManager::account_id()),
 			is_sufficient,
 			min_balance,
@@ -1403,7 +1403,7 @@ impl pallet_asset_manager::AssetRegistrar<Runtime> for AssetRegistrar {
 		// Lastly, the metadata
 		Assets::force_set_metadata(
 			RuntimeOrigin::root(),
-			asset,
+			asset.into(),
 			metadata.name,
 			metadata.symbol,
 			metadata.decimals,
@@ -1455,7 +1455,7 @@ where
 				let multi: MultiLocation = LocalNetwork::get();
 				Some(multi)
 			}
-			CurrencyId::OtherReserve(asset) => AssetXConverter::reverse_ref(asset).ok(),
+			CurrencyId::OtherReserve(asset) => AssetXConverter::convert_back(&asset),
 		}
 	}
 }
@@ -1483,7 +1483,7 @@ where
 }
 
 parameter_types! {
-	pub const BaseXcmWeight: XcmV2Weight = 100_000_000;
+	pub const BaseXcmWeight: Weight = Weight::from_parts(200_000_000u64, 0);
 	pub const MaxAssetsForTransfer: usize = 2;
 
 	// This is how we are going to detect whether the asset is a Reserve asset
@@ -1503,7 +1503,7 @@ pub struct AccountIdToMultiLocation;
 impl Convert<AccountId, MultiLocation> for AccountIdToMultiLocation {
 	fn convert(account: AccountId) -> MultiLocation {
 		X1(AccountId32 {
-			network: NetworkId::Any,
+			network: NetworkId::None,
 			id: account.into(),
 		})
 		.into()
@@ -1567,7 +1567,7 @@ construct_runtime! {
 
 		// Collator support. the order of these 4 are important and shall not change.
 		Authorship: pallet_authorship::{Pallet, Storage},
-		CollatorSelection: pallet_collator_selection::{Pallet, Call, Storage, Event<T>, Config<T>},
+		CollatorSelection: pallet_collator_selection::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>},
 		Aura: pallet_aura::{Pallet, Storage, Config<T>},
 		AuraExt: cumulus_pallet_aura_ext::{Pallet, Storage, Config<T>},

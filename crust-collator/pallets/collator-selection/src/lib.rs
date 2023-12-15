@@ -71,26 +71,25 @@ pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::{
-		dispatch::{DispatchResultWithPostInfo, DispatchClass},
-		pallet_prelude::*,
-		traits::{
-			Currency, ReservableCurrency, EnsureOrigin, ExistenceRequirement::KeepAlive, GenesisBuild
-		},
-		PalletId,
-	};
-	use frame_system::pallet_prelude::*;
-	use frame_system::Config as SystemConfig;
-	use frame_support::{
-		sp_runtime::{
-			RuntimeDebug,
-			traits::{AccountIdConversion, CheckedSub, Zero, Saturating},
-		}
-	};
-	use core::ops::Div;
-	use pallet_session::SessionManager;
-	use sp_staking::SessionIndex;
 	pub use crate::weights::WeightInfo;
+	use core::ops::Div;
+	use frame_support::{
+		dispatch::{DispatchClass, DispatchResultWithPostInfo},
+		pallet_prelude::*,
+		sp_runtime::{
+			traits::{AccountIdConversion, CheckedSub, Saturating, Zero},
+			RuntimeDebug,
+		},
+		traits::{
+			Currency, EnsureOrigin, ExistenceRequirement::KeepAlive, ReservableCurrency,
+			ValidatorRegistration
+		},
+		BoundedVec, DefaultNoBound, PalletId,
+	};
+	use frame_system::{pallet_prelude::*, Config as SystemConfig};
+	use pallet_session::SessionManager;
+	use sp_runtime::traits::Convert;
+	use sp_staking::SessionIndex;
 	use sp_std::{convert::TryInto, vec::Vec};
 
 	type BalanceOf<T> =
@@ -193,7 +192,7 @@ pub mod pallet {
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig<T> for GenesisConfig<T> {
 		fn build(&self) {
 
 			let duplicate_invulnerables = self.invulnerables.iter().collect::<sp_std::collections::btree_set::BTreeSet<_>>();

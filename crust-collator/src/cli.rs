@@ -63,6 +63,16 @@ pub struct Cli {
 	#[command(flatten)]
 	pub run: cumulus_client_cli::RunCmd,
 
+	/// Disable automatic hardware benchmarks.
+	///
+	/// By default these benchmarks are automatically ran at startup and measure
+	/// the CPU speed, the memory bandwidth and the disk speed.
+	///
+	/// The results are then printed out in the logs, and also sent as part of
+	/// telemetry, if telemetry is enabled.
+	#[arg(long)]
+	pub no_hardware_benchmarks: bool,
+
 	/// Relay chain arguments
 	#[arg(raw = true, conflicts_with = "relay-chain-rpc-url")]
 	pub relaychain_args: Vec<String>,
@@ -88,7 +98,7 @@ impl RelayChainCli {
 	) -> Self {
 		let extension = chain_spec::Extensions::try_get(&*para_config.chain_spec);
 		let chain_id = extension.map(|e| e.relay_chain.clone());
-		let base_path = para_config.base_path.as_ref().map(|x| x.path().join("polkadot"));
+		let base_path = para_config.base_path.path().join("polkadot");
 		Self {
 			base_path: Some(base_path),
 			chain_id,

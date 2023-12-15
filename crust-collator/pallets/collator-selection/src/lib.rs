@@ -192,7 +192,7 @@ pub mod pallet {
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> BuildGenesisConfig<T> for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 
 			let duplicate_invulnerables = self.invulnerables.iter().collect::<sp_std::collections::btree_set::BTreeSet<_>>();

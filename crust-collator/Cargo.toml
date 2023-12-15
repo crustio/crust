@@ -52,13 +52,18 @@ sp-trie = { git = "https://github.com/paritytech/substrate", branch = "polkadot-
 sc-chain-spec = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sc-rpc = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sc-tracing = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+sc-sysinfo = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+sc-offchain = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sp-offchain = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sp-consensus-aura = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 substrate-prometheus-endpoint = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 sp-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+frame-benchmarking-cli = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+
 
 # RPC related dependencies
-jsonrpsee = { version = "0.15.0", default-features = false, features = [ "macros", "server" ] }
+jsonrpsee = { version = "0.16.3", default-features = false, features = [ "macros", "server" ] }
 sc-transaction-pool-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 frame-rpc-system = { package = "substrate-frame-rpc-system", git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }

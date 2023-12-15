@@ -79,7 +79,7 @@ use xcm_builder::{
 	SovereignSignedViaLocation, EnsureXcmOrigin, AllowExplicitUnpaidExecutionFrom, ParentAsSuperuser,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds,
 	UsingComponents, SignedToAccountId32, SiblingParachainAsNative, AllowKnownQueryResponses,
-	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId, Account32Hash, WithComputedOrigin
+	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId, Account32Hash, WithComputedOrigin, NoChecking
 };
 use xcm_executor::{
 	traits::{JustTry, ConvertOrigin},
@@ -125,6 +125,7 @@ pub mod opaque {
 }
 
 /// This runtime version.
+#[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("crust-collator"),
 	impl_name: create_runtime_str!("crust-collator"),
@@ -982,7 +983,7 @@ impl<T: Get<ParaId>> NativeAssetChecker for NativeAssetFilter<T> {
 	fn is_native_asset_id(id: &MultiLocation) -> bool {
 		let native_locations = [
 			MultiLocation::here(),
-			Multilocation {
+			MultiLocation {
 				parents: 1,
 				interior: Junctions::X1(Parachain(T::get().into()))
 			}
@@ -1025,7 +1026,7 @@ pub type FungiblesTransactor = FungiblesAdapter<
 	// We dont allow teleports.
 	NoChecking,
 	// We dont track any teleports
-	(),
+	CheckingAccount,
 >;
 
 type LocalAssetTransactor = CurrencyAdapter<
@@ -1503,7 +1504,7 @@ pub struct AccountIdToMultiLocation;
 impl Convert<AccountId, MultiLocation> for AccountIdToMultiLocation {
 	fn convert(account: AccountId) -> MultiLocation {
 		X1(AccountId32 {
-			network: NetworkId::None,
+			network: None,
 			id: account.into(),
 		})
 		.into()

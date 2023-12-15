@@ -18,7 +18,6 @@ use cumulus_client_consensus_aura::{
 	AuraConsensus, BuildAuraConsensusParams, SlotProportion,
 };
 use cumulus_client_cli::CollatorOptions;
-use cumulus_client_network::BlockAnnounceValidator;
 use cumulus_client_service::{
 	build_network, build_relay_chain_interface,
 	prepare_node_config, start_collator, start_full_node, BuildNetworkParams,
@@ -30,7 +29,6 @@ use sc_consensus::ImportQueue;
 use cumulus_client_consensus_common::{
 	ParachainBlockImport as TParachainBlockImport, ParachainConsensus,
 };
-use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
 use sc_client_api::Backend;
 use cumulus_primitives_core::ParaId;
 use parachain_runtime::RuntimeApi;
@@ -48,13 +46,8 @@ use cumulus_relay_chain_interface::{RelayChainInterface};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use substrate_prometheus_endpoint::Registry;
 
-use polkadot_service::CollatorPair;
-use jsonrpsee::RpcModule;∂
+use jsonrpsee::RpcModule;
 
-#[cfg(not(feature = "runtime-benchmarks"))]
-type HostFunctions = sp_io::SubstrateHostFunctions;
-
-#[cfg(feature = "runtime-benchmarks")]
 type HostFunctions =
 	(sp_io::SubstrateHostFunctions, frame_benchmarking::benchmarking::HostFunctions);
 
@@ -66,11 +59,11 @@ impl sc_executor::NativeExecutionDispatch for ParachainNativeExecutor {
 	type ExtendHostFunctions = frame_benchmarking::benchmarking::HostFunctions;
 
 	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-		parachain_template_runtime::api::dispatch(method, data)
+		parachain_runtime::api::dispatch(method, data)
 	}
 
 	fn native_version() -> sc_executor::NativeVersion {
-		parachain_template_runtime::native_version()
+		parachain_runtime::native_version()
 	}
 }
 
@@ -161,8 +154,8 @@ pub fn new_partial(
 		_,
 		_,
 		>(cumulus_client_consensus_aura::ImportQueueParams {
-			block_import,
-			client,
+			block_import: block_import.clone(),
+			client: client.clone(),
 			create_inherent_data_providers: move |_, _| async move {
 				let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 
@@ -181,7 +174,7 @@ pub fn new_partial(
 
 	let params = PartialComponents {
 		backend,
-		client,
+		client: client.clone(),
 		import_queue,
 		keystore_container,
 		task_manager,
@@ -262,7 +255,7 @@ where
 	let prometheus_registry = parachain_config.prometheus_registry().cloned();
 	let transaction_pool = params.transaction_pool.clone();
 	let import_queue_service = params.import_queue.service();
-	let (network, system_rpc_tx, tx_handler_controllerk, start_network, sync_service) =
+	let (network, system_rpc_tx, tx_handler_controller, start_network, sync_service) =
 		build_network(BuildNetworkParams {
 			parachain_config: &parachain_config,
 			net_config,
@@ -331,14 +324,6 @@ where
 
 	if let Some(hwbench) = hwbench {
 		sc_sysinfo::print_hwbench(&hwbench);
-		// Here you can check whether the hardware meets your chains' requirements. Putting a link
-		// in there and swapping out the requirements for your own are probably a good idea. The
-		// requirements for a para-chain are dictated by its relay-chain.
-		if !SUBSTRATE_REFERENCE_HARDWARE.check_hardware(&hwbench) && validator {
-			log::warn!(
-				"⚠️  The hardware does not meet the minimal requirements for role 'Authority'."
-			);
-		}
 
 		if let Some(ref mut telemetry) = telemetry {
 			let telemetry_handle = telemetry.handle();

@@ -201,7 +201,7 @@ fn testnet_genesis(
 				.map(|k| (k, 1 << 60))
 				.collect(),
 		},
-		sudo: parachain_runtime::SudoConfig { key: Some(endowed_accounts[0].clone()) },
+		// sudo: parachain_runtime::SudoConfig { key: Some(endowed_accounts[0].clone()) },
 		parachain_info: parachain_runtime::ParachainInfoConfig { parachain_id: id, ..Default::default() },
 		collator_selection: parachain_runtime::CollatorSelectionConfig {
 			invulnerables: invulnerables.iter().cloned().map(|(acc, _)| acc).collect(),

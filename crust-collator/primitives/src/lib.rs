@@ -20,26 +20,27 @@
 
 use sp_runtime::{
 	generic,
-	traits::{BlakeTwo256, IdentifyAccount, Verify},
+	traits::{BlakeTwo256, IdentifyAccount, Verify, MaybeEquivalence},
 	MultiSignature,
 };
 
 use frame_support::{
-	traits::{tokens::fungibles::Mutate, Get, Contains},
-	weights::{constants::WEIGHT_PER_SECOND}, ensure
+	pallet_prelude::Weight,
+	traits::{tokens::fungibles::Mutate, Get},
+	weights::{constants::WEIGHT_REF_TIME_PER_SECOND}
 };
 use sp_runtime::traits::Zero;
-use sp_std::{borrow::Borrow, vec::Vec};
+use sp_std::{vec::Vec};
 use sp_std::{
 	marker::PhantomData,
 };
 use xcm::latest::{
 	AssetId as xcmAssetId, Error as XcmError, Fungibility,
-	MultiAsset, MultiLocation, prelude::{BuyExecution, DescendOrigin, WithdrawAsset},
-	WeightLimit::{Limited, Unlimited}, Xcm,
+	MultiAsset, MultiLocation
 };
 use xcm_builder::TakeRevenue;
-use xcm_executor::traits::{MatchesFungibles, WeightTrader, ShouldExecute};
+use xcm_executor::traits::{MatchesFungibles, WeightTrader};
+use xcm_executor::traits::ConvertLocation;
 
 pub mod constants;
 pub mod traits;
@@ -73,7 +74,7 @@ pub type AccountIndex = u32;
 pub type Balance = u128;
 
 /// Index of a transaction in the chain.
-pub type Index = u32;
+pub type Nonce = u32;
 
 /// A hash of some data used by the chain.
 pub type Hash = sp_core::H256;
@@ -175,30 +176,29 @@ impl<
 pub struct AsAssetType<AssetId, AssetType, AssetIdInfoGetter>(
 	PhantomData<(AssetId, AssetType, AssetIdInfoGetter)>,
 );
-impl<AssetId, AssetType, AssetIdInfoGetter> xcm_executor::traits::Convert<MultiLocation, AssetId>
+impl<AssetId, AssetType, AssetIdInfoGetter> MaybeEquivalence<MultiLocation, AssetId>
 	for AsAssetType<AssetId, AssetType, AssetIdInfoGetter>
 where
 	AssetId: Clone,
 	AssetType: From<MultiLocation> + Into<Option<MultiLocation>> + Clone,
 	AssetIdInfoGetter: AssetTypeGetter<AssetId, AssetType>,
 {
-	fn convert_ref(id: impl Borrow<MultiLocation>) -> Result<AssetId, ()> {
-		if let Some(asset_id) = AssetIdInfoGetter::get_asset_id(id.borrow().clone().into()) {
-			Ok(asset_id)
-		} else {
-			Err(())
-		}
+	fn convert(id: &MultiLocation) -> Option<AssetId> {
+		AssetIdInfoGetter::get_asset_id(id.clone().into())
 	}
-	fn reverse_ref(what: impl Borrow<AssetId>) -> Result<MultiLocation, ()> {
-		if let Some(asset_type) = AssetIdInfoGetter::get_asset_type(what.borrow().clone()) {
-			if let Some(location) = asset_type.into() {
-				Ok(location)
-			} else {
-				Err(())
-			}
-		} else {
-			Err(())
-		}
+	fn convert_back(what: &AssetId) -> Option<MultiLocation> {
+		AssetIdInfoGetter::get_asset_type(what.clone()).and_then(Into::into)
+	}
+}
+impl<AssetId, AssetType, AssetIdInfoGetter> ConvertLocation<AssetId>
+	for AsAssetType<AssetId, AssetType, AssetIdInfoGetter>
+where
+	AssetId: Clone,
+	AssetType: From<MultiLocation> + Into<Option<MultiLocation>> + Clone,
+	AssetIdInfoGetter: AssetTypeGetter<AssetId, AssetType>,
+{
+	fn convert_location(id: &MultiLocation) -> Option<AssetId> {
+		AssetIdInfoGetter::get_asset_id(id.clone().into())
 	}
 }
 
@@ -210,8 +210,8 @@ pub struct FirstAssetTrader<
 	AssetIdInfoGetter: UnitsToWeightRatio<AssetType>,
 	R: TakeRevenue,
 >(
-	u64,
-	Option<(MultiLocation, u128, u128)>,
+	Weight,
+	Option<(MultiLocation, u128, u128)>, // id, amount, units_per_second
 	PhantomData<(AssetType, AssetIdInfoGetter, R)>,
 );
 impl<
@@ -221,18 +221,20 @@ impl<
 	> WeightTrader for FirstAssetTrader<AssetType, AssetIdInfoGetter, R>
 {
 	fn new() -> Self {
-		FirstAssetTrader(0, None, PhantomData)
+		FirstAssetTrader(Weight::zero(), None, PhantomData)
 	}
 	fn buy_weight(
 		&mut self,
-		weight: u64,
+		weight: Weight,
 		payment: xcm_executor::Assets,
 	) -> Result<xcm_executor::Assets, XcmError> {
-		log::trace!(
-			target: "xcm::weight",
-			"FirstAssetTrader::buy_weight weight: {:?}, payment: {:?}",
-			weight, payment,
-		);
+		// can only call one time
+		if self.1.is_some() {
+			// TODO: better error
+			return Err(XcmError::NotWithdrawable);
+		}
+
+		assert_eq!(self.0, Weight::zero());
 		let first_asset = payment
 			.clone()
 			.fungible_assets_iter()
@@ -252,8 +254,9 @@ impl<
 				}
 				if let Some(units_per_second) = AssetIdInfoGetter::get_units_per_second(asset_type)
 				{
-					let amount = units_per_second.saturating_mul(weight as u128)
-						/ (WEIGHT_PER_SECOND.ref_time() as u128);
+					// TODO handle proof size payment
+					let amount = units_per_second.saturating_mul(weight.ref_time() as u128)
+						/ (WEIGHT_REF_TIME_PER_SECOND as u128);
 
 					// We dont need to proceed if the amount is 0
 					// For cases (specially tests) where the asset is very cheap with respect
@@ -269,32 +272,10 @@ impl<
 					let unused = payment
 						.checked_sub(required)
 						.map_err(|_| XcmError::TooExpensive)?;
-					self.0 = self.0.saturating_add(weight);
 
-					// In case the asset matches the one the trader already stored before, add
-					// to later refund
+					self.0 = weight;
+					self.1 = Some((id, amount, units_per_second));
 
-					// Else we are always going to substract the weight if we can, but we latter do
-					// not refund it
-
-					// In short, we only refund on the asset the trader first succesfully was able
-					// to pay for an execution
-					let new_asset = match self.1.clone() {
-						Some((prev_id, prev_amount, units_per_second)) => {
-							if prev_id == id.clone() {
-								Some((id, prev_amount.saturating_add(amount), units_per_second))
-							} else {
-								None
-							}
-						}
-						None => Some((id, amount, units_per_second)),
-					};
-
-					// Due to the trait bound, we can only refund one asset.
-					if let Some(new_asset) = new_asset {
-						self.0 = self.0.saturating_add(weight);
-						self.1 = Some(new_asset);
-					};
 					return Ok(unused);
 				} else {
 					return Err(XcmError::TooExpensive);
@@ -304,11 +285,14 @@ impl<
 		}
 	}
 
-	fn refund_weight(&mut self, weight: u64) -> Option<MultiAsset> {
+	// Refund weight. We will refund in whatever asset is stored in self.
+	fn refund_weight(&mut self, weight: Weight) -> Option<MultiAsset> {
 		if let Some((id, prev_amount, units_per_second)) = self.1.clone() {
 			let weight = weight.min(self.0);
 			self.0 -= weight;
-			let amount = units_per_second * (weight as u128) / (WEIGHT_PER_SECOND.ref_time() as u128);
+			let amount = units_per_second * (weight.ref_time() as u128)
+				/ (WEIGHT_REF_TIME_PER_SECOND as u128);
+			let amount = amount.min(prev_amount);
 			self.1 = Some((
 				id.clone(),
 				prev_amount.saturating_sub(amount),
@@ -334,54 +318,6 @@ impl<
 	fn drop(&mut self) {
 		if let Some((id, amount, _)) = self.1.clone() {
 			R::take_revenue((id, amount).into());
-		}
-	}
-}
-
-pub struct AllowDescendOriginFromLocal<T>(PhantomData<T>);
-impl<T: Contains<MultiLocation>> ShouldExecute for AllowDescendOriginFromLocal<T> {
-	fn should_execute<Call>(
-		origin: &MultiLocation,
-		message: &mut Xcm<Call>,
-		max_weight: u64,
-		_weight_credit: &mut u64,
-	) -> Result<(), ()> {
-		log::trace!(
-			target: "xcm::barriers",
-			"AllowDescendOriginFromLocal origin:
-			{:?}, message: {:?}, max_weight: {:?}, weight_credit: {:?}",
-			origin, message, max_weight, _weight_credit,
-		);
-		ensure!(T::contains(origin), ());
-		let mut iter = message.0.iter_mut();
-		// Make sure the first instruction is DescendOrigin
-		iter.next()
-			.filter(|instruction| matches!(instruction, DescendOrigin(_)))
-			.ok_or(())?;
-
-		// Then WithdrawAsset
-		iter.next()
-			.filter(|instruction| matches!(instruction, WithdrawAsset(_)))
-			.ok_or(())?;
-
-		// Then BuyExecution
-		let i = iter.next().ok_or(())?;
-		match i {
-			BuyExecution {
-				weight_limit: Limited(ref mut weight),
-				..
-			} if *weight >= max_weight => {
-				*weight = max_weight;
-				Ok(())
-			}
-			BuyExecution {
-				ref mut weight_limit,
-				..
-			} if weight_limit == &Unlimited => {
-				*weight_limit = Limited(max_weight);
-				Ok(())
-			}
-			_ => Err(()),
 		}
 	}
 }

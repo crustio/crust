@@ -14,12 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Cumulus.  If not, see <http://www.gnu.org/licenses/>.
 
-use substrate_wasm_builder::WasmBuilder;
-
+#[cfg(feature = "std")]
 fn main() {
-	WasmBuilder::new()
+	substrate_wasm_builder::WasmBuilder::new()
 		.with_current_project()
 		.export_heap_base()
 		.import_memory()
 		.build()
 }
+
+/// The wasm builder is deactivated when compiling
+/// this crate for wasm to speed up the compilation.
+#[cfg(not(feature = "std"))]
+fn main() {}

@@ -43,6 +43,7 @@ pub mod mock;
 #[cfg(test)]
 pub mod tests;
 pub mod weights;
+pub mod migration;
 
 #[pallet]
 pub mod pallet {
@@ -98,7 +99,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// The Asset Id. This will be used to register the asset in Assets
 		type AssetId: Member + Parameter + Default + Copy + HasCompact + MaxEncodedLen;
@@ -115,8 +116,8 @@ pub mod pallet {
 		/// The trait we use to register Assets
 		type AssetRegistrar: AssetRegistrar<Self>;
 
-		/// Origin that is allowed to create and modify asset information
-		type AssetModifierOrigin: EnsureOrigin<Self::Origin>;
+		/// RuntimeOrigin that is allowed to create and modify asset information
+		type AssetModifierOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		type WeightInfo: WeightInfo;
 	}
@@ -189,6 +190,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Register new asset with the asset manager
+		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register_foreign_asset())]
 		pub fn register_asset(
 			origin: OriginFor<T>,
@@ -219,6 +221,7 @@ pub mod pallet {
 		}
 
 		/// Change the amount of units we are charging per execution second for a given AssetType
+		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::set_asset_units_per_second(*num_assets_weight_hint))]
 		pub fn set_asset_units_per_second(
 			origin: OriginFor<T>,
@@ -259,6 +262,7 @@ pub mod pallet {
 		/// Change the xcm type mapping for a given assetId
 		/// We also change this if the previous units per second where pointing at the old
 		/// assetType
+		#[pallet::call_index(2)]
 		#[pallet::weight(T::WeightInfo::change_existing_asset_type(*num_assets_weight_hint))]
 		pub fn change_existing_asset_type(
 			origin: OriginFor<T>,
@@ -313,6 +317,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::remove_supported_asset(*num_assets_weight_hint))]
 		pub fn remove_supported_asset(
 			origin: OriginFor<T>,
@@ -344,6 +349,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(4)]
 		/// Remove a given assetId -> assetType association
 		#[pallet::weight(T::WeightInfo::remove_existing_asset_type(*num_assets_weight_hint))]
 		pub fn remove_existing_asset_type(

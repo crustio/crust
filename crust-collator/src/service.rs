@@ -48,10 +48,6 @@ use substrate_prometheus_endpoint::Registry;
 
 use jsonrpsee::RpcModule;
 
-type HostFunctions =
-	(sp_io::SubstrateHostFunctions, frame_benchmarking::benchmarking::HostFunctions);
-
-
 /// Native executor type.
 pub struct ParachainNativeExecutor;
 

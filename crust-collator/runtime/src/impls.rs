@@ -1,19 +1,11 @@
 // Copyright (C) 2019-2021 Crust Network Technologies Ltd.
 // This file is part of Crust.
 
-use frame_support::traits::{OnUnbalanced, Currency, Imbalance, WithdrawReasons, Get, ExistenceRequirement};
-use frame_support::unsigned::TransactionValidityError;
+use frame_support::traits::Currency;
 use frame_support::weights::{WeightToFeePolynomial, WeightToFeeCoefficients, WeightToFeeCoefficient};
-use frame_support::dispatch::{GetCallMetadata, CallMetadata};
 use sp_arithmetic::{Perbill, traits::{BaseArithmetic, Unsigned}};
 use smallvec::smallvec;
-use sp_std::marker::PhantomData;
-use sp_runtime::{
-    traits::{DispatchInfoOf, PostDispatchInfoOf, Zero, Saturating, Convert, SaturatedConversion},
-    transaction_validity::InvalidTransaction,
-};
-use pallet_transaction_payment::{OnChargeTransaction};
-use crust_parachain_primitives::traits::BenefitInterface;
+use sp_runtime::traits::{Convert, SaturatedConversion};
 
 // /// Logic for the author to get a portion of fees.
 // pub struct Author;

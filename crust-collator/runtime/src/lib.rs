@@ -72,11 +72,11 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 
 // XCM imports
 use polkadot_parachain::primitives::Sibling;
-use xcm::latest::{prelude::*, Weight as XCMWeight};
+use xcm::latest::{prelude::*};
 use xcm_builder::{
 	AccountId32Aliases, CurrencyAdapter, ParentIsPreset, RelayChainAsNative,
 	SiblingParachainConvertsVia, SignedAccountId32AsNative,
-	SovereignSignedViaLocation, EnsureXcmOrigin, AllowExplicitUnpaidExecutionFrom, ParentAsSuperuser,
+	SovereignSignedViaLocation, EnsureXcmOrigin, ParentAsSuperuser,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds,
 	UsingComponents, SignedToAccountId32, SiblingParachainAsNative, AllowKnownQueryResponses,
 	AllowSubscriptionsFrom, FungiblesAdapter, ConvertedConcreteAssetId, Account32Hash, WithComputedOrigin, NoChecking
@@ -943,7 +943,7 @@ parameter_types! {
 	pub CheckingAccount: AccountId = PalletId(*b"checking").into_account_truncating();
 }
 use xcm_executor::traits::ConvertLocation as LocationConvert;
-pub struct SiblingAccountId32Aliases<AccountId>(PhantomData<(AccountId)>);
+pub struct SiblingAccountId32Aliases<AccountId>(PhantomData<AccountId>);
 impl<AccountId: From<[u8; 32]> + Into<[u8; 32]> + Clone>
 	LocationConvert<AccountId> for SiblingAccountId32Aliases<AccountId>
 {
@@ -1647,9 +1647,7 @@ pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, RuntimeCall, 
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, RuntimeCall, SignedExtra>;
 /// Executive: handles dispatch to the various modules.
-pub type Migrations = (
-	pallet_asset_manager::migration::XcmV2ToV3AssetManager<Runtime>
-);
+pub type Migrations = pallet_asset_manager::migration::XcmV2ToV3AssetManager<Runtime>;
 pub type Executive = frame_executive::Executive<
 	Runtime,
 	Block,

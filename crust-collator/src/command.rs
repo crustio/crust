@@ -19,8 +19,7 @@ use crate::{
 	cli::{Cli, RelayChainCli, Subcommand},
 };
 use cumulus_primitives_core::ParaId;
-use log::{info, warn};
-use parachain_runtime::Block;
+use log::{info};
 use sc_cli::{
 	ChainSpec, CliConfiguration, DefaultConfigurationValues, ImportParams, KeystoreParams,
 	NetworkParams, Result, SharedParams, SubstrateCli,
@@ -29,7 +28,6 @@ use sc_service::{
 	config::{BasePath, PrometheusConfig},
 	PartialComponents,
 };
-use sp_core::hexdisplay::HexDisplay;
 use sp_runtime::traits::{AccountIdConversion};
 use std::net::SocketAddr;
 

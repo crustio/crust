@@ -81,14 +81,12 @@ pub mod pallet {
 			RuntimeDebug,
 		},
 		traits::{
-			Currency, EnsureOrigin, ExistenceRequirement::KeepAlive, ReservableCurrency,
-			ValidatorRegistration
+			Currency, EnsureOrigin, ExistenceRequirement::KeepAlive, ReservableCurrency
 		},
-		BoundedVec, DefaultNoBound, PalletId,
+		PalletId,
 	};
 	use frame_system::{pallet_prelude::*, Config as SystemConfig};
 	use pallet_session::SessionManager;
-	use sp_runtime::traits::Convert;
 	use sp_staking::SessionIndex;
 	use sp_std::{convert::TryInto, vec::Vec};
 

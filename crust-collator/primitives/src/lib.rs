@@ -18,7 +18,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use cumulus_primitives_core::XcmContext;
 use sp_runtime::{
 	generic,
 	traits::{BlakeTwo256, IdentifyAccount, Verify, MaybeEquivalence},
@@ -27,8 +26,8 @@ use sp_runtime::{
 
 use frame_support::{
 	pallet_prelude::Weight,
-	traits::{tokens::fungibles::Mutate, Get, Contains},
-	weights::{constants::WEIGHT_REF_TIME_PER_SECOND}, ensure
+	traits::{tokens::fungibles::Mutate, Get},
+	weights::{constants::WEIGHT_REF_TIME_PER_SECOND}
 };
 use sp_runtime::traits::Zero;
 use sp_std::{vec::Vec};
@@ -37,11 +36,10 @@ use sp_std::{
 };
 use xcm::latest::{
 	AssetId as xcmAssetId, Error as XcmError, Fungibility,
-	MultiAsset, MultiLocation, prelude::{BuyExecution, DescendOrigin, WithdrawAsset},
-	WeightLimit::{Limited, Unlimited}, Xcm,
+	MultiAsset, MultiLocation
 };
 use xcm_builder::TakeRevenue;
-use xcm_executor::traits::{MatchesFungibles, WeightTrader, ShouldExecute};
+use xcm_executor::traits::{MatchesFungibles, WeightTrader};
 use xcm_executor::traits::ConvertLocation;
 
 pub mod constants;

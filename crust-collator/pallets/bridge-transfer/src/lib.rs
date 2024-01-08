@@ -128,8 +128,8 @@ pub mod pallet {
 			Self::deposit_event(Event::FeeUpdated(dest_id, min_fee, fee_scale));
 			Ok(())
 		}
-
-        #[pallet::weight(1000)]
+        #[pallet::call_index(3)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
         pub fn change_superior(origin: OriginFor<T>, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
@@ -141,8 +141,8 @@ pub mod pallet {
 
             Ok(())
         }
-
-        #[pallet::weight(1000)]
+        #[pallet::call_index(4)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
         pub fn set_bridge_limit(origin: OriginFor<T>, limit: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_superior = Self::superior();

@@ -16,6 +16,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod weights;
+
 mod types {
     use crate::pallet::Config;
     use frame_support::traits::Currency;
@@ -45,9 +47,9 @@ pub mod pallet {
     use sp_std::vec::Vec;
     use sp_runtime::traits::StaticLookup;
     use cstrml_bridge as bridge;
+    use crate::weights::WeightInfo;
 
     #[pallet::pallet]
-    #[pallet::generate_store(pub(super) trait Store)]
     pub struct Pallet<T>(_);
 
     /// Tracks current relayer set
@@ -71,18 +73,20 @@ pub mod pallet {
         + bridge::Config
     {
         /// Because this pallet emits events, it depends on the runtime's definition of an event.
-        type Event: From<Event<Self>>
-            + IsType<<Self as frame_system::Config>::Event>;
+        type RuntimeEvent: From<Event<Self>>
+            + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Specifies the origin check provided by the bridge for calls that can only be called by
         /// the bridge pallet
-        type BridgeOrigin: EnsureOrigin<Self::Origin, Success = Self::AccountId>;
+        type BridgeOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
 
         /// The currency mechanism
         type Currency: Currency<Self::AccountId>;
 
         /// Ids can be defined by the runtime and passed in, perhaps from blake2b_128 hashes.
         type BridgeTokenId: Get<[u8; 32]>;
+
+        type BridgeTransferWeightInfo: WeightInfo;
     }
 
     #[pallet::event]
@@ -115,7 +119,8 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Change extra bridge transfer fee that user should pay
-		#[pallet::weight(195_000_000)]
+        #[pallet::call_index(0)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
 		pub fn sudo_change_fee(origin: OriginFor<T>, min_fee: BalanceOf<T>, fee_scale: u32, dest_id: u8) -> DispatchResult {
 			ensure_root(origin)?;
 			ensure!(fee_scale <= 1000u32, Error::<T>::InvalidFeeOption);
@@ -123,8 +128,8 @@ pub mod pallet {
 			Self::deposit_event(Event::FeeUpdated(dest_id, min_fee, fee_scale));
 			Ok(())
 		}
-
-        #[pallet::weight(1000)]
+        #[pallet::call_index(3)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
         pub fn change_superior(origin: OriginFor<T>, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
@@ -136,8 +141,8 @@ pub mod pallet {
 
             Ok(())
         }
-
-        #[pallet::weight(1000)]
+        #[pallet::call_index(4)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
         pub fn set_bridge_limit(origin: OriginFor<T>, limit: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_superior = Self::superior();
@@ -156,7 +161,8 @@ pub mod pallet {
         }
 
 		/// Transfers some amount of the native token to some recipient on a (whitelisted) destination chain.
-		#[pallet::weight(195_000_000)]
+        #[pallet::call_index(1)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
 		pub fn transfer_native(origin: OriginFor<T>, amount: BalanceOf<T>, recipient: Vec<u8>, dest_id: u8) -> DispatchResult {
 			let source = ensure_signed(origin)?;
 			ensure!(<bridge::Pallet<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
@@ -179,7 +185,8 @@ pub mod pallet {
 		//
 
 		/// Executes a simple currency transfer using the bridge account as the source
-		#[pallet::weight(195_000_000)]
+        #[pallet::call_index(2)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
 		pub fn transfer(origin: OriginFor<T>, to: T::AccountId, amount: BalanceOf<T>, _rid: [u8; 32]) -> DispatchResult {
 			let _source = T::BridgeOrigin::ensure_origin(origin)?;
             // 1. Check bridge limit

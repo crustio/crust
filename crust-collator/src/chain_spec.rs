@@ -29,7 +29,7 @@ use parachain_runtime::{Balance, CENTS};
 const SHADOW_ED: Balance = 10 * CENTS;
 
 /// Specialized `ChainSpec` for the normal parachain runtime.
-pub type ChainSpec = sc_service::GenericChainSpec<parachain_runtime::GenesisConfig, Extensions>;
+pub type ChainSpec = sc_service::GenericChainSpec<parachain_runtime::RuntimeGenesisConfig, Extensions>;
 
 /// Helper function to generate a crypto pair from seed
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
@@ -190,12 +190,13 @@ fn testnet_genesis(
 	endowed_accounts: Vec<AccountId>,
 	id: ParaId,
 	council_accounts: Vec<AccountId>,
-) -> parachain_runtime::GenesisConfig {
-	parachain_runtime::GenesisConfig {
+) -> parachain_runtime::RuntimeGenesisConfig {
+	parachain_runtime::RuntimeGenesisConfig {
 		system: parachain_runtime::SystemConfig {
 			code: parachain_runtime::WASM_BINARY
 				.expect("WASM binary was not build, please build it!")
 				.to_vec(),
+			..Default::default()
 		},
 		balances: parachain_runtime::BalancesConfig {
 			balances: endowed_accounts
@@ -205,7 +206,7 @@ fn testnet_genesis(
 				.collect(),
 		},
 		// sudo: parachain_runtime::SudoConfig { key: Some(endowed_accounts[0].clone()) },
-		parachain_info: parachain_runtime::ParachainInfoConfig { parachain_id: id },
+		parachain_info: parachain_runtime::ParachainInfoConfig { parachain_id: id, ..Default::default() },
 		collator_selection: parachain_runtime::CollatorSelectionConfig {
 			invulnerables: invulnerables.iter().cloned().map(|(acc, _)| acc).collect(),
 			candidacy_bond: SHADOW_ED * 16,

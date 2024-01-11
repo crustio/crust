@@ -16,7 +16,7 @@ use pallet_chainbridge::{
         new_test_ext_initialized,
         Bridge,
         MockRuntime,
-        Origin,
+        RuntimeOrigin,
         ProposalLifetime,
         TestChainId,
         ENDOWED_BALANCE,
@@ -107,13 +107,13 @@ fn setup_resources() {
         let method = "Pallet.do_something".as_bytes().to_vec();
         let method2 = "Pallet.do_somethingElse".as_bytes().to_vec();
 
-        assert_ok!(Bridge::set_resource(Origin::root(), id, method.clone()));
+        assert_ok!(Bridge::set_resource(RuntimeOrigin::root(), id, method.clone()));
         assert_eq!(Bridge::resources(id), Some(method));
 
-        assert_ok!(Bridge::set_resource(Origin::root(), id, method2.clone()));
+        assert_ok!(Bridge::set_resource(RuntimeOrigin::root(), id, method2.clone()));
         assert_eq!(Bridge::resources(id), Some(method2));
 
-        assert_ok!(Bridge::remove_resource(Origin::root(), id));
+        assert_ok!(Bridge::remove_resource(RuntimeOrigin::root(), id));
         assert_eq!(Bridge::resources(id), None);
     })
 }
@@ -123,9 +123,9 @@ fn whitelist_chain() {
     new_test_ext().execute_with(|| {
         assert!(!Bridge::chain_whitelisted(0));
 
-        assert_ok!(Bridge::whitelist_chain(Origin::root(), 0));
+        assert_ok!(Bridge::whitelist_chain(RuntimeOrigin::root(), 0));
         assert_noop!(
-            Bridge::whitelist_chain(Origin::root(), TestChainId::get()),
+            Bridge::whitelist_chain(RuntimeOrigin::root(), TestChainId::get()),
             Error::<MockRuntime>::InvalidChainId
         );
 
@@ -140,10 +140,10 @@ fn set_get_threshold() {
     new_test_ext().execute_with(|| {
         assert_eq!(<RelayerThreshold::<MockRuntime>>::get(), 1);
 
-        assert_ok!(Bridge::set_threshold(Origin::root(), TEST_THRESHOLD));
+        assert_ok!(Bridge::set_threshold(RuntimeOrigin::root(), TEST_THRESHOLD));
         assert_eq!(<RelayerThreshold::<MockRuntime>>::get(), TEST_THRESHOLD);
 
-        assert_ok!(Bridge::set_threshold(Origin::root(), 5));
+        assert_ok!(Bridge::set_threshold(RuntimeOrigin::root(), 5));
         assert_eq!(<RelayerThreshold::<MockRuntime>>::get(), 5);
 
         assert_events(vec![
@@ -169,9 +169,9 @@ fn asset_transfer_success() {
         let amount = 100;
         let token_id = vec![1, 2, 3, 4];
 
-        assert_ok!(Bridge::set_threshold(Origin::root(), TEST_THRESHOLD,));
+        assert_ok!(Bridge::set_threshold(RuntimeOrigin::root(), TEST_THRESHOLD,));
 
-        assert_ok!(Bridge::whitelist_chain(Origin::root(), dest_id.clone()));
+        assert_ok!(Bridge::whitelist_chain(RuntimeOrigin::root(), dest_id.clone()));
         assert_ok!(Bridge::transfer_fungible(
             dest_id.clone(),
             resource_id.clone(),
@@ -236,7 +236,7 @@ fn asset_transfer_invalid_chain() {
         let bad_dest_id = 3;
         let resource_id = [4; 32];
 
-        assert_ok!(Bridge::whitelist_chain(Origin::root(), chain_id.clone()));
+        assert_ok!(Bridge::whitelist_chain(RuntimeOrigin::root(), chain_id.clone()));
         assert_events(vec![mock::Event::Bridge(pallet_chainbridge::Event::<
             MockRuntime,
         >::ChainWhitelisted(
@@ -274,25 +274,25 @@ fn asset_transfer_invalid_chain() {
 #[test]
 fn add_remove_relayer() {
     new_test_ext().execute_with(|| {
-        assert_ok!(Bridge::set_threshold(Origin::root(), TEST_THRESHOLD,));
+        assert_ok!(Bridge::set_threshold(RuntimeOrigin::root(), TEST_THRESHOLD,));
         assert_eq!(Bridge::relayer_count(), 0);
 
-        assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_A));
-        assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_B));
-        assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_C));
+        assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_A));
+        assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_B));
+        assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_C));
         assert_eq!(Bridge::relayer_count(), 3);
 
         // Already exists
         assert_noop!(
-            Bridge::add_relayer(Origin::root(), RELAYER_A),
+            Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_A),
             Error::<MockRuntime>::RelayerAlreadyExists
         );
 
         // Confirm removal
-        assert_ok!(Bridge::remove_relayer(Origin::root(), RELAYER_B));
+        assert_ok!(Bridge::remove_relayer(RuntimeOrigin::root(), RELAYER_B));
         assert_eq!(Bridge::relayer_count(), 2);
         assert_noop!(
-            Bridge::remove_relayer(Origin::root(), RELAYER_B),
+            Bridge::remove_relayer(RuntimeOrigin::root(), RELAYER_B),
             Error::<MockRuntime>::RelayerInvalid
         );
         assert_eq!(Bridge::relayer_count(), 2);
@@ -338,7 +338,7 @@ fn create_sucessful_proposal() {
 
             // Create proposal (& vote)
             assert_ok!(Bridge::acknowledge_proposal(
-                Origin::signed(RELAYER_A),
+                RuntimeOrigin::signed(RELAYER_A),
                 prop_id,
                 src_id,
                 r_id,
@@ -357,7 +357,7 @@ fn create_sucessful_proposal() {
 
             // Second relayer votes against
             assert_ok!(Bridge::reject_proposal(
-                Origin::signed(RELAYER_B),
+                RuntimeOrigin::signed(RELAYER_B),
                 prop_id,
                 src_id,
                 r_id,
@@ -376,7 +376,7 @@ fn create_sucessful_proposal() {
 
             // Third relayer votes in favour
             assert_ok!(Bridge::acknowledge_proposal(
-                Origin::signed(RELAYER_C),
+                RuntimeOrigin::signed(RELAYER_C),
                 prop_id,
                 src_id,
                 r_id,
@@ -435,7 +435,7 @@ fn create_unsucessful_proposal() {
 
             // Create proposal (& vote)
             assert_ok!(Bridge::acknowledge_proposal(
-                Origin::signed(RELAYER_A),
+                RuntimeOrigin::signed(RELAYER_A),
                 prop_id,
                 src_id,
                 r_id,
@@ -454,7 +454,7 @@ fn create_unsucessful_proposal() {
 
             // Second relayer votes against
             assert_ok!(Bridge::reject_proposal(
-                Origin::signed(RELAYER_B),
+                RuntimeOrigin::signed(RELAYER_B),
                 prop_id,
                 src_id,
                 r_id,
@@ -473,7 +473,7 @@ fn create_unsucessful_proposal() {
 
             // Third relayer votes against
             assert_ok!(Bridge::reject_proposal(
-                Origin::signed(RELAYER_C),
+                RuntimeOrigin::signed(RELAYER_C),
                 prop_id,
                 src_id,
                 r_id,
@@ -533,7 +533,7 @@ fn execute_after_threshold_change() {
 
             // Create proposal (& vote)
             assert_ok!(Bridge::acknowledge_proposal(
-                Origin::signed(RELAYER_A),
+                RuntimeOrigin::signed(RELAYER_A),
                 prop_id,
                 src_id,
                 r_id,
@@ -551,11 +551,11 @@ fn execute_after_threshold_change() {
             assert_eq!(prop, expected);
 
             // Change threshold
-            assert_ok!(Bridge::set_threshold(Origin::root(), 1));
+            assert_ok!(Bridge::set_threshold(RuntimeOrigin::root(), 1));
 
             // Attempt to execute
             assert_ok!(Bridge::eval_vote_state(
-                Origin::signed(RELAYER_A),
+                RuntimeOrigin::signed(RELAYER_A),
                 prop_id,
                 src_id,
                 Box::new(proposal.clone())
@@ -611,7 +611,7 @@ fn proposal_expires() {
 
             // Create proposal (& vote)
             assert_ok!(Bridge::acknowledge_proposal(
-                Origin::signed(RELAYER_A),
+                RuntimeOrigin::signed(RELAYER_A),
                 prop_id,
                 src_id,
                 r_id,
@@ -634,7 +634,7 @@ fn proposal_expires() {
             // Attempt to submit a vote should fail
             assert_noop!(
                 Bridge::reject_proposal(
-                    Origin::signed(RELAYER_B),
+                    RuntimeOrigin::signed(RELAYER_B),
                     prop_id,
                     src_id,
                     r_id,
@@ -658,7 +658,7 @@ fn proposal_expires() {
             // eval_vote_state should have no effect
             assert_noop!(
                 Bridge::eval_vote_state(
-                    Origin::signed(RELAYER_C),
+                    RuntimeOrigin::signed(RELAYER_C),
                     prop_id,
                     src_id,
                     Box::new(proposal.clone())

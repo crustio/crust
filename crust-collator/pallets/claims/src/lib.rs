@@ -24,6 +24,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod weights;
+
 /// An Ethereum address (i.e. 20 bytes, used to represent an Ethereum account).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
@@ -129,6 +131,7 @@ pub mod pallet {
     use frame_support::{
         traits::{Currency, Get}
     };
+    use crate::weights::WeightInfo;
 
     /// The balance type of this module.
     pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -147,7 +150,7 @@ pub mod pallet {
         type PalletId: Get<PalletId>;
 
         /// The overarching event type.
-        type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// The payment balance.
         type Currency: Currency<Self::AccountId>;
@@ -155,6 +158,8 @@ pub mod pallet {
         /// The constant used for ethereum signature.
         #[pallet::constant]
         type Prefix: Get<&'static [u8]>;
+
+        type WeightInfo: WeightInfo;
 	}
 
 	#[pallet::event]
@@ -227,7 +232,8 @@ pub mod pallet {
         ///
         /// Parameter:
         /// - `new_superior`: The new superior's address
-        #[pallet::weight(1000)]
+        #[pallet::call_index(0)]
+		#[pallet::weight(T::WeightInfo::default_claim_weight())]
         pub fn change_superior(origin: OriginFor<T>, new_superior: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
@@ -246,7 +252,8 @@ pub mod pallet {
         ///
         /// Parameters:
         /// - `new_miner`: The new miner's address
-        #[pallet::weight(1000)]
+        #[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::default_claim_weight())]
         pub fn change_miner(origin: OriginFor<T>, new_miner: <T::Lookup as StaticLookup>::Source) -> DispatchResult {
             ensure_root(origin)?;
 
@@ -264,7 +271,8 @@ pub mod pallet {
         ///
         /// Parameters:
         /// - `limit`: The claim CRUs limit
-        #[pallet::weight(1000)]
+        #[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::default_claim_weight())]
         pub fn set_claim_limit(origin: OriginFor<T>, limit: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_superior = Self::superior();
@@ -290,7 +298,8 @@ pub mod pallet {
         /// - `tx`: The claim ethereum tx hash
         /// - `who`: The claimer ethereum address
         /// - `value`: The amount of this tx, should be less than claim_limit
-        #[pallet::weight(1000)]
+        #[pallet::call_index(3)]
+		#[pallet::weight(T::WeightInfo::default_claim_weight())]
         pub fn mint_claim(origin: OriginFor<T>, tx: EthereumTxHash, who: EthereumAddress, value: BalanceOf<T>) -> DispatchResult {
             let signer = ensure_signed(origin)?;
             let maybe_miner = Self::miner();
@@ -318,7 +327,8 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::weight(0)]
+        #[pallet::call_index(4)]
+		#[pallet::weight(T::WeightInfo::claim_weight())]
         pub fn claim(origin: OriginFor<T>, dest: T::AccountId, tx: EthereumTxHash, sig: EcdsaSignature) -> DispatchResult {
             let _ = ensure_none(origin)?;
 

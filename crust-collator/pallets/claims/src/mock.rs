@@ -18,7 +18,7 @@ impl frame_system::Config for Test {
     type BaseCallFilter = ();
     type BlockWeights = ();
     type BlockLength = ();
-    type Origin = Origin;
+    type RuntimeOrigin = RuntimeOrigin;
     type Call = Call;
     type Index = u64;
     type BlockNumber = u64;
@@ -27,7 +27,7 @@ impl frame_system::Config for Test {
     type AccountId = u64;
     type Lookup = IdentityLookup<u64>;
     type Header = Header;
-    type Event = ();
+    type RuntimeEvent = ();
     type BlockHashCount = BlockHashCount;
     type DbWeight = ();
     type Version = ();
@@ -46,7 +46,7 @@ parameter_types! {
 impl balances::Config for Test {
     type Balance = u64;
     type DustRemoval = ();
-    type Event = ();
+    type RuntimeEvent = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
@@ -59,7 +59,7 @@ parameter_types!{
 }
 impl Config for Test {
     type PalletId = ClaimPalletId;
-    type Event = ();
+    type RuntimeEvent = ();
     type Currency = Balances;
     type Prefix = Prefix;
 }

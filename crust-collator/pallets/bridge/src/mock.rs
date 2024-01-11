@@ -59,7 +59,7 @@ impl pallet_balances::Config for MockRuntime {
     type AccountStore = System;
     type Balance = Balance;
     type DustRemoval = ();
-    type Event = Event;
+    type RuntimeEvent = RuntimeEvent;
     type ExistentialDeposit = ExistentialDeposit;
     type MaxLocks = ();
     type MaxReserves = ();
@@ -77,7 +77,7 @@ impl frame_system::Config for MockRuntime {
     type BlockWeights = ();
     type Call = Call;
     type DbWeight = ();
-    type Event = Event;
+    type RuntimeEvent = RuntimeEvent;
     type Hash = H256;
     type Hashing = BlakeTwo256;
     type Header = Header;
@@ -86,7 +86,7 @@ impl frame_system::Config for MockRuntime {
     type OnKilledAccount = ();
     type OnNewAccount = ();
     type OnSetCode = ();
-    type Origin = Origin;
+    type RuntimeOrigin = RuntimeOrigin;
     type PalletInfo = PalletInfo;
     type SS58Prefix = SS58Prefix;
     type SystemWeightInfo = ();
@@ -115,7 +115,7 @@ parameter_types! {
 impl pallet_chainbridge::Config for MockRuntime {
     type BridgeCommitteeOrigin = EnsureSignedBy<TestUserId, u64>;
     type BridgeChainId = TestChainId;
-    type Event = Event;
+    type RuntimeEvent = RuntimeEvent;
     type PalletId = ChainBridgePalletId;
     type Proposal = Call;
     type ProposalLifetime = ProposalLifetime;
@@ -146,18 +146,18 @@ pub fn new_test_ext_initialized(
     t.execute_with(|| {
         // Set and check threshold
         assert_ok!(Bridge::set_threshold(
-            crate::mock::Origin::root(),
+            crate::mock::RuntimeOrigin::root(),
             TEST_THRESHOLD
         ));
         assert_eq!(Bridge::relayer_threshold(), TEST_THRESHOLD);
         // Add relayers
-        assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_A));
-        assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_B));
-        assert_ok!(Bridge::add_relayer(Origin::root(), RELAYER_C));
+        assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_A));
+        assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_B));
+        assert_ok!(Bridge::add_relayer(RuntimeOrigin::root(), RELAYER_C));
         // Whitelist chain
-        assert_ok!(Bridge::whitelist_chain(Origin::root(), src_id));
+        assert_ok!(Bridge::whitelist_chain(RuntimeOrigin::root(), src_id));
         // Set and check resource ID mapped to some junk data
-        assert_ok!(Bridge::set_resource(Origin::root(), r_id, resource));
+        assert_ok!(Bridge::set_resource(RuntimeOrigin::root(), r_id, resource));
         assert_eq!(Bridge::resource_exists(r_id), true);
     });
     t

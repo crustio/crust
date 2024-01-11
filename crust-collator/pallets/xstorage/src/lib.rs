@@ -3,17 +3,21 @@ use frame_support::pallet;
 
 pub use pallet::*;
 
+pub mod weights;
+
 #[pallet]
 pub mod pallet {
 	use sp_std::prelude::*;
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
 
-	use xcm::v2::prelude::*;
+	use xcm::latest::prelude::*;
 	use sp_std::convert::TryInto;
 	use sp_runtime::traits::{AccountIdConversion, Convert};
+	use xcm::latest::{XcmContext};
 
 	use xcm_executor::traits::TransactAsset;
+	use crate::weights::WeightInfo;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -27,7 +31,7 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Overarching event type.
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		type XcmpMessageSender: SendXcm;
 
@@ -43,8 +47,10 @@ pub mod pallet {
 		/// Convert `T::AccountId` to `MultiLocation`.
 		type AccountIdToMultiLocation: Convert<Self::AccountId, MultiLocation>;
 
-		/// Origin that is allowed to create and modify storage fee information
-		type StorageFeeOwner: EnsureOrigin<Self::Origin>;
+		/// RuntimeOrigin that is allowed to create and modify storage fee information
+		type StorageFeeOwner: EnsureOrigin<Self::RuntimeOrigin>;
+
+		type WeightInfo: WeightInfo;
 	}
 
 	/// An error that can occur while executing the mapping pallet's logic.
@@ -78,7 +84,8 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		// The index cannot be changed.
-		#[pallet::weight(1_000_000)]
+		#[pallet::call_index(0)]
+		#[pallet::weight(T::WeightInfo::default_xstorage_weight())]
 		pub fn place_storage_order_through_parachain(
 			origin: OriginFor<T>,
 			cid: Vec<u8>,
@@ -95,7 +102,8 @@ pub mod pallet {
 			Ok(().into())
 		}
 
-		#[pallet::weight(1_000_000)]
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::default_xstorage_weight())]
 		pub fn place_storage_order(
 			origin: OriginFor<T>,
 			cid: Vec<u8>,
@@ -118,8 +126,9 @@ pub mod pallet {
 			// Convert origin to multilocation
 			let origin_as_mult = T::AccountIdToMultiLocation::convert(who.clone());
 			let dest_as_mult = T::AccountIdToMultiLocation::convert(Self::account_id());
+			let ctx = XcmContext { origin: None, message_id: XcmHash::default(), topic: None };
 
-			T::AssetTransactor::internal_transfer_asset(&fee.clone().into(), &origin_as_mult, &dest_as_mult)
+			T::AssetTransactor::internal_transfer_asset(&fee.clone().into(), &origin_as_mult, &dest_as_mult, &ctx)
 				.map_err(|_| Error::<T>::UnableToTransferStorageFee)?;
 
 			Self::deposit_event(Event::FileSuccess {
@@ -131,7 +140,8 @@ pub mod pallet {
 			Ok(().into())
 		}
 
-		#[pallet::weight(1_000_000)]
+		#[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::default_xstorage_weight())]
 		pub fn register_storage_fee(
 			origin: OriginFor<T>,
 			currency_id: T::CurrencyId,

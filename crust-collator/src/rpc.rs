@@ -27,7 +27,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 
-use crust_parachain_primitives::{AccountId, Balance, Block, Index as Nonce};
+use crust_parachain_primitives::{AccountId, Balance, Block, Nonce};
 
 /// A type representing all RPC extensions.
 use jsonrpsee::RpcModule;

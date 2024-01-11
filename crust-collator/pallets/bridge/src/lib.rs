@@ -41,6 +41,8 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+pub mod weights;
+
 #[frame_support::pallet]
 pub mod pallet {
     use crate::types::{
@@ -51,9 +53,8 @@ pub mod pallet {
     };
     use codec::EncodeLike;
     use frame_support::{
-        dispatch::Dispatchable,
+        dispatch::{Dispatchable, GetDispatchInfo},
         pallet_prelude::*,
-        weights::GetDispatchInfo,
         PalletId,
     };
     use frame_system::pallet_prelude::*;
@@ -62,16 +63,17 @@ pub mod pallet {
     use sp_core::U256;
     use sp_std::vec::Vec;
     use sp_std::convert::TryInto;
+    use crate::weights::WeightInfo;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type Event: From<Event<Self>>
-            + IsType<<Self as frame_system::Config>::Event>;
-        /// Origin used to administer the pallet
-        type BridgeCommitteeOrigin: EnsureOrigin<Self::Origin>;
+        type RuntimeEvent: From<Event<Self>>
+            + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+        /// RuntimeOrigin used to administer the pallet
+        type BridgeCommitteeOrigin: EnsureOrigin<Self::RuntimeOrigin>;
         /// Proposed dispatchable call
         type Proposal: Parameter
-            + Dispatchable<Origin = Self::Origin>
+            + Dispatchable<RuntimeOrigin = Self::RuntimeOrigin>
             + EncodeLike
             + GetDispatchInfo;
         /// The identifier for this chain.
@@ -81,7 +83,7 @@ pub mod pallet {
         type BridgeChainId: Get<u8>;
 
         #[pallet::constant]
-        type ProposalLifetime: Get<Self::BlockNumber>;
+        type ProposalLifetime: Get<BlockNumberFor<Self>>;
 
         /// Constant configuration parameter to store the module identifier for the pallet.
         ///
@@ -90,10 +92,11 @@ pub mod pallet {
         // macro in the [`runtime/lib.rs`] file.
         #[pallet::constant]
         type PalletId: Get<PalletId>;
+
+        type WeightInfo: WeightInfo;
     }
 
     #[pallet::pallet]
-    #[pallet::generate_store(pub(super) trait Store)]
     #[pallet::without_storage_info]
     pub struct Pallet<T>(_);
 
@@ -141,7 +144,7 @@ pub mod pallet {
         u8,
         Blake2_256,
         (u64, T::Proposal),
-        ProposalVotes<T::AccountId, T::BlockNumber>,
+        ProposalVotes<T::AccountId, BlockNumberFor<T>>,
         OptionQuery,
     >;
 
@@ -233,7 +236,8 @@ pub mod pallet {
         /// # <weight>
         /// - O(1) lookup and insert
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(0)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn set_threshold(
             origin: OriginFor<T>,
             threshold: u32,
@@ -248,7 +252,8 @@ pub mod pallet {
         /// # <weight>
         /// - O(1) write
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn set_resource(
             origin: OriginFor<T>,
             id: [u8; 32],
@@ -267,7 +272,8 @@ pub mod pallet {
         /// # <weight>
         /// - O(1) removeal
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn remove_resource(
             origin: OriginFor<T>,
             id: [u8; 32],
@@ -282,7 +288,8 @@ pub mod pallet {
         /// # <weight>
         /// - O(1) lookup and insert
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(3)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn whitelist_chain(
             origin: OriginFor<T>,
             id: u8,
@@ -297,7 +304,8 @@ pub mod pallet {
         /// # <weight>
         /// - O(1) lookup and removal
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(4)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn add_relayer(
             origin: OriginFor<T>,
             v: T::AccountId,
@@ -312,7 +320,8 @@ pub mod pallet {
         /// # <weight>
         /// - O(1) lookup and removal
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(5)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn remove_relayer(
             origin: OriginFor<T>,
             v: T::AccountId,
@@ -330,7 +339,8 @@ pub mod pallet {
         /// # <weight>
         /// - weight of proposed call, regardless of whether execution is performed
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(6)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn acknowledge_proposal(
             origin: OriginFor<T>,
             nonce: u64,
@@ -357,7 +367,8 @@ pub mod pallet {
         /// # <weight>
         /// - Fixed, since execution of proposal should not be included
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(7)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn reject_proposal(
             origin: OriginFor<T>,
             nonce: u64,
@@ -386,7 +397,8 @@ pub mod pallet {
         /// # <weight>
         /// - weight of proposed call, regardless of whether execution is performed
         /// # </weight>
-        #[pallet::weight(10_000)]
+        #[pallet::call_index(8)]
+		#[pallet::weight(T::WeightInfo::default_bridge_weight())]
         pub fn eval_vote_state(
             origin: OriginFor<T>,
             nonce: u64,
@@ -735,17 +747,17 @@ pub fn derive_resource_id(chain: u8, id: &[u8]) -> [u8; 32] {
 /// Simple ensure origin for the bridge account
 pub struct EnsureBridge<T>(sp_std::marker::PhantomData<T>);
 
-impl<T: Config> EnsureOrigin<T::Origin> for EnsureBridge<T> {
+impl<T: Config> EnsureOrigin<T::RuntimeOrigin> for EnsureBridge<T> {
     type Success = T::AccountId;
 
-    fn try_origin(o: T::Origin) -> Result<Self::Success, T::Origin> {
+    fn try_origin(o: T::RuntimeOrigin) -> Result<Self::Success, T::RuntimeOrigin> {
         let bridge_id = T::PalletId::get().into_account_truncating();
         o.into().and_then(|o| {
             match o {
                 frame_system::RawOrigin::Signed(who) if who == bridge_id => {
                     Ok(bridge_id)
                 }
-                r => Err(T::Origin::from(r)),
+                r => Err(T::RuntimeOrigin::from(r)),
             }
         })
     }
@@ -755,8 +767,8 @@ impl<T: Config> EnsureOrigin<T::Origin> for EnsureBridge<T> {
     ///
     /// ** Should be used for benchmarking only!!! **
     #[cfg(feature = "runtime-benchmarks")]
-    fn successful_origin() -> T::Origin {
-        T::Origin::from(frame_system::Origin::Signed(<Pallet<T>>::account_id()))
+    fn successful_origin() -> T::RuntimeOrigin {
+        T::RuntimeOrigin::from(frame_system::RuntimeOrigin::Signed(<Pallet<T>>::account_id()))
     }
     */
 }

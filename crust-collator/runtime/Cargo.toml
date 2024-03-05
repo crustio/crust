@@ -172,3 +172,4 @@ std = [
 	"bridge-transfer/std",
 	"substrate-wasm-builder"
 ]
+enable_sudo = []

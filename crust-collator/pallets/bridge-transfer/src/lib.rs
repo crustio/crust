@@ -29,9 +29,7 @@ mod types {
 
 #[frame_support::pallet]
 pub mod pallet {
-    use crate::types::{
-        BalanceOf,
-    };
+    use crate::types::BalanceOf;
     use frame_support::{
         pallet_prelude::*,
         traits::{
@@ -40,17 +38,22 @@ pub mod pallet {
         },
     };
     use frame_system::pallet_prelude::*;
+    use frame_support::PalletId;
     use frame_support::sp_runtime::traits::Saturating;
     use frame_support::sp_runtime::SaturatedConversion;
     use sp_core::U256;
     use sp_std::convert::TryInto;
     use sp_std::vec::Vec;
     use sp_runtime::traits::StaticLookup;
+    use sp_runtime::traits::AccountIdConversion;
     use cstrml_bridge as bridge;
     use crate::weights::WeightInfo;
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
+
+    /// The bridge-transfer's pallet id
+	pub const PALLET_ID: PalletId = PalletId(*b"brdgtxfr");
 
     /// Tracks current relayer set
     #[pallet::storage]
@@ -192,9 +195,27 @@ pub mod pallet {
             // 1. Check bridge limit
             ensure!(Self::bridge_limit() >= amount, Error::<T>::ExceedBridgeLimit);
             BridgeLimit::<T>::mutate(|l| *l = l.saturating_sub(amount));
-			let _ = <T as Config>::Currency::deposit_creating(&to, amount.into());
+
+            // Fix SubScan display issue
+            // Cause: SubScan 'Transfer' tab only display transactions which emits Event::Transfer event
+            //        But Currency::deposit_creating only emits Event::Deposit event
+            // Solution: deposit to the pallet account first, then transfer to the target account
+            let pot = Self::account_id();
+
+            // Amount should be larger then ED, otherwise the newly created pot account would still have 0 balance
+			let _ = <T as Config>::Currency::deposit_creating(&pot, amount.into());
+
+            <T as Config>::Currency::transfer(&pot, &to, amount.into(), AllowDeath)?;
+
 			Ok(())
 		}
 
+    }
+
+    impl<T: Config> Pallet<T> {
+        /// Provides an AccountId for the pallet to use as a temporary deposit/withdrawal account.
+        pub fn account_id() -> T::AccountId {
+            PALLET_ID.into_account_truncating()
+        }
     }
 }

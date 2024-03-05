@@ -103,3 +103,6 @@ polkadot-parachain = { git = "https://github.com/paritytech/polkadot", branch = 
 pallet-sudo = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 substrate-test-client = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
 substrate-test-runtime-client = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v1.0.0" }
+
+[features]
+enable_sudo = []

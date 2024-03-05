@@ -23,8 +23,7 @@ use serde::{Deserialize, Serialize};
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_core::crypto::UncheckedInto;
-use parachain_runtime::{AuraId};
-use parachain_runtime::{Balance, CENTS};
+use parachain_runtime::{AuraId, Balance, CENTS};
 
 const SHADOW_ED: Balance = 10 * CENTS;
 
@@ -87,7 +86,8 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 		ChainType::Local,
 		move || {
 			testnet_genesis(
-				hex!["f8da9f475ca917478d54d8971c8838ab109a8e4bb85566e753deceec1044ef45"].into(),
+				//hex!["f8da9f475ca917478d54d8971c8838ab109a8e4bb85566e753deceec1044ef45"].into(),
+				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				vec![(
 					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").into(),
 					hex!("0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a").unchecked_into()
@@ -110,10 +110,17 @@ pub fn get_chain_spec(id: ParaId) -> ChainSpec {
 					hex!["0a38d76ecfbd4b13077669bb9c9ebaaf0847723426f809d20a67c62f2bebc75a"].into(),
 					hex!["7e5040d49782960b2a15e7cb4106f730ca7a997a28facff6e2978aeda32fc348"].into(),
 					hex!["869f4e66b0b16f6de5f3cc217b99ada20f766a7d26868dda3020d29e9e80e97c"].into(),
-					hex!["7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65"].into()
+					hex!["7a6a226782a4cf5712f914bbf3cc64304f3c9af58b82f1dd2a4f09c48278ae65"].into(),
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					get_account_id_from_seed::<sr25519::Public>("Bob"),
+					get_account_id_from_seed::<sr25519::Public>("Charlie"),
 				],
 				id,
-				vec![],
+				vec![
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					get_account_id_from_seed::<sr25519::Public>("Bob"),
+					get_account_id_from_seed::<sr25519::Public>("Charlie"),
+				],
 			)
 		},
 		vec![],
@@ -225,16 +232,21 @@ fn testnet_genesis(
 		aura_ext: Default::default(),
 		parachain_system: Default::default(),
 		council: parachain_runtime::CouncilConfig {
-            members: council_accounts,
+            members: council_accounts.clone(),
             phantom: Default::default(),
         },
         technical_committee: parachain_runtime::TechnicalCommitteeConfig {
-            members: vec![],
+            members: if let Some(first_elem) = council_accounts.first() { vec![(*first_elem).clone()] } else { vec![] },
             phantom: Default::default(),
         },
         technical_membership: Default::default(),
         treasury: Default::default(),
         democracy: Default::default(),
         phragmen_election: Default::default(),
+		#[cfg(feature = "enable_sudo")]
+		sudo: parachain_runtime::SudoConfig {
+			// Assign network admin rights.
+			key: Some(_root_key),
+		},
 	}
 }

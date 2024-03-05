@@ -175,7 +175,7 @@ pub mod pallet {
 				min_fee
 			};
 			ensure!(amount > fee, Error::<T>::LessThanFee);
-			T::Currency::withdraw(&source, amount.into(), WithdrawReasons::all(), AllowDeath)?;
+			let _ = T::Currency::withdraw(&source, amount.into(), WithdrawReasons::all(), AllowDeath)?;
 
 			<bridge::Pallet<T>>::transfer_fungible(dest_id, T::BridgeTokenId::get(), recipient, U256::from(amount.saturating_sub(fee).saturated_into::<u128>()))
 		}
@@ -192,7 +192,7 @@ pub mod pallet {
             // 1. Check bridge limit
             ensure!(Self::bridge_limit() >= amount, Error::<T>::ExceedBridgeLimit);
             BridgeLimit::<T>::mutate(|l| *l = l.saturating_sub(amount));
-			<T as Config>::Currency::deposit_creating(&to, amount.into());
+			let _ = <T as Config>::Currency::deposit_creating(&to, amount.into());
 			Ok(())
 		}
 

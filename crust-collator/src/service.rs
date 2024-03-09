@@ -21,7 +21,7 @@ use cumulus_client_cli::CollatorOptions;
 use cumulus_client_service::{
 	build_network, build_relay_chain_interface,
 	prepare_node_config, start_collator, start_full_node, BuildNetworkParams,
-	StartCollatorParams, StartFullNodeParams,
+	StartCollatorParams, StartFullNodeParams, CollatorSybilResistance,
 };
 
 use crate::rpc;
@@ -83,7 +83,7 @@ pub fn new_partial(
 		ParachainClient,
 		ParachainBackend,
 		(),
-		sc_consensus::DefaultImportQueue<Block, ParachainClient>,
+		sc_consensus::DefaultImportQueue<Block>,
 		sc_transaction_pool::FullPool<Block, ParachainClient>,
 		(ParachainBlockImport, Option<Telemetry>, Option<TelemetryWorkerHandle>),
 	>,
@@ -261,6 +261,7 @@ where
 			spawn_handle: task_manager.spawn_handle(),
 			relay_chain_interface: relay_chain_interface.clone(),
 			import_queue: params.import_queue,
+			sybil_resistance_level: CollatorSybilResistance::Resistant, // because of Aura
 		})
 		.await?;
 

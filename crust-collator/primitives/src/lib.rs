@@ -36,7 +36,7 @@ use sp_std::{
 };
 use xcm::latest::{
 	AssetId as xcmAssetId, Error as XcmError, Fungibility,
-	MultiAsset, MultiLocation
+	MultiAsset, MultiLocation, XcmContext
 };
 use xcm_builder::TakeRevenue;
 use xcm_executor::traits::{MatchesFungibles, WeightTrader};
@@ -227,6 +227,7 @@ impl<
 		&mut self,
 		weight: Weight,
 		payment: xcm_executor::Assets,
+		_context: &XcmContext,
 	) -> Result<xcm_executor::Assets, XcmError> {
 		// can only call one time
 		if self.1.is_some() {
@@ -286,7 +287,7 @@ impl<
 	}
 
 	// Refund weight. We will refund in whatever asset is stored in self.
-	fn refund_weight(&mut self, weight: Weight) -> Option<MultiAsset> {
+	fn refund_weight(&mut self, weight: Weight, _context: &XcmContext) -> Option<MultiAsset> {
 		if let Some((id, prev_amount, units_per_second)) = self.1.clone() {
 			let weight = weight.min(self.0);
 			self.0 -= weight;

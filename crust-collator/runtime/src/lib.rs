@@ -59,13 +59,14 @@ pub use frame_support::{
 		IdentityFee, Weight, ConstantMultiplier,
 		WeightToFeeCoefficient, WeightToFeeCoefficients, WeightToFeePolynomial,
 	},
-	StorageValue, RuntimeDebug,
+	StorageValue, 
 };
 use frame_system::limits::{BlockLength, BlockWeights};
 use frame_system::{EnsureRoot, EnsureNever, EnsureSigned};
 use sp_std::convert::TryFrom;
 use sp_core::H256;
 use sp_runtime::traits::Hash as THash;
+use sp_runtime::RuntimeDebug;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
@@ -130,7 +131,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("crust-collator"),
 	impl_name: create_runtime_str!("crust-collator"),
 	authoring_version: 1,
-	spec_version: 17,
+	spec_version: 18,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -416,11 +417,12 @@ impl pallet_proxy::Config for Runtime {
 	type AnnouncementDepositFactor = AnnouncementDepositFactor;
 }
 
-// impl pallet_sudo::Config for Runtime {
-// 	type RuntimeCall = RuntimeCall;
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type WeightInfo = ();
-// }
+#[cfg(feature = "enable_sudo")]
+impl pallet_sudo::Config for Runtime {
+	type RuntimeCall = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+}
 
 parameter_types! {
 	pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) * RuntimeBlockWeights::get().max_block;
@@ -1563,7 +1565,10 @@ construct_runtime! {
 		System: frame_system::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		// Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
+		
+		#[cfg(feature = "enable_sudo")]
+		Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>},
+
 		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>, ValidateUnsigned, Config<T>},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config<T>, Call},

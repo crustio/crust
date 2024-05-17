@@ -126,6 +126,15 @@ pub struct RegisterPayload<Public, AccountId> {
     public: Public
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct WorkReportMetadata<AccountId> {
+    pub block_number: BlockNumber,
+    pub extrinsic_index: u32,
+    pub reporter: AccountId,
+    pub owner: AccountId
+}
+
 /// An event handler for reporting works
 pub trait Works<AccountId> {
     fn report_works(workload_map: BTreeMap<AccountId, u128>, total_workload: u128) -> Weight;
@@ -240,6 +249,11 @@ decl_storage! {
         /// status transition from off-chain sWorker
         pub WorkReports get(fn work_reports):
             map hasher(twox_64_concat) SworkerAnchor => Option<WorkReport>;
+
+        
+        /// Work reports to process queue, which will be processed by the offchain Crust-Spower service
+        pub WorkReportsToProcess get(fn work_reports_to_process):
+            double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => WorkReportMetadata<T::AccountId>;
 
         /// The current report slot block number, this value should be a multiple of report slot block.
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
@@ -709,12 +723,24 @@ decl_module! {
                 slot,
             );
 
-            // 12. Emit work report event
+            // 12. Add to WorkReportsToProcess queue to be processed by the crust-spower off-chain service
+            let id = Self::identities(&reporter).unwrap_or_default();
+            let owner = if let Some(group) = id.group { group.clone() } else { reporter.clone() };
+            let cur_bn = Self::get_current_block_number();
+            let extrinsic_index = <system::Module<T>>::extrinsic_index().unwrap();
+            let work_report_metadata = WorkReportMetadata {
+                block_number: cur_bn, 
+                extrinsic_index: extrinsic_index,
+                reporter: reporter.clone(),
+                owner: owner.clone()
+            };
+
+            <WorkReportsToProcess<T>>::insert(&anchor, slot, work_report_metadata);
+
+            // 13. Emit work report event
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
-            // 13. Try to free count limitation
-            let id = Self::identities(&reporter).unwrap_or_default();
-            let owner = if let Some(group) = id.group { group } else { reporter };
+            // 14. Try to free count limitation
             if T::BenefitInterface::maybe_free_count(&owner) {
                return Ok(Pays::No.into());
             }
@@ -1118,44 +1144,22 @@ impl<T: Config> Module<T> {
 
     /// Update sOrder information based on changed files, return the changed_file_size and changed_file_count
     fn update_files(
-        reporter: &T::AccountId,
+        _reporter: &T::AccountId,
         changed_files: &Vec<(MerkleRoot, u64, u64)>,
-        anchor: &SworkerPubKey,
-        is_added: bool) -> (u64, u32) {
+        _anchor: &SworkerPubKey,
+        _is_added: bool) -> (u64, u32) {
         let mut changed_spower: u64 = 0;
         let mut changed_files_count: u32 = 0;
 
-        // 1. Loop changed files
-        if is_added {
-            for (cid, size, valid_at) in changed_files {
-                let mut owner = reporter.clone();
-                if let Some(identity) = Self::identities(reporter) {
-                    if let Some(group_owner) = identity.group {
-                        owner = group_owner;
-                    }
-                };
-                let (added_spower, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, owner, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap());
-                changed_spower = changed_spower.saturating_add(added_spower);
-                if is_valid_cid {
-                    changed_files_count += 1;
-                }
-            }
-        } else {
-            for (cid, _, _) in changed_files {
-                // 2. If mapping to storage orders
-                let mut owner = reporter.clone();
-                if let Some(identity) = Self::identities(reporter) {
-                    if let Some(group_owner) = identity.group {
-                        owner = group_owner;
-                    }
-                };
-                let (deleted_spower, is_valid_cid) = T::MarketInterface::delete_replica(reporter, owner, cid, anchor);
-                changed_spower = changed_spower.saturating_add(deleted_spower);
-                if is_valid_cid {
-                    changed_files_count += 1;
-                }
-            }
+        for (_, size, _) in changed_files {
+            // The replica update logic is moved to offchain crust-spower service, so DO NOT invoke the 
+            // T::MarketInterface::upsert_replica or delete_replica call here
+            // Use the raw value for calculation directly. The actual spower and file count of any illegal files 
+            // will be updated upon the market::update_replicas extrinsic call
+            changed_spower = changed_spower.saturating_add(*size);
+            changed_files_count += 1;
         }
+        
         (changed_spower, changed_files_count)
     }
 

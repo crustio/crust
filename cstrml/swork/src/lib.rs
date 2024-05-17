@@ -127,6 +127,15 @@ pub struct RegisterPayload<Public, AccountId> {
     public: Public
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct WorkReportMetadata<AccountId> {
+    pub block_number: BlockNumber,
+    pub extrinsic_index: u32,
+    pub reporter: AccountId,
+    pub owner: AccountId
+}
+
 /// An event handler for reporting works
 pub trait Works<AccountId> {
     fn report_works(workload_map: BTreeMap<AccountId, u128>, total_workload: u128) -> Weight;

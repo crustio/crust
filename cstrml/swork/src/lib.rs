@@ -130,7 +130,7 @@ pub struct RegisterPayload<Public, AccountId> {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct WorkReportMetadata<AccountId> {
-    pub block_number: BlockNumber,
+    pub report_block: BlockNumber,
     pub extrinsic_index: u32,
     pub reporter: AccountId,
     pub owner: AccountId

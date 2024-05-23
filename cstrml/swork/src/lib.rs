@@ -129,7 +129,7 @@ pub struct RegisterPayload<Public, AccountId> {
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct WorkReportMetadata<AccountId> {
-    pub block_number: BlockNumber,
+    pub report_block: BlockNumber,
     pub extrinsic_index: u32,
     pub reporter: AccountId,
     pub owner: AccountId
@@ -250,10 +250,9 @@ decl_storage! {
         pub WorkReports get(fn work_reports):
             map hasher(twox_64_concat) SworkerAnchor => Option<WorkReport>;
 
-        
         /// Work reports to process queue, which will be processed by the offchain Crust-Spower service
         pub WorkReportsToProcess get(fn work_reports_to_process):
-            double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => WorkReportMetadata<T::AccountId>;
+            double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => Option<WorkReportMetadata<T::AccountId>>;
 
         /// The current report slot block number, this value should be a multiple of report slot block.
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
@@ -729,7 +728,7 @@ decl_module! {
             let cur_bn = Self::get_current_block_number();
             let extrinsic_index = <system::Module<T>>::extrinsic_index().unwrap();
             let work_report_metadata = WorkReportMetadata {
-                block_number: cur_bn, 
+                report_block: cur_bn, 
                 extrinsic_index: extrinsic_index,
                 reporter: reporter.clone(),
                 owner: owner.clone()
@@ -1088,12 +1087,12 @@ impl<T: Config> Module<T> {
     /// 3. update `Spower` and `Free`
     /// 4. call `Works::report_works` interface
     fn maybe_upsert_work_report(
-        reporter: &T::AccountId,
+        _reporter: &T::AccountId,
         anchor: &SworkerAnchor,
         reported_srd_size: u64,
         reported_files_size: u64,
         added_files: &Vec<(MerkleRoot, u64, u64)>,
-        deleted_files: &Vec<(MerkleRoot, u64, u64)>,
+        _deleted_files: &Vec<(MerkleRoot, u64, u64)>,
         reported_srd_root: &MerkleRoot,
         reported_files_root: &MerkleRoot,
         report_slot: u64,
@@ -1108,10 +1107,10 @@ impl<T: Config> Module<T> {
         // 2. Update sOrder and get changed size
         // loop added. if not exist, calculate spower.
         // loop deleted, need to check each key whether we should delete it or not
-        let (added_files_size, added_files_count)= Self::update_files(reporter, added_files, &anchor, true);
-        let (deleted_files_size, _) = Self::update_files(reporter, deleted_files, &anchor, false);
+        // let (added_files_size, added_files_count)= Self::update_files(reporter, added_files, &anchor, true);
+        // let (deleted_files_size, _) = Self::update_files(reporter, deleted_files, &anchor, false);
 
-        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files_count)});
+        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files.size_hint() as u32)});
 
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
@@ -1121,10 +1120,11 @@ impl<T: Config> Module<T> {
         }
 
         // 4. Construct work report
-        let spower = old_spower.saturating_add(added_files_size).saturating_sub(deleted_files_size);
+        // Do not change the spower here, it would be updated by the crust-spower service
+        // let spower = old_spower.saturating_add(added_files_size).saturating_sub(deleted_files_size);
         let wr = WorkReport {
             report_slot,
-            spower,
+            spower: old_spower,
             free: reported_srd_size,
             reported_files_size,
             reported_srd_root: reported_srd_root.clone(),
@@ -1143,25 +1143,25 @@ impl<T: Config> Module<T> {
     }
 
     /// Update sOrder information based on changed files, return the changed_file_size and changed_file_count
-    fn update_files(
-        _reporter: &T::AccountId,
-        changed_files: &Vec<(MerkleRoot, u64, u64)>,
-        _anchor: &SworkerPubKey,
-        _is_added: bool) -> (u64, u32) {
-        let mut changed_spower: u64 = 0;
-        let mut changed_files_count: u32 = 0;
+    // fn update_files(
+    //     _reporter: &T::AccountId,
+    //     changed_files: &Vec<(MerkleRoot, u64, u64)>,
+    //     _anchor: &SworkerPubKey,
+    //     _is_added: bool) -> (u64, u32) {
+    //     let mut changed_spower: u64 = 0;
+    //     let mut changed_files_count: u32 = 0;
 
-        for (_, size, _) in changed_files {
-            // The replica update logic is moved to offchain crust-spower service, so DO NOT invoke the 
-            // T::MarketInterface::upsert_replica or delete_replica call here
-            // Use the raw value for calculation directly. The actual spower and file count of any illegal files 
-            // will be updated upon the market::update_replicas extrinsic call
-            changed_spower = changed_spower.saturating_add(*size);
-            changed_files_count += 1;
-        }
+    //     for (_, size, _) in changed_files {
+    //         // The replica update logic is moved to offchain crust-spower service, so DO NOT invoke the 
+    //         // T::MarketInterface::upsert_replica or delete_replica call here
+    //         // Use the raw value for calculation directly. The actual spower and file count of any illegal files 
+    //         // will be updated upon the market::update_replicas extrinsic call
+    //         changed_spower = changed_spower.saturating_add(*size);
+    //         changed_files_count += 1;
+    //     }
         
-        (changed_spower, changed_files_count)
-    }
+    //     (changed_spower, changed_files_count)
+    // }
 
     /// Get workload by reporter account,
     /// this function should only be called in the 2nd last session of new era

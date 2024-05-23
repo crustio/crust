@@ -4,6 +4,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(option_result_contains)]
 
+use core::option::Option::None;
+
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
@@ -34,12 +36,9 @@ mod tests;
 pub mod benchmarking;
 
 use primitives::{
-    MerkleRoot, BlockNumber, SworkerAnchor,
-    constants::market::*,
-    traits::{
-        UsableCurrency, MarketInterface,
-        SworkerInterface, BenefitInterface
-    }
+    constants::market::*, traits::{
+        BenefitInterface, MarketInterface, SworkerInterface, UsableCurrency
+    }, BlockNumber, MerkleRoot, ReportSlot, SworkerAnchor
 };
 
 pub(crate) const LOG_TARGET: &'static str = "market";
@@ -62,6 +61,7 @@ pub trait WeightInfo {
     fn place_storage_order() -> Weight;
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
+    fn update_replicas() -> Weight;
 }
 
 #[derive(Debug, PartialEq, Encode, Decode, Default, Clone)]
@@ -106,124 +106,37 @@ pub struct Replica<AccountId> {
     pub created_at: Option<BlockNumber>
 }
 
+
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct FileReplicaToUpdate<AccountId> {
+    pub reporter: AccountId,
+    pub owner: AccountId,
+    pub sworker_anchor: SworkerAnchor,
+    pub report_slot: ReportSlot,
+    pub report_block: BlockNumber,
+    pub valid_at: BlockNumber,
+    pub is_added: bool
+}
+type FileReplicaToUpdateOf<T> = FileReplicaToUpdate<<T as system::Config>::AccountId>; 
+
+#[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct FileInfoToUpdate<AccountId: Ord, Balance> {
+    pub existing_file_info: FileInfoV2<AccountId, Balance>,
+    // The first report block number where the existing_file_info is set
+    pub report_block: BlockNumber,
+    pub actual_added_replicas: Vec<FileReplicaToUpdate<AccountId>>,
+    pub actual_deleted_replicas: Vec<FileReplicaToUpdate<AccountId>>,
+}
+type FileInfoToUpdateOf<T> = FileInfoToUpdate<<T as system::Config>::AccountId, BalanceOf<T>>;
+
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::NegativeImbalance;
 
 impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> for Module<T>
 {
-    /// Upsert new replica
-    /// Accept id(who, anchor), reported_file_size, cid, valid_at and maybe_member
-    /// Returns the real storage power of this file and whether this file is in the market system
-    /// storage power is decided by market
-    fn upsert_replica(who: &<T as system::Config>::AccountId,
-                      owner: <T as system::Config>::AccountId,
-                      cid: &MerkleRoot,
-                      reported_file_size: u64,
-                      anchor: &SworkerAnchor,
-                      valid_at: BlockNumber
-                    ) -> (u64, bool) {
-        // Judge if file_info.file_size == reported_file_size or not
-        Self::maybe_upsert_file_size(who, cid, reported_file_size);
-
-        // `is_counted` is a concept in swork-side, which means if this `cid`'s `storage power` size is counted by `(who, anchor)`
-        // if the file doesn't exist/exceed-replicas(aka. is_counted == false), return false(doesn't increase storage power) cause it's junk.
-        // if the file exist, is_counted == true, will change it later.
-        let mut spower: u64 = 0;
-        let mut is_valid_cid: bool = false;
-        if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
-            is_valid_cid = true;
-            // 1. Check if the length of the groups exceed MAX_REPLICAS or not
-            if file_info.replicas.len() < MAX_REPLICAS {
-                // 2. Check if the file is stored by other members
-                if !file_info.replicas.contains_key(&owner) {
-                    let new_replica = Replica {
-                        who: who.clone(),
-                        valid_at,
-                        anchor: anchor.clone(),
-                        is_reported: true,
-                        // set created_at to some
-                        created_at: Some(valid_at)
-                    };
-                    file_info.replicas.insert(owner.clone(), new_replica);
-                    file_info.reported_replica_count += 1;
-                    // Always return the file size for this [who] reported first time
-                    spower = file_info.file_size;
-
-                    if file_info.remaining_paid_count > 0 {
-                        let reward_amount = Self::calculate_reward_amount(file_info.remaining_paid_count, &file_info.amount);
-                        if let Some(new_reward) = Self::has_enough_collateral(&owner, &reward_amount) {
-                            T::BenefitInterface::update_reward(&owner, new_reward);
-                            file_info.amount = file_info.amount.saturating_sub(reward_amount);
-                            file_info.remaining_paid_count = file_info.remaining_paid_count.saturating_sub(1);
-                        }
-                    }
-                }
-            }
-
-            // 3. The first join the replicas and file become live(expired_at > calculated_at)
-            if file_info.expired_at == 0 {
-                let curr_bn = Self::get_current_block_number();
-                file_info.calculated_at = curr_bn;
-                file_info.expired_at = curr_bn + T::FileDuration::get();
-            }
-
-            // 4. Update files
-            <FilesV2<T>>::insert(cid, file_info);
-        }
-        (spower, is_valid_cid)
-    }
-
-    /// Node who delete the replica
-    /// Accept id(who, anchor), cid and current block number
-    /// Returns the real storage power of this file and whether this file is in the market system
-    fn delete_replica(who: &<T as system::Config>::AccountId,
-                      owner: <T as system::Config>::AccountId,
-                      cid: &MerkleRoot,
-                      anchor: &SworkerAnchor) -> (u64, bool) {
-        let mut spower: u64 = 0;
-        let mut is_valid_cid: bool = false;
-        // 1. Delete replica from file_info
-        if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
-            is_valid_cid = true;
-            let mut to_decrease_count = 0;
-            // None => No such file
-            // Some(true) => Already pass the SpowerReadyPeriod, decrease the spower
-            // Some(false) => Still in SpowerReadyPeriod, decrease the file_size
-            let mut is_spower_counted: Option<bool> = None;
-            let maybe_replica = file_info.replicas.get(&owner);
-            if let Some(replica) = maybe_replica {
-                if replica.who == *who {
-                    if replica.anchor == *anchor {
-                        // We added it before
-                        if replica.created_at.is_none() { is_spower_counted = Some(true); } else { is_spower_counted = Some(false); };
-                    }
-                    if replica.is_reported {
-                        // if this anchor didn't report work, we already decrease the `reported_replica_count` in `update_replicas`
-                        to_decrease_count += 1;
-                    }
-                    file_info.replicas.remove(&owner);
-                }
-            }
-
-            // 2. Return the original storage power in wr
-            if let Some(is_spower_counted) = is_spower_counted {
-                if is_spower_counted {
-                    spower = file_info.spower;
-                } else {
-                    spower = file_info.file_size;
-                }
-            }
-
-            // 3. Decrease the reported_replica_count
-            if to_decrease_count != 0 {
-                file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(to_decrease_count);
-            }
-            <FilesV2<T>>::insert(cid, file_info);
-        }
-        (spower, is_valid_cid)
-    }
-
     /// Withdraw market staking pot for distributing staking reward
     fn withdraw_staking_pot() -> BalanceOf<T> {
         let staking_pot = Self::staking_pot();
@@ -357,6 +270,19 @@ decl_storage! {
 
         /// The sPower will become valid after this period, default is 3 months
         pub SpowerReadyPeriod get(fn spower_ready_period): BlockNumber = 1_296_000;
+
+        /// The crust-spower service account
+        pub SpowerSuperior get(fn spower_superior): Option<T::AccountId>;
+
+        /// The files whose replicas data have been updated, which would be later processed by the crust-spower service
+        /// to calculate the updated spower for sworkers
+        /// After the spower has been updated on chain, the related data will be removed from this storage
+        pub UpdatedFilesToProcess get(fn updated_files_to_process): 
+        map hasher(twox_64_concat) MerkleRoot => Option<FileInfoToUpdateOf<T>>;
+
+        /// The illegal file replicas count, need to be substraed by swork::AddedFilesCount during spower update, and then purged
+        pub IllegalFileReplicasCount get(fn illegal_file_replicas_count): 
+        map hasher(twox_64_concat) ReportSlot => Option<u32>;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -390,6 +316,10 @@ decl_error! {
         PlaceOrderNotAvailable,
         /// The file does not exist. Please check the cid again.
         FileNotExist,
+        /// The spower superior account is not set. Please call the set_spower_superior extrinsic first.
+        SpowerSuperiorNotSet,
+        /// The caller account is not the spower superior account. Please check the caller account again.
+        IllegalSpowerSuperior,
     }
 }
 
@@ -528,6 +458,45 @@ decl_module! {
             Ok(())
         }
 
+        /// Set the crust-spower service superior account
+        #[weight = 1000]
+        pub fn set_spower_superior(origin, superior: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+
+            SpowerSuperior::<T>::put(superior.clone());
+
+            Self::deposit_event(RawEvent::SetSpowerSuperiorSuccess(superior));
+            Ok(())
+        }
+
+        /// Update file replicas from crust-spower offchain service
+        /// Emits `ReplicasUpdateSuccess` event if the call is success
+        /// # params
+        ///  - fileInfosMap: file replicas info map with the data structure as belowed:
+        ///     Map<(CID, file_size, Vec<(reporter, owner, sworker_anchor, report_slot, block_number, valid_at, is_added))>>
+        ///     The key is the file CID, and the value is a vector of file replicas info.
+        #[weight = T::WeightInfo::update_replicas()]
+        pub fn update_replicas(
+            origin,
+            file_infos_map: Vec<(MerkleRoot, u64, Vec<FileReplicaToUpdateOf<T>>)>,
+        ) -> DispatchResult {
+            let caller = ensure_signed(origin)?;
+            let maybe_superior = Self::spower_superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::SpowerSuperiorNotSet);
+            // 2. Check if caller is superior
+            ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
+
+            // 3. update replicas
+            Self::internal_update_replicas(file_infos_map)?;
+
+            Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller)); 
+
+            // TODO: Do not charge fee
+            Ok(())
+        }
+
         /// Calculate the reward for a file
         #[weight = T::WeightInfo::calculate_reward()]
         pub fn calculate_reward(
@@ -550,13 +519,10 @@ decl_module! {
             // 3. Maybe reward liquidator when he try to close outdated file
             Self::maybe_reward_liquidator(&cid, curr_bn, &liquidator)?;
 
-            // 4. Refresh the status of the file and calculate the reward for merchants
-            Self::update_replicas(&cid, curr_bn);
-
-            // 5. Try to renew file if prepaid is not zero
+            // 4. Try to renew file if prepaid is not zero
             Self::try_to_renew_file(&cid, curr_bn, &liquidator)?;
 
-            // 6. Try to close file
+            // 5. Try to close file
             Self::try_to_close_file(&cid, curr_bn)?;
 
             Self::deposit_event(RawEvent::CalculateSuccess(cid));
@@ -708,55 +674,283 @@ impl<T: Config> Module<T> {
         T::ModuleId::get().into_sub_account("rese")
     }
 
-    /// This function will update replicas
-    /// and (maybe) insert file's status(delete file)
-    /// input:
-    ///   - cid: MerkleRoot
-    ///   - curr_bn: BlockNumber
-    pub fn update_replicas(cid: &MerkleRoot, curr_bn: BlockNumber)
+    /// 
+    pub fn internal_update_replicas(file_infos_map: Vec<(MerkleRoot, u64, Vec<FileReplicaToUpdateOf<T>>)>) -> DispatchResult
     {
-        // 1. File must exist
-        if Self::filesv2(cid).is_none() { return; }
-        
-        // 2. File must already started
-        let mut file_info = Self::filesv2(cid).unwrap_or_default();
-        
-        // 3. File already expired
-        if file_info.expired_at <= file_info.calculated_at { return; }
+        log!(info, "💸 file_infos_map: {:?}.", file_infos_map);
+        'file_loop: for (cid, reported_file_size, file_replicas) in file_infos_map {
 
-        let calculated_block = curr_bn.min(file_info.expired_at);
-        let mut new_replicas = BTreeMap::<T::AccountId, Replica<T::AccountId>>::new();
-        let mut new_reported_replica_count = 0u32;
+            // Split the replicas array into added_replicas and deleted_replicas
+            // let (mut added_replicas, mut deleted_replicas):
+            //     (Vec<FileReplicaToUpdateOf<T>>,Vec<FileReplicaToUpdateOf<T>>) = file_replicas
+            //     .into_iter()
+            //     .partition(|replica| replica.is_added);
 
-        // 4. Loop replicas and update reported replica count
-        for (owner, replica) in file_info.replicas.iter() {
-            if !T::SworkerInterface::is_wr_reported(&replica.anchor, curr_bn) {
-                let mut invalid_replica = replica.clone();
-                // update the valid_at to the curr_bn
-                invalid_replica.valid_at = curr_bn;
-                invalid_replica.is_reported = false;
-                new_replicas.insert(owner.clone(), invalid_replica);
-            } else {
-                let mut valid_replica = replica.clone();
-                valid_replica.is_reported = true;
-                new_replicas.insert(owner.clone(), valid_replica);
-                new_reported_replica_count += 1;
+            let mut added_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            let mut deleted_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            for replica in file_replicas {
+                if replica.is_added {
+                    added_replicas.push(replica);
+                } else {
+                    deleted_replicas.push(replica);
+                }
+            }
+
+            // Sort each array by report_block
+            added_replicas.sort_by(|a, b| a.report_block.cmp(&b.report_block));
+            deleted_replicas.sort_by(|a, b| a.report_block.cmp(&b.report_block));
+
+            // Print the results for debug purpose
+            log!(info, "Added Replicas: {:?}", added_replicas);
+            log!(info, "Deleted Replicas: {:?}", deleted_replicas);
+
+            // Get the file_info object from storage for 1 time db read
+            let maybe_file_info = Self::filesv2(&cid);
+            if maybe_file_info.is_none() {
+                // If the cid doesn't exist in the market, either this is a non-exist cid, or has been removed by illegal file size, or has been liquidated and closed
+                // Since we haven't change the sworker's spower during the swork.report_works call, so we can just ignore all replicas here without any side-effects
+                continue;
+            }
+            let mut file_info = maybe_file_info.unwrap();
+          
+
+            // Record actual_added_replicas and actual_deleted_replicas
+            let mut actual_added_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            let mut actual_deleted_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            let mut is_replica_updated: bool = false;
+
+            // ---------------------------------------------------------
+            // --- Handle upsert replicas ---
+            for file_replica in added_replicas.iter() {
+
+                let FileReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, report_block, valid_at, ..} = file_replica;
+
+                // 1. Check if file_info.file_size == reported_file_size or not
+                let is_valid_cid = Self::maybe_upsert_file_size(&mut file_info, &reporter, &cid, reported_file_size); 
+                if !is_valid_cid {
+                    // This is a invalid cid with illegal file size, which has been removed in maybe_upsert_file_size
+
+                    // We simply add all added_replicas count as of the first replica's report_slot, which is almost the case
+                    IllegalFileReplicasCount::mutate(report_slot, |maybe_count| {
+                        *maybe_count = Some(maybe_count.unwrap_or(0)+added_replicas.len() as u32)
+                    });
+
+                    // We don't need to process all subsequent replicas anymore.
+                    continue 'file_loop;
+                }
+
+                // 2. Add replica data to storage
+                let is_replica_added = Self::upsert_replica(&mut file_info, &reporter, &owner, &sworker_anchor, *report_block, *valid_at);
+                // If the replica is not added (due to exceed MAX_REPLICA, or same owner reported), just ignore this replica
+                if is_replica_added {
+                    actual_added_replicas.push(file_replica.clone());
+                    is_replica_updated = true;
+                }
+            }
+
+            // ---------------------------------------------------------
+            // --- Handle delete replicas ---
+            for file_replica in deleted_replicas.iter() {
+
+                let FileReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
+                
+                let (is_replica_deleted, is_deleted_replicas_spower_counted) = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
+                if is_replica_deleted {
+                    is_replica_updated = true;
+                }
+                // If the deleted replicas's spower is not counted, just ignore this replica
+                if is_deleted_replicas_spower_counted {
+                    actual_deleted_replicas.push(file_replica.clone());
+                }
+            }
+
+            // Update the file info with all the above changes in one DB write
+            log!(info, "file_info: {:?}", file_info);
+            <FilesV2<T>>::insert(cid.clone(), file_info.clone());
+
+            // Update the UpdatedFilesToProcess storage item
+            if is_replica_updated {
+                <UpdatedFilesToProcess<T>>::mutate(cid, |maybe_updated_file_info| {
+                    match *maybe_updated_file_info {
+                        Some(ref mut updated_file_info) => {
+                            updated_file_info.actual_added_replicas.extend(actual_added_replicas);
+                            updated_file_info.actual_deleted_replicas.extend(actual_deleted_replicas);
+                        },
+                        None => {
+                            *maybe_updated_file_info = Some(FileInfoToUpdate{
+                                existing_file_info: file_info,
+                                report_block: Self::get_current_block_number(),
+                                actual_added_replicas,
+                                actual_deleted_replicas
+                            });
+                        }
+                    }
+                    
+                    log!(info, "Updated Files To Process {:?}", *maybe_updated_file_info);
+                });
             }
         }
 
-        // 5 Update file info
-        file_info.reported_replica_count = new_reported_replica_count;
-        file_info.replicas = new_replicas;
-
-        // 6. Update spower info
-        // TODO: add this weight into place_storage_order
-        let _ = Self::update_replicas_spower(&mut file_info, Some(curr_bn));
-
-        // 6. File status might become ready to be closed if calculated_block == expired_at
-        file_info.calculated_at = calculated_block;
-        // 7. Update files
-        <FilesV2<T>>::insert(cid, file_info);
+        Ok(())
     }
+
+    fn maybe_upsert_file_size(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, 
+                              who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) -> bool {
+        
+        let mut is_valid_cid = true;
+        // 1. Judge if file_info.file_size == reported_file_size or not
+        if file_info.replicas.len().is_zero() {
+            // ordered_file_size == reported_file_size, return it
+            if file_info.file_size == reported_file_size {
+                return true;
+            // ordered_file_size > reported_file_size, correct it
+            } else if file_info.file_size > reported_file_size {
+                file_info.file_size = reported_file_size;                
+            // ordered_file_size < reported_file_size, close it with notification
+            } else {
+                let total_amount = file_info.amount + file_info.prepaid;
+                if !Self::maybe_reward_merchant(who, &total_amount) {
+                    // This should not have error => discard the result
+                    let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
+                }
+                <FilesV2<T>>::remove(cid);
+                FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
+                OrdersCount::mutate(|count| {*count = count.saturating_sub(1)});
+                Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
+
+                is_valid_cid = false;
+            }
+        }
+
+        is_valid_cid
+    }
+
+    fn upsert_replica(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, 
+                      who: &<T as system::Config>::AccountId,
+                      owner: &<T as system::Config>::AccountId,
+                      anchor: &SworkerAnchor,
+                      report_block: BlockNumber,
+                      valid_at: BlockNumber
+                    ) -> bool {
+
+        let mut is_replica_added = false;
+        // 1. Check if the length of the groups exceed MAX_REPLICAS or not
+        if file_info.replicas.len() < MAX_REPLICAS {
+            // 2. Check if the file is stored by other members
+            if !file_info.replicas.contains_key(&owner) {
+                let new_replica = Replica {
+                    who: who.clone(),
+                    valid_at,
+                    anchor: anchor.clone(),
+                    is_reported: true,
+                    // set created_at to some
+                    created_at: Some(valid_at)
+                };
+                file_info.replicas.insert(owner.clone(), new_replica);
+                file_info.reported_replica_count += 1;
+                is_replica_added = true;
+
+                // Reward the first 4 merchants which submits the replica report
+                if file_info.remaining_paid_count > 0 {
+                    let reward_amount = Self::calculate_reward_amount(file_info.remaining_paid_count, &file_info.amount);
+                    if let Some(new_reward) = Self::has_enough_collateral(&owner, &reward_amount) {
+                        T::BenefitInterface::update_reward(&owner, new_reward);
+                        file_info.amount = file_info.amount.saturating_sub(reward_amount);
+                        file_info.remaining_paid_count = file_info.remaining_paid_count.saturating_sub(1);
+                    }
+                }
+            }
+        }
+
+        // 3. The first join the replicas and file become live(expired_at > calculated_at)
+        if file_info.expired_at == 0 {
+            file_info.calculated_at = report_block;
+            file_info.expired_at = report_block + T::FileDuration::get();
+        }
+
+        is_replica_added
+    }
+
+    fn delete_replica(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>,
+                      who: &<T as system::Config>::AccountId,
+                      owner: &<T as system::Config>::AccountId,
+                      anchor: &SworkerAnchor) -> (bool, bool) {
+        
+        let mut is_replica_deleted: bool = false;
+        let mut is_deleted_replicas_spower_counted: bool = false;
+
+        // 1. Delete replica from file_info
+        let maybe_replica = file_info.replicas.get(owner);
+        if let Some(replica) = maybe_replica {
+            if replica.who == *who {
+                // If this is the same sworker_anchor, we need to substrate its spower
+                // But if this is not the same sworker_anchor, it means the sworker has re-registered, 
+                // which indicates the original sworker_anchor's spower has been removed, 
+                // the new sworker_anchor's spower doesn't have this file's spower counted yet
+                if replica.anchor == *anchor {
+                    is_deleted_replicas_spower_counted = true;
+                }
+
+                // Don't need to check the replica.is_reported here, because we don't use the calculate_rewards->update_replicas right now
+                file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
+                file_info.replicas.remove(owner);
+                is_replica_deleted = true;
+            }
+        }
+
+        (is_replica_deleted, is_deleted_replicas_spower_counted)
+    }
+
+    // /// TODO: Remove this a while later
+    // /// This function will update replicas
+    // /// and (maybe) insert file's status(delete file)
+    // /// input:
+    // ///   - cid: MerkleRoot
+    // ///   - curr_bn: BlockNumber
+    // pub fn update_replicas(cid: &MerkleRoot, curr_bn: BlockNumber)
+    // {
+    //     // 1. File must exist
+    //     if Self::filesv2(cid).is_none() { return; }
+        
+    //     // 2. File must already started
+    //     let mut file_info = Self::filesv2(cid).unwrap_or_default();
+        
+    //     // 3. File already expired
+    //     if file_info.expired_at <= file_info.calculated_at { return; }
+
+    //     let calculated_block = curr_bn.min(file_info.expired_at);
+    //     let mut new_replicas = BTreeMap::<T::AccountId, Replica<T::AccountId>>::new();
+    //     let mut new_reported_replica_count = 0u32;
+
+    //     // 4. Loop replicas and update reported replica count
+    //     for (owner, replica) in file_info.replicas.iter() {
+    //         if !T::SworkerInterface::is_wr_reported(&replica.anchor, curr_bn) {
+    //             let mut invalid_replica = replica.clone();
+    //             // update the valid_at to the curr_bn
+    //             invalid_replica.valid_at = curr_bn;
+    //             invalid_replica.is_reported = false;
+    //             new_replicas.insert(owner.clone(), invalid_replica);
+    //         } else {
+    //             let mut valid_replica = replica.clone();
+    //             valid_replica.is_reported = true;
+    //             new_replicas.insert(owner.clone(), valid_replica);
+    //             new_reported_replica_count += 1;
+    //         }
+    //     }
+
+    //     // 5 Update file info
+    //     file_info.reported_replica_count = new_reported_replica_count;
+    //     file_info.replicas = new_replicas;
+
+    //     // 6. Update spower info
+    //     // TODO: add this weight into place_storage_order
+    //     let _ = Self::update_replicas_spower(&mut file_info, Some(curr_bn));
+
+    //     // 6. File status might become ready to be closed if calculated_block == expired_at
+    //     file_info.calculated_at = calculated_block;
+    //     // 7. Update files
+    //     <FilesV2<T>>::insert(cid, file_info);
+    // }
 
     /// Close file, maybe move into trash
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) -> DispatchResult {
@@ -1033,32 +1227,6 @@ impl<T: Config> Module<T> {
         TryInto::<u32>::try_into(current_block_number).ok().unwrap()
     }
 
-    fn maybe_upsert_file_size(who: &T::AccountId, cid: &MerkleRoot, reported_file_size: u64) {
-        if let Some(mut file_info) = Self::filesv2(cid) {
-            if file_info.replicas.len().is_zero() {
-                // ordered_file_size == reported_file_size, return it
-                if file_info.file_size == reported_file_size {
-                    return
-                // ordered_file_size > reported_file_size, correct it
-                } else if file_info.file_size > reported_file_size {
-                    file_info.file_size = reported_file_size;
-                    <FilesV2<T>>::insert(cid, file_info);
-                // ordered_file_size < reported_file_size, close it with notification
-                } else {
-                    let total_amount = file_info.amount + file_info.prepaid;
-                    if !Self::maybe_reward_merchant(who, &total_amount) {
-                        // This should not have error => discard the result
-                        let _ = T::Currency::transfer(&Self::storage_pot(), &Self::reserved_pot(), total_amount, KeepAlive);
-                    }
-                    <FilesV2<T>>::remove(cid);
-                    FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
-                    OrdersCount::mutate(|count| {*count = count.saturating_sub(1)});
-                    Self::deposit_event(RawEvent::IllegalFileClosed(cid.clone()));
-                }
-            }
-        }
-    }
-
     fn maybe_reward_merchant(who: &T::AccountId, amount: &BalanceOf<T>) -> bool {
         if let Some(owner) = T::SworkerInterface::get_owner(who) {
             if let Some(new_reward) = Self::has_enough_collateral(&owner, amount) {
@@ -1171,5 +1339,9 @@ decl_event!(
         SetEnableMarketSuccess(bool),
         /// Set the file base fee success.
         SetBaseFeeSuccess(Balance),
+        /// Set the crust-spower service superior account.
+        SetSpowerSuperiorSuccess(AccountId),
+        /// Update replicas success
+        UpdateReplicasSuccess(AccountId),
     }
 );

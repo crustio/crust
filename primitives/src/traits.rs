@@ -2,8 +2,9 @@
 // This file is part of Crust.
 
 use frame_support::traits::{LockableCurrency, WithdrawReasons};
-use crate::{SworkerAnchor, BlockNumber, EraIndex};
+use crate::{BlockNumber, EraIndex, ReportSlot, SworkerAnchor};
 use sp_runtime::{DispatchError, Perbill};
+use sp_std::vec::Vec;
 
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
@@ -26,6 +27,8 @@ pub trait SworkerInterface<AccountId> {
 	fn get_added_files_count_and_clear_record() -> u32;
 	// Get owner of this member
 	fn get_owner(who: &AccountId) -> Option<AccountId>;
+	// Clear the designated processed work reports
+	fn clear_processed_work_reports(work_reports: &Vec<(SworkerAnchor, ReportSlot)>);
 }
 
 /// Means for interacting with a specialized version of the `market` trait.

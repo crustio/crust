@@ -122,14 +122,12 @@ type FileReplicaToUpdateOf<T> = FileReplicaToUpdate<<T as system::Config>::Accou
 
 #[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct FileInfoToUpdate<AccountId: Ord, Balance> {
-    pub existing_file_info: FileInfoV2<AccountId, Balance>,
-    // The first report block number where the existing_file_info is set
-    pub report_block: BlockNumber,
+pub struct UpdatedFileInfo<AccountId: Ord> {
+    pub cid: MerkleRoot,
     pub actual_added_replicas: Vec<FileReplicaToUpdate<AccountId>>,
     pub actual_deleted_replicas: Vec<FileReplicaToUpdate<AccountId>>,
 }
-type FileInfoToUpdateOf<T> = FileInfoToUpdate<<T as system::Config>::AccountId, BalanceOf<T>>;
+type UpdatedFileInfoOf<T> = UpdatedFileInfo<<T as system::Config>::AccountId>;
 
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
@@ -278,7 +276,7 @@ decl_storage! {
         /// to calculate the updated spower for sworkers
         /// After the spower has been updated on chain, the related data will be removed from this storage
         pub UpdatedFilesToProcess get(fn updated_files_to_process): 
-        map hasher(twox_64_concat) MerkleRoot => Option<FileInfoToUpdateOf<T>>;
+        map hasher(twox_64_concat) BlockNumber => Option<Vec<UpdatedFileInfoOf<T>>>;
 
         /// The illegal file replicas count, need to be substraed by swork::AddedFilesCount during spower update, and then purged
         pub IllegalFileReplicasCount get(fn illegal_file_replicas_count): 
@@ -479,6 +477,7 @@ decl_module! {
         pub fn update_replicas(
             origin,
             file_infos_map: Vec<(MerkleRoot, u64, Vec<FileReplicaToUpdateOf<T>>)>,
+            work_reports: Vec<(SworkerAnchor, ReportSlot)>
         ) -> DispatchResult {
             let caller = ensure_signed(origin)?;
             let maybe_superior = Self::spower_superior();
@@ -491,9 +490,14 @@ decl_module! {
             // 3. update replicas
             Self::internal_update_replicas(file_infos_map)?;
 
-            Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller)); 
+            // 4. update success, clear the processed work reports
+            T::SworkerInterface::clear_processed_work_reports(&work_reports);
 
-            // TODO: Do not charge fee
+            // 5. Emit the event
+            let curr_bn = Self::get_current_block_number();
+            Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn)); 
+
+            // No charge fee?
             Ok(())
         }
 
@@ -766,27 +770,27 @@ impl<T: Config> Module<T> {
 
             // Update the file info with all the above changes in one DB write
             log!(info, "file_info: {:?}", file_info);
-            <FilesV2<T>>::insert(cid.clone(), file_info.clone());
+            <FilesV2<T>>::insert(cid.clone(), file_info);
 
             // Update the UpdatedFilesToProcess storage item
             if is_replica_updated {
-                <UpdatedFilesToProcess<T>>::mutate(cid, |maybe_updated_file_info| {
-                    match *maybe_updated_file_info {
-                        Some(ref mut updated_file_info) => {
-                            updated_file_info.actual_added_replicas.extend(actual_added_replicas);
-                            updated_file_info.actual_deleted_replicas.extend(actual_deleted_replicas);
-                        },
-                        None => {
-                            *maybe_updated_file_info = Some(FileInfoToUpdate{
-                                existing_file_info: file_info,
-                                report_block: Self::get_current_block_number(),
+                let curr_bn = Self::get_current_block_number();
+                <UpdatedFilesToProcess<T>>::mutate(curr_bn, |maybe_updated_files| {
+                    let updated_file_info = UpdatedFileInfo{
+                                cid,
                                 actual_added_replicas,
                                 actual_deleted_replicas
-                            });
+                            };
+                    match *maybe_updated_files {
+                        Some(ref mut updated_files) => {
+                            updated_files.push(updated_file_info);
+                        },
+                        None => {
+                            *maybe_updated_files = Some(vec![updated_file_info]);
                         }
                     }
                     
-                    log!(info, "Updated Files To Process {:?}", *maybe_updated_file_info);
+                    log!(info, "Updated Files To Process {:?}", *maybe_updated_files);
                 });
             }
         }
@@ -1342,6 +1346,8 @@ decl_event!(
         /// Set the crust-spower service superior account.
         SetSpowerSuperiorSuccess(AccountId),
         /// Update replicas success
-        UpdateReplicasSuccess(AccountId),
+        /// The first item is the account who update the replicas.
+        /// The second item is the current block number
+        UpdateReplicasSuccess(AccountId, BlockNumber),
     }
 );

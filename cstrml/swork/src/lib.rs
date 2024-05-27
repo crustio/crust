@@ -187,6 +187,14 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     fn get_owner(who: &T::AccountId) -> Option<T::AccountId> {
         Self::identities(who).unwrap_or_default().group
     }
+
+    // Clear the designated processed work reports    
+    fn clear_processed_work_reports(work_reports: &Vec<(SworkerAnchor, ReportSlot)>) {
+        for (anchor, slot) in work_reports {
+            <WorkReportsToProcess<T>>::remove(&anchor, slot);
+        }
+    }
+
 }
 
 /// The module's configuration trait.
@@ -733,10 +741,9 @@ decl_module! {
                 reporter: reporter.clone(),
                 owner: owner.clone()
             };
+            <WorkReportsToProcess<T>>::insert(&anchor, slot, work_report_metadata.clone());
 
-            <WorkReportsToProcess<T>>::insert(&anchor, slot, work_report_metadata);
-
-            // 13. Emit work report event
+            // 13. Emit work report event   
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
             // 14. Try to free count limitation

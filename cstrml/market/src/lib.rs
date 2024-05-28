@@ -118,31 +118,6 @@ pub struct ReplicaToUpdate<AccountId> {
 }
 type ReplicaToUpdateOf<T> = ReplicaToUpdate<<T as system::Config>::AccountId>; 
 
-
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct FileReplicaToUpdate<AccountId> {
-    pub reporter: AccountId,
-    pub owner: AccountId,
-    pub sworker_anchor: SworkerAnchor,
-    pub report_slot: ReportSlot,
-    pub report_block: BlockNumber,
-    pub valid_at: BlockNumber,
-    pub is_added: bool
-}
-type FileReplicaToUpdateOf<T> = FileReplicaToUpdate<<T as system::Config>::AccountId>; 
-
-#[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct FileInfoToUpdate<AccountId: Ord, Balance> {
-    pub existing_file_info: FileInfoV2<AccountId, Balance>,
-    // The first report block number where the existing_file_info is set
-    pub report_block: BlockNumber,
-    pub actual_added_replicas: Vec<FileReplicaToUpdate<AccountId>>,
-    pub actual_deleted_replicas: Vec<FileReplicaToUpdate<AccountId>>,
-}
-type FileInfoToUpdateOf<T> = FileInfoToUpdate<<T as system::Config>::AccountId, BalanceOf<T>>;
-
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::NegativeImbalance;
@@ -753,8 +728,13 @@ impl<T: Config> Module<T> {
         'file_loop: for (cid, reported_file_size, file_replicas) in file_infos_map {
 
             // Split the replicas array into added_replicas and deleted_replicas
-            let mut added_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
-            let mut deleted_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
+            // let (mut added_replicas, mut deleted_replicas):
+            //     (Vec<FileReplicaToUpdateOf<T>>,Vec<FileReplicaToUpdateOf<T>>) = file_replicas
+            //     .into_iter()
+            //     .partition(|replica| replica.is_added);
+
+            let mut added_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            let mut deleted_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
             for replica in file_replicas {
                 if replica.is_added {
                     added_replicas.push(replica);

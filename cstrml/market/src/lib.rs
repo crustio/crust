@@ -109,7 +109,7 @@ pub struct Replica<AccountId> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct FileReplicaToUpdate<AccountId> {
+pub struct ReplicaToUpdate<AccountId> {
     pub reporter: AccountId,
     pub owner: AccountId,
     pub sworker_anchor: SworkerAnchor,
@@ -118,14 +118,14 @@ pub struct FileReplicaToUpdate<AccountId> {
     pub valid_at: BlockNumber,
     pub is_added: bool
 }
-type FileReplicaToUpdateOf<T> = FileReplicaToUpdate<<T as system::Config>::AccountId>; 
+type ReplicaToUpdateOf<T> = ReplicaToUpdate<<T as system::Config>::AccountId>; 
 
 #[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct UpdatedFileInfo<AccountId: Ord> {
     pub cid: MerkleRoot,
-    pub actual_added_replicas: Vec<FileReplicaToUpdate<AccountId>>,
-    pub actual_deleted_replicas: Vec<FileReplicaToUpdate<AccountId>>,
+    pub actual_added_replicas: Vec<ReplicaToUpdate<AccountId>>,
+    pub actual_deleted_replicas: Vec<ReplicaToUpdate<AccountId>>,
 }
 type UpdatedFileInfoOf<T> = UpdatedFileInfo<<T as system::Config>::AccountId>;
 
@@ -476,7 +476,7 @@ decl_module! {
         #[weight = T::WeightInfo::update_replicas()]
         pub fn update_replicas(
             origin,
-            file_infos_map: Vec<(MerkleRoot, u64, Vec<FileReplicaToUpdateOf<T>>)>,
+            file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>,
             work_reports: Vec<(SworkerAnchor, ReportSlot)>
         ) -> DispatchResult {
             let caller = ensure_signed(origin)?;
@@ -488,14 +488,14 @@ decl_module! {
             ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
 
             // 3. update replicas
-            Self::internal_update_replicas(file_infos_map)?;
+            let changed_files_count = Self::internal_update_replicas(file_infos_map);
 
             // 4. update success, clear the processed work reports
             T::SworkerInterface::clear_processed_work_reports(&work_reports);
 
             // 5. Emit the event
             let curr_bn = Self::get_current_block_number();
-            Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn)); 
+            Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn, changed_files_count, work_reports.len() as u32)); 
 
             // No charge fee?
             Ok(())
@@ -679,9 +679,10 @@ impl<T: Config> Module<T> {
     }
 
     /// 
-    pub fn internal_update_replicas(file_infos_map: Vec<(MerkleRoot, u64, Vec<FileReplicaToUpdateOf<T>>)>) -> DispatchResult
+    pub fn internal_update_replicas(file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>) -> u32
     {
         log!(info, "💸 file_infos_map: {:?}.", file_infos_map);
+        let mut changed_files_count = 0;
         'file_loop: for (cid, reported_file_size, file_replicas) in file_infos_map {
 
             // Split the replicas array into added_replicas and deleted_replicas
@@ -690,8 +691,8 @@ impl<T: Config> Module<T> {
             //     .into_iter()
             //     .partition(|replica| replica.is_added);
 
-            let mut added_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
-            let mut deleted_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            let mut added_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
+            let mut deleted_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
             for replica in file_replicas {
                 if replica.is_added {
                     added_replicas.push(replica);
@@ -712,22 +713,22 @@ impl<T: Config> Module<T> {
             let maybe_file_info = Self::filesv2(&cid);
             if maybe_file_info.is_none() {
                 // If the cid doesn't exist in the market, either this is a non-exist cid, or has been removed by illegal file size, or has been liquidated and closed
-                // Since we haven't change the sworker's spower during the swork.report_works call, so we can just ignore all replicas here without any side-effects
+                // Since we haven't changed the sworker's spower during the swork.report_works call, so we can just ignore all replicas here without any side-effects
                 continue;
             }
             let mut file_info = maybe_file_info.unwrap();
           
 
             // Record actual_added_replicas and actual_deleted_replicas
-            let mut actual_added_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
-            let mut actual_deleted_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            let mut actual_added_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
+            let mut actual_deleted_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
             let mut is_replica_updated: bool = false;
 
             // ---------------------------------------------------------
             // --- Handle upsert replicas ---
             for file_replica in added_replicas.iter() {
 
-                let FileReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, report_block, valid_at, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, report_block, valid_at, ..} = file_replica;
 
                 // 1. Check if file_info.file_size == reported_file_size or not
                 let is_valid_cid = Self::maybe_upsert_file_size(&mut file_info, &reporter, &cid, reported_file_size); 
@@ -739,6 +740,7 @@ impl<T: Config> Module<T> {
                         *maybe_count = Some(maybe_count.unwrap_or(0)+added_replicas.len() as u32)
                     });
 
+                    changed_files_count += 1;
                     // We don't need to process all subsequent replicas anymore.
                     continue 'file_loop;
                 }
@@ -756,7 +758,7 @@ impl<T: Config> Module<T> {
             // --- Handle delete replicas ---
             for file_replica in deleted_replicas.iter() {
 
-                let FileReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
                 
                 let (is_replica_deleted, is_deleted_replicas_spower_counted) = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
                 if is_replica_deleted {
@@ -771,6 +773,7 @@ impl<T: Config> Module<T> {
             // Update the file info with all the above changes in one DB write
             log!(info, "file_info: {:?}", file_info);
             <FilesV2<T>>::insert(cid.clone(), file_info);
+            changed_files_count += 1;
 
             // Update the UpdatedFilesToProcess storage item
             if is_replica_updated {
@@ -795,7 +798,7 @@ impl<T: Config> Module<T> {
             }
         }
 
-        Ok(())
+        changed_files_count
     }
 
     fn maybe_upsert_file_size(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, 
@@ -1348,6 +1351,8 @@ decl_event!(
         /// Update replicas success
         /// The first item is the account who update the replicas.
         /// The second item is the current block number
-        UpdateReplicasSuccess(AccountId, BlockNumber),
+        /// The third item is the changed files count
+        /// The fourth item is the processed work reports count for swork::WorkReportsToProcess
+        UpdateReplicasSuccess(AccountId, BlockNumber, u32, u32),
     }
 );

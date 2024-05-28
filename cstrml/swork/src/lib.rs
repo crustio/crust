@@ -260,7 +260,7 @@ decl_storage! {
 
         /// Work reports to process queue, which will be processed by the offchain Crust-Spower service
         pub WorkReportsToProcess get(fn work_reports_to_process):
-            double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => Option<WorkReportMetadata<T::AccountId>>;
+            double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => WorkReportMetadata<T::AccountId>;
 
         /// The current report slot block number, this value should be a multiple of report slot block.
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
@@ -733,17 +733,18 @@ decl_module! {
             // 12. Add to WorkReportsToProcess queue to be processed by the crust-spower off-chain service
             let id = Self::identities(&reporter).unwrap_or_default();
             let owner = if let Some(group) = id.group { group.clone() } else { reporter.clone() };
-            let cur_bn = Self::get_current_block_number();
+            let curr_bn = Self::get_current_block_number();
             let extrinsic_index = <system::Module<T>>::extrinsic_index().unwrap();
             let work_report_metadata = WorkReportMetadata {
-                report_block: cur_bn, 
+                report_block: curr_bn, 
                 extrinsic_index: extrinsic_index,
                 reporter: reporter.clone(),
                 owner: owner.clone()
             };
-            <WorkReportsToProcess<T>>::insert(&anchor, slot, work_report_metadata.clone());
+            <WorkReportsToProcess<T>>::insert(&anchor, slot, work_report_metadata);
 
             // 13. Emit work report event   
+            Self::deposit_event(RawEvent::QueueWorkReportSuccess(<system::Module<T>>::block_number(), extrinsic_index, reporter.clone(), owner.clone()));
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
             // 14. Try to free count limitation
@@ -1482,5 +1483,19 @@ decl_event!(
         SetPunishmentSuccess(bool),
         /// Remove the expired code success
         RemoveCodeSuccess(SworkerCode),
+        /// Work report has been added to the WorkReportsToProcess queue success
+        /// The first item is the report block
+        /// The second item is the extrinsic index
+        /// The third item is the account who send the work report
+        /// The fourth item is the owner account
+        QueueWorkReportSuccess(BlockNumber, u32, AccountId, AccountId),
+        /// Set the crust-spower service superior account.
+        SetSpowerSuperiorSuccess(AccountId),
+        /// Sworker spower update success
+        /// The first item is the account who update the spower.
+        /// The second item is the current block number
+        /// The third item is the updated sworkers count
+        /// The fourth item is the processed report blocks count for market::UpdatedFilesToProcess
+        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32),
     }
 );

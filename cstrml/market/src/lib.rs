@@ -173,6 +173,21 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         }
         staking_amount
     }
+    
+    fn update_file_spower(file_new_spower_map: &BTreeMap<MerkleRoot, u64>) {
+        for (cid, new_spower) in file_new_spower_map {
+            if let Some(mut file_info) = <FilesV2<T>>::get(&cid) {
+                file_info.spower = *new_spower;
+                <FilesV2<T>>::insert(&cid, file_info);
+            }
+        }
+    }
+    
+    fn clear_processed_files_by_blocks(updated_blocks: &Vec<BlockNumber>) {
+        for block in updated_blocks {
+            <UpdatedFilesToProcess<T>>::remove(block);
+        }
+    }
 }
 
 /// The module's configuration trait.
@@ -285,10 +300,6 @@ decl_storage! {
         /// After the spower has been updated on chain, the related data will be removed from this storage
         pub UpdatedFilesToProcess get(fn updated_files_to_process): 
         map hasher(twox_64_concat) BlockNumber => Option<Vec<UpdatedFileInfoOf<T>>>;
-
-        /// The illegal file replicas count, need to be substraed by swork::AddedFilesCount during spower update, and then purged
-        pub IllegalFileReplicasCount get(fn illegal_file_replicas_count): 
-        map hasher(twox_64_concat) ReportSlot => Option<u32>;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -495,13 +506,16 @@ decl_module! {
             // 2. Check if caller is superior
             ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
 
-            // 3. update replicas
-            let changed_files_count = Self::internal_update_replicas(file_infos_map);
+            // 3. Internal update replicas
+            let (changed_files_count, illegal_file_replicas_map) = Self::internal_update_replicas(file_infos_map);
 
-            // 4. update success, clear the processed work reports
+            // 4. Update success, clear the processed work reports
             T::SworkerInterface::clear_processed_work_reports(&work_reports);
 
-            // 5. Emit the event
+            // 5. Update illegal file replicas count
+            T::SworkerInterface::update_illegal_file_replicas_count(&illegal_file_replicas_map);
+
+            // 6. Emit the event
             let curr_bn = Self::get_current_block_number();
             Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn, changed_files_count, work_reports.len() as u32)); 
 
@@ -687,18 +701,14 @@ impl<T: Config> Module<T> {
     }
 
     /// 
-    pub fn internal_update_replicas(file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>) -> u32
+    pub fn internal_update_replicas(file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>) -> (u32,BTreeMap<ReportSlot, u32>)
     {
         log!(info, "💸 file_infos_map: {:?}.", file_infos_map);
         let mut changed_files_count = 0;
+        let mut illegal_file_replicas_map: BTreeMap<ReportSlot, u32> = BTreeMap::new();
         'file_loop: for (cid, reported_file_size, file_replicas) in file_infos_map {
 
             // Split the replicas array into added_replicas and deleted_replicas
-            // let (mut added_replicas, mut deleted_replicas):
-            //     (Vec<FileReplicaToUpdateOf<T>>,Vec<FileReplicaToUpdateOf<T>>) = file_replicas
-            //     .into_iter()
-            //     .partition(|replica| replica.is_added);
-
             let mut added_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
             let mut deleted_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
             for replica in file_replicas {
@@ -736,7 +746,7 @@ impl<T: Config> Module<T> {
             // --- Handle upsert replicas ---
             for file_replica in added_replicas.iter() {
 
-                let ReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, report_block, valid_at, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, valid_at, ..} = file_replica;
 
                 // 1. Check if file_info.file_size == reported_file_size or not
                 let is_valid_cid = Self::maybe_upsert_file_size(&mut file_info, &reporter, &cid, reported_file_size); 
@@ -744,9 +754,11 @@ impl<T: Config> Module<T> {
                     // This is a invalid cid with illegal file size, which has been removed in maybe_upsert_file_size
 
                     // We simply add all added_replicas count as of the first replica's report_slot, which is almost the case
-                    IllegalFileReplicasCount::mutate(report_slot, |maybe_count| {
-                        *maybe_count = Some(maybe_count.unwrap_or(0)+added_replicas.len() as u32)
-                    });
+                    if let Some(count) = illegal_file_replicas_map.get_mut(report_slot) {
+                        *count += added_replicas.len() as u32;
+                    } else {
+                        illegal_file_replicas_map.insert(*report_slot, added_replicas.len() as u32);
+                    }
 
                     changed_files_count += 1;
                     // We don't need to process all subsequent replicas anymore.
@@ -754,7 +766,7 @@ impl<T: Config> Module<T> {
                 }
 
                 // 2. Add replica data to storage
-                let is_replica_added = Self::upsert_replica(&mut file_info, &reporter, &owner, &sworker_anchor, *report_block, *valid_at);
+                let is_replica_added = Self::upsert_replica(&mut file_info, &reporter, &owner, &sworker_anchor, *valid_at);
                 // If the replica is not added (due to exceed MAX_REPLICA, or same owner reported), just ignore this replica
                 if is_replica_added {
                     actual_added_replicas.push(file_replica.clone());
@@ -766,9 +778,9 @@ impl<T: Config> Module<T> {
             // --- Handle delete replicas ---
             for file_replica in deleted_replicas.iter() {
 
-                let ReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, ..} = file_replica;
                 
-                let is_replica_deleted = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
+                let is_replica_deleted = Self::delete_replica(&mut file_info,&reporter, owner);
                 if is_replica_deleted {
                     actual_deleted_replicas.push(file_replica.clone());
                     is_replica_updated = true;
@@ -811,7 +823,7 @@ impl<T: Config> Module<T> {
             }
         }
 
-        changed_files_count
+        (changed_files_count, illegal_file_replicas_map)
     }
 
     fn maybe_upsert_file_size(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, 
@@ -849,7 +861,6 @@ impl<T: Config> Module<T> {
                       who: &<T as system::Config>::AccountId,
                       owner: &<T as system::Config>::AccountId,
                       anchor: &SworkerAnchor,
-                      _report_block: BlockNumber,
                       valid_at: BlockNumber
                     ) -> bool {
 
@@ -893,8 +904,7 @@ impl<T: Config> Module<T> {
 
     fn delete_replica(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>,
                       who: &<T as system::Config>::AccountId,
-                      owner: &<T as system::Config>::AccountId,
-                      anchor: &SworkerAnchor) -> bool {
+                      owner: &<T as system::Config>::AccountId) -> bool {
         
         let mut is_replica_deleted: bool = false;
 
@@ -1259,63 +1269,63 @@ impl<T: Config> Module<T> {
         }
     }
 
-    // fn update_replicas_spower(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, curr_bn: Option<BlockNumber>) -> u64 {
-    //     let new_spower = Self::calculate_spower(file_info.file_size, file_info.reported_replica_count);
-    //     let prev_spower = file_info.spower;
-    //     let mut replicas_count = 0;
-    //     for (_onwer, ref mut replica) in &mut file_info.replicas {
-    //         // already begin to use spower
-    //         if replica.created_at.is_none() {
-    //             replicas_count += 1;
-    //             T::SworkerInterface::update_spower(&replica.anchor, prev_spower, new_spower);
-    //         } else {
-    //             if let Some(curr_bn) = curr_bn {
-    //                 // Make it become valid
-    //                 if let Some(created_at) = replica.created_at {
-    //                     if created_at + Self::spower_ready_period() <= curr_bn {
-    //                         replicas_count += 1;
-    //                         T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
-    //                         replica.created_at = None;
-    //                     }
-    //                 }
-    //             } else {
-    //                 // File is to close
-    //                 replicas_count += 1;
-    //                 T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
-    //             }
-    //         }
-    //     }
-    //     file_info.spower = new_spower;
-    //     replicas_count
-    // }
+    fn update_replicas_spower(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, curr_bn: Option<BlockNumber>) -> u64 {
+        let new_spower = Self::calculate_spower(file_info.file_size, file_info.reported_replica_count);
+        let prev_spower = file_info.spower;
+        let mut replicas_count = 0;
+        for (_onwer, ref mut replica) in &mut file_info.replicas {
+            // already begin to use spower
+            if replica.created_at.is_none() {
+                replicas_count += 1;
+                T::SworkerInterface::update_spower(&replica.anchor, prev_spower, new_spower);
+            } else {
+                if let Some(curr_bn) = curr_bn {
+                    // Make it become valid
+                    if let Some(created_at) = replica.created_at {
+                        if created_at + Self::spower_ready_period() <= curr_bn {
+                            replicas_count += 1;
+                            T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+                            replica.created_at = None;
+                        }
+                    }
+                } else {
+                    // File is to close
+                    replicas_count += 1;
+                    T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+                }
+            }
+        }
+        file_info.spower = new_spower;
+        replicas_count
+    }
 
-    // pub fn calculate_spower(file_size: u64, reported_replica_count: u32) -> u64 {
-    //     let (integer, numerator, denominator): (u64, u64, u64) = match reported_replica_count {
-    //         0 => (0, 0, 1),
-    //         1..=8 => (1, 1, 20),
-    //         9..=16 => (1, 1, 5),
-    //         17..=24 => (1, 1, 2),
-    //         25..=32 => (2, 0, 1),
-    //         33..=40 => (2, 3, 5),
-    //         41..=48 => (3, 3, 10),
-    //         49..=55 => (4, 0, 1),
-    //         56..=65 => (5, 0, 1),
-    //         66..=74 => (6, 0, 1),
-    //         75..=83 => (7, 0, 1),
-    //         84..=92 => (8, 0, 1),
-    //         93..=100 => (8, 1, 2),
-    //         101..=115 => (8, 4, 5),
-    //         116..=127 => (9, 0, 1),
-    //         128..=142 => (9, 1, 5),
-    //         143..=157 => (9, 2, 5),
-    //         158..=167 => (9, 3, 5),
-    //         168..=182 => (9, 4, 5),
-    //         183..=200 => (10, 0, 1),
-    //         _ => (10, 0, 1), // larger than 200 => 200
-    //     };
+    pub fn calculate_spower(file_size: u64, reported_replica_count: u32) -> u64 {
+        let (integer, numerator, denominator): (u64, u64, u64) = match reported_replica_count {
+            0 => (0, 0, 1),
+            1..=8 => (1, 1, 20),
+            9..=16 => (1, 1, 5),
+            17..=24 => (1, 1, 2),
+            25..=32 => (2, 0, 1),
+            33..=40 => (2, 3, 5),
+            41..=48 => (3, 3, 10),
+            49..=55 => (4, 0, 1),
+            56..=65 => (5, 0, 1),
+            66..=74 => (6, 0, 1),
+            75..=83 => (7, 0, 1),
+            84..=92 => (8, 0, 1),
+            93..=100 => (8, 1, 2),
+            101..=115 => (8, 4, 5),
+            116..=127 => (9, 0, 1),
+            128..=142 => (9, 1, 5),
+            143..=157 => (9, 2, 5),
+            158..=167 => (9, 3, 5),
+            168..=182 => (9, 4, 5),
+            183..=200 => (10, 0, 1),
+            _ => (10, 0, 1), // larger than 200 => 200
+        };
 
-    //     integer * file_size + file_size / denominator * numerator
-    // }
+        integer * file_size + file_size / denominator * numerator
+    }
 }
 
 decl_event!(

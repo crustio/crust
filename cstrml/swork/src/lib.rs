@@ -71,6 +71,7 @@ pub trait WeightInfo {
     fn set_code() -> Weight;
     fn register() -> Weight;
     fn report_works(added: u32, deleted: u32) -> Weight;
+    fn update_spower(changed_sworkers_count: u32, changed_files_count: u32, changed_blocks_count: u32) -> Weight;
     fn create_group() -> Weight;
     fn join_group() -> Weight;
     fn quit_group() -> Weight;
@@ -194,6 +195,15 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
             <WorkReportsToProcess<T>>::remove(&anchor, slot);
         }
     }
+    
+    // Update illegal file replicas count
+    fn update_illegal_file_replicas_count(illegal_file_replicas_map: &BTreeMap<ReportSlot, u32>) {
+        // For those legacy report slots, we just ignore them because 'AddedFilesCount' is reset per report slot
+        if let Some(illegal_count) = illegal_file_replicas_map.get(&Self::current_report_slot()) {
+            // Substract the illegal count
+            AddedFilesCount::mutate(|count| {*count = count.saturating_sub(*illegal_count)});
+        }
+    }
 
 }
 
@@ -261,6 +271,12 @@ decl_storage! {
         /// Work reports to process queue, which will be processed by the offchain Crust-Spower service
         pub WorkReportsToProcess get(fn work_reports_to_process):
             double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => WorkReportMetadata<T::AccountId>;
+
+        /// The crust-spower service account
+        pub SpowerSuperior get(fn spower_superior): Option<T::AccountId>;
+
+        /// The last spower update block, which is set during updateSpower call by Crust-Spower service
+        pub LastSpowerUpdateBlock get(fn last_spower_update_block): BlockNumber = 0;
 
         /// The current report slot block number, this value should be a multiple of report slot block.
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
@@ -351,7 +367,15 @@ decl_error! {
         /// Code has not been expired
         CodeNotExpired,
         /// Tee signature is not valid
-        InvalidTeeSignature
+        InvalidTeeSignature,
+        /// The spower superior account is not set. Please call the set_spower_superior extrinsic first.
+        SpowerSuperiorNotSet,
+        /// The caller account is not the spower superior account. Please check the caller account again.
+        IllegalSpowerSuperior,
+        /// Update spower call request arguments are invalid.
+        InvalidSpowerUpdateRequest,
+        /// Expired spower update blocks. This may be caused by the update_spower call replay.
+        ExpiredSpowerUpdateBlock
     }
 }
 
@@ -753,6 +777,74 @@ decl_module! {
             }
 
             Ok(Pays::Yes.into())
+        }
+
+        /// Set the crust-spower service superior account
+        #[weight = 1000]
+        pub fn set_spower_superior(origin, superior: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+
+            SpowerSuperior::<T>::put(superior.clone());
+
+            Self::deposit_event(RawEvent::SetSpowerSuperiorSuccess(superior));
+            Ok(())
+        }
+
+        /// Update sworker spower, which is called by Crust-Spower service
+        #[weight = T::WeightInfo::update_spower(sworker_changed_spower_map.len() as u32, file_new_spower_map.len() as u32, updated_blocks.len() as u32)]
+        pub fn update_spower(
+            origin,
+            sworker_changed_spower_map: BTreeMap<SworkerAnchor, i64>,
+            file_new_spower_map: BTreeMap<MerkleRoot, u64>,
+            updated_blocks: Vec<BlockNumber>,
+        ) -> DispatchResult {
+            let caller = ensure_signed(origin)?;
+            let maybe_superior = Self::spower_superior();
+
+            // 1. Check if superior is set and the caller is superior
+            ensure!(maybe_superior.is_some(), Error::<T>::SpowerSuperiorNotSet);
+            ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
+
+            // 2. Check the LastSpowerUpdateBlock
+            ensure!(updated_blocks.len() > 0, Error::<T>::InvalidSpowerUpdateRequest);
+            let last_update_block = Self::last_spower_update_block();
+            let min_updated_block = updated_blocks.iter().min().unwrap();
+            let max_updated_block = updated_blocks.iter().max().unwrap();
+            ensure!(*min_updated_block > last_update_block, Error::<T>::ExpiredSpowerUpdateBlock);
+
+            // 3. Update sworker spower
+            for (anchor, changed_spower) in sworker_changed_spower_map.iter() {
+                WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
+                    Some(WorkReport { ref mut spower, .. }) => {
+                        if *changed_spower >= 0 {
+                            *spower = spower.saturating_add(changed_spower.abs() as u64);
+                        } else {
+                            *spower = spower.saturating_sub(changed_spower.abs() as u64);
+                        }                        
+                    },
+                    ref mut i => *i = None,
+                });
+            }
+
+            // 4. Update the file new spower in pallet_market
+            T::MarketInterface::update_file_spower(&file_new_spower_map);
+            
+            // 5. Clear the successfully processed files by blocks in pallet_market
+            T::MarketInterface::clear_processed_files_by_blocks(&updated_blocks);
+
+            // 6. Set the LastSpowerUpdateBlock value, which is the latest block in updated_blocks
+            LastSpowerUpdateBlock::put(max_updated_block);
+
+            // 7. Emit the event
+            Self::deposit_event(RawEvent::UpdateSpowerSuccess(caller, 
+                <system::Module<T>>::block_number(), 
+                sworker_changed_spower_map.len() as u32, 
+                file_new_spower_map.len() as u32,
+                updated_blocks.len() as u32,
+                (*max_updated_block as u64).try_into().ok().unwrap())); 
+
+            // No charge fee?
+            Ok(())
         }
 
         /// Create a group. One account can only create one group once.
@@ -1491,11 +1583,12 @@ decl_event!(
         QueueWorkReportSuccess(BlockNumber, u32, AccountId, AccountId),
         /// Set the crust-spower service superior account.
         SetSpowerSuperiorSuccess(AccountId),
-        /// Sworker spower update success
         /// The first item is the account who update the spower.
         /// The second item is the current block number
-        /// The third item is the updated sworkers count
-        /// The fourth item is the processed report blocks count for market::UpdatedFilesToProcess
-        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32),
+        /// The third item is the updated sworkers count for sworker::WorkReports
+        /// The fourth item is the updated files count for market::FilesV2
+        /// The fifth item is the processed update blocks count for market::UpdatedFilesToProcess
+        /// The sixth item is the latest LastSpowerUpdateBlock value
+        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32, u32, BlockNumber),
     }
 );

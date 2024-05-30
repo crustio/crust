@@ -2,9 +2,10 @@
 // This file is part of Crust.
 
 use frame_support::traits::{LockableCurrency, WithdrawReasons};
-use crate::{BlockNumber, EraIndex, ReportSlot, SworkerAnchor};
+use crate::{BlockNumber, EraIndex, MerkleRoot, ReportSlot, SworkerAnchor};
 use sp_runtime::{DispatchError, Perbill};
 use sp_std::vec::Vec;
+use sp_std::collections::btree_map::BTreeMap;
 
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
@@ -29,12 +30,18 @@ pub trait SworkerInterface<AccountId> {
 	fn get_owner(who: &AccountId) -> Option<AccountId>;
 	// Clear the designated processed work reports
 	fn clear_processed_work_reports(work_reports: &Vec<(SworkerAnchor, ReportSlot)>);
+	// Update illegal file replicas count
+	fn update_illegal_file_replicas_count(illegal_file_replicas_map: &BTreeMap<ReportSlot, u32>);
 }
 
 /// Means for interacting with a specialized version of the `market` trait.
 pub trait MarketInterface<AccountId, Balance> {
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;
+	// Update file spower in market::FilesV2
+	fn update_file_spower(file_new_spower_map: &BTreeMap<MerkleRoot, u64>);
+	// Clear the successfully processed files by blocks in market::UpdatedFilesToProcessed
+	fn clear_processed_files_by_blocks(updated_blocks: &Vec<BlockNumber>);
 }
 
 pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {

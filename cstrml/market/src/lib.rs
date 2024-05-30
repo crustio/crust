@@ -772,7 +772,7 @@ impl<T: Config> Module<T> {
             // --- Handle upsert replicas ---
             for file_replica in added_replicas.iter() {
 
-                let ReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, report_block, valid_at, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, valid_at, ..} = file_replica;
 
                 // 1. Check if file_info.file_size == reported_file_size or not
                 let is_valid_cid = Self::maybe_upsert_file_size(&mut file_info, &reporter, &cid, reported_file_size); 
@@ -792,7 +792,7 @@ impl<T: Config> Module<T> {
                 }
 
                 // 2. Add replica data to storage
-                let is_replica_added = Self::upsert_replica(&mut file_info, &reporter, &owner, &sworker_anchor, *report_block, *valid_at);
+                let is_replica_added = Self::upsert_replica(&mut file_info, &reporter, &owner, &sworker_anchor, *valid_at);
                 // If the replica is not added (due to exceed MAX_REPLICA, or same owner reported), just ignore this replica
                 if is_replica_added {
                     // Update related sworker's changed spower
@@ -808,7 +808,7 @@ impl<T: Config> Module<T> {
             // --- Handle delete replicas ---
             for file_replica in deleted_replicas.iter() {
 
-                let ReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, ..} = file_replica;
                 
                 let (is_replica_deleted, to_delete_spower) = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
                 if is_replica_deleted {
@@ -864,7 +864,6 @@ impl<T: Config> Module<T> {
                       who: &<T as system::Config>::AccountId,
                       owner: &<T as system::Config>::AccountId,
                       anchor: &SworkerAnchor,
-                      _report_block: BlockNumber,
                       valid_at: BlockNumber
                     ) -> bool {
 

@@ -1561,11 +1561,12 @@ decl_event!(
         QueueWorkReportSuccess(SworkerAnchor, AccountId, AccountId),
         /// Set the crust-spower service superior account.
         SetSpowerSuperiorSuccess(AccountId),
-        /// Sworker spower update success
         /// The first item is the account who update the spower.
         /// The second item is the current block number
-        /// The third item is the updated sworkers count
-        /// The fourth item is the processed report blocks count for market::UpdatedFilesToProcess
-        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32),
+        /// The third item is the updated sworkers count for sworker::WorkReports
+        /// The fourth item is the updated files count for market::FilesV2
+        /// The fifth item is the processed update blocks count for market::UpdatedFilesToProcess
+        /// The sixth item is the latest LastSpowerUpdateBlock value
+        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32, u32, BlockNumber),
     }
 );

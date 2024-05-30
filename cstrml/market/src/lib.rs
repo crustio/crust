@@ -101,8 +101,6 @@ pub struct Replica<AccountId> {
     // Is reported in the last check
     pub is_reported: bool,
     // Timestamp which the replica created
-    // None: means who += spower
-    // Some: means who += file_size
     pub created_at: Option<BlockNumber>
 }
 
@@ -122,12 +120,22 @@ type ReplicaToUpdateOf<T> = ReplicaToUpdate<<T as system::Config>::AccountId>;
 
 #[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct UpdatedFileInfo<AccountId: Ord> {
+pub struct UpdatedFileInfo<AccountId: Ord, Balance> {
     pub cid: MerkleRoot,
+    pub file_size: u64,
+    pub spower: u64,
+    pub expired_at: BlockNumber,
+    pub calculated_at: BlockNumber,
+    #[codec(compact)]
+    pub amount: Balance,
+    #[codec(compact)]
+    pub prepaid: Balance,
+    pub reported_replica_count: u32,
+    pub remaining_paid_count: u32,
     pub actual_added_replicas: Vec<ReplicaToUpdate<AccountId>>,
     pub actual_deleted_replicas: Vec<ReplicaToUpdate<AccountId>>,
 }
-type UpdatedFileInfoOf<T> = UpdatedFileInfo<<T as system::Config>::AccountId>;
+type UpdatedFileInfoOf<T> = UpdatedFileInfo<<T as system::Config>::AccountId, BalanceOf<T>>;
 
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
@@ -760,19 +768,16 @@ impl<T: Config> Module<T> {
 
                 let ReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
                 
-                let (is_replica_deleted, is_deleted_replicas_spower_counted) = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
+                let is_replica_deleted = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
                 if is_replica_deleted {
-                    is_replica_updated = true;
-                }
-                // If the deleted replicas's spower is not counted, just ignore this replica
-                if is_deleted_replicas_spower_counted {
                     actual_deleted_replicas.push(file_replica.clone());
+                    is_replica_updated = true;
                 }
             }
 
             // Update the file info with all the above changes in one DB write
             log!(info, "file_info: {:?}", file_info);
-            <FilesV2<T>>::insert(cid.clone(), file_info);
+            <FilesV2<T>>::insert(cid.clone(), file_info.clone());
             changed_files_count += 1;
 
             // Update the UpdatedFilesToProcess storage item
@@ -781,6 +786,14 @@ impl<T: Config> Module<T> {
                 <UpdatedFilesToProcess<T>>::mutate(curr_bn, |maybe_updated_files| {
                     let updated_file_info = UpdatedFileInfo{
                                 cid,
+                                file_size: file_info.file_size,
+                                spower: file_info.spower,
+                                expired_at: file_info.expired_at,
+                                calculated_at: file_info.calculated_at,
+                                amount: file_info.amount,
+                                prepaid: file_info.prepaid,
+                                reported_replica_count: file_info.reported_replica_count,
+                                remaining_paid_count: file_info.remaining_paid_count,
                                 actual_added_replicas,
                                 actual_deleted_replicas
                             };
@@ -836,11 +849,12 @@ impl<T: Config> Module<T> {
                       who: &<T as system::Config>::AccountId,
                       owner: &<T as system::Config>::AccountId,
                       anchor: &SworkerAnchor,
-                      report_block: BlockNumber,
+                      _report_block: BlockNumber,
                       valid_at: BlockNumber
                     ) -> bool {
 
         let mut is_replica_added = false;
+        let curr_bn = Self::get_current_block_number();
         // 1. Check if the length of the groups exceed MAX_REPLICAS or not
         if file_info.replicas.len() < MAX_REPLICAS {
             // 2. Check if the file is stored by other members
@@ -850,8 +864,7 @@ impl<T: Config> Module<T> {
                     valid_at,
                     anchor: anchor.clone(),
                     is_reported: true,
-                    // set created_at to some
-                    created_at: Some(valid_at)
+                    created_at: Some(curr_bn) // The created_at is the current block
                 };
                 file_info.replicas.insert(owner.clone(), new_replica);
                 file_info.reported_replica_count += 1;
@@ -871,8 +884,8 @@ impl<T: Config> Module<T> {
 
         // 3. The first join the replicas and file become live(expired_at > calculated_at)
         if file_info.expired_at == 0 {
-            file_info.calculated_at = report_block;
-            file_info.expired_at = report_block + T::FileDuration::get();
+            file_info.calculated_at = curr_bn;
+            file_info.expired_at = curr_bn + T::FileDuration::get();
         }
 
         is_replica_added
@@ -881,23 +894,14 @@ impl<T: Config> Module<T> {
     fn delete_replica(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>,
                       who: &<T as system::Config>::AccountId,
                       owner: &<T as system::Config>::AccountId,
-                      anchor: &SworkerAnchor) -> (bool, bool) {
+                      anchor: &SworkerAnchor) -> bool {
         
         let mut is_replica_deleted: bool = false;
-        let mut is_deleted_replicas_spower_counted: bool = false;
 
         // 1. Delete replica from file_info
         let maybe_replica = file_info.replicas.get(owner);
         if let Some(replica) = maybe_replica {
             if replica.who == *who {
-                // If this is the same sworker_anchor, we need to substrate its spower
-                // But if this is not the same sworker_anchor, it means the sworker has re-registered, 
-                // which indicates the original sworker_anchor's spower has been removed, 
-                // the new sworker_anchor's spower doesn't have this file's spower counted yet
-                if replica.anchor == *anchor {
-                    is_deleted_replicas_spower_counted = true;
-                }
-
                 // Don't need to check the replica.is_reported here, because we don't use the calculate_rewards->update_replicas right now
                 file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
                 file_info.replicas.remove(owner);
@@ -905,7 +909,7 @@ impl<T: Config> Module<T> {
             }
         }
 
-        (is_replica_deleted, is_deleted_replicas_spower_counted)
+        is_replica_deleted
     }
 
     // /// TODO: Remove this a while later
@@ -1255,63 +1259,63 @@ impl<T: Config> Module<T> {
         }
     }
 
-    fn update_replicas_spower(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, curr_bn: Option<BlockNumber>) -> u64 {
-        let new_spower = Self::calculate_spower(file_info.file_size, file_info.reported_replica_count);
-        let prev_spower = file_info.spower;
-        let mut replicas_count = 0;
-        for (_onwer, ref mut replica) in &mut file_info.replicas {
-            // already begin to use spower
-            if replica.created_at.is_none() {
-                replicas_count += 1;
-                T::SworkerInterface::update_spower(&replica.anchor, prev_spower, new_spower);
-            } else {
-                if let Some(curr_bn) = curr_bn {
-                    // Make it become valid
-                    if let Some(created_at) = replica.created_at {
-                        if created_at + Self::spower_ready_period() <= curr_bn {
-                            replicas_count += 1;
-                            T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
-                            replica.created_at = None;
-                        }
-                    }
-                } else {
-                    // File is to close
-                    replicas_count += 1;
-                    T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
-                }
-            }
-        }
-        file_info.spower = new_spower;
-        replicas_count
-    }
+    // fn update_replicas_spower(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, curr_bn: Option<BlockNumber>) -> u64 {
+    //     let new_spower = Self::calculate_spower(file_info.file_size, file_info.reported_replica_count);
+    //     let prev_spower = file_info.spower;
+    //     let mut replicas_count = 0;
+    //     for (_onwer, ref mut replica) in &mut file_info.replicas {
+    //         // already begin to use spower
+    //         if replica.created_at.is_none() {
+    //             replicas_count += 1;
+    //             T::SworkerInterface::update_spower(&replica.anchor, prev_spower, new_spower);
+    //         } else {
+    //             if let Some(curr_bn) = curr_bn {
+    //                 // Make it become valid
+    //                 if let Some(created_at) = replica.created_at {
+    //                     if created_at + Self::spower_ready_period() <= curr_bn {
+    //                         replicas_count += 1;
+    //                         T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+    //                         replica.created_at = None;
+    //                     }
+    //                 }
+    //             } else {
+    //                 // File is to close
+    //                 replicas_count += 1;
+    //                 T::SworkerInterface::update_spower(&replica.anchor, file_info.file_size, new_spower);
+    //             }
+    //         }
+    //     }
+    //     file_info.spower = new_spower;
+    //     replicas_count
+    // }
 
-    pub fn calculate_spower(file_size: u64, reported_replica_count: u32) -> u64 {
-        let (integer, numerator, denominator): (u64, u64, u64) = match reported_replica_count {
-            0 => (0, 0, 1),
-            1..=8 => (1, 1, 20),
-            9..=16 => (1, 1, 5),
-            17..=24 => (1, 1, 2),
-            25..=32 => (2, 0, 1),
-            33..=40 => (2, 3, 5),
-            41..=48 => (3, 3, 10),
-            49..=55 => (4, 0, 1),
-            56..=65 => (5, 0, 1),
-            66..=74 => (6, 0, 1),
-            75..=83 => (7, 0, 1),
-            84..=92 => (8, 0, 1),
-            93..=100 => (8, 1, 2),
-            101..=115 => (8, 4, 5),
-            116..=127 => (9, 0, 1),
-            128..=142 => (9, 1, 5),
-            143..=157 => (9, 2, 5),
-            158..=167 => (9, 3, 5),
-            168..=182 => (9, 4, 5),
-            183..=200 => (10, 0, 1),
-            _ => (10, 0, 1), // larger than 200 => 200
-        };
+    // pub fn calculate_spower(file_size: u64, reported_replica_count: u32) -> u64 {
+    //     let (integer, numerator, denominator): (u64, u64, u64) = match reported_replica_count {
+    //         0 => (0, 0, 1),
+    //         1..=8 => (1, 1, 20),
+    //         9..=16 => (1, 1, 5),
+    //         17..=24 => (1, 1, 2),
+    //         25..=32 => (2, 0, 1),
+    //         33..=40 => (2, 3, 5),
+    //         41..=48 => (3, 3, 10),
+    //         49..=55 => (4, 0, 1),
+    //         56..=65 => (5, 0, 1),
+    //         66..=74 => (6, 0, 1),
+    //         75..=83 => (7, 0, 1),
+    //         84..=92 => (8, 0, 1),
+    //         93..=100 => (8, 1, 2),
+    //         101..=115 => (8, 4, 5),
+    //         116..=127 => (9, 0, 1),
+    //         128..=142 => (9, 1, 5),
+    //         143..=157 => (9, 2, 5),
+    //         158..=167 => (9, 3, 5),
+    //         168..=182 => (9, 4, 5),
+    //         183..=200 => (10, 0, 1),
+    //         _ => (10, 0, 1), // larger than 200 => 200
+    //     };
 
-        integer * file_size + file_size / denominator * numerator
-    }
+    //     integer * file_size + file_size / denominator * numerator
+    // }
 }
 
 decl_event!(

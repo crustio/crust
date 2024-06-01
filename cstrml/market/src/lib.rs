@@ -120,22 +120,12 @@ type ReplicaToUpdateOf<T> = ReplicaToUpdate<<T as system::Config>::AccountId>;
 
 #[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct UpdatedFileInfo<AccountId: Ord, Balance> {
+pub struct UpdatedFileInfo<AccountId: Ord> {
     pub cid: MerkleRoot,
-    pub file_size: u64,
-    pub spower: u64,
-    pub expired_at: BlockNumber,
-    pub calculated_at: BlockNumber,
-    #[codec(compact)]
-    pub amount: Balance,
-    #[codec(compact)]
-    pub prepaid: Balance,
-    pub reported_replica_count: u32,
-    pub remaining_paid_count: u32,
     pub actual_added_replicas: Vec<ReplicaToUpdate<AccountId>>,
     pub actual_deleted_replicas: Vec<ReplicaToUpdate<AccountId>>,
 }
-type UpdatedFileInfoOf<T> = UpdatedFileInfo<<T as system::Config>::AccountId, BalanceOf<T>>;
+type UpdatedFileInfoOf<T> = UpdatedFileInfo<<T as system::Config>::AccountId>;
 
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
@@ -184,8 +174,15 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
     }
     
     fn clear_processed_files_by_blocks(updated_blocks: &Vec<BlockNumber>) {
+        let mut max_updated_block: BlockNumber = 0;
         for block in updated_blocks {
             <UpdatedFilesToProcess<T>>::remove(block);
+            if block > &max_updated_block {
+                max_updated_block = *block;
+            }
+        }
+        if max_updated_block > 0 {
+            LastProcessedBlockUpdatedFiles::put(max_updated_block);
         }
     }
 }
@@ -300,6 +297,9 @@ decl_storage! {
         /// After the spower has been updated on chain, the related data will be removed from this storage
         pub UpdatedFilesToProcess get(fn updated_files_to_process): 
         map hasher(twox_64_concat) BlockNumber => Option<Vec<UpdatedFileInfoOf<T>>>;
+
+        /// The last processed block for the UpdatedFilesToProcess data, which is used by the crust-spower service for fresh new start
+        pub LastProcessedBlockUpdatedFiles get (fn last_processed_block_updated_files): BlockNumber = 0;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -489,14 +489,17 @@ decl_module! {
         /// Update file replicas from crust-spower offchain service
         /// Emits `ReplicasUpdateSuccess` event if the call is success
         /// # params
-        ///  - fileInfosMap: file replicas info map with the data structure as belowed:
-        ///     Map<(CID, file_size, Vec<(reporter, owner, sworker_anchor, report_slot, block_number, valid_at, is_added))>>
+        ///  - file_infos_Map: file replicas info map with the data structure as belowed:
+        ///     Map<(CID, file_size, Vec<(reporter, owner, sworker_anchor, report_slot, report_block, valid_at, is_added))>>
         ///     The key is the file CID, and the value is a vector of file replicas info.
+        ///     PS: We're not using the ReplicaToUpdate type in the argument directly, because this would fail traditional apps
+        ///         which would need to decode extrinsics, which will then error out with 'Unable to decode on ReplicaToUpdate'.
+        ///         So we directly use the raw types and tuple here as the argument
         #[weight = T::WeightInfo::update_replicas()]
         pub fn update_replicas(
             origin,
-            file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>,
-            work_reports: Vec<(SworkerAnchor, ReportSlot)>
+            file_infos_map: Vec<(MerkleRoot, u64, Vec<(T::AccountId, T::AccountId, SworkerAnchor, ReportSlot, BlockNumber, BlockNumber, bool)>)>,
+            last_processed_block_wrs: BlockNumber
         ) -> DispatchResult {
             let caller = ensure_signed(origin)?;
             let maybe_superior = Self::spower_superior();
@@ -507,17 +510,40 @@ decl_module! {
             ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
 
             // 3. Internal update replicas
-            let (changed_files_count, illegal_file_replicas_map) = Self::internal_update_replicas(file_infos_map);
+            let mut file_infos_map_ex: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)> = vec![];
+            for (cid, file_size, replicas) in file_infos_map {
+                let mut replica_list: Vec<ReplicaToUpdateOf<T>> = vec![];
+                for (reporter, owner, sworker_anchor, report_slot, report_block, valid_at, is_added) in replicas {
+                    let replica_to_update = ReplicaToUpdate {
+                        reporter: reporter,
+                        owner: owner,
+                        sworker_anchor: sworker_anchor,
+                        report_slot: report_slot,
+                        report_block: report_block,
+                        valid_at: valid_at,
+                        is_added: is_added
+                    };
+                    replica_list.push(replica_to_update);
+                }
+                file_infos_map_ex.push((cid, file_size, replica_list));
+            } 
+            let (changed_files_count, illegal_file_replicas_map) = Self::internal_update_replicas(file_infos_map_ex);
 
-            // 4. Update success, clear the processed work reports
-            T::SworkerInterface::clear_processed_work_reports(&work_reports);
+            // 4. Update the last processed block of work reports in pallet_swork
+            T::SworkerInterface::update_last_processed_block_of_work_reports(last_processed_block_wrs);
 
-            // 5. Update illegal file replicas count
+            // 5. Update illegal file replicas count in pallet_swork
             T::SworkerInterface::update_illegal_file_replicas_count(&illegal_file_replicas_map);
 
-            // 6. Emit the event
+            // 6. Update the LastProcessedBlockUpdatedFiles field if this is the first time
+            if LastProcessedBlockUpdatedFiles::get() == 0 {
+                // The curr_bn is the first block need to be indexed, so the last indexed block is the curr_bn - 1
+                LastProcessedBlockUpdatedFiles::put(Self::get_current_block_number() - 1);
+            }
+
+            // 7. Emit the event
             let curr_bn = Self::get_current_block_number();
-            Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn, changed_files_count, work_reports.len() as u32)); 
+            Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn, changed_files_count, last_processed_block_wrs)); 
 
             // No charge fee?
             Ok(())
@@ -703,7 +729,6 @@ impl<T: Config> Module<T> {
     /// 
     pub fn internal_update_replicas(file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>) -> (u32,BTreeMap<ReportSlot, u32>)
     {
-        log!(info, "💸 file_infos_map: {:?}.", file_infos_map);
         let mut changed_files_count = 0;
         let mut illegal_file_replicas_map: BTreeMap<ReportSlot, u32> = BTreeMap::new();
         'file_loop: for (cid, reported_file_size, file_replicas) in file_infos_map {
@@ -722,10 +747,6 @@ impl<T: Config> Module<T> {
             // Sort each array by report_block
             added_replicas.sort_by(|a, b| a.report_block.cmp(&b.report_block));
             deleted_replicas.sort_by(|a, b| a.report_block.cmp(&b.report_block));
-
-            // Print the results for debug purpose
-            log!(info, "Added Replicas: {:?}", added_replicas);
-            log!(info, "Deleted Replicas: {:?}", deleted_replicas);
 
             // Get the file_info object from storage for 1 time db read
             let maybe_file_info = Self::filesv2(&cid);
@@ -798,14 +819,6 @@ impl<T: Config> Module<T> {
                 <UpdatedFilesToProcess<T>>::mutate(curr_bn, |maybe_updated_files| {
                     let updated_file_info = UpdatedFileInfo{
                                 cid,
-                                file_size: file_info.file_size,
-                                spower: file_info.spower,
-                                expired_at: file_info.expired_at,
-                                calculated_at: file_info.calculated_at,
-                                amount: file_info.amount,
-                                prepaid: file_info.prepaid,
-                                reported_replica_count: file_info.reported_replica_count,
-                                remaining_paid_count: file_info.remaining_paid_count,
                                 actual_added_replicas,
                                 actual_deleted_replicas
                             };
@@ -1366,7 +1379,7 @@ decl_event!(
         /// The first item is the account who update the replicas.
         /// The second item is the current block number
         /// The third item is the changed files count
-        /// The fourth item is the processed work reports count for swork::WorkReportsToProcess
-        UpdateReplicasSuccess(AccountId, BlockNumber, u32, u32),
+        /// The fourth item is the last processed block of work reports
+        UpdateReplicasSuccess(AccountId, BlockNumber, u32, BlockNumber),
     }
 );

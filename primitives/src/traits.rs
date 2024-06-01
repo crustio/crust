@@ -28,8 +28,8 @@ pub trait SworkerInterface<AccountId> {
 	fn get_added_files_count_and_clear_record() -> u32;
 	// Get owner of this member
 	fn get_owner(who: &AccountId) -> Option<AccountId>;
-	// Clear the designated processed work reports
-	fn clear_processed_work_reports(work_reports: &Vec<(SworkerAnchor, ReportSlot)>);
+	// Update the last processed block of work reports
+	fn update_last_processed_block_of_work_reports(last_processed_block: BlockNumber);
 	// Update illegal file replicas count
 	fn update_illegal_file_replicas_count(illegal_file_replicas_map: &BTreeMap<ReportSlot, u32>);
 }

@@ -127,15 +127,6 @@ pub struct RegisterPayload<Public, AccountId> {
     public: Public
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct WorkReportMetadata<AccountId> {
-    pub report_block: BlockNumber,
-    pub extrinsic_index: u32,
-    pub reporter: AccountId,
-    pub owner: AccountId
-}
-
 /// An event handler for reporting works
 pub trait Works<AccountId> {
     fn report_works(workload_map: BTreeMap<AccountId, u128>, total_workload: u128) -> Weight;
@@ -189,11 +180,9 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
         Self::identities(who).unwrap_or_default().group
     }
 
-    // Clear the designated processed work reports    
-    fn clear_processed_work_reports(work_reports: &Vec<(SworkerAnchor, ReportSlot)>) {
-        for (anchor, slot) in work_reports {
-            <WorkReportsToProcess<T>>::remove(&anchor, slot);
-        }
+    // Update the last processed block of work reports 
+    fn update_last_processed_block_of_work_reports(last_processed_block: BlockNumber) {
+        LastProcessedBlockWorkReports::put(last_processed_block);
     }
     
     // Update illegal file replicas count
@@ -268,9 +257,8 @@ decl_storage! {
         pub WorkReports get(fn work_reports):
             map hasher(twox_64_concat) SworkerAnchor => Option<WorkReport>;
 
-        /// Work reports to process queue, which will be processed by the offchain Crust-Spower service
-        pub WorkReportsToProcess get(fn work_reports_to_process):
-            double_map hasher(twox_64_concat) SworkerAnchor, hasher(twox_64_concat) ReportSlot => WorkReportMetadata<T::AccountId>;
+        /// The last procssed block for the WorkReportsToProcess data, which is used by the crust-spower service for fresh new start
+        pub LastProcessedBlockWorkReports get (fn last_processed_block_work_reports): BlockNumber = 0;
 
         /// The crust-spower service account
         pub SpowerSuperior get(fn spower_superior): Option<T::AccountId>;
@@ -754,21 +742,23 @@ decl_module! {
                 slot,
             );
 
-            // 12. Add to WorkReportsToProcess queue to be processed by the crust-spower off-chain service
+            // 12. Emit QueueWorkReportSuccess event to be processed by the crust-spower off-chain service
             let id = Self::identities(&reporter).unwrap_or_default();
             let owner = if let Some(group) = id.group { group.clone() } else { reporter.clone() };
-            let curr_bn = Self::get_current_block_number();
-            let extrinsic_index = <system::Module<T>>::extrinsic_index().unwrap();
-            let work_report_metadata = WorkReportMetadata {
-                report_block: curr_bn, 
-                extrinsic_index: extrinsic_index,
-                reporter: reporter.clone(),
-                owner: owner.clone()
-            };
-            <WorkReportsToProcess<T>>::insert(&anchor, slot, work_report_metadata);
+            if added_files.len() > 0 || deleted_files.len() > 0 {                
+                let curr_bn = Self::get_current_block_number();
 
+                // Update the LastProcessedBlockWorkReports field if this is the first time
+                if LastProcessedBlockWorkReports::get() == 0 {
+                    // The curr_bn is the first block need to be indexed, so the last indexed block is the curr_bn - 1
+                    LastProcessedBlockWorkReports::put(curr_bn - 1);
+                }
+
+                // Emit the QueueWorkReportSuccess event
+                Self::deposit_event(RawEvent::QueueWorkReportSuccess(anchor, reporter.clone(), owner.clone()));
+            }
+            
             // 13. Emit work report event   
-            Self::deposit_event(RawEvent::QueueWorkReportSuccess(<system::Module<T>>::block_number(), extrinsic_index, reporter.clone(), owner.clone()));
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
             // 14. Try to free count limitation
@@ -1576,11 +1566,10 @@ decl_event!(
         /// Remove the expired code success
         RemoveCodeSuccess(SworkerCode),
         /// Work report has been added to the WorkReportsToProcess queue success
-        /// The first item is the report block
-        /// The second item is the extrinsic index
-        /// The third item is the account who send the work report
-        /// The fourth item is the owner account
-        QueueWorkReportSuccess(BlockNumber, u32, AccountId, AccountId),
+        /// The first item is the sworker anchor
+        /// The second item is the account who send the work report
+        /// The third item is the owner account
+        QueueWorkReportSuccess(SworkerAnchor, AccountId, AccountId),
         /// Set the crust-spower service superior account.
         SetSpowerSuperiorSuccess(AccountId),
         /// The first item is the account who update the spower.

@@ -40,7 +40,7 @@ pub trait MarketInterface<AccountId, Balance> {
 	fn withdraw_staking_pot() -> Balance;
 	// Update file spower in market::FilesV2
 	fn update_file_spower(file_new_spower_map: &BTreeMap<MerkleRoot, u64>);
-	// Clear the successfully processed files by blocks in market::UpdatedFilesToProcessed
+	// Clear the successfully processed files by blocks in market::UpdatedFilesToProcess
 	fn clear_processed_files_by_blocks(updated_blocks: &Vec<BlockNumber>);
 }
 

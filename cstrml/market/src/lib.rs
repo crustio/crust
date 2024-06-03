@@ -121,7 +121,6 @@ type ReplicaToUpdateOf<T> = ReplicaToUpdate<<T as system::Config>::AccountId>;
 #[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct UpdatedFileInfo<AccountId: Ord> {
-    pub cid: MerkleRoot,
     pub actual_added_replicas: Vec<ReplicaToUpdate<AccountId>>,
     pub actual_deleted_replicas: Vec<ReplicaToUpdate<AccountId>>,
 }
@@ -295,8 +294,8 @@ decl_storage! {
         /// The files whose replicas data have been updated, which would be later processed by the crust-spower service
         /// to calculate the updated spower for sworkers
         /// After the spower has been updated on chain, the related data will be removed from this storage
-        pub UpdatedFilesToProcess get(fn updated_files_to_process): 
-        map hasher(twox_64_concat) BlockNumber => Option<Vec<UpdatedFileInfoOf<T>>>;
+        pub UpdatedFilesToProcess get(fn updated_files_to_process_v2):
+        map hasher(twox_64_concat) BlockNumber => BTreeMap<MerkleRoot, UpdatedFileInfoOf<T>>;
 
         /// The last processed block for the UpdatedFilesToProcess data, which is used by the crust-spower service for fresh new start
         pub LastProcessedBlockUpdatedFiles get (fn last_processed_block_updated_files): BlockNumber = 0;
@@ -809,30 +808,30 @@ impl<T: Config> Module<T> {
             }
 
             // Update the file info with all the above changes in one DB write
-            log!(info, "file_info: {:?}", file_info);
             <FilesV2<T>>::insert(cid.clone(), file_info.clone());
             changed_files_count += 1;
 
             // Update the UpdatedFilesToProcess storage item
             if is_replica_updated {
                 let curr_bn = Self::get_current_block_number();
-                <UpdatedFilesToProcess<T>>::mutate(curr_bn, |maybe_updated_files| {
-                    let updated_file_info = UpdatedFileInfo{
-                                cid,
+                let updated_file_info = UpdatedFileInfo{
                                 actual_added_replicas,
                                 actual_deleted_replicas
                             };
-                    match *maybe_updated_files {
-                        Some(ref mut updated_files) => {
-                            updated_files.push(updated_file_info);
-                        },
-                        None => {
-                            *maybe_updated_files = Some(vec![updated_file_info]);
-                        }
+
+                let mut updated_files_map = UpdatedFilesToProcess::<T>::get(curr_bn);
+                if updated_files_map.len() == 0 {
+                    updated_files_map.insert(cid, updated_file_info);
+                    UpdatedFilesToProcess::<T>::insert(curr_bn, updated_files_map);
+                } else {
+                    if let Some(existing_file_info) = updated_files_map.get_mut(&cid) {
+                        existing_file_info.actual_added_replicas.extend(updated_file_info.actual_added_replicas);
+                        existing_file_info.actual_deleted_replicas.extend(updated_file_info.actual_deleted_replicas);
+                    } else {
+                        updated_files_map.insert(cid, updated_file_info);
                     }
-                    
-                    log!(info, "Updated Files To Process {:?}", *maybe_updated_files);
-                });
+                    UpdatedFilesToProcess::<T>::insert(curr_bn, updated_files_map);
+                }
             }
         }
 

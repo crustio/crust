@@ -4,7 +4,6 @@
 use frame_support::traits::{LockableCurrency, WithdrawReasons};
 use crate::{BlockNumber, EraIndex, MerkleRoot, ReportSlot, SworkerAnchor};
 use sp_runtime::{DispatchError, Perbill};
-use sp_std::vec::Vec;
 use sp_std::collections::btree_map::BTreeMap;
 
 /// A currency whose accounts can have liquidity restrictions.
@@ -30,6 +29,8 @@ pub trait SworkerInterface<AccountId> {
 	fn get_owner(who: &AccountId) -> Option<AccountId>;
 	// Update the last processed block of work reports
 	fn update_last_processed_block_of_work_reports(last_processed_block: BlockNumber);
+	// Update changed spower of sworkers
+	fn update_sworkers_changed_spower(sworker_spower_changed_map: &BTreeMap<SworkerAnchor, i64>);
 	// Update illegal file replicas count
 	fn update_illegal_file_replicas_count(illegal_file_replicas_map: &BTreeMap<ReportSlot, u32>);
 }
@@ -38,10 +39,8 @@ pub trait SworkerInterface<AccountId> {
 pub trait MarketInterface<AccountId, Balance> {
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;
-	// Update file spower in market::FilesV2
-	fn update_file_spower(file_new_spower_map: &BTreeMap<MerkleRoot, u64>);
-	// Clear the successfully processed files by blocks in market::UpdatedFilesToProcess
-	fn clear_processed_files_by_blocks(updated_blocks: &Vec<BlockNumber>);
+	// Update files spower in market::FilesV2
+	fn update_files_spower(files_changed_map: &BTreeMap<MerkleRoot, (u64, BTreeMap<AccountId, (AccountId, SworkerAnchor, Option<BlockNumber>)>)>);
 }
 
 pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {

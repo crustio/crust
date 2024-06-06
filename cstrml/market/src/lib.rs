@@ -118,14 +118,6 @@ pub struct ReplicaToUpdate<AccountId> {
 }
 type ReplicaToUpdateOf<T> = ReplicaToUpdate<<T as system::Config>::AccountId>; 
 
-#[derive(Debug, PartialEq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct UpdatedFileInfo<AccountId: Ord> {
-    pub actual_added_replicas: Vec<ReplicaToUpdate<AccountId>>,
-    pub actual_deleted_replicas: Vec<ReplicaToUpdate<AccountId>>,
-}
-type UpdatedFileInfoOf<T> = UpdatedFileInfo<<T as system::Config>::AccountId>;
-
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::NegativeImbalance;
@@ -163,25 +155,28 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         staking_amount
     }
     
-    fn update_file_spower(file_new_spower_map: &BTreeMap<MerkleRoot, u64>) {
-        for (cid, new_spower) in file_new_spower_map {
+    fn update_files_spower(files_changed_map: &BTreeMap<MerkleRoot, (u64, BTreeMap<T::AccountId, (T::AccountId, SworkerAnchor, Option<BlockNumber>)>)>) {
+        for (cid, changed_file_info) in files_changed_map {
+            let (new_spower, changed_replicas) = changed_file_info;
             if let Some(mut file_info) = <FilesV2<T>>::get(&cid) {
+                // Update file spower
                 file_info.spower = *new_spower;
+
+                // Update the create_at
+                for (owner, changed_replica) in changed_replicas {
+                    let (who, anchor, created_at) = changed_replica;
+
+                    let maybe_replica = file_info.replicas.get_mut(owner);
+                    if let Some(mut replica) = maybe_replica {
+                        if replica.who == *who && replica.anchor == *anchor {
+                            replica.created_at = *created_at;
+                        }
+                    }
+                }
+
+                // Write back to storage
                 <FilesV2<T>>::insert(&cid, file_info);
             }
-        }
-    }
-    
-    fn clear_processed_files_by_blocks(updated_blocks: &Vec<BlockNumber>) {
-        let mut max_updated_block: BlockNumber = 0;
-        for block in updated_blocks {
-            <UpdatedFilesToProcess<T>>::remove(block);
-            if block > &max_updated_block {
-                max_updated_block = *block;
-            }
-        }
-        if max_updated_block > 0 {
-            LastProcessedBlockUpdatedFiles::put(max_updated_block);
         }
     }
 }
@@ -291,14 +286,8 @@ decl_storage! {
         /// The crust-spower service account
         pub SpowerSuperior get(fn spower_superior): Option<T::AccountId>;
 
-        /// The files whose replicas data have been updated, which would be later processed by the crust-spower service
-        /// to calculate the updated spower for sworkers
-        /// After the spower has been updated on chain, the related data will be removed from this storage
-        pub UpdatedFilesToProcess get(fn updated_files_to_process_v2):
-        map hasher(twox_64_concat) BlockNumber => BTreeMap<MerkleRoot, UpdatedFileInfoOf<T>>;
-
-        /// The last processed block for the UpdatedFilesToProcess data, which is used by the crust-spower service for fresh new start
-        pub LastProcessedBlockUpdatedFiles get (fn last_processed_block_updated_files): BlockNumber = 0;
+        /// The last replicas update block
+        pub LastReplicasUpdateBlock get (fn last_replicas_update_block): BlockNumber = 0;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -526,22 +515,22 @@ decl_module! {
                 }
                 file_infos_map_ex.push((cid, file_size, replica_list));
             } 
-            let (changed_files_count, illegal_file_replicas_map) = Self::internal_update_replicas(file_infos_map_ex);
+            let (changed_files_count, sworker_changed_spower_map, illegal_file_replicas_map) = Self::internal_update_replicas(file_infos_map_ex);
 
             // 4. Update the last processed block of work reports in pallet_swork
             T::SworkerInterface::update_last_processed_block_of_work_reports(last_processed_block_wrs);
 
+            // 5. Update the changed spower of sworkers
+            T::SworkerInterface::update_sworkers_changed_spower(&sworker_changed_spower_map);
+
             // 5. Update illegal file replicas count in pallet_swork
             T::SworkerInterface::update_illegal_file_replicas_count(&illegal_file_replicas_map);
 
-            // 6. Update the LastProcessedBlockUpdatedFiles field if this is the first time
-            if LastProcessedBlockUpdatedFiles::get() == 0 {
-                // The curr_bn is the first block need to be indexed, so the last indexed block is the curr_bn - 1
-                LastProcessedBlockUpdatedFiles::put(Self::get_current_block_number() - 1);
-            }
+            // 6. Update the LastReplicasUpdateBlock
+            let curr_bn = Self::get_current_block_number();
+            LastReplicasUpdateBlock::put(curr_bn);
 
             // 7. Emit the event
-            let curr_bn = Self::get_current_block_number();
             Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn, changed_files_count, last_processed_block_wrs)); 
 
             // No charge fee?
@@ -726,9 +715,12 @@ impl<T: Config> Module<T> {
     }
 
     /// 
-    pub fn internal_update_replicas(file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>) -> (u32,BTreeMap<ReportSlot, u32>)
+    pub fn internal_update_replicas(
+        file_infos_map: Vec<(MerkleRoot, u64, Vec<ReplicaToUpdateOf<T>>)>
+    ) -> (u32, BTreeMap<SworkerAnchor, i64>, BTreeMap<ReportSlot, u32>)
     {
         let mut changed_files_count = 0;
+        let mut sworker_changed_spower_map: BTreeMap<SworkerAnchor, i64> = BTreeMap::new(); 
         let mut illegal_file_replicas_map: BTreeMap<ReportSlot, u32> = BTreeMap::new();
         'file_loop: for (cid, reported_file_size, file_replicas) in file_infos_map {
 
@@ -755,18 +747,12 @@ impl<T: Config> Module<T> {
                 continue;
             }
             let mut file_info = maybe_file_info.unwrap();
-          
-
-            // Record actual_added_replicas and actual_deleted_replicas
-            let mut actual_added_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
-            let mut actual_deleted_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
-            let mut is_replica_updated: bool = false;
 
             // ---------------------------------------------------------
             // --- Handle upsert replicas ---
             for file_replica in added_replicas.iter() {
 
-                let ReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, valid_at, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, sworker_anchor, report_slot, report_block, valid_at, ..} = file_replica;
 
                 // 1. Check if file_info.file_size == reported_file_size or not
                 let is_valid_cid = Self::maybe_upsert_file_size(&mut file_info, &reporter, &cid, reported_file_size); 
@@ -786,11 +772,15 @@ impl<T: Config> Module<T> {
                 }
 
                 // 2. Add replica data to storage
-                let is_replica_added = Self::upsert_replica(&mut file_info, &reporter, &owner, &sworker_anchor, *valid_at);
+                let is_replica_added = Self::upsert_replica(&mut file_info, &reporter, &owner, &sworker_anchor, *report_block, *valid_at);
                 // If the replica is not added (due to exceed MAX_REPLICA, or same owner reported), just ignore this replica
                 if is_replica_added {
-                    actual_added_replicas.push(file_replica.clone());
-                    is_replica_updated = true;
+                    // Update related sworker's changed spower
+                    if let Some(changed_spower) = sworker_changed_spower_map.get_mut(sworker_anchor) {
+                        *changed_spower += file_info.file_size as i64;
+                    } else {
+                        sworker_changed_spower_map.insert(sworker_anchor.clone(), file_info.file_size as i64);
+                    }
                 }
             }
 
@@ -798,44 +788,25 @@ impl<T: Config> Module<T> {
             // --- Handle delete replicas ---
             for file_replica in deleted_replicas.iter() {
 
-                let ReplicaToUpdate { reporter, owner, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
                 
-                let is_replica_deleted = Self::delete_replica(&mut file_info,&reporter, owner);
+                let (is_replica_deleted, to_delete_spower) = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
                 if is_replica_deleted {
-                    actual_deleted_replicas.push(file_replica.clone());
-                    is_replica_updated = true;
+                    // Update replicated sworker's changed spower
+                    if let Some(changed_spower) = sworker_changed_spower_map.get_mut(sworker_anchor) {
+                        *changed_spower -= to_delete_spower as i64;
+                    } else {
+                        sworker_changed_spower_map.insert(sworker_anchor.clone(), 0-(to_delete_spower as i64));
+                    }
                 }
             }
 
             // Update the file info with all the above changes in one DB write
             <FilesV2<T>>::insert(cid.clone(), file_info.clone());
             changed_files_count += 1;
-
-            // Update the UpdatedFilesToProcess storage item
-            if is_replica_updated {
-                let curr_bn = Self::get_current_block_number();
-                let updated_file_info = UpdatedFileInfo{
-                                actual_added_replicas,
-                                actual_deleted_replicas
-                            };
-
-                let mut updated_files_map = UpdatedFilesToProcess::<T>::get(curr_bn);
-                if updated_files_map.len() == 0 {
-                    updated_files_map.insert(cid, updated_file_info);
-                    UpdatedFilesToProcess::<T>::insert(curr_bn, updated_files_map);
-                } else {
-                    if let Some(existing_file_info) = updated_files_map.get_mut(&cid) {
-                        existing_file_info.actual_added_replicas.extend(updated_file_info.actual_added_replicas);
-                        existing_file_info.actual_deleted_replicas.extend(updated_file_info.actual_deleted_replicas);
-                    } else {
-                        updated_files_map.insert(cid, updated_file_info);
-                    }
-                    UpdatedFilesToProcess::<T>::insert(curr_bn, updated_files_map);
-                }
-            }
         }
 
-        (changed_files_count, illegal_file_replicas_map)
+        (changed_files_count, sworker_changed_spower_map, illegal_file_replicas_map)
     }
 
     fn maybe_upsert_file_size(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>, 
@@ -873,6 +844,7 @@ impl<T: Config> Module<T> {
                       who: &<T as system::Config>::AccountId,
                       owner: &<T as system::Config>::AccountId,
                       anchor: &SworkerAnchor,
+                      report_block: BlockNumber,
                       valid_at: BlockNumber
                     ) -> bool {
 
@@ -887,7 +859,7 @@ impl<T: Config> Module<T> {
                     valid_at,
                     anchor: anchor.clone(),
                     is_reported: true,
-                    created_at: Some(curr_bn) // The created_at is the current block
+                    created_at: Some(report_block)  // Use report_block as the replica created_at block
                 };
                 file_info.replicas.insert(owner.clone(), new_replica);
                 file_info.reported_replica_count += 1;
@@ -916,14 +888,26 @@ impl<T: Config> Module<T> {
 
     fn delete_replica(file_info: &mut FileInfoV2<T::AccountId, BalanceOf<T>>,
                       who: &<T as system::Config>::AccountId,
-                      owner: &<T as system::Config>::AccountId) -> bool {
+                      owner: &<T as system::Config>::AccountId,
+                      anchor: &SworkerAnchor,
+                    ) -> (bool, u64) {
         
+        let mut spower: u64 = 0;
         let mut is_replica_deleted: bool = false;
 
         // 1. Delete replica from file_info
         let maybe_replica = file_info.replicas.get(owner);
         if let Some(replica) = maybe_replica {
             if replica.who == *who {
+                // Only decreate the spower if it's the same anchor, because for new anchor, the spower has been reset to 0 after re-register
+                if replica.anchor == *anchor {
+                    if replica.created_at.is_none() { 
+                        // It means the replica is already using the spower value, because created_at would be set to None when use the spower value
+                        spower = file_info.spower;
+                    } else { 
+                        spower = file_info.file_size; 
+                    };
+                }
                 // Don't need to check the replica.is_reported here, because we don't use the calculate_rewards->update_replicas right now
                 file_info.reported_replica_count = file_info.reported_replica_count.saturating_sub(1);
                 file_info.replicas.remove(owner);
@@ -931,7 +915,7 @@ impl<T: Config> Module<T> {
             }
         }
 
-        is_replica_deleted
+        (is_replica_deleted, spower)
     }
 
     // /// TODO: Remove this a while later
@@ -1001,6 +985,7 @@ impl<T: Config> Module<T> {
                 // Remove files
                 <FilesV2<T>>::remove(&cid);
                 FileKeysCount::mutate(|count| *count = count.saturating_sub(1));
+                Self::deposit_event(RawEvent::FileClosed(cid.clone()));
             };
         }
         Ok(())
@@ -1380,5 +1365,8 @@ decl_event!(
         /// The third item is the changed files count
         /// The fourth item is the last processed block of work reports
         UpdateReplicasSuccess(AccountId, BlockNumber, u32, BlockNumber),
+        /// A file is closed due to expired
+        /// The first item is the cid of the file
+        FileClosed(MerkleRoot),
     }
 );

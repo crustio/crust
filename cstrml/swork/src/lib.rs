@@ -794,16 +794,16 @@ decl_module! {
 
         /// Update sworker spower, which is called by Crust-Spower service
         /// Arguments:
-        /// sworker_changed_spower_map: 
-        ///     The key is sworker anchor, the value is changed spower
-        /// files_changed_map:
-        ///     The map contains the files changed spower data, the data structure is
-        ///     Map<cid, (file_size, Map<owner, (who, anchor, created_at)>)>
-        #[weight = T::WeightInfo::update_spower(sworker_changed_spower_map.len() as u32, files_changed_map.len() as u32)]
+        /// changed_spowers: 
+        ///     Vec<(SworkerAnchor, changed_spower_value)>
+        /// changed_files:
+        ///     Specify the files changed spower data, the data structure is
+        ///     Vec<(cid, spower, Vec<(owner, who, anchor, created_at)>)>
+        #[weight = T::WeightInfo::update_spower(changed_spowers.len() as u32, changed_files.len() as u32)]
         pub fn update_spower(
             origin,
-            sworker_changed_spower_map: BTreeMap<SworkerAnchor, i64>,
-            files_changed_map: BTreeMap<MerkleRoot, (u64, BTreeMap<T::AccountId, (T::AccountId, SworkerAnchor, Option<BlockNumber>)>)>,
+            changed_spowers: Vec<(SworkerAnchor, i64)>,
+            changed_files: Vec<(MerkleRoot, u64, Vec<(T::AccountId, T::AccountId, SworkerAnchor, Option<BlockNumber>)>)>,
         ) -> DispatchResult {
             let caller = ensure_signed(origin)?;
             let maybe_superior = Self::spower_superior();
@@ -813,7 +813,7 @@ decl_module! {
             ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
 
             // 2. Update sworker spower
-            for (anchor, changed_spower) in sworker_changed_spower_map.iter() {
+            for (anchor, changed_spower) in changed_spowers.iter() {
                 WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
                     Some(WorkReport { ref mut spower, .. }) => {
                         if *changed_spower >= 0 {
@@ -827,7 +827,7 @@ decl_module! {
             }
 
             // 3. Update the file new spower in pallet_market
-            T::MarketInterface::update_files_spower(&files_changed_map);
+            T::MarketInterface::update_files_spower(&changed_files);
 
             // 4. Set the LastSpowerUpdateBlock value, which is the latest block in updated_blocks
             LastSpowerUpdateBlock::put(Self::get_current_block_number());
@@ -835,8 +835,8 @@ decl_module! {
             // 5. Emit the event
             Self::deposit_event(RawEvent::UpdateSpowerSuccess(caller, 
                 <system::Module<T>>::block_number(), 
-                sworker_changed_spower_map.len() as u32, 
-                files_changed_map.len() as u32)); 
+                changed_spowers.len() as u32, 
+                changed_files.len() as u32)); 
 
             // No charge fee?
             Ok(())

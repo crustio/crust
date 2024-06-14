@@ -155,17 +155,14 @@ impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> 
         staking_amount
     }
     
-    fn update_files_spower(files_changed_map: &BTreeMap<MerkleRoot, (u64, BTreeMap<T::AccountId, (T::AccountId, SworkerAnchor, Option<BlockNumber>)>)>) {
-        for (cid, changed_file_info) in files_changed_map {
-            let (new_spower, changed_replicas) = changed_file_info;
+    fn update_files_spower(changed_files: &Vec<(MerkleRoot, u64, Vec<(T::AccountId, T::AccountId, SworkerAnchor, Option<BlockNumber>)>)>) {
+        for (cid, new_spower, changed_replicas) in changed_files {
             if let Some(mut file_info) = <FilesV2<T>>::get(&cid) {
                 // Update file spower
                 file_info.spower = *new_spower;
 
                 // Update the create_at
-                for (owner, changed_replica) in changed_replicas {
-                    let (who, anchor, created_at) = changed_replica;
-
+                for (owner, who, anchor, created_at) in changed_replicas {
                     let maybe_replica = file_info.replicas.get_mut(owner);
                     if let Some(mut replica) = maybe_replica {
                         if replica.who == *who && replica.anchor == *anchor {
@@ -917,57 +914,6 @@ impl<T: Config> Module<T> {
 
         (is_replica_deleted, spower)
     }
-
-    // /// TODO: Remove this a while later
-    // /// This function will update replicas
-    // /// and (maybe) insert file's status(delete file)
-    // /// input:
-    // ///   - cid: MerkleRoot
-    // ///   - curr_bn: BlockNumber
-    // pub fn update_replicas(cid: &MerkleRoot, curr_bn: BlockNumber)
-    // {
-    //     // 1. File must exist
-    //     if Self::filesv2(cid).is_none() { return; }
-        
-    //     // 2. File must already started
-    //     let mut file_info = Self::filesv2(cid).unwrap_or_default();
-        
-    //     // 3. File already expired
-    //     if file_info.expired_at <= file_info.calculated_at { return; }
-
-    //     let calculated_block = curr_bn.min(file_info.expired_at);
-    //     let mut new_replicas = BTreeMap::<T::AccountId, Replica<T::AccountId>>::new();
-    //     let mut new_reported_replica_count = 0u32;
-
-    //     // 4. Loop replicas and update reported replica count
-    //     for (owner, replica) in file_info.replicas.iter() {
-    //         if !T::SworkerInterface::is_wr_reported(&replica.anchor, curr_bn) {
-    //             let mut invalid_replica = replica.clone();
-    //             // update the valid_at to the curr_bn
-    //             invalid_replica.valid_at = curr_bn;
-    //             invalid_replica.is_reported = false;
-    //             new_replicas.insert(owner.clone(), invalid_replica);
-    //         } else {
-    //             let mut valid_replica = replica.clone();
-    //             valid_replica.is_reported = true;
-    //             new_replicas.insert(owner.clone(), valid_replica);
-    //             new_reported_replica_count += 1;
-    //         }
-    //     }
-
-    //     // 5 Update file info
-    //     file_info.reported_replica_count = new_reported_replica_count;
-    //     file_info.replicas = new_replicas;
-
-    //     // 6. Update spower info
-    //     // TODO: add this weight into place_storage_order
-    //     let _ = Self::update_replicas_spower(&mut file_info, Some(curr_bn));
-
-    //     // 6. File status might become ready to be closed if calculated_block == expired_at
-    //     file_info.calculated_at = calculated_block;
-    //     // 7. Update files
-    //     <FilesV2<T>>::insert(cid, file_info);
-    // }
 
     /// Close file, maybe move into trash
     fn try_to_close_file(cid: &MerkleRoot, curr_bn: BlockNumber) -> DispatchResult {

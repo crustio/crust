@@ -5,6 +5,7 @@ use frame_support::traits::{LockableCurrency, WithdrawReasons};
 use crate::{BlockNumber, EraIndex, MerkleRoot, ReportSlot, SworkerAnchor};
 use sp_runtime::{DispatchError, Perbill};
 use sp_std::collections::btree_map::BTreeMap;
+use sp_std::vec::Vec;
 
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
@@ -40,7 +41,7 @@ pub trait MarketInterface<AccountId, Balance> {
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;
 	// Update files spower in market::FilesV2
-	fn update_files_spower(files_changed_map: &BTreeMap<MerkleRoot, (u64, BTreeMap<AccountId, (AccountId, SworkerAnchor, Option<BlockNumber>)>)>);
+	fn update_files_spower(changed_files: &Vec<(MerkleRoot, u64, Vec<(AccountId, AccountId, SworkerAnchor, Option<BlockNumber>)>)>);
 }
 
 pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {

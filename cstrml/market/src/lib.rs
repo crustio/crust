@@ -9,13 +9,13 @@ use core::option::Option::None;
 use codec::{Decode, Encode};
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
-    dispatch::DispatchResult, ensure,
+    dispatch::{DispatchResult, DispatchResultWithPostInfo}, ensure,
     traits::{
         Currency, ReservableCurrency, Get, LockableCurrency, ExistenceRequirement,
         ExistenceRequirement::{AllowDeath, KeepAlive},
         WithdrawReasons, Imbalance
     },
-    weights::Weight
+    weights::{Weight, Pays}
 };
 use sp_std::{prelude::*, convert::TryInto, collections::btree_set::BTreeSet, collections::btree_map::BTreeMap};
 use frame_system::{self as system, ensure_signed, ensure_root};
@@ -485,7 +485,7 @@ decl_module! {
             origin,
             file_infos_map: Vec<(MerkleRoot, u64, Vec<(T::AccountId, T::AccountId, SworkerAnchor, ReportSlot, BlockNumber, BlockNumber, bool)>)>,
             last_processed_block_wrs: BlockNumber
-        ) -> DispatchResult {
+        ) -> DispatchResultWithPostInfo {
             let caller = ensure_signed(origin)?;
             let maybe_superior = Self::spower_superior();
 
@@ -530,8 +530,8 @@ decl_module! {
             // 7. Emit the event
             Self::deposit_event(RawEvent::UpdateReplicasSuccess(caller, curr_bn, changed_files_count, last_processed_block_wrs)); 
 
-            // No charge fee?
-            Ok(())
+            // Do not charge fee for management extrinsic
+            Ok(Pays::No.into())
         }
 
         /// Calculate the reward for a file
@@ -741,6 +741,18 @@ impl<T: Config> Module<T> {
             if maybe_file_info.is_none() {
                 // If the cid doesn't exist in the market, either this is a non-exist cid, or has been removed by illegal file size, or has been liquidated and closed
                 // Since we haven't changed the sworker's spower during the swork.report_works call, so we can just ignore all replicas here without any side-effects
+
+                // Invalid cid's replicas count should be subtracted from Swork::Added_Files_Count
+                if added_replicas.len() > 0 {
+                    let ReplicaToUpdate { report_slot, ..} = added_replicas[0];
+                    if let Some(count) = illegal_file_replicas_map.get_mut(&report_slot) {
+                        *count += added_replicas.len() as u32;
+                    } else {
+                        illegal_file_replicas_map.insert(report_slot, added_replicas.len() as u32);
+                    }
+                }
+                
+                // Just continue to next cid
                 continue;
             }
             let mut file_info = maybe_file_info.unwrap();
@@ -841,7 +853,7 @@ impl<T: Config> Module<T> {
                       who: &<T as system::Config>::AccountId,
                       owner: &<T as system::Config>::AccountId,
                       anchor: &SworkerAnchor,
-                      report_block: BlockNumber,
+                      _report_block: BlockNumber,
                       valid_at: BlockNumber
                     ) -> bool {
 
@@ -856,7 +868,7 @@ impl<T: Config> Module<T> {
                     valid_at,
                     anchor: anchor.clone(),
                     is_reported: true,
-                    created_at: Some(report_block)  // Use report_block as the replica created_at block
+                    created_at: Some(valid_at) 
                 };
                 file_info.replicas.insert(owner.clone(), new_replica);
                 file_info.reported_replica_count += 1;
@@ -980,8 +992,10 @@ impl<T: Config> Module<T> {
                 let reward_liquidator_amount = file_info.amount;
                 file_info.amount = Zero::zero();
                 T::Currency::transfer(&Self::storage_pot(), liquidator, reward_liquidator_amount, KeepAlive)?;
-                <FilesV2<T>>::insert(cid, file_info);
             }
+
+            file_info.calculated_at = curr_bn.min(file_info.expired_at);
+            <FilesV2<T>>::insert(cid, file_info);
         }
         Ok(())
     }
@@ -1243,31 +1257,29 @@ impl<T: Config> Module<T> {
     }
 
     pub fn calculate_spower(file_size: u64, reported_replica_count: u32) -> u64 {
-        let (integer, numerator, denominator): (u64, u64, u64) = match reported_replica_count {
-            0 => (0, 0, 1),
-            1..=8 => (1, 1, 20),
-            9..=16 => (1, 1, 5),
-            17..=24 => (1, 1, 2),
-            25..=32 => (2, 0, 1),
-            33..=40 => (2, 3, 5),
-            41..=48 => (3, 3, 10),
-            49..=55 => (4, 0, 1),
-            56..=65 => (5, 0, 1),
-            66..=74 => (6, 0, 1),
-            75..=83 => (7, 0, 1),
-            84..=92 => (8, 0, 1),
-            93..=100 => (8, 1, 2),
-            101..=115 => (8, 4, 5),
-            116..=127 => (9, 0, 1),
-            128..=142 => (9, 1, 5),
-            143..=157 => (9, 2, 5),
-            158..=167 => (9, 3, 5),
-            168..=182 => (9, 4, 5),
-            183..=200 => (10, 0, 1),
-            _ => (10, 0, 1), // larger than 200 => 200
+        let (alpha, multiplier): (f64, u64) = match reported_replica_count {
+            0 => (0.0, 1),
+            1..=8 => (0.1, 10),
+            9..=16 => (1.0, 1),
+            17..=24 => (3.0, 1),
+            25..=32 => (7.0, 1),
+            33..=40 => (9.0, 1),
+            41..=48 => (14.0, 1),
+            49..=55 => (19.0, 1),
+            56..=65 => (49.0, 1),
+            66..=74 => (79.0, 1),
+            75..=83 => (99.0, 1),
+            84..=92 => (119.0, 1),
+            93..=100 => (149.0, 1),
+            101..=115 => (159.0, 1),
+            116..=127 => (169.0, 1),
+            128..=142 => (179.0, 1),
+            143..=157 => (189.0, 1),
+            158..=200 => (199.0, 1),
+            _ => (199.0, 1), // larger than 200 => 200
         };
 
-        integer * file_size + file_size / denominator * numerator
+        file_size + file_size * ((alpha * multiplier as f64) as u64) / multiplier
     }
 }
 

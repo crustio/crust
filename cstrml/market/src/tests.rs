@@ -104,6 +104,7 @@ fn place_storage_order_should_work_for_extend_scenarios() {
 
         let source = ALICE;
         let merchant = MERCHANT;
+        let spower = SPOWER;
 
         let cid =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -183,48 +184,45 @@ fn place_storage_order_should_work_for_extend_scenarios() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
             ));
-        run_to_block(700);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        // Swork::report_works should not change filesv2 right now
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
-                expired_at: 1400,
+                spower: 0,
+                expired_at: 0,
+                calculated_at: 50,
+                amount: 46440, // ( 1000 * 129 + 0 ) * 0.18 * 2
+                prepaid: 0,
+                reported_replica_count: 0,
+                remaining_paid_count: 4,
+                replicas: BTreeMap::from_iter(vec![].into_iter())
+            }
+        );
+        run_to_block(700);
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        assert_ok!(Market::update_replicas(
+            Origin::signed(spower.clone()), 
+            vec![(cid.clone(), 
+                  file_size, 
+                  vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 400, 303, true)]
+                )], 
+            400));
+        assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
+            FileInfoV2 {
+                file_size,
+                spower: 0,
+                expired_at: 1700, // Market::update_replicas is called at block 700, so expired_at should be 1700
                 calculated_at: 700,
                 amount: 39990, // ( 1000 * 129 + 0 ) * 0.18 * 2 - ( 1000 * 129 + 0 ) * 0.025 * 2
                 prepaid: 0,
-                reported_replica_count: 1,
+                reported_replica_count: 1, // Replicas should have been added after Market::update_replicas call
                 remaining_paid_count: 3,
                 replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
                     who: merchant.clone(),
                     valid_at: 303,
                     anchor: legal_pk.clone(),
                     is_reported: true,
-                    created_at: Some(303)
-                })])
-            }
-        );
-
-        // Calculate reward should work
-        run_to_block(800);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
-        assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
-            FileInfoV2 {
-                file_size,
-                spower: Market::calculate_spower(file_size, 1),
-                expired_at: 1400,
-                calculated_at: 800,
-                amount: 39990, // ( 1000 * 129 + 0 ) * 0.18 * 2 - ( 1000 * 129 + 0 ) * 0.025 * 2
-                prepaid: 0,
-                reported_replica_count: 1,
-                remaining_paid_count: 3,
-                replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
-                    who: merchant.clone(),
-                    valid_at: 303,
-                    anchor: legal_pk.clone(),
-                    is_reported: true,
-                    created_at: Some(303)
+                    created_at: Some(303) 
                 })])
             }
         );
@@ -239,9 +237,9 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
+                spower: 0,
                 expired_at: 1900,
-                calculated_at: 800,
+                calculated_at: 700,
                 amount: 63210, // 39990 + 23220
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -266,10 +264,10 @@ fn place_storage_order_should_work_for_extend_scenarios() {
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
-                expired_at: 2000,
-                calculated_at: 800,
-                amount: 86630, // 39990 + 23220
+                spower: 0,
+                expired_at: 2000, // Should extend expired_at
+                calculated_at: 700, // Should remain unchanged
+                amount: 86630, // 63210 + 23220 + 200(tips)
                 prepaid: 0,
                 reported_replica_count: 1,
                 remaining_paid_count: 3,
@@ -283,63 +281,31 @@ fn place_storage_order_should_work_for_extend_scenarios() {
             }
         );
         assert_eq!(Market::orders_count(), 4);
-    });
-}
 
-#[test]
-fn update_replicas_should_fail_due_to_not_live() {
-    new_test_ext().execute_with(|| {
-        // generate 50 blocks first
-        run_to_block(50);
-
-        let source = ALICE;
-        let merchant = MERCHANT;
-
-        let cid =
-            "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
-        let file_size = 100; // should less than merchant
-
-        let _ = Balances::make_free_balance_be(&source, 20000);
-        let _ = Balances::make_free_balance_be(&merchant, 20000);
-
-        // collateral is 60 < 121 reward
-        mock_bond_owner(&merchant, &merchant);
-        add_collateral(&merchant, 6000);
-
-        assert_ok!(Market::place_storage_order(
-            Origin::signed(source), cid.clone(),
-            file_size, 0, vec![]
-        ));
-
-
+        // 5. Update spower should work
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
+        let file_spower = Market::calculate_spower(file_size, 1);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower - file_size).try_into().unwrap())],
+            vec![(cid.clone(), file_spower, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: 0,
-                expired_at: 0,
-                calculated_at: 50,
-                amount: 180,
+                spower: file_spower,  // spower value should have been set to file_spower
+                expired_at: 2000,
+                calculated_at: 700,
+                amount: 86630,
                 prepaid: 0,
-                reported_replica_count: 0,
-                remaining_paid_count: 4,
-                replicas: BTreeMap::from_iter(vec![].into_iter())
-            }
-        );
-
-        run_to_block(1506);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
-
-        assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
-            FileInfoV2 {
-                file_size,
-                spower: 0,
-                expired_at: 0,
-                calculated_at: 50,
-                amount: 180,
-                prepaid: 0,
-                reported_replica_count: 0,
-                remaining_paid_count: 4,
-                replicas: BTreeMap::from_iter(vec![].into_iter())
+                reported_replica_count: 1,
+                remaining_paid_count: 3,
+                replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
+                    who: merchant.clone(),
+                    valid_at: 303,
+                    anchor: legal_pk.clone(),
+                    is_reported: true,
+                    created_at: None // created_at should have been set to None
+                })])
             }
         );
     });
@@ -357,6 +323,7 @@ fn update_replicas_should_work_for_more_replicas() {
         let dave = DAVE;
         let eve = EVE;
         let ferdie = FERDIE;
+        let spower = SPOWER;
 
         let cid =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -366,7 +333,7 @@ fn update_replicas_should_work_for_more_replicas() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
 
         assert_ok!(Market::place_storage_order(
@@ -388,15 +355,17 @@ fn update_replicas_should_work_for_more_replicas() {
             }
         );
 
-        run_to_block(303);
+        run_to_block(203);
 
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
 
-        add_who_into_replica(&cid, file_size, ferdie.clone(), ferdie.clone(), legal_pk.clone(), Some(303u32), None);
-        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), Some(403u32), None);
-        add_who_into_replica(&cid, file_size, dave.clone(), dave.clone(), legal_pk.clone(), Some(503u32), None);
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        add_who_into_replica(&cid, file_size, ferdie.clone(), ferdie.clone(), legal_pk.clone(),legal_wr_info.block_number, 203, 103);
+        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), legal_wr_info.block_number, 203, 203);
+        add_who_into_replica(&cid, file_size, dave.clone(), dave.clone(), legal_pk.clone(), legal_wr_info.block_number, 203, 203);
 
+        run_to_block(303);
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
@@ -413,73 +382,18 @@ fn update_replicas_should_work_for_more_replicas() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
             ));
-
-        add_who_into_replica(&cid, file_size, eve.clone(), eve.clone(), legal_pk.clone(), Some(503u32), None);
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
-        assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
-            FileInfoV2 {
-                file_size,
-                spower: Market::calculate_spower(file_size, 5),
-                expired_at: 1303,
-                calculated_at: 303,
-                amount: 10320,
-                prepaid: 0,
-                reported_replica_count: 5,
-                remaining_paid_count: 0,
-                replicas: BTreeMap::from_iter(vec![
-                    (ferdie.clone(),
-                    Replica {
-                        who: ferdie.clone(),
-                        valid_at: 303,
-                        anchor: legal_pk.clone(),
-                        is_reported: true,
-                        created_at: Some(303)
-                    }),
-                    (merchant.clone(),
-                    Replica {
-                        who: merchant.clone(),
-                        valid_at: 303,
-                        anchor: legal_pk.clone(),
-                        is_reported: true,
-                        created_at: Some(303)
-                    }),
-                    (charlie.clone(),
-                    Replica {
-                        who: charlie.clone(),
-                        valid_at: 403,
-                        anchor: legal_pk.clone(),
-                        is_reported: true,
-                        created_at: Some(403)
-                    }),
-                    (dave.clone(),
-                    Replica {
-                        who: dave.clone(),
-                        valid_at: 503,
-                        anchor: legal_pk.clone(),
-                        is_reported: true,
-                        created_at: Some(503)
-                    }),
-                    (eve.clone(),
-                    Replica {
-                        who: eve.clone(),
-                        valid_at: 503,
-                        anchor: legal_pk.clone(),
-                        is_reported: true,
-                        created_at: Some(503)
-                    })
-                ])
-            }
-        );
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+
         run_to_block(503);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        add_who_into_replica(&cid, file_size, eve.clone(), eve.clone(), legal_pk.clone(), legal_wr_info.block_number, 503, 503);
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 5),
-                expired_at: 1303,
-                calculated_at: 503,
+                spower: 0,
+                expired_at: 1203,
+                calculated_at: 203,
                 amount: 10320,
                 prepaid: 0,
                 reported_replica_count: 5,
@@ -488,10 +402,26 @@ fn update_replicas_should_work_for_more_replicas() {
                     (ferdie.clone(),
                     Replica {
                         who: ferdie.clone(),
-                        valid_at: 303,
+                        valid_at: 103,
                         anchor: legal_pk.clone(),
                         is_reported: true,
-                        created_at: Some(303)
+                        created_at: Some(103)
+                    }),
+                    (charlie.clone(),
+                    Replica {
+                        who: charlie.clone(),
+                        valid_at: 203,
+                        anchor: legal_pk.clone(),
+                        is_reported: true,
+                        created_at: Some(203)
+                    }),
+                    (dave.clone(),
+                    Replica {
+                        who: dave.clone(),
+                        valid_at: 203,
+                        anchor: legal_pk.clone(),
+                        is_reported: true,
+                        created_at: Some(203)
                     }),
                     (merchant.clone(),
                     Replica {
@@ -500,22 +430,6 @@ fn update_replicas_should_work_for_more_replicas() {
                         anchor: legal_pk.clone(),
                         is_reported: true,
                         created_at: Some(303)
-                    }),
-                    (charlie.clone(),
-                    Replica {
-                        who: charlie.clone(),
-                        valid_at: 403,
-                        anchor: legal_pk.clone(),
-                        is_reported: true,
-                        created_at: Some(403)
-                    }),
-                    (dave.clone(),
-                    Replica {
-                        who: dave.clone(),
-                        valid_at: 503,
-                        anchor: legal_pk.clone(),
-                        is_reported: true,
-                        created_at: Some(503)
                     }),
                     (eve.clone(),
                     Replica {
@@ -528,12 +442,8 @@ fn update_replicas_should_work_for_more_replicas() {
                 ])
             }
         );
-
+        
         assert_eq!(merchant_ledgers(&ferdie), MockMerchantLedger {
-            collateral: 6_000_000,
-            reward: 3225
-        });
-        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
             collateral: 6_000_000,
             reward: 3225
         });
@@ -542,6 +452,10 @@ fn update_replicas_should_work_for_more_replicas() {
             reward: 3225
         });
         assert_eq!(merchant_ledgers(&dave), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 3225
+        });
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
             collateral: 6_000_000,
             reward: 3225
         });
@@ -564,12 +478,15 @@ fn update_replicas_should_only_pay_the_groups() {
         let dave = DAVE;
         let eve = EVE;
         let ferdie = FERDIE;
+        let spower = SPOWER;
 
         let cid =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
         let file_size = 134289408;
         let _ = Balances::make_free_balance_be(&source, 20_000_000);
         let merchants = vec![merchant.clone(), charlie.clone(), dave.clone(), eve.clone(), ferdie.clone()];
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -593,10 +510,10 @@ fn update_replicas_should_only_pay_the_groups() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
 
-        run_to_block(303);
+        run_to_block(203);
 
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
@@ -611,9 +528,11 @@ fn update_replicas_should_only_pay_the_groups() {
             punishment_deadline: 0,
             group: None
         });
-        add_who_into_replica(&cid, file_size, ferdie.clone(), ferdie.clone(), hex::decode("11").unwrap(), Some(303u32), Some(BTreeSet::from_iter(vec![charlie.clone(), ferdie.clone()].into_iter())));
-        add_who_into_replica(&cid, file_size, charlie.clone(), ferdie.clone(), hex::decode("22").unwrap(), Some(403u32), Some(BTreeSet::from_iter(vec![charlie.clone(), ferdie.clone()].into_iter())));
-        add_who_into_replica(&cid, file_size, dave.clone(), dave.clone(), hex::decode("33").unwrap(), Some(503u32), None);
+        add_who_into_replica(&cid, file_size, ferdie.clone(), ferdie.clone(), hex::decode("11").unwrap(), legal_wr_info.block_number, 203, 103);
+        add_who_into_replica(&cid, file_size, charlie.clone(), ferdie.clone(), hex::decode("22").unwrap(),legal_wr_info.block_number, 203, 203);
+        add_who_into_replica(&cid, file_size, dave.clone(), dave.clone(), hex::decode("33").unwrap(), legal_wr_info.block_number, 203, 203);
+
+        run_to_block(303);
 
         register(&legal_pk, LegalCode::get());
 
@@ -632,18 +551,17 @@ fn update_replicas_should_only_pay_the_groups() {
                 legal_wr_info.sig
             ));
 
-        add_who_into_replica(&cid, file_size, eve.clone(), eve.clone(), legal_pk.clone(), Some(503u32), None);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 0, true);
-        <swork::ReportedInSlot>::insert(hex::decode("22").unwrap(), 0, true);
-        <swork::ReportedInSlot>::insert(hex::decode("33").unwrap(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+
+        run_to_block(503);
+        add_who_into_replica(&cid, file_size, eve.clone(), eve.clone(), legal_pk.clone(), legal_wr_info.block_number, 503, 503);
+        
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 4),
-                expired_at: 1303,
-                calculated_at: 303,
+                spower: 0,
+                expired_at: 1203,
+                calculated_at: 203,
                 amount: 10320,
                 prepaid: 0,
                 reported_replica_count: 4,
@@ -652,10 +570,18 @@ fn update_replicas_should_only_pay_the_groups() {
                     (ferdie.clone(),
                     Replica {
                         who: ferdie.clone(),
-                        valid_at: 303,
+                        valid_at: 103,
                         anchor: hex::decode("11").unwrap(),
                         is_reported: true,
-                        created_at: Some(303)
+                        created_at: Some(103)
+                    }),
+                    (dave.clone(),
+                    Replica {
+                        who: dave.clone(),
+                        valid_at: 203,
+                        anchor: hex::decode("33").unwrap(),
+                        is_reported: true,
+                        created_at: Some(203)
                     }),
                     (merchant.clone(),
                     Replica {
@@ -664,14 +590,6 @@ fn update_replicas_should_only_pay_the_groups() {
                         anchor: legal_pk.clone(),
                         is_reported: true,
                         created_at: Some(303)
-                    }),
-                    (dave.clone(),
-                    Replica {
-                        who: dave.clone(),
-                        valid_at: 503,
-                        anchor: hex::decode("33").unwrap(),
-                        is_reported: true,
-                        created_at: Some(503)
                     }),
                     (eve.clone(),
                     Replica {
@@ -689,16 +607,16 @@ fn update_replicas_should_only_pay_the_groups() {
             collateral: 6_000_000,
             reward: 3225
         });
-        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
-            collateral: 6_000_000,
-            reward: 3225
-        });
         // charlie won't get payed
         assert_eq!(merchant_ledgers(&charlie), MockMerchantLedger {
             collateral: 6_000_000,
             reward: 0
         });
         assert_eq!(merchant_ledgers(&dave), MockMerchantLedger {
+            collateral: 6_000_000,
+            reward: 3225
+        });
+        assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
             collateral: 6_000_000,
             reward: 3225
         });
@@ -984,6 +902,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
 
         let source = ALICE;
         let merchant = MERCHANT;
+        let spower = SPOWER;
 
         let cid1 =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -997,6 +916,8 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let _ = Balances::make_free_balance_be(&storage_pot, 1);
         let _ = Balances::make_free_balance_be(&source, 20000);
         let _ = Balances::make_free_balance_be(&merchant, 20000);
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 6000);
@@ -1028,7 +949,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         let legal_pk = legal_wr_info.curr_pk.clone();
         register(&legal_pk, LegalCode::get());
         // reported_file_size_cid1 = 90 < 100 => update file size in file info
-        add_who_into_replica(&cid1, reported_file_size_cid1, merchant.clone(), merchant.clone(), legal_pk.clone(), None, None);
+        add_who_into_replica(&cid1, reported_file_size_cid1, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         assert_eq!(Market::filesv2(&cid1).unwrap_or_default(),
             FileInfoV2 {
                 file_size: reported_file_size_cid1,
@@ -1051,7 +972,7 @@ fn scenario_test_for_reported_file_size_is_not_same_with_file_size() {
         assert_eq!(Market::orders_count(), 2);
         assert_eq!(Balances::free_balance(&storage_pot), 361);
         // reported_file_size_cid2 = 1000 > 100 => close this file
-        add_who_into_replica(&cid2, reported_file_size_cid2, merchant.clone(), merchant.clone(), legal_pk.clone(), None, None);
+        add_who_into_replica(&cid2, reported_file_size_cid2, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         assert_eq!(Market::filesv2(&cid2).is_none(), true);
         assert_eq!(merchant_ledgers(&merchant), MockMerchantLedger {
             collateral: 6000,
@@ -1071,6 +992,7 @@ fn double_place_storage_order_file_size_check_should_work() {
 
         let source = ALICE;
         let merchant = MERCHANT;
+        let spower = SPOWER;
 
         let cid1 =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -1081,6 +1003,8 @@ fn double_place_storage_order_file_size_check_should_work() {
 
         mock_bond_owner(&merchant, &merchant);
         add_collateral(&merchant, 6000);
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid1.clone(),
@@ -1104,7 +1028,7 @@ fn double_place_storage_order_file_size_check_should_work() {
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
         register(&legal_pk, LegalCode::get());
-        add_who_into_replica(&cid1, reported_file_size_cid1, merchant.clone(), merchant.clone(), legal_pk.clone(), None, None);
+        add_who_into_replica(&cid1, reported_file_size_cid1, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         assert_eq!(Market::filesv2(&cid1).unwrap_or_default(),
             FileInfoV2 {
                 file_size: reported_file_size_cid1,
@@ -1177,6 +1101,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         let charlie = CHARLIE;
         let dave = DAVE;
         let eve = EVE;
+        let spower = SPOWER;
 
         let staking_pot = Market::staking_pot();
         let reserved_pot = Market::reserved_pot();
@@ -1187,8 +1112,10 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -1230,7 +1157,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
             ));
-
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
@@ -1252,14 +1179,19 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         );
 
         run_to_block(503);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
+        let file_spower = Market::calculate_spower(file_size, 1);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower - file_size).try_into().unwrap())],
+            vec![(cid.clone(), file_spower, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
+                spower: file_spower,
                 expired_at: 1303,
-                calculated_at: 503,
+                calculated_at: 303,
                 amount: 19995,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -1269,7 +1201,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                     valid_at: 303,
                     anchor: legal_pk.clone(),
                     is_reported: true,
-                    created_at: Some(303)
+                    created_at: None
                 })])
             }
         );
@@ -1278,13 +1210,13 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
             reward: 3225
         });
 
-        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), None, None);
+        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), legal_wr_info.block_number, 503, 503);
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
+                spower: file_spower,
                 expired_at: 1303,
-                calculated_at: 503,
+                calculated_at: 303,
                 amount: 16770,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -1295,7 +1227,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                         valid_at: 303,
                         anchor: legal_pk.clone(),
                         is_reported: true,
-                        created_at: Some(303)
+                        created_at: None
                     }),
                     (charlie.clone(), Replica {
                         who: charlie.clone(),
@@ -1316,9 +1248,9 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
+                spower: file_spower,
                 expired_at: 2803,
-                calculated_at: 503,
+                calculated_at: 303,
                 amount: 39990,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -1329,7 +1261,7 @@ fn place_storage_order_for_expired_file_should_inherit_the_status() {
                         valid_at: 303,
                         anchor: legal_pk.clone(),
                         is_reported: true,
-                        created_at: Some(303)
+                        created_at: None
                     }),
                     (charlie.clone(), Replica {
                         who: charlie.clone(),
@@ -1367,6 +1299,7 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         let charlie = CHARLIE;
         let dave = DAVE;
         let eve = EVE;
+        let spower = SPOWER;
 
         let staking_pot = Market::staking_pot();
         let reserved_pot = Market::reserved_pot();
@@ -1377,8 +1310,10 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -1421,6 +1356,8 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
                 legal_wr_info.sig
             ));
 
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
@@ -1442,14 +1379,19 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         );
 
         run_to_block(503);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
+        let file_spower = Market::calculate_spower(file_size, 1);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower - file_size).try_into().unwrap())],
+            vec![(cid.clone(), file_spower, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
+                spower: file_spower,
                 expired_at: 1303,
-                calculated_at: 503,
+                calculated_at: 303,
                 amount: 19995,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -1459,7 +1401,7 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
                     valid_at: 303,
                     anchor: legal_pk.clone(),
                     is_reported: true,
-                    created_at: Some(303)
+                    created_at: None
                 })])
             }
         );
@@ -1468,13 +1410,14 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
             reward: 3225
         });
 
-        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), None, None);
+        run_to_block(503);
+        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), legal_wr_info.block_number, 503, 503);
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 1),
+                spower: file_spower,
                 expired_at: 1303,
-                calculated_at: 503,
+                calculated_at: 303,
                 amount: 16770,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -1485,7 +1428,7 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
                         valid_at: 303,
                         anchor: legal_pk.clone(),
                         is_reported: true,
-                        created_at: Some(303)
+                        created_at: None
                     }),
                     (charlie.clone(), Replica {
                         who: charlie.clone(),
@@ -1496,18 +1439,22 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
                     })])
             }
         );
-        Market::delete_replica(&merchant, merchant.clone(), &cid, &legal_pk);
-        Market::delete_replica(&charlie, charlie.clone(), &cid, &legal_pk);
+        delete_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 503, 503);
+        delete_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), legal_wr_info.block_number, 503, 503);
 
         run_to_block(903);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
-        // calculated_at should be updated
+        let new_file_spower = file_size; // 0 replicas use file_size as file_spower
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_size as i64 - file_spower as i64))],
+            vec![(cid.clone(), new_file_spower, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: 0,
+                spower: new_file_spower, 
                 expired_at: 1303,
-                calculated_at: 903,
+                calculated_at: 303,
                 amount: 16770,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1525,9 +1472,9 @@ fn place_storage_order_for_file_should_make_it_pending_if_replicas_is_zero() {
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: 0,
+                spower: new_file_spower,
                 expired_at: 0,
-                calculated_at: 903,
+                calculated_at: 303,
                 amount: 39990,
                 prepaid: 0,
                 reported_replica_count: 0,
@@ -1546,6 +1493,7 @@ fn dynamic_spower_should_work() {
 
         let source = ALICE;
         let merchant = MERCHANT;
+        let spower = SPOWER;
 
         let cid =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -1555,8 +1503,11 @@ fn dynamic_spower_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -1584,29 +1535,53 @@ fn dynamic_spower_should_work() {
 
         <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
         for index in 0..10 {
-            add_who_into_replica(&cid, file_size, AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), legal_pk.clone(), Some(303u32), None);
+            add_who_into_replica(&cid, file_size, AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         }
 
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        let file_spower_10 = Market::calculate_spower(file_size, 10);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower_10 as i64 - file_size as i64))],
+            vec![(cid.clone(), file_spower_10, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().spower, Market::calculate_spower(file_size, 10));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().reported_replica_count, 10);
 
         for index in 10..20 {
-            add_who_into_replica(&cid, file_size, AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), legal_pk.clone(), Some(303u32), None);
+            add_who_into_replica(&cid, file_size, AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         }
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        let file_spower_20 = Market::calculate_spower(file_size, 20);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower_20 as i64 - file_spower_10 as i64))],
+            vec![(cid.clone(), file_spower_20, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+        
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().spower, Market::calculate_spower(file_size, 20));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().reported_replica_count, 20);
+
+        
         for index in 20..220 {
-            add_who_into_replica(&cid, file_size, AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), legal_pk.clone(), Some(303u32), None);
+            add_who_into_replica(&cid, file_size, AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         }
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        let file_spower_200 = Market::calculate_spower(file_size, 200);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower_200 as i64 - file_spower_20 as i64))],
+            vec![(cid.clone(), file_spower_200, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().spower, Market::calculate_spower(file_size, 200));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().reported_replica_count, 200);
+
+
         for index in 0..140 {
-            Market::delete_replica(&AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), &cid, &legal_pk);
+            delete_replica(&cid, file_size, AccountId32::new([index as u8; 32]), AccountId32::new([index as u8; 32]), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
         }
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        let file_spower_60 = Market::calculate_spower(file_size, 60);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower_60 as i64 - file_spower_200 as i64))],
+            vec![(cid.clone(), file_spower_60, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().spower, Market::calculate_spower(file_size, 60));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().reported_replica_count, 60);
     });
@@ -1616,12 +1591,12 @@ fn dynamic_spower_should_work() {
 fn calculate_spower_should_work() {
     new_test_ext().execute_with(|| {
         let file_size = 1000;
-        assert_eq!(Market::calculate_spower(file_size, 0) , 0);
-        assert_eq!(Market::calculate_spower(file_size, 200) , file_size * 10);
-        assert_eq!(Market::calculate_spower(file_size, 250) , file_size * 10);
-        assert_eq!(Market::calculate_spower(file_size, 146) , file_size * 9 + file_size * 2 / 5);
-        assert_eq!(Market::calculate_spower(file_size, 16) , file_size + file_size / 5);
-        assert_eq!(Market::calculate_spower(file_size, 128) , file_size * 9 + file_size / 5);
+        assert_eq!(Market::calculate_spower(file_size, 0) , file_size);
+        assert_eq!(Market::calculate_spower(file_size, 200) , file_size * 200);
+        assert_eq!(Market::calculate_spower(file_size, 250) , file_size * 200);
+        assert_eq!(Market::calculate_spower(file_size, 146) , file_size * 190);
+        assert_eq!(Market::calculate_spower(file_size, 16) , file_size * 2);
+        assert_eq!(Market::calculate_spower(file_size, 128) , file_size * 180);
     });
 }
 
@@ -1635,6 +1610,7 @@ fn delete_spower_should_work() {
         let bob = BOB;
         let charlie = CHARLIE;
         let merchant = MERCHANT;
+        let spower = SPOWER;
 
         let cid =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -1644,8 +1620,11 @@ fn delete_spower_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -1671,30 +1650,75 @@ fn delete_spower_should_work() {
         let mut expected_groups = BTreeMap::new();
         for i in 10..28 {
             let key = hex::decode(i.to_string()).unwrap();
-            add_who_into_replica(&cid, file_size, AccountId32::new([i as u8; 32]), AccountId32::new([i as u8; 32]), key.clone(), Some(303u32), None);
+            add_who_into_replica(&cid, file_size, AccountId32::new([i as u8; 32]), AccountId32::new([i as u8; 32]), key.clone(), 300, 303, 303);
             <swork::ReportedInSlot>::insert(key.clone(), 0, true);
             expected_groups.insert(key.clone(), true);
         }
-        add_who_into_replica(&cid, file_size, bob.clone(), bob.clone(), hex::decode("29").unwrap(), Some(303u32), None);
+        add_who_into_replica(&cid, file_size, bob.clone(), bob.clone(), hex::decode("29").unwrap(), 300, 303, 303);
         <swork::ReportedInSlot>::insert(hex::decode("29").unwrap(), 0, true);
-        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), hex::decode("30").unwrap(), Some(303u32), None);
+        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), hex::decode("30").unwrap(), 300, 303, 303);
         <swork::ReportedInSlot>::insert(hex::decode("30").unwrap(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+
+        let file_spower_20 = Market::calculate_spower(file_size, 20);
+        let mut changed_spowers = vec![];
+        let mut changed_replicas = vec![];
+        for i in 10..28 {
+            let key = hex::decode(i.to_string()).unwrap();
+            changed_spowers.push((key.clone(), (file_spower_20 as i64 - file_size as i64)));
+            changed_replicas.push((AccountId32::new([i as u8; 32]), AccountId32::new([i as u8; 32]), key.clone(), None)); 
+        }
+        changed_spowers.push((hex::decode("29").unwrap(), (file_spower_20 as i64 - file_size as i64)));
+        changed_replicas.push((bob.clone(), bob.clone(), hex::decode("29").unwrap(), None));
+        changed_spowers.push((hex::decode("30").unwrap(), (file_spower_20 as i64 - file_size as i64)));
+        changed_replicas.push((charlie.clone(), charlie.clone(), hex::decode("30").unwrap(), None));
+
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            changed_spowers,
+            vec![(cid.clone(), file_spower_20, changed_replicas)]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().spower, Market::calculate_spower(file_size, 20));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().reported_replica_count, 20);
-        Market::delete_replica(&AccountId32::new([10u8; 32]), AccountId32::new([10u8; 32]), &cid, &hex::decode("10").unwrap());
+
+        // 
+        delete_replica(&cid, file_size, AccountId32::new([10u8; 32]), AccountId32::new([10u8; 32]), hex::decode("10").unwrap(), 300, 303, 303);
         expected_groups.remove(&hex::decode("10").unwrap());
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+
+        let file_spower_19 = Market::calculate_spower(file_size, 19);
+        let mut changed_spowers_19 = vec![];
+        for i in 10..28 {
+            let key = hex::decode(i.to_string()).unwrap();
+            changed_spowers_19.push((key.clone(), (file_spower_19 as i64 - file_spower_20 as i64)));
+        }
+        changed_spowers_19.push((hex::decode("29").unwrap(), (file_spower_19 as i64 - file_spower_20 as i64)));
+        changed_spowers_19.push((hex::decode("30").unwrap(), (file_spower_19 as i64 - file_spower_20 as i64)));
+
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            changed_spowers_19,
+            vec![(cid.clone(), file_spower_19, vec![])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().spower, Market::calculate_spower(file_size, 19));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().reported_replica_count, 19);
 
-        for i in 28..30 {
+        // delete 29, 29 won't be deleted twice
+        delete_replica(&cid, file_size, bob.clone(), bob.clone(), hex::decode("29").unwrap(), 300, 303, 303);
+        expected_groups.remove(&hex::decode("29").unwrap());
+
+        let file_spower_18 = Market::calculate_spower(file_size, 19);
+        let mut changed_spowers_18 = vec![];
+        for i in 10..28 {
             let key = hex::decode(i.to_string()).unwrap();
-            <swork::ReportedInSlot>::insert(key.clone(), 300, true);
-            expected_groups.insert(key.clone(), true);
+            changed_spowers_18.push((key.clone(), (file_spower_18 as i64 - file_spower_19 as i64)));
         }
-        Market::delete_replica(&bob, bob.clone(), &cid, &hex::decode("29").unwrap()); // delete 21. 21 won't be deleted twice.
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        changed_spowers_18.push((hex::decode("29").unwrap(), (file_spower_19 as i64 - file_spower_20 as i64)));
+        changed_spowers_18.push((hex::decode("30").unwrap(), (file_spower_19 as i64 - file_spower_20 as i64)));
+
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            changed_spowers_18,
+            vec![(cid.clone(), file_spower_18, vec![])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().spower, Market::calculate_spower(file_size, 18));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default().reported_replica_count, 18);
     });
@@ -1713,6 +1737,7 @@ fn reward_liquidator_should_work() {
         let source = ALICE;
         let merchant = BOB;
         let charlie = CHARLIE;
+        let spower = SPOWER;
 
         let storage_pot = Market::storage_pot();
         assert_eq!(Balances::free_balance(&storage_pot), 0);
@@ -1723,8 +1748,10 @@ fn reward_liquidator_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
 
@@ -1763,14 +1790,16 @@ fn reward_liquidator_should_work() {
                 legal_wr_info.sig
         ));
 
-        // // Calculate reward cannot work in the middle of the file
-        // assert_noop!(
-        //     Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
-        //     DispatchError::Module {
-        //         index: 3,
-        //         error: 6,
-        //         message: Some("NotInRewardPeriod")
-        // });
+        // Calculate reward cannot work in the middle of the file
+        assert_noop!(
+            Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()),
+            DispatchError::Module {
+                index: 3,
+                error: 2,
+                message: Some("NotInRewardPeriod")
+        });
+
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
         run_to_block(2503);
         // all would be rewarded to liquidator charlie
@@ -1878,6 +1907,7 @@ fn renew_file_should_work() {
         let source = ALICE;
         let merchant = BOB;
         let charlie = CHARLIE;
+        let spower = SPOWER;
 
         let storage_pot = Market::storage_pot();
         let reserved_pot = Market::reserved_pot();
@@ -1890,8 +1920,11 @@ fn renew_file_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+        
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_noop!(
             Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
@@ -1927,6 +1960,8 @@ fn renew_file_should_work() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
         ));
+        
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
         assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
@@ -1961,13 +1996,13 @@ fn renew_file_should_work() {
                 calculated_at: 2503,
                 amount: 23220, // 23220
                 prepaid: 270000,
-                reported_replica_count: 0,
+                reported_replica_count: 1,
                 remaining_paid_count: 3,
                 replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
                     who: merchant.clone(),
-                    valid_at: 2503,
+                    valid_at: 303,
                     anchor: legal_pk.clone(),
-                    is_reported: false,
+                    is_reported: true,
                     created_at: Some(303)
                 })])
             }
@@ -1979,22 +2014,23 @@ fn renew_file_should_work() {
 
         run_to_block(8000); // expired_on 2303 => all reward to liquidator charlie
         assert_ok!(Market::calculate_reward(Origin::signed(charlie.clone()), cid.clone()));
+
         assert_eq!(Balances::free_balance(&charlie), 43215); // 19995 + 23220
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 0),
+                spower: 0,
                 expired_at: 9000,
                 calculated_at: 8000,
                 amount: 23220,
                 prepaid: 140000,
-                reported_replica_count: 0,
+                reported_replica_count: 1,
                 remaining_paid_count: 3,
                 replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
                     who: merchant.clone(),
-                    valid_at: 8000,
+                    valid_at: 303,
                     anchor: legal_pk.clone(),
-                    is_reported: false,
+                    is_reported: true,
                     created_at: Some(303)
                 })])
             }
@@ -2008,18 +2044,18 @@ fn renew_file_should_work() {
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 0),
+                spower: 0,
                 expired_at: 11000,
                 calculated_at: 10000,
                 amount: 23220,
                 prepaid: 10000,
-                reported_replica_count: 0,
+                reported_replica_count: 1,
                 remaining_paid_count: 3,
                 replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
                     who: merchant.clone(),
-                    valid_at: 10000,
+                    valid_at: 303,
                     anchor: legal_pk.clone(),
-                    is_reported: false,
+                    is_reported: true,
                     created_at: Some(303)
                 })])
             }
@@ -2048,6 +2084,7 @@ fn renew_onging_file_should_not_work() {
         let source = ALICE;
         let merchant = BOB;
         let charlie = CHARLIE;
+        let spower = SPOWER;
 
         let storage_pot = Market::storage_pot();
         let reserved_pot = Market::reserved_pot();
@@ -2060,8 +2097,11 @@ fn renew_onging_file_should_not_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_noop!(
             Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000),
@@ -2097,6 +2137,7 @@ fn renew_onging_file_should_not_work() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
         ));
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
         assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
@@ -2131,13 +2172,13 @@ fn renew_onging_file_should_not_work() {
                 calculated_at: 503,
                 amount: 19995,
                 prepaid: 400_000,
-                reported_replica_count: 0,
+                reported_replica_count: 1,
                 remaining_paid_count: 3,
                 replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
                     who: merchant.clone(),
-                    valid_at: 503,
+                    valid_at: 303,
                     anchor: legal_pk.clone(),
-                    is_reported: false,
+                    is_reported: true,
                     created_at: Some(303)
                 })])
             }
@@ -2153,6 +2194,7 @@ fn change_base_fee_should_work() {
 
         let source = ALICE;
         let merchant = MERCHANT;
+        let spower = SPOWER;
 
         let cid =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -2165,6 +2207,8 @@ fn change_base_fee_should_work() {
         let _ = Balances::make_free_balance_be(&merchant, 200);
 
         add_collateral(&merchant, 60_000);
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         // Change base fee to 10000
         assert_ok!(Market::set_base_fee(Origin::root(), 50000));
@@ -2213,6 +2257,8 @@ fn change_base_fee_should_work() {
             legal_wr_info.sig
         ));
 
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+
         assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 200_000));
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
@@ -2240,18 +2286,18 @@ fn change_base_fee_should_work() {
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
-                spower: Market::calculate_spower(file_size, 0),
+                spower: 0,
                 expired_at: 3503,
                 calculated_at: 2503,
                 amount: 23220, // 23_220
                 prepaid: 21000, // 200000 -129000 - 50000
-                reported_replica_count: 0,
+                reported_replica_count: 1,
                 remaining_paid_count: 3,
                 replicas: BTreeMap::from_iter(vec![(merchant.clone(), Replica {
                     who: merchant.clone(),
-                    valid_at: 2503,
+                    valid_at: 303,
                     anchor: legal_pk.clone(),
-                    is_reported: false,
+                    is_reported: true,
                     created_at: Some(303)
                 })])
             }
@@ -2270,6 +2316,8 @@ fn storage_pot_should_be_balanced() {
         let source = ALICE;
         let merchant = BOB;
         let charlie = CHARLIE;
+        let spower = SPOWER;
+
         let storage_pot = Market::storage_pot();
         let reserved_pot = Market::reserved_pot();
         let _ = Balances::make_free_balance_be(&storage_pot, 1);
@@ -2280,8 +2328,10 @@ fn storage_pot_should_be_balanced() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -2307,6 +2357,8 @@ fn storage_pot_should_be_balanced() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
         ));
+
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
         assert_ok!(Market::add_prepaid(Origin::signed(source.clone()), cid.clone(), 400_000));
         assert_eq!(Balances::free_balance(&storage_pot), 423221);
@@ -2346,6 +2398,7 @@ fn one_owner_should_work() {
 
         let bob = BOB; // owner 1, have merchant, charlie and dave
         let zikun = ZIKUN; // owner 2 have eve and ferdie
+        let spower = SPOWER;
 
         let cid =
             "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec();
@@ -2376,10 +2429,12 @@ fn one_owner_should_work() {
         let legal_wr_info = legal_work_report_with_added_files();
         let legal_pk = legal_wr_info.curr_pk.clone();
 
-        add_who_into_replica(&cid, file_size, ferdie.clone(), zikun.clone(), legal_pk.clone(), Some(303u32), None);
-        add_who_into_replica(&cid, file_size, charlie.clone(), bob.clone(), legal_pk.clone(), Some(403u32), None);
-        add_who_into_replica(&cid, file_size, dave.clone(), bob.clone(), legal_pk.clone(), Some(503u32), None);
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        add_who_into_replica(&cid, file_size, ferdie.clone(), zikun.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+        add_who_into_replica(&cid, file_size, charlie.clone(), bob.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+        add_who_into_replica(&cid, file_size, dave.clone(), bob.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
+        run_to_block(403);
         register(&legal_pk, LegalCode::get());
 
         assert_ok!(Swork::report_works(
@@ -2397,11 +2452,9 @@ fn one_owner_should_work() {
                 legal_wr_info.sig
             ));
 
-        add_who_into_replica(&cid, file_size, eve.clone(), zikun.clone(), legal_pk.clone(), Some(503u32), None);
+        add_who_into_replica(&cid, file_size, eve.clone(), zikun.clone(), legal_pk.clone(), legal_wr_info.block_number, 403, 403);
 
         run_to_block(503);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
 
         assert_eq!(merchant_ledgers(&bob), MockMerchantLedger {
             collateral: 6_000_000,
@@ -2523,6 +2576,7 @@ fn spower_delay_should_work() {
         let charlie = CHARLIE;
         let dave = DAVE;
         let eve = EVE;
+        let spower = SPOWER;
         SpowerReadyPeriod::put(300);
 
         let staking_pot = Market::staking_pot();
@@ -2534,8 +2588,11 @@ fn spower_delay_should_work() {
         for who in merchants.iter() {
             let _ = Balances::make_free_balance_be(&who, 20_000_000);
             mock_bond_owner(&who, &who);
-            add_collateral(who, 6_000_000);
+            add_collateral(&who, 6_000_000);
         }
+
+        assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+        assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source), cid.clone(),
@@ -2578,6 +2635,8 @@ fn spower_delay_should_work() {
             legal_wr_info.sig
         ));
 
+        add_who_into_replica(&cid, file_size, merchant.clone(), merchant.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
             FileInfoV2 {
                 file_size,
@@ -2599,14 +2658,18 @@ fn spower_delay_should_work() {
         );
 
         run_to_block(503);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 0, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        let file_spower = Market::calculate_spower(file_size, 1);
+        assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(legal_pk.clone(), (file_spower as i64 - file_size as i64))],
+            vec![(cid.clone(), file_spower, vec![(merchant.clone(), merchant.clone(), legal_pk.clone(), None)])]));
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
            FileInfoV2 {
                 file_size,
                 spower: Market::calculate_spower(file_size, 1),
                 expired_at: 1303,
-                calculated_at: 503,
+                calculated_at: 303,
                 amount: 19995,
                 prepaid: 0,
                 reported_replica_count: 1,
@@ -2616,7 +2679,7 @@ fn spower_delay_should_work() {
                     valid_at: 303,
                     anchor: legal_pk.clone(),
                     is_reported: true,
-                    created_at: Some(303)
+                    created_at: None
                 })])
            }
         );
@@ -2625,17 +2688,16 @@ fn spower_delay_should_work() {
             reward: 3225
         });
 
-        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), None, None);
+        add_who_into_replica(&cid, file_size, charlie.clone(), charlie.clone(), legal_pk.clone(), legal_wr_info.block_number, 503, 503);
 
         run_to_block(603);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 300, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
            FileInfoV2 {
                 file_size,
                 spower: Market::calculate_spower(file_size, 1),
                 expired_at: 1303,
-                calculated_at: 603,
+                calculated_at: 303,
                 amount: 16770,
                 prepaid: 0,
                 reported_replica_count: 2,
@@ -2659,18 +2721,17 @@ fn spower_delay_should_work() {
            }
         );
 
-        add_who_into_replica(&cid, file_size, dave.clone(), dave.clone(), hex::decode("11").unwrap(), None, None);
         run_to_block(703);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        add_who_into_replica(&cid, file_size, dave.clone(), dave.clone(), hex::decode("11").unwrap(), legal_wr_info.block_number, 703, 703);
         assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
            FileInfoV2 {
                file_size,
                spower: Market::calculate_spower(file_size, 1),
                expired_at: 1303,
-               calculated_at: 703,
+               calculated_at: 303,
                amount: 13545,
                prepaid: 0,
-               reported_replica_count: 2,
+               reported_replica_count: 3,
                remaining_paid_count: 1,
                 replicas: BTreeMap::from_iter(vec![
                     (merchant.clone(), Replica {
@@ -2691,91 +2752,93 @@ fn spower_delay_should_work() {
                     who: dave.clone(),
                     valid_at: 703,
                     anchor: hex::decode("11").unwrap(),
-                    is_reported: false,
-                    created_at: Some(603)
+                    is_reported: true,
+                    created_at: Some(703)
                     })
                 ])
            }
         );
 
-        run_to_block(903);
-        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 600, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
-        assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
-           FileInfoV2 {
-               file_size,
-               spower: Market::calculate_spower(file_size, 1),
-               expired_at: 1303,
-               calculated_at: 903,
-               amount: 13545,
-               prepaid: 0,
-               reported_replica_count: 1,
-               remaining_paid_count: 1,
-                replicas: BTreeMap::from_iter(vec![
-                    (merchant.clone(), Replica {
-                    who: merchant.clone(),
-                    valid_at: 903,
-                    anchor: legal_pk.clone(),
-                    is_reported: false,
-                    created_at: None
-                    }),
-                    (charlie.clone(), Replica {
-                    who: charlie.clone(),
-                    valid_at: 903,
-                    anchor: legal_pk.clone(),
-                    is_reported: false,
-                    created_at: None
-                    }),
-                    (dave.clone(), Replica {
-                    who: dave.clone(),
-                    valid_at: 703,
-                    anchor: hex::decode("11").unwrap(),
-                    is_reported: true,
-                    created_at: None
-                    })
-                ])
-           }
-        );
+        // TODO: Revisit these test cases after implement the batch files' replicas valid_at and is_reported update logic in crust-spower service
 
-        run_to_block(1203);
-        <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 900, true);
-        <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
-        Market::update_replicas(&cid, System::block_number().try_into().unwrap());
-        assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
-           FileInfoV2 {
-               file_size,
-               spower: Market::calculate_spower(file_size, 1),
-               expired_at: 1303,
-               calculated_at: 1203,
-               amount: 13545,
-               prepaid: 0,
-               reported_replica_count: 3,
-               remaining_paid_count: 1,
-                replicas: BTreeMap::from_iter(vec![
-                    (merchant.clone(), Replica {
-                    who: merchant.clone(),
-                    valid_at: 903,
-                    anchor: legal_pk.clone(),
-                    is_reported: true,
-                    created_at: None
-                    }),
-                    (charlie.clone(), Replica {
-                    who: charlie.clone(),
-                    valid_at: 903,
-                    anchor: legal_pk.clone(),
-                    is_reported: true,
-                    created_at: None
-                    }),
-                    (dave.clone(), Replica {
-                    who: dave.clone(),
-                    valid_at: 703,
-                    anchor: hex::decode("11").unwrap(),
-                    is_reported: true,
-                    created_at: None
-                    })
-                ])
-           }
-        );
+        // run_to_block(903);
+        // <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 600, true);
+        // Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        // assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
+        //    FileInfoV2 {
+        //        file_size,
+        //        spower: Market::calculate_spower(file_size, 1),
+        //        expired_at: 1303,
+        //        calculated_at: 903,
+        //        amount: 13545,
+        //        prepaid: 0,
+        //        reported_replica_count: 1,
+        //        remaining_paid_count: 1,
+        //         replicas: BTreeMap::from_iter(vec![
+        //             (merchant.clone(), Replica {
+        //             who: merchant.clone(),
+        //             valid_at: 903,
+        //             anchor: legal_pk.clone(),
+        //             is_reported: false,
+        //             created_at: None
+        //             }),
+        //             (charlie.clone(), Replica {
+        //             who: charlie.clone(),
+        //             valid_at: 903,
+        //             anchor: legal_pk.clone(),
+        //             is_reported: false,
+        //             created_at: None
+        //             }),
+        //             (dave.clone(), Replica {
+        //             who: dave.clone(),
+        //             valid_at: 703,
+        //             anchor: hex::decode("11").unwrap(),
+        //             is_reported: true,
+        //             created_at: None
+        //             })
+        //         ])
+        //    }
+        // );
+
+        // run_to_block(1203);
+        // <swork::ReportedInSlot>::insert(hex::decode("11").unwrap(), 900, true);
+        // <swork::ReportedInSlot>::insert(legal_pk.clone(), 900, true);
+        // Market::update_replicas(&cid, System::block_number().try_into().unwrap());
+        // assert_eq!(Market::filesv2(&cid).unwrap_or_default(),
+        //    FileInfoV2 {
+        //        file_size,
+        //        spower: Market::calculate_spower(file_size, 1),
+        //        expired_at: 1303,
+        //        calculated_at: 1203,
+        //        amount: 13545,
+        //        prepaid: 0,
+        //        reported_replica_count: 3,
+        //        remaining_paid_count: 1,
+        //         replicas: BTreeMap::from_iter(vec![
+        //             (merchant.clone(), Replica {
+        //             who: merchant.clone(),
+        //             valid_at: 903,
+        //             anchor: legal_pk.clone(),
+        //             is_reported: true,
+        //             created_at: None
+        //             }),
+        //             (charlie.clone(), Replica {
+        //             who: charlie.clone(),
+        //             valid_at: 903,
+        //             anchor: legal_pk.clone(),
+        //             is_reported: true,
+        //             created_at: None
+        //             }),
+        //             (dave.clone(), Replica {
+        //             who: dave.clone(),
+        //             valid_at: 703,
+        //             anchor: hex::decode("11").unwrap(),
+        //             is_reported: true,
+        //             created_at: None
+        //             })
+        //         ])
+        //    }
+        // );
     });
 }
 

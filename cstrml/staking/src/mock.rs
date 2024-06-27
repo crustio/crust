@@ -226,10 +226,11 @@ impl swork::Works<AccountId> for TestStaking {
 }
 
 impl<AID> MarketInterface<AID, BalanceOf<Test>> for TestStaking {
-    fn upsert_replica(_: &AID, _: AID,  _: &MerkleRoot, _: u64,  _: &SworkerAnchor, _: u32) -> (u64, bool) { (0, true) }
-    fn delete_replica(_: &AID, _: AID,  _: &MerkleRoot, _: &SworkerAnchor) -> (u64, bool) { (0, true) }
     fn withdraw_staking_pot() -> BalanceOf<Test> {
         BalanceOf::<Test>::from(DSM_STAKING_PAYOUT.with(|v| *v.borrow()))
+    }
+
+    fn update_files_spower(_changed_files: &Vec<(MerkleRoot, u64, Vec<(AID, AID, SworkerAnchor, Option<primitives::BlockNumber>)>)>) {
     }
 }
 

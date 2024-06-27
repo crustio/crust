@@ -204,7 +204,7 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     // Update illegal file replicas count
     fn update_illegal_file_replicas_count(illegal_file_replicas_map: &BTreeMap<ReportSlot, u32>) {
         // For those legacy report slots, we just ignore them because 'AddedFilesCount' is reset per report slot
-        if let Some(illegal_count) = illegal_file_replicas_map.get(&Self::current_report_slot()) {
+        if let Some(illegal_count) = illegal_file_replicas_map.get(&Self::get_current_reported_slot()) {
             // Substract the illegal count
             AddedFilesCount::mutate(|count| {*count = count.saturating_sub(*illegal_count)});
         }
@@ -804,7 +804,7 @@ decl_module! {
             origin,
             changed_spowers: Vec<(SworkerAnchor, i64)>,
             changed_files: Vec<(MerkleRoot, u64, Vec<(T::AccountId, T::AccountId, SworkerAnchor, Option<BlockNumber>)>)>,
-        ) -> DispatchResult {
+        ) -> DispatchResultWithPostInfo {
             let caller = ensure_signed(origin)?;
             let maybe_superior = Self::spower_superior();
 
@@ -838,8 +838,8 @@ decl_module! {
                 changed_spowers.len() as u32, 
                 changed_files.len() as u32)); 
 
-            // No charge fee?
-            Ok(())
+            // Do not charge fee for management extrinsic
+            Ok(Pays::No.into())
         }
 
         /// Create a group. One account can only create one group once.
@@ -1199,13 +1199,8 @@ impl<T: Config> Module<T> {
         // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
 
-        // 2. Update sOrder and get changed size
-        // loop added. if not exist, calculate spower.
-        // loop deleted, need to check each key whether we should delete it or not
-        // let (added_files_size, added_files_count)= Self::update_files(reporter, added_files, &anchor, true);
-        // let (deleted_files_size, _) = Self::update_files(reporter, deleted_files, &anchor, false);
-
-        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files.size_hint() as u32)});
+        // 2. Update sOrder
+        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files.len() as u32)});
 
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
@@ -1236,27 +1231,6 @@ impl<T: Config> Module<T> {
         Free::put(total_free);
         ReportedFilesSize::put(total_reported_files_size);
     }
-
-    /// Update sOrder information based on changed files, return the changed_file_size and changed_file_count
-    // fn update_files(
-    //     _reporter: &T::AccountId,
-    //     changed_files: &Vec<(MerkleRoot, u64, u64)>,
-    //     _anchor: &SworkerPubKey,
-    //     _is_added: bool) -> (u64, u32) {
-    //     let mut changed_spower: u64 = 0;
-    //     let mut changed_files_count: u32 = 0;
-
-    //     for (_, size, _) in changed_files {
-    //         // The replica update logic is moved to offchain crust-spower service, so DO NOT invoke the 
-    //         // T::MarketInterface::upsert_replica or delete_replica call here
-    //         // Use the raw value for calculation directly. The actual spower and file count of any illegal files 
-    //         // will be updated upon the market::update_replicas extrinsic call
-    //         changed_spower = changed_spower.saturating_add(*size);
-    //         changed_files_count += 1;
-    //     }
-        
-    //     (changed_spower, changed_files_count)
-    // }
 
     /// Get workload by reporter account,
     /// this function should only be called in the 2nd last session of new era

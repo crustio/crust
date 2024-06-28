@@ -104,7 +104,6 @@ pub struct Replica<AccountId> {
     pub created_at: Option<BlockNumber>
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct ReplicaToUpdate<AccountId> {
@@ -118,12 +117,6 @@ pub struct ReplicaToUpdate<AccountId> {
 }
 type ReplicaToUpdateOf<T> = ReplicaToUpdate<<T as system::Config>::AccountId>; 
 
-type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
-type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
-type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::NegativeImbalance;
-
-impl<T: Config> MarketInterface<<T as system::Config>::AccountId, BalanceOf<T>> for Module<T>
-{
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as system::Config>::AccountId>>::NegativeImbalance;
@@ -733,8 +726,8 @@ impl<T: Config> Module<T> {
             //     .into_iter()
             //     .partition(|replica| replica.is_added);
 
-            let mut added_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
-            let mut deleted_replicas: Vec<FileReplicaToUpdateOf<T>> = vec![];
+            let mut added_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
+            let mut deleted_replicas: Vec<ReplicaToUpdateOf<T>> = vec![];
             for replica in file_replicas {
                 if replica.is_added {
                     added_replicas.push(replica);
@@ -808,7 +801,7 @@ impl<T: Config> Module<T> {
             // --- Handle delete replicas ---
             for file_replica in deleted_replicas.iter() {
 
-                let ReplicaToUpdate { reporter, owner, ..} = file_replica;
+                let ReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
                 
                 let (is_replica_deleted, to_delete_spower) = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
                 if is_replica_deleted {

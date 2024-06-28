@@ -780,7 +780,6 @@ decl_module! {
             }
             
             // 13. Emit work report event   
-            Self::deposit_event(RawEvent::QueueWorkReportSuccess(<system::Module<T>>::block_number(), extrinsic_index, reporter.clone(), owner.clone()));
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
             // 14. Try to free count limitation
@@ -1561,12 +1560,11 @@ decl_event!(
         QueueWorkReportSuccess(SworkerAnchor, AccountId, AccountId),
         /// Set the crust-spower service superior account.
         SetSpowerSuperiorSuccess(AccountId),
+        /// Update spower success
         /// The first item is the account who update the spower.
         /// The second item is the current block number
         /// The third item is the updated sworkers count for sworker::WorkReports
         /// The fourth item is the updated files count for market::FilesV2
-        /// The fifth item is the processed update blocks count for market::UpdatedFilesToProcess
-        /// The sixth item is the latest LastSpowerUpdateBlock value
-        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32, u32, BlockNumber),
+        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32),
     }
 );

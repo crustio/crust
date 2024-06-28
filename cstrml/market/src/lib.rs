@@ -357,6 +357,9 @@ decl_storage! {
 
         /// The sPower will become valid after this period, default is 3 months
         pub SpowerReadyPeriod get(fn spower_ready_period): BlockNumber = 1_296_000;
+
+        /// The crust-spower service account
+        pub SpowerSuperior get(fn spower_superior): Option<T::AccountId>;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -525,6 +528,17 @@ decl_module! {
 
             Self::deposit_event(RawEvent::AddPrepaidSuccess(who, cid, amount));
 
+            Ok(())
+        }
+
+        /// Set the crust-spower service superior account
+        #[weight = 1000]
+        pub fn set_spower_superior(origin, superior: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+
+            SpowerSuperior::<T>::put(superior.clone());
+
+            Self::deposit_event(RawEvent::SetSpowerSuperiorSuccess(superior));
             Ok(())
         }
 
@@ -1170,5 +1184,7 @@ decl_event!(
         SetEnableMarketSuccess(bool),
         /// Set the file base fee success.
         SetBaseFeeSuccess(Balance),
+        /// Set the crust-spower service superior account.
+        SetSpowerSuperiorSuccess(AccountId),
     }
 );

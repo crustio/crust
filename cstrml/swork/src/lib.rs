@@ -241,6 +241,9 @@ decl_storage! {
         pub WorkReports get(fn work_reports):
             map hasher(twox_64_concat) SworkerAnchor => Option<WorkReport>;
 
+        /// The crust-spower service account
+        pub SpowerSuperior get(fn spower_superior): Option<T::AccountId>;
+
         /// The current report slot block number, this value should be a multiple of report slot block.
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
 
@@ -720,6 +723,17 @@ decl_module! {
             }
 
             Ok(Pays::Yes.into())
+        }
+
+        /// Set the crust-spower service superior account
+        #[weight = 1000]
+        pub fn set_spower_superior(origin, superior: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+
+            SpowerSuperior::<T>::put(superior.clone());
+
+            Self::deposit_event(RawEvent::SetSpowerSuperiorSuccess(superior));
+            Ok(())
         }
 
         /// Create a group. One account can only create one group once.
@@ -1471,5 +1485,7 @@ decl_event!(
         SetPunishmentSuccess(bool),
         /// Remove the expired code success
         RemoveCodeSuccess(SworkerCode),
+        /// Set the crust-spower service superior account.
+        SetSpowerSuperiorSuccess(AccountId),
     }
 );

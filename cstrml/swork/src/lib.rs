@@ -71,6 +71,7 @@ pub trait WeightInfo {
     fn set_code() -> Weight;
     fn register() -> Weight;
     fn report_works(added: u32, deleted: u32) -> Weight;
+    fn update_spower(changed_sworkers_count: u32, changed_files_count: u32) -> Weight;
     fn create_group() -> Weight;
     fn join_group() -> Weight;
     fn quit_group() -> Weight;
@@ -178,6 +179,37 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     fn get_owner(who: &T::AccountId) -> Option<T::AccountId> {
         Self::identities(who).unwrap_or_default().group
     }
+
+    // Update the last processed block of work reports 
+    fn update_last_processed_block_of_work_reports(last_processed_block: BlockNumber) {
+        LastProcessedBlockWorkReports::put(last_processed_block);
+    }
+    
+    // Update changed spower of sworkers
+	fn update_sworkers_changed_spower(sworker_spower_changed_map: &BTreeMap<SworkerAnchor, i64>) {
+        for (anchor, changed_spower) in sworker_spower_changed_map {
+            WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
+                Some(WorkReport { ref mut spower, .. }) => {
+                    if *changed_spower >= 0 {
+                        *spower = spower.saturating_add(changed_spower.abs() as u64);
+                    } else {
+                        *spower = spower.saturating_sub(changed_spower.abs() as u64);
+                    }                        
+                },
+                ref mut i => *i = None,
+            });
+        }
+    }
+
+    // Update illegal file replicas count
+    fn update_illegal_file_replicas_count(illegal_file_replicas_map: &BTreeMap<ReportSlot, u32>) {
+        // For those legacy report slots, we just ignore them because 'AddedFilesCount' is reset per report slot
+        if let Some(illegal_count) = illegal_file_replicas_map.get(&Self::get_current_reported_slot()) {
+            // Substract the illegal count
+            AddedFilesCount::mutate(|count| {*count = count.saturating_sub(*illegal_count)});
+        }
+    }
+
 }
 
 /// The module's configuration trait.
@@ -241,8 +273,14 @@ decl_storage! {
         pub WorkReports get(fn work_reports):
             map hasher(twox_64_concat) SworkerAnchor => Option<WorkReport>;
 
+        /// The last procssed block for the WorkReportsToProcess data, which is used by the crust-spower service for fresh new start
+        pub LastProcessedBlockWorkReports get (fn last_processed_block_work_reports): BlockNumber = 0;
+
         /// The crust-spower service account
         pub SpowerSuperior get(fn spower_superior): Option<T::AccountId>;
+
+        /// The last spower update block, which is set during updateSpower call by Crust-Spower service
+        pub LastSpowerUpdateBlock get(fn last_spower_update_block): BlockNumber = 0;
 
         /// The current report slot block number, this value should be a multiple of report slot block.
         pub CurrentReportSlot get(fn current_report_slot): ReportSlot = 0;
@@ -333,7 +371,11 @@ decl_error! {
         /// Code has not been expired
         CodeNotExpired,
         /// Tee signature is not valid
-        InvalidTeeSignature
+        InvalidTeeSignature,
+        /// The spower superior account is not set. Please call the set_spower_superior extrinsic first.
+        SpowerSuperiorNotSet,
+        /// The caller account is not the spower superior account. Please check the caller account again.
+        IllegalSpowerSuperior
     }
 }
 
@@ -712,12 +754,26 @@ decl_module! {
                 slot,
             );
 
-            // 12. Emit work report event
+            // 12. Emit QueueWorkReportSuccess event to be processed by the crust-spower off-chain service
+            let id = Self::identities(&reporter).unwrap_or_default();
+            let owner = if let Some(group) = id.group { group.clone() } else { reporter.clone() };
+            if added_files.len() > 0 || deleted_files.len() > 0 {                
+                let curr_bn = Self::get_current_block_number();
+
+                // Update the LastProcessedBlockWorkReports field if this is the first time
+                if LastProcessedBlockWorkReports::get() == 0 {
+                    // The curr_bn is the first block need to be indexed, so the last indexed block is the curr_bn - 1
+                    LastProcessedBlockWorkReports::put(curr_bn - 1);
+                }
+
+                // Emit the QueueWorkReportSuccess event
+                Self::deposit_event(RawEvent::QueueWorkReportSuccess(anchor, reporter.clone(), owner.clone()));
+            }
+            
+            // 13. Emit work report event   
             Self::deposit_event(RawEvent::WorksReportSuccess(reporter.clone(), curr_pk.clone()));
 
-            // 13. Try to free count limitation
-            let id = Self::identities(&reporter).unwrap_or_default();
-            let owner = if let Some(group) = id.group { group } else { reporter };
+            // 14. Try to free count limitation
             if T::BenefitInterface::maybe_free_count(&owner) {
                return Ok(Pays::No.into());
             }
@@ -734,6 +790,56 @@ decl_module! {
 
             Self::deposit_event(RawEvent::SetSpowerSuperiorSuccess(superior));
             Ok(())
+        }
+
+        /// Update sworker spower, which is called by Crust-Spower service
+        /// Arguments:
+        /// changed_spowers: 
+        ///     Vec<(SworkerAnchor, changed_spower_value)>
+        /// changed_files:
+        ///     Specify the files changed spower data, the data structure is
+        ///     Vec<(cid, spower, Vec<(owner, who, anchor, created_at)>)>
+        #[weight = T::WeightInfo::update_spower(changed_spowers.len() as u32, changed_files.len() as u32)]
+        pub fn update_spower(
+            origin,
+            changed_spowers: Vec<(SworkerAnchor, i64)>,
+            changed_files: Vec<(MerkleRoot, u64, Vec<(T::AccountId, T::AccountId, SworkerAnchor, Option<BlockNumber>)>)>,
+        ) -> DispatchResultWithPostInfo {
+            let caller = ensure_signed(origin)?;
+            let maybe_superior = Self::spower_superior();
+
+            // 1. Check if superior is set and the caller is superior
+            ensure!(maybe_superior.is_some(), Error::<T>::SpowerSuperiorNotSet);
+            ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
+
+            // 2. Update sworker spower
+            for (anchor, changed_spower) in changed_spowers.iter() {
+                WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
+                    Some(WorkReport { ref mut spower, .. }) => {
+                        if *changed_spower >= 0 {
+                            *spower = spower.saturating_add(changed_spower.abs() as u64);
+                        } else {
+                            *spower = spower.saturating_sub(changed_spower.abs() as u64);
+                        }                        
+                    },
+                    ref mut i => *i = None,
+                });
+            }
+
+            // 3. Update the file new spower in pallet_market
+            T::MarketInterface::update_files_spower(&changed_files);
+
+            // 4. Set the LastSpowerUpdateBlock value, which is the latest block in updated_blocks
+            LastSpowerUpdateBlock::put(Self::get_current_block_number());
+
+            // 5. Emit the event
+            Self::deposit_event(RawEvent::UpdateSpowerSuccess(caller, 
+                <system::Module<T>>::block_number(), 
+                changed_spowers.len() as u32, 
+                changed_files.len() as u32)); 
+
+            // Do not charge fee for management extrinsic
+            Ok(Pays::No.into())
         }
 
         /// Create a group. One account can only create one group once.
@@ -1076,12 +1182,12 @@ impl<T: Config> Module<T> {
     /// 3. update `Spower` and `Free`
     /// 4. call `Works::report_works` interface
     fn maybe_upsert_work_report(
-        reporter: &T::AccountId,
+        _reporter: &T::AccountId,
         anchor: &SworkerAnchor,
         reported_srd_size: u64,
         reported_files_size: u64,
         added_files: &Vec<(MerkleRoot, u64, u64)>,
-        deleted_files: &Vec<(MerkleRoot, u64, u64)>,
+        _deleted_files: &Vec<(MerkleRoot, u64, u64)>,
         reported_srd_root: &MerkleRoot,
         reported_files_root: &MerkleRoot,
         report_slot: u64,
@@ -1093,13 +1199,8 @@ impl<T: Config> Module<T> {
         // 1. Mark who has reported in this (report)slot
         ReportedInSlot::insert(&anchor, report_slot, true);
 
-        // 2. Update sOrder and get changed size
-        // loop added. if not exist, calculate spower.
-        // loop deleted, need to check each key whether we should delete it or not
-        let (added_files_size, added_files_count)= Self::update_files(reporter, added_files, &anchor, true);
-        let (deleted_files_size, _) = Self::update_files(reporter, deleted_files, &anchor, false);
-
-        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files_count)});
+        // 2. Update sOrder
+        AddedFilesCount::mutate(|count| {*count = count.saturating_add(added_files.len() as u32)});
 
         // 3. If contains work report
         if let Some(old_wr) = Self::work_reports(&anchor) {
@@ -1109,10 +1210,11 @@ impl<T: Config> Module<T> {
         }
 
         // 4. Construct work report
-        let spower = old_spower.saturating_add(added_files_size).saturating_sub(deleted_files_size);
+        // Do not change the spower here, it would be updated by the crust-spower service
+        // let spower = old_spower.saturating_add(added_files_size).saturating_sub(deleted_files_size);
         let wr = WorkReport {
             report_slot,
-            spower,
+            spower: old_spower,
             free: reported_srd_size,
             reported_files_size,
             reported_srd_root: reported_srd_root.clone(),
@@ -1128,49 +1230,6 @@ impl<T: Config> Module<T> {
 
         Free::put(total_free);
         ReportedFilesSize::put(total_reported_files_size);
-    }
-
-    /// Update sOrder information based on changed files, return the changed_file_size and changed_file_count
-    fn update_files(
-        reporter: &T::AccountId,
-        changed_files: &Vec<(MerkleRoot, u64, u64)>,
-        anchor: &SworkerPubKey,
-        is_added: bool) -> (u64, u32) {
-        let mut changed_spower: u64 = 0;
-        let mut changed_files_count: u32 = 0;
-
-        // 1. Loop changed files
-        if is_added {
-            for (cid, size, valid_at) in changed_files {
-                let mut owner = reporter.clone();
-                if let Some(identity) = Self::identities(reporter) {
-                    if let Some(group_owner) = identity.group {
-                        owner = group_owner;
-                    }
-                };
-                let (added_spower, is_valid_cid) = T::MarketInterface::upsert_replica(reporter, owner, cid, *size, anchor, TryInto::<u32>::try_into(*valid_at).ok().unwrap());
-                changed_spower = changed_spower.saturating_add(added_spower);
-                if is_valid_cid {
-                    changed_files_count += 1;
-                }
-            }
-        } else {
-            for (cid, _, _) in changed_files {
-                // 2. If mapping to storage orders
-                let mut owner = reporter.clone();
-                if let Some(identity) = Self::identities(reporter) {
-                    if let Some(group_owner) = identity.group {
-                        owner = group_owner;
-                    }
-                };
-                let (deleted_spower, is_valid_cid) = T::MarketInterface::delete_replica(reporter, owner, cid, anchor);
-                changed_spower = changed_spower.saturating_add(deleted_spower);
-                if is_valid_cid {
-                    changed_files_count += 1;
-                }
-            }
-        }
-        (changed_spower, changed_files_count)
     }
 
     /// Get workload by reporter account,
@@ -1485,7 +1544,18 @@ decl_event!(
         SetPunishmentSuccess(bool),
         /// Remove the expired code success
         RemoveCodeSuccess(SworkerCode),
+        /// Work report has been added to the WorkReportsToProcess queue success
+        /// The first item is the sworker anchor
+        /// The second item is the account who send the work report
+        /// The third item is the owner account
+        QueueWorkReportSuccess(SworkerAnchor, AccountId, AccountId),
         /// Set the crust-spower service superior account.
         SetSpowerSuperiorSuccess(AccountId),
+        /// Update spower success
+        /// The first item is the account who update the spower.
+        /// The second item is the current block number
+        /// The third item is the updated sworkers count for sworker::WorkReports
+        /// The fourth item is the updated files count for market::FilesV2
+        UpdateSpowerSuccess(AccountId, BlockNumber, u32, u32),
     }
 );

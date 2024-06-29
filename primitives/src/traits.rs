@@ -2,8 +2,10 @@
 // This file is part of Crust.
 
 use frame_support::traits::{LockableCurrency, WithdrawReasons};
-use crate::{SworkerAnchor, MerkleRoot, BlockNumber, EraIndex};
+use crate::{BlockNumber, EraIndex, MerkleRoot, ReportSlot, SworkerAnchor};
 use sp_runtime::{DispatchError, Perbill};
+use sp_std::collections::btree_map::BTreeMap;
+use sp_std::vec::Vec;
 
 /// A currency whose accounts can have liquidity restrictions.
 pub trait UsableCurrency<AccountId>: LockableCurrency<AccountId> {
@@ -26,18 +28,20 @@ pub trait SworkerInterface<AccountId> {
 	fn get_added_files_count_and_clear_record() -> u32;
 	// Get owner of this member
 	fn get_owner(who: &AccountId) -> Option<AccountId>;
+	// Update the last processed block of work reports
+	fn update_last_processed_block_of_work_reports(last_processed_block: BlockNumber);
+	// Update changed spower of sworkers
+	fn update_sworkers_changed_spower(sworker_spower_changed_map: &BTreeMap<SworkerAnchor, i64>);
+	// Update illegal file replicas count
+	fn update_illegal_file_replicas_count(illegal_file_replicas_map: &BTreeMap<ReportSlot, u32>);
 }
 
 /// Means for interacting with a specialized version of the `market` trait.
 pub trait MarketInterface<AccountId, Balance> {
-	// used for `added_files`
-	// return real spower of this file and whether this file is in the market system
-	fn upsert_replica(who: &AccountId, owner: AccountId, cid: &MerkleRoot, reported_file_size: u64, anchor: &SworkerAnchor, valid_at: BlockNumber) -> (u64, bool);
-	// used for `delete_files`
-	// return real spower of this file and whether this file is in the market system
-	fn delete_replica(who: &AccountId, owner: AccountId, cid: &MerkleRoot, anchor: &SworkerAnchor) -> (u64, bool);
 	// used for distribute market staking payout
 	fn withdraw_staking_pot() -> Balance;
+	// Update files spower in market::FilesV2
+	fn update_files_spower(changed_files: &Vec<(MerkleRoot, u64, Vec<(AccountId, AccountId, SworkerAnchor, Option<BlockNumber>)>)>);
 }
 
 pub trait BenefitInterface<AccountId, Balance, NegativeImbalance> {

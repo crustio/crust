@@ -21,3 +21,6 @@
 
 ## Integration test
 db/
+
+# logs
+*.log

@@ -101,6 +101,8 @@ pub struct Replica<AccountId> {
     // Is reported in the last check
     pub is_reported: bool,
     // Timestamp which the replica created
+    // None: means who += spower
+    // Some: means who += file_size
     pub created_at: Option<BlockNumber>
 }
 

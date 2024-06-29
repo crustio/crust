@@ -23,6 +23,8 @@ pub use std::{cell::RefCell, collections::HashMap, borrow::Borrow, iter::FromIte
 pub type AccountId = AccountId32;
 pub type Balance = u64;
 
+pub const SPOWER: AccountId32 = AccountId32::new([9u8; 32]);
+
 thread_local! {
     static EXISTENTIAL_DEPOSIT: RefCell<u64> = RefCell::new(0);
     static LEGAL_PK: Vec<u8> = hex::decode("cb8a7b27493749c939da4bba7266f1476bb960e74891817544503212620dce3c94e1c26c622ccb9a840415881deef5412b548f22a7d5e5c05fb412cfdc8e5464").unwrap();
@@ -778,7 +780,7 @@ pub fn add_live_files(who: &AccountId, anchor: &SworkerAnchor) {
 fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: Balance, prepaid: Balance,  reported_replica_count: u32, replicas: BTreeMap::<AccountId, Replica<AccountId>>, file_size: u64) {
     let file_info = FileInfoV2 {
         file_size,
-        spower: Market::calculate_spower(file_size, replicas.len() as u32),
+        spower: 0,
         expired_at, 
         calculated_at,
         amount,
@@ -794,4 +796,42 @@ fn insert_file(f_id: &MerkleRoot, calculated_at: u32, expired_at: u32, amount: B
 pub fn update_identities() {
     Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET as u64);
     Swork::on_initialize(REPORT_SLOT - UPDATE_OFFSET as u64);
+}
+
+pub fn add_who_into_replica(
+    cid: &MerkleRoot, 
+    reported_size: u64, 
+    who: AccountId, 
+    owner: AccountId, 
+    anchor: SworkerAnchor, 
+    report_slot: ReportSlot,
+    report_block: BlockNumber,
+    valid_at: BlockNumber) {
+    
+    assert_ok!(Market::update_replicas(
+            Origin::signed(SPOWER.clone()), 
+            vec![(cid.clone(), 
+                  reported_size, 
+                  vec![(who.clone(), owner.clone(), anchor.clone(), report_slot, report_block, valid_at, true)]
+                )], 
+            400));
+}
+
+pub fn delete_replica(
+    cid: &MerkleRoot, 
+    reported_size: u64, 
+    who: AccountId, 
+    owner: AccountId, 
+    anchor: SworkerAnchor, 
+    report_slot: ReportSlot,
+    report_block: BlockNumber,
+    valid_at: BlockNumber) {
+    
+    assert_ok!(Market::update_replicas(
+            Origin::signed(SPOWER.clone()), 
+            vec![(cid.clone(), 
+                  reported_size, 
+                  vec![(who.clone(), owner.clone(), anchor.clone(), report_slot, report_block, valid_at, false)]
+                )], 
+            400));
 }

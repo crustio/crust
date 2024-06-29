@@ -393,6 +393,8 @@ fn report_works_should_work() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let spower = SPOWER;
+
             let legal_wr_info = legal_work_report_with_added_files();
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
@@ -403,6 +405,11 @@ fn report_works_should_work() {
                 reported_srd_root: legal_wr_info.srd_root.clone(),
                 reported_files_root: legal_wr_info.files_root.clone()
             };
+
+            let file_f = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(); // F file
+            let file_h = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oH".as_bytes().to_vec(); // H file
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
             register(&legal_pk, LegalCode::get());
             add_not_live_files();
@@ -425,6 +432,8 @@ fn report_works_should_work() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
             ));
+            add_who_into_replica(&file_f, 134289408, reporter.clone(), reporter.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_h, 268578816, reporter.clone(), reporter.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
             // Check work report
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
@@ -497,6 +506,8 @@ fn report_works_for_invalid_cids_should_work() {
             run_to_block(303);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let spower = SPOWER;
+
             let legal_wr_info = legal_work_report_with_added_files();
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
@@ -508,6 +519,11 @@ fn report_works_for_invalid_cids_should_work() {
                 reported_files_root: legal_wr_info.files_root.clone()
             };
 
+            let file_f = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(); // F file
+            let file_h = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oH".as_bytes().to_vec(); // H file
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+            
             register(&legal_pk, LegalCode::get());
 
             // Check workloads before reporting
@@ -528,6 +544,10 @@ fn report_works_for_invalid_cids_should_work() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
             ));
+            // Since file cid is not in FilesV2, the following call should trigger the T::SworkerInterface::update_illegal_file_replicas_count
+            // which should make the Swork::Added_Files_Count to become 0 again
+            add_who_into_replica(&file_f, 134289408, reporter.clone(), reporter.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_h, 268578816, reporter.clone(), reporter.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
             // Check work report
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
@@ -891,6 +911,11 @@ fn incremental_report_should_work_with_files_change() {
     ExtBuilder::default()
         .build()
         .execute_with(|| {
+
+            let spower = SPOWER;
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+
             // Generate 303 blocks first
             run_to_block(303);
 
@@ -927,12 +952,16 @@ fn incremental_report_should_work_with_files_change() {
                 legal_wr_info.free,
                 legal_wr_info.spower,
                 legal_wr_info.added_files,
-                legal_wr_info.deleted_files,
+                legal_wr_info.deleted_files.clone(),
                 legal_wr_info.srd_root,
                 legal_wr_info.files_root,
                 legal_wr_info.sig
             ));
 
+            for deleted_file in legal_wr_info.deleted_files {
+                delete_replica(&deleted_file.0, deleted_file.1, reporter.clone(), reporter.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+            }
+            
             // Check work report
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
 
@@ -1163,11 +1192,15 @@ fn ab_upgrade_should_work() {
         .build()
         .execute_with(|| {
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let spower = SPOWER;
+
             let a_wr_info = legal_work_report();
             let b_wr_info_1 = ab_upgrade_work_report();
             let b_wr_info_2 = continuous_ab_upgrade_work_report();
             let a_pk = a_wr_info.curr_pk.clone();
             let b_pk = b_wr_info_1.curr_pk.clone();
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
             // 0. Initial setup
             register(&a_pk, LegalCode::get());
@@ -1275,6 +1308,11 @@ fn ab_upgrade_should_work() {
                 b_wr_info_2.files_root,
                 b_wr_info_2.sig
             ));
+            // b_wr_info_2 contains 1 added_file (file_c) and 1 deleted_file (file_b)
+            let file_b = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(); // B file
+            let file_c = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(); // C file
+            add_who_into_replica(&file_c, 37, reporter.clone(), reporter.clone(), a_pk.clone(), b_wr_info_2.block_number, 909, 903);
+            delete_replica(&file_b, 7, reporter.clone(), reporter.clone(), a_pk.clone(), b_wr_info_2.block_number, 909, 903);
 
             // 11. Check B's work report and free & spower again
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
@@ -1892,6 +1930,9 @@ fn join_group_should_work_for_spower_in_work_report() {
             let bob = Sr25519Keyring::Bob.to_account_id();
             let eve = Sr25519Keyring::Eve.to_account_id();
             let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+            let spower = SPOWER;
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
             // Get work report in 300 slot fo alice, bob and eve
             let alice_wr_info = group_work_report_alice_300();
@@ -1967,6 +2008,10 @@ fn join_group_should_work_for_spower_in_work_report() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
+
+            add_who_into_replica(&file_a, 13, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_b, 7, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_c, 37, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
 
             assert_eq!(Market::filesv2(&file_a).unwrap_or_default(),
                 FileInfoV2 {
@@ -2052,6 +2097,10 @@ fn join_group_should_work_for_spower_in_work_report() {
                 bob_wr_info.files_root,
                 bob_wr_info.sig
             ));
+
+            add_who_into_replica(&file_b, 7, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_c, 37, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_d, 55, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 303, 303);
 
             assert_eq!(Market::filesv2(&file_b).unwrap_or_default(),
                 FileInfoV2 {
@@ -2166,6 +2215,10 @@ fn join_group_should_work_for_spower_in_work_report() {
                 eve_wr_info.sig
             ));
 
+            add_who_into_replica(&file_c, 37, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_d, 55, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_e, 22, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 303, 303);
+
             assert_eq!(Market::filesv2(&file_c).unwrap_or_default(),
                 FileInfoV2 {
                     file_size: 37,
@@ -2270,6 +2323,8 @@ fn join_group_should_work_for_spower_in_work_report() {
                 bob_wr_info.files_root,
                 bob_wr_info.sig
             ));
+            delete_replica(&file_b, 7, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 603, 603);
+            delete_replica(&file_c, 37, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 603, 603);
 
             assert_eq!(Market::filesv2(&file_b).unwrap_or_default(),
                 FileInfoV2 {
@@ -2361,6 +2416,10 @@ fn join_group_should_work_for_spower_in_work_report() {
                 eve_wr_info.files_root,
                 eve_wr_info.sig
             ));
+            delete_replica(&file_c, 37, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 603, 603);
+            delete_replica(&file_d, 55, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 603, 603);
+            delete_replica(&file_e, 22, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 603, 603);
+
             assert_eq!(Market::filesv2(&file_c).unwrap_or_default(),
                 FileInfoV2 {
                     file_size: 37,
@@ -2440,7 +2499,7 @@ fn join_group_should_work_for_spower_in_work_report() {
 
             assert_eq!(Swork::work_reports(&a_pk).unwrap(), WorkReport {
                 report_slot: 300,
-                spower: 20,
+                spower: 57,
                 free: 4294967296,
                 reported_files_size: 57,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2449,7 +2508,7 @@ fn join_group_should_work_for_spower_in_work_report() {
 
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                spower: 0,
+                spower: 55,
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2490,6 +2549,9 @@ fn join_group_should_work_for_spower_in_work_report() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
+            delete_replica(&file_a, 13, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 1503, 1503);
+            delete_replica(&file_b, 7, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 1503, 1503);
+            delete_replica(&file_c, 37, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 1503, 1503);
 
             // delete won't call calculate payout anymore and won't close the file
             assert_eq!(Market::filesv2(&file_a).is_some(), true);
@@ -2512,10 +2574,19 @@ fn join_group_should_work_for_spower_in_work_report() {
             assert_eq!(Market::filesv2(&file_a), None);
             assert_eq!(Market::filesv2(&file_b), None);
 
+            // calculate_reward doesn't update spower now, the offchain crust-spower service will listen to the FileClosed event 
+            // and update the spower for file_c and file_d
+            assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
+            assert_ok!(Swork::update_spower(
+            Origin::signed(spower.clone()), 
+            vec![(b_pk.clone(), (0 as i64 - 55 as i64)),
+                 (a_pk.clone(), (0 as i64 - 37 as i64))],
+            vec![]));
+
             // d has gone!
             assert_eq!(Swork::work_reports(&b_pk).unwrap(), WorkReport {
                 report_slot: 600,
-                spower: 0,
+                spower: 0, 
                 free: 4294967296,
                 reported_files_size: 55,
                 reported_srd_root: hex::decode("00").unwrap(),
@@ -2543,6 +2614,7 @@ fn join_group_should_work_for_stake_limit() {
             let bob = Sr25519Keyring::Bob.to_account_id();
             let eve = Sr25519Keyring::Eve.to_account_id();
             let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+            let spower = SPOWER;
 
             let alice_wr_info = group_work_report_alice_300();
             let bob_wr_info = group_work_report_bob_300();
@@ -2550,6 +2622,14 @@ fn join_group_should_work_for_stake_limit() {
             let a_pk = alice_wr_info.curr_pk.clone();
             let b_pk = bob_wr_info.curr_pk.clone();
             let c_pk = eve_wr_info.curr_pk.clone();
+
+            let file_a = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oA".as_bytes().to_vec(); // A file
+            let file_b = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(); // B file
+            let file_c = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(); // C file
+            let file_d = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oD".as_bytes().to_vec(); // D file
+            let file_e = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oE".as_bytes().to_vec(); // E file
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
             register(&a_pk, LegalCode::get());
             register(&b_pk, LegalCode::get());
@@ -2611,6 +2691,9 @@ fn join_group_should_work_for_stake_limit() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
+            add_who_into_replica(&file_a, 13, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_b, 7, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_c, 37, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
             assert_ok!(Swork::report_works(
                 Origin::signed(bob.clone()),
                 bob_wr_info.curr_pk,
@@ -2625,6 +2708,9 @@ fn join_group_should_work_for_stake_limit() {
                 bob_wr_info.files_root,
                 bob_wr_info.sig
             ));
+            add_who_into_replica(&file_b, 7, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_c, 37, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_d, 55, bob.clone(), ferdie.clone(), b_pk.clone(), bob_wr_info.block_number, 303, 303);
             assert_ok!(Swork::report_works(
                 Origin::signed(eve.clone()),
                 eve_wr_info.curr_pk,
@@ -2639,6 +2725,9 @@ fn join_group_should_work_for_stake_limit() {
                 eve_wr_info.files_root,
                 eve_wr_info.sig
             ));
+            add_who_into_replica(&file_c, 37, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_d, 55, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_e, 22, eve.clone(), ferdie.clone(), c_pk.clone(), eve_wr_info.block_number, 303, 303);
 
             run_to_block(603);
             update_identities();
@@ -2753,6 +2842,13 @@ fn kick_out_should_work_for_stake_limit() {
             let bob = Sr25519Keyring::Bob.to_account_id();
             let eve = Sr25519Keyring::Eve.to_account_id();
             let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+            let spower = SPOWER;
+
+            let file_a = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oA".as_bytes().to_vec(); // A file
+            let file_b = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(); // B file
+            let file_c = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(); // C file
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
             assert_noop!(
                 Swork::kick_out(
@@ -2821,6 +2917,10 @@ fn kick_out_should_work_for_stake_limit() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
+            add_who_into_replica(&file_a, 13, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_b, 7, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_c, 37, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+
 
             run_to_block(603);
 
@@ -2861,9 +2961,16 @@ fn punishment_by_offline_should_work_for_stake_limit() {
         .execute_with(|| {
             let alice = Sr25519Keyring::Alice.to_account_id();
             let ferdie = Sr25519Keyring::Ferdie.to_account_id();
+            let spower = SPOWER;
+
+            let file_a = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oA".as_bytes().to_vec(); // A file
+            let file_b = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oB".as_bytes().to_vec(); // B file
+            let file_c = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oC".as_bytes().to_vec(); // C file
 
             let alice_wr_info = group_work_report_alice_300();
             let a_pk = alice_wr_info.curr_pk.clone();
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
 
             register(&a_pk, LegalCode::get());
             register_identity(&alice, &a_pk, &a_pk);
@@ -2901,6 +3008,9 @@ fn punishment_by_offline_should_work_for_stake_limit() {
                 alice_wr_info.files_root,
                 alice_wr_info.sig
             ));
+            add_who_into_replica(&file_a, 13, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_b, 7, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_c, 37, alice.clone(), ferdie.clone(), a_pk.clone(), alice_wr_info.block_number, 303, 303);
 
             run_to_block(603);
             update_identities();
@@ -3134,14 +3244,15 @@ fn update_identities_timeline_should_work() {
             });
             add_live_files(&reporter, &legal_pk);
 
-            run_to_block(202);
+            run_to_block(252);
             // Start update identity
-            Swork::on_initialize(200);
+            // UPDATE_OFFSET has changed to REPORT_SLOT/6, so change the block from 200 to 250
+            Swork::on_initialize(250);
             assert_eq!(Swork::workload().is_some(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(WorkloadMap::get().borrow().get(&reporter).is_none(), true);
 
-            Swork::on_initialize(201);
+            Swork::on_initialize(251);
             assert_eq!(Swork::workload().is_none(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
@@ -3175,20 +3286,22 @@ fn update_identities_timeline_should_work() {
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
             assert_eq!(Swork::current_report_slot(), 0);
             // Start update identity
-            Swork::on_initialize(500);
+            // UPDATE_OFFSET has changed to REPORT_SLOT/6, so change the block from 500 to 550
+            Swork::on_initialize(550);
             assert_eq!(Swork::workload().is_some(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
             assert_eq!(Swork::current_report_slot(), 0);
-            Swork::on_initialize(500);
+            Swork::on_initialize(550);
             assert_eq!(Swork::workload().is_none(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
             assert_eq!(Swork::current_report_slot(), 300);
 
-            run_to_block(800);
+            run_to_block(850);
             // Start update identity, report_in_slot is false => no workload
-            Swork::on_initialize(800);
+            // UPDATE_OFFSET has changed to REPORT_SLOT/6, so change the block from 800 to 850
+            Swork::on_initialize(850);
             assert_eq!(Swork::workload().is_some(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
@@ -3453,6 +3566,8 @@ fn spower_delay_should_work() {
             market::SpowerReadyPeriod::put(300);
 
             let reporter: AccountId = Sr25519Keyring::Alice.to_account_id();
+            let spower = SPOWER;
+
             let legal_wr_info = legal_work_report_with_added_files();
             let legal_pk = legal_wr_info.curr_pk.clone();
             let legal_wr = WorkReport {
@@ -3463,6 +3578,12 @@ fn spower_delay_should_work() {
                 reported_srd_root: legal_wr_info.srd_root.clone(),
                 reported_files_root: legal_wr_info.files_root.clone()
             };
+
+            let file_f = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oF".as_bytes().to_vec(); // F file
+            let file_h = "QmdwgqZy1MZBfWPi7GcxVsYgJEtmvHg6rsLzbCej3tf3oH".as_bytes().to_vec(); // H file
+
+            assert_ok!(Market::set_spower_superior(Origin::root(), spower.clone()));
+            assert_ok!(Swork::set_spower_superior(Origin::root(), spower.clone()));
 
             register(&legal_pk, LegalCode::get());
             add_not_live_files();
@@ -3485,6 +3606,8 @@ fn spower_delay_should_work() {
                 legal_wr_info.files_root,
                 legal_wr_info.sig
             ));
+            add_who_into_replica(&file_f, 134289408, reporter.clone(), reporter.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
+            add_who_into_replica(&file_h, 268578816, reporter.clone(), reporter.clone(), legal_pk.clone(), legal_wr_info.block_number, 303, 303);
 
             // Check work report
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), legal_wr);
@@ -3544,6 +3667,15 @@ fn spower_delay_should_work() {
             run_to_block(606);
 
             assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[0].0.clone()));
+            // calculate_reward doesn't update spower anymore, it's done by the offchain crust-spower
+            let cid_0 = legal_wr_info.added_files[0].0.clone();
+            let file_size_0 = legal_wr_info.added_files[0].1;
+            let file_spower_0 = Market::calculate_spower(file_size_0, 1);
+            assert_ok!(Swork::update_spower(
+                Origin::signed(spower.clone()), 
+                vec![(legal_pk.clone(), (file_spower_0 as i64 - file_size_0 as i64))],
+                vec![(cid_0.clone(), file_spower_0, vec![(reporter.clone(), reporter.clone(), legal_pk.clone(), None)])]));
+
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 spower: Market::calculate_spower(134289408, 1) + 268578816,
@@ -3554,6 +3686,14 @@ fn spower_delay_should_work() {
             });
 
             assert_ok!(Market::calculate_reward(Origin::signed(reporter.clone()), legal_wr_info.added_files[1].0.clone()));
+            let cid_1 = legal_wr_info.added_files[1].0.clone();
+            let file_size_1 = legal_wr_info.added_files[1].1;
+            let file_spower_1 = Market::calculate_spower(file_size_1, 1);
+            assert_ok!(Swork::update_spower(
+                Origin::signed(spower.clone()), 
+                vec![(legal_pk.clone(), (file_spower_1 as i64 - file_size_1 as i64))],
+                vec![(cid_1.clone(), file_spower_1, vec![(reporter.clone(), reporter.clone(), legal_pk.clone(), None)])]));
+
             assert_eq!(Swork::work_reports(&legal_pk).unwrap(), WorkReport {
                 report_slot: 300,
                 spower: Market::calculate_spower(134289408, 1) + Market::calculate_spower(268578816, 1),

@@ -32,6 +32,7 @@ pub const MERCHANT: AccountId32 = AccountId32::new([5u8; 32]);
 pub const DAVE: AccountId32 = AccountId32::new([6u8; 32]);
 pub const FERDIE: AccountId32 = AccountId32::new([7u8; 32]);
 pub const ZIKUN: AccountId32 = AccountId32::new([8u8; 32]);
+pub const SPOWER: AccountId32 = AccountId32::new([9u8; 32]);
 
 #[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, Default)]
 pub struct MockMerchantLedger {
@@ -301,8 +302,42 @@ pub fn init_swork_setup() {
 }
 
 // fake for report_works
-pub fn add_who_into_replica(cid: &MerkleRoot, reported_size: u64, who: AccountId, owner: AccountId, anchor: SworkerAnchor, created_at: Option<u32>, _maybe_members: Option<BTreeSet<AccountId>>) -> u64 {
-    Market::upsert_replica(&who, owner, cid, reported_size, &anchor, created_at.unwrap_or(TryInto::<u32>::try_into(System::block_number()).ok().unwrap())).0
+pub fn add_who_into_replica(
+    cid: &MerkleRoot, 
+    reported_size: u64, 
+    who: AccountId, 
+    owner: AccountId, 
+    anchor: SworkerAnchor, 
+    report_slot: ReportSlot,
+    report_block: BlockNumber,
+    valid_at: BlockNumber) {
+    
+    assert_ok!(Market::update_replicas(
+            Origin::signed(SPOWER.clone()), 
+            vec![(cid.clone(), 
+                  reported_size, 
+                  vec![(who.clone(), owner.clone(), anchor.clone(), report_slot, report_block, valid_at, true)]
+                )], 
+            400));
+}
+
+pub fn delete_replica(
+    cid: &MerkleRoot, 
+    reported_size: u64, 
+    who: AccountId, 
+    owner: AccountId, 
+    anchor: SworkerAnchor, 
+    report_slot: ReportSlot,
+    report_block: BlockNumber,
+    valid_at: BlockNumber) {
+    
+    assert_ok!(Market::update_replicas(
+            Origin::signed(SPOWER.clone()), 
+            vec![(cid.clone(), 
+                  reported_size, 
+                  vec![(who.clone(), owner.clone(), anchor.clone(), report_slot, report_block, valid_at, false)]
+                )], 
+            400));
 }
 
 pub fn legal_work_report_with_added_files() -> ReportWorksInfo {

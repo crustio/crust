@@ -70,7 +70,7 @@ pub mod swork {
     #[cfg(not(feature = "test"))]
     pub const REPORT_SLOT: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
 
-    pub const UPDATE_OFFSET: u32 = (REPORT_SLOT / 3) as u32;
+    pub const UPDATE_OFFSET: u32 = (REPORT_SLOT / 6) as u32;
     pub const END_OFFSET: u32 = 1;
 }
 

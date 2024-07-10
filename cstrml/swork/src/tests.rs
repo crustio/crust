@@ -3246,13 +3246,12 @@ fn update_identities_timeline_should_work() {
 
             run_to_block(252);
             // Start update identity
-            // UPDATE_OFFSET has changed to REPORT_SLOT/6, so change the block from 200 to 250
-            Swork::on_initialize(250);
+            Swork::on_initialize(200);
             assert_eq!(Swork::workload().is_some(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(WorkloadMap::get().borrow().get(&reporter).is_none(), true);
 
-            Swork::on_initialize(251);
+            Swork::on_initialize(201);
             assert_eq!(Swork::workload().is_none(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
@@ -3286,13 +3285,12 @@ fn update_identities_timeline_should_work() {
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
             assert_eq!(Swork::current_report_slot(), 0);
             // Start update identity
-            // UPDATE_OFFSET has changed to REPORT_SLOT/6, so change the block from 500 to 550
-            Swork::on_initialize(550);
+            Swork::on_initialize(500);
             assert_eq!(Swork::workload().is_some(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 2u128);
             assert_eq!(Swork::current_report_slot(), 0);
-            Swork::on_initialize(550);
+            Swork::on_initialize(500);
             assert_eq!(Swork::workload().is_none(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);
@@ -3300,8 +3298,7 @@ fn update_identities_timeline_should_work() {
 
             run_to_block(850);
             // Start update identity, report_in_slot is false => no workload
-            // UPDATE_OFFSET has changed to REPORT_SLOT/6, so change the block from 800 to 850
-            Swork::on_initialize(850);
+            Swork::on_initialize(800);
             assert_eq!(Swork::workload().is_some(), true);
             assert_eq!(Swork::identity_previous_key().is_none(), true);
             assert_eq!(*WorkloadMap::get().borrow().get(&reporter).unwrap(), 4u128);

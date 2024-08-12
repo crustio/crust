@@ -805,7 +805,7 @@ impl<T: Config> Module<T> {
 
                 let ReplicaToUpdate { reporter, owner, sworker_anchor, ..} = file_replica;
                 
-                let (is_replica_deleted, to_delete_spower) = Self::delete_replica(&mut file_info,&reporter, owner, &sworker_anchor);
+                let (is_replica_deleted, to_delete_spower) = Self::delete_replica(&mut file_info,&reporter, &owner, &sworker_anchor);
                 if is_replica_deleted {
                     // Update replicated sworker's changed spower
                     if let Some(changed_spower) = sworker_changed_spower_map.get_mut(sworker_anchor) {
@@ -817,7 +817,7 @@ impl<T: Config> Module<T> {
             }
 
             // Update the file info with all the above changes in one DB write
-            <FilesV2<T>>::insert(cid.clone(), file_info.clone());
+            <FilesV2<T>>::insert(cid, file_info);
             changed_files_count += 1;
         }
 

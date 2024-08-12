@@ -49,7 +49,7 @@ impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 	}
 	fn update_replicas() -> Weight {
 		(1_000_000_000 as Weight)
-			.saturating_add(T::DbWeight::get().reads(500 as Weight))
-			.saturating_add(T::DbWeight::get().writes(500 as Weight))
+			.saturating_add(T::DbWeight::get().reads(1000 as Weight))
+			.saturating_add(T::DbWeight::get().writes(1000 as Weight))
 	}
 }

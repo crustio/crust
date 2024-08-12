@@ -46,6 +46,7 @@ const MAX_REPLICAS: usize = 200;
 // We should change `calculate_reward_amount` if we change the REWARD_PERSON
 // Any ratio change should re-design the `calculate_reward_amount` as well
 const REWARD_PERSON: u32 = 4;
+const MAX_CALCULATE_SPOWER_FILES_COUNT: usize = 300;
 
 #[macro_export]
 macro_rules! log {
@@ -62,6 +63,7 @@ pub trait WeightInfo {
     fn calculate_reward() -> Weight;
     fn reward_merchant() -> Weight;
     fn update_replicas() -> Weight;
+    fn calcuate_spowers(files_count: u32) -> Weight;
 }
 
 #[derive(Debug, PartialEq, Encode, Decode, Default, Clone)]
@@ -286,6 +288,9 @@ decl_storage! {
 
         /// The last replicas update block
         pub LastReplicasUpdateBlock get (fn last_replicas_update_block): BlockNumber = 0;
+
+        /// The last spower calculate block
+        pub LastSpowerCalculateBlock get (fn last_spower_calculate_block): BlockNumber = 0;
     }
     add_extra_genesis {
 		build(|_config| {
@@ -323,6 +328,8 @@ decl_error! {
         SpowerSuperiorNotSet,
         /// The caller account is not the spower superior account. Please check the caller account again.
         IllegalSpowerSuperior,
+        /// The files count exceeds limit. Please calculate less files.
+        ExceedCalculateSpowerFilesLimit,
     }
 }
 
@@ -533,6 +540,65 @@ decl_module! {
 
             // Do not charge fee for management extrinsic
             Ok(Pays::No.into())
+        }
+
+        /// Calculate and update spower for a list of files
+        /// Emits `CalculateSpowerSuccess` event if the call is success
+        /// # params
+        ///  - cids: file CID list
+        #[weight = T::WeightInfo::calcuate_spowers(cids.len() as u32)]
+        pub fn calculate_spowers(
+            origin,
+            cids: Vec<MerkleRoot>
+        ) -> DispatchResultWithPostInfo {
+            let caller = ensure_signed(origin)?;
+            let maybe_superior = Self::spower_superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::SpowerSuperiorNotSet);
+            // 2. Check if caller is superior
+            ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
+
+            // 3. Check if the cid list exceeds the limit
+            if cids.len() > MAX_CALCULATE_SPOWER_FILES_COUNT {
+                Err(Error::<T>::ExceedCalculateSpowerFilesLimit)?
+            }
+
+            // 4. Calculate and update spower
+            let curr_bn = Self::get_current_block_number();
+            let (sworker_changed_spower_map, updated_files_count) = Self::internal_calculate_spowers(&cids, curr_bn);
+
+            // 5. Update the changed spower of sworkers
+            T::SworkerInterface::update_sworkers_changed_spower(&sworker_changed_spower_map);
+
+            // 6. Update the LastSpowerCalculateBlock
+            LastSpowerCalculateBlock::put(curr_bn);
+
+            // 7. Emit the event if success
+            Self::deposit_event(RawEvent::CalculateSpowersSuccess(caller, 
+                curr_bn, 
+                sworker_changed_spower_map.len() as u32, 
+                updated_files_count)); 
+
+            // Do not charge fee for management extrinsic
+            Ok(Pays::No.into())
+        }
+
+        /// Set spower ready period
+        #[weight = 1_000_000]
+        pub fn set_spower_ready_period(origin, ready_period: BlockNumber) -> DispatchResult {
+            let caller = ensure_signed(origin)?;
+            let maybe_superior = Self::spower_superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::SpowerSuperiorNotSet);
+            // 2. Check if caller is superior
+            ensure!(Some(&caller) == maybe_superior.as_ref(), Error::<T>::IllegalSpowerSuperior);
+
+            SpowerReadyPeriod::put(ready_period);
+
+            Self::deposit_event(RawEvent::SetSpowerReadyPeriodSuccess(ready_period));
+            Ok(())
         }
 
         /// Calculate the reward for a file
@@ -930,6 +996,56 @@ impl<T: Config> Module<T> {
         }
 
         (is_replica_deleted, spower)
+    }
+
+    /// Calculate spower for batch of cids
+    fn internal_calculate_spowers(cids: &Vec<MerkleRoot>, curr_bn: BlockNumber) -> (BTreeMap<SworkerAnchor, i64>, u32) {
+        let mut sworker_changed_spower_map: BTreeMap<SworkerAnchor, i64> = BTreeMap::new(); 
+        let mut updated_files_count: u32 = 0;
+
+        for cid in cids {
+            if let Some(mut file_info) = <FilesV2<T>>::get(cid) {
+                let new_spower: u64 = Self::calculate_spower(file_info.file_size, file_info.reported_replica_count);
+                let old_spower: u64 = file_info.spower;
+                let mut need_update: bool = new_spower != old_spower;
+
+                for (_owner, ref mut replica) in &mut file_info.replicas {
+                    let mut changed_spower: i64 = 0;
+
+                    if let Some(created_at) = replica.created_at {
+                        // For new replicas, only update to use spower if already pass the spowerReadyPeriod
+                        if created_at + Self::spower_ready_period() <= curr_bn {
+                            // replicas use file_size as spower by default
+                            changed_spower = new_spower as i64 - file_info.file_size as i64;
+                            // Set the created_at to None as an indicator that the spower is already used
+                            replica.created_at = None;
+                        }
+                    } else {
+                        // Already begin to use spower
+                        changed_spower = new_spower as i64 - old_spower as i64;
+                    }
+
+                    // Record to the sworker_changed_spower_map
+                    if changed_spower != 0 {
+                        if let Some(total_changed_spower) = sworker_changed_spower_map.get_mut(&replica.anchor) {
+                            *total_changed_spower += changed_spower;
+                        } else {
+                            sworker_changed_spower_map.insert(replica.anchor.clone(), changed_spower);
+                        }
+                        need_update = true;
+                    }
+                }
+
+                // Update new spower and created_at data back to storage
+                if need_update {
+                    file_info.spower = new_spower;
+                    <FilesV2<T>>::insert(cid, file_info);
+                    updated_files_count += 1;
+                }
+            }
+        }
+
+        (sworker_changed_spower_map, updated_files_count)
     }
 
     /// Close file, maybe move into trash
@@ -1331,5 +1447,14 @@ decl_event!(
         /// A file is closed due to expired
         /// The first item is the cid of the file
         FileClosed(MerkleRoot),
+        /// Calculate spowers success
+        /// The first item is the account who calculate the spower.
+        /// The second item is the current block number
+        /// The third item is the updated sworkers count for sworker::WorkReports
+        /// The fourth item is the updated files count for market::FilesV2
+        CalculateSpowersSuccess(AccountId, BlockNumber, u32, u32),
+        /// Set the spower ready period success
+        /// The first item is the new spower ready period
+        SetSpowerReadyPeriodSuccess(BlockNumber),
     }
 );

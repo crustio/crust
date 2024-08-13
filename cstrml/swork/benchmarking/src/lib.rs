@@ -40,7 +40,7 @@ struct ReportWorksInfo {
 fn legal_work_report_with_srd() -> ReportWorksInfo {
     let curr_pk = vec![180,216,4,207,174,119,91,81,224,3,199,197,55,92,214,228,89,100,74,21,77,39,138,2,1,130,216,109,248,185,114,6,221,231,72,76,13,173,5,66,53,246,208,189,195,8,86,87,52,211,148,114,208,192,37,225,239,8,130,132,216,221,179,170];
     let prev_pk: Vec<u8> = vec![];
-    let block_number = 0;
+    let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
     let spower: u64 = 0;
@@ -68,7 +68,7 @@ fn legal_work_report_with_srd() -> ReportWorksInfo {
 fn legal_work_report_with_added_files() -> ReportWorksInfo {
     let curr_pk = vec![180,216,4,207,174,119,91,81,224,3,199,197,55,92,214,228,89,100,74,21,77,39,138,2,1,130,216,109,248,185,114,6,221,231,72,76,13,173,5,66,53,246,208,189,195,8,86,87,52,211,148,114,208,192,37,225,239,8,130,132,216,221,179,170];
     let prev_pk: Vec<u8> = vec![];
-    let block_number = 0;
+    let block_number = 300;
     let block_hash = vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     let free: u64 = 4294967296;
     let spower: u64 = 300;
@@ -234,9 +234,7 @@ benchmarks! {
         system::Module::<T>::set_block_number(303u32.into());
         let fake_bh:T::Hash = T::Hash::decode(&mut &wr.block_hash[..]).unwrap_or_default();
         let target_block_number:T::BlockNumber = 300u32.into();
-        let wr_block_number:T::BlockNumber = 0u32.into();
         <system::BlockHash<T>>::insert(target_block_number, fake_bh);
-        <system::BlockHash<T>>::insert(wr_block_number, fake_bh);
 
         // Prepare Files in market
         add_market_files::<T>(wr.added_files.clone(), caller.clone(), wr.curr_pk.clone());
@@ -274,9 +272,7 @@ benchmarks! {
         system::Module::<T>::set_block_number(303u32.into());
         let fake_bh:T::Hash = T::Hash::decode(&mut &wr.block_hash[..]).unwrap_or_default();
         let target_block_number:T::BlockNumber = 300u32.into();
-        let wr_block_number:T::BlockNumber = 0u32.into();
         <system::BlockHash<T>>::insert(target_block_number, fake_bh);
-        <system::BlockHash<T>>::insert(wr_block_number, fake_bh);
 
         // Prepare Files in market
         add_market_files::<T>(wr.added_files.clone(), caller.clone(), wr.curr_pk.clone());

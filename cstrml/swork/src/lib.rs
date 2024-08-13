@@ -188,16 +188,18 @@ impl<T: Config> SworkerInterface<T::AccountId> for Module<T> {
     // Update changed spower of sworkers
 	fn update_sworkers_changed_spower(sworker_spower_changed_map: &BTreeMap<SworkerAnchor, i64>) {
         for (anchor, changed_spower) in sworker_spower_changed_map {
-            WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
-                Some(WorkReport { ref mut spower, .. }) => {
-                    if *changed_spower >= 0 {
-                        *spower = spower.saturating_add(changed_spower.abs() as u64);
-                    } else {
-                        *spower = spower.saturating_sub(changed_spower.abs() as u64);
-                    }                        
-                },
-                ref mut i => *i = None,
-            });
+            if *changed_spower != 0 {
+                WorkReports::mutate_exists(anchor, |maybe_wr| match *maybe_wr {
+                    Some(WorkReport { ref mut spower, .. }) => {
+                        if *changed_spower >= 0 {
+                            *spower = spower.saturating_add(changed_spower.abs() as u64);
+                        } else {
+                            *spower = spower.saturating_sub(changed_spower.abs() as u64);
+                        }                        
+                    },
+                    ref mut i => *i = None,
+                });
+            }
         }
     }
 
@@ -1357,7 +1359,6 @@ impl<T: Config> Module<T> {
             &block_hash == wr_block_hash,
             "work report hash is illegal"
         );
-
         // 2. Check work report timing
         ensure!(
             wr_block_number == 1 || wr_block_number == Self::get_current_reported_slot(),

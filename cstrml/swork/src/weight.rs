@@ -51,7 +51,9 @@ impl<T: frame_system::Config> crate::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().writes(2 as Weight).saturating_mul(deleted as Weight))
 	}
 	fn update_spower(changed_sworkers_count: u32, changed_files_count: u32) -> Weight {
-		(100_000_000 as Weight)
+		(1_000_000_000 as Weight)
+			.saturating_add((350_000_000 as Weight).saturating_mul(changed_sworkers_count as Weight))
+			.saturating_add((700_000_000 as Weight).saturating_mul(changed_files_count as Weight))
 			.saturating_add(T::DbWeight::get().reads(1 as Weight).saturating_mul(changed_sworkers_count as Weight))
 			.saturating_add(T::DbWeight::get().writes(1 as Weight).saturating_mul(changed_sworkers_count as Weight))
 			.saturating_add(T::DbWeight::get().reads(1 as Weight).saturating_mul(changed_files_count as Weight))

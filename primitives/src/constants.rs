@@ -92,17 +92,17 @@ pub mod market {
 
     pub const FILE_FEE_ADJUST_INTERVAL: u32 = 1; // Unit in slots
 
-    pub const INIT_FILE_BYTE_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300);
-    pub const INIT_FILE_BYTE_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000);
+    pub const INIT_FILE_BYTE_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300_000);
+    pub const INIT_FILE_BYTE_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000_000);
 
     pub const INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD: u32 = 2_000_000;
-    pub const INIT_FILE_KEYS_COUNT_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300);
-    pub const INIT_FILE_KEYS_COUNT_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000);
+    pub const INIT_FILE_KEYS_COUNT_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300_000);
+    pub const INIT_FILE_KEYS_COUNT_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000_000);
 
     pub const INIT_FILE_BASE_FEE_INCREASE_THRESHOLD: u32 = 10;
     pub const INIT_FILE_BASE_FEE_DECREASE_THRESHOLD: u32 = 30;
-    pub const INIT_FILE_BASE_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300);
-    pub const INIT_FILE_BASE_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000);
+    pub const INIT_FILE_BASE_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300_000);
+    pub const INIT_FILE_BASE_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000_000);
 
     // Use different settings in the test
     #[cfg(feature = "test")]

@@ -381,6 +381,8 @@ decl_error! {
         IllegalSpowerSuperior,
         /// The files count exceeds limit. Please calculate less files.
         ExceedCalculateSpowerFilesLimit,
+        /// The file fee adjust interval is invalid.
+        FileFeeAdjustIntervalInvalid,
         /// The max fee should be greater than the min fee.
         MaxFeeLessThanMinFee,
         /// The file base fee increase threshold should be less than the decrease threshold.
@@ -865,6 +867,7 @@ decl_module! {
             file_fee_adjust_interval: u32
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
+            ensure!(file_fee_adjust_interval > 0, Error::<T>::FileFeeAdjustIntervalInvalid);
             FileFeeAdjustInterval::put(file_fee_adjust_interval);
             Ok(())
         }

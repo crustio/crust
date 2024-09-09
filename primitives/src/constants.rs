@@ -95,7 +95,7 @@ pub mod market {
     pub const INIT_FILE_BYTE_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300_000);
     pub const INIT_FILE_BYTE_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000_000);
 
-    pub const INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD: u32 = 2_000_000;
+    pub const INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD: u32 = 5_000_000;
     pub const INIT_FILE_KEYS_COUNT_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300_000);
     pub const INIT_FILE_KEYS_COUNT_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000_000);
 

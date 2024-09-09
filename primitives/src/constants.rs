@@ -78,17 +78,31 @@ pub mod swork {
 }
 
 pub mod market {
+    use sp_runtime::Perbill;
+
     pub const BASE_FEE_UPDATE_SLOT: u32 = 600;
     pub const BASE_FEE_UPDATE_OFFSET: u32 = 22;
 
     pub const PRICE_UPDATE_SLOT: u32 = 600;
     pub const PRICE_UPDATE_OFFSET: u32 = 3;
-    pub const FILES_COUNT_REFERENCE: u32 = 2_000_000; // 2_000_000 / 50_000_000 = 40% // Try 2M first
 
     pub const SPOWER_UPDATE_SLOT: u32 = 100;
     pub const SPOWER_UPDATE_OFFSET: u32 = 7;
     pub const MAX_PENDING_FILES: usize = 20;
 
+    pub const FILE_FEE_ADJUST_INTERVAL: u32 = 1; // Unit in slots
+
+    pub const INIT_FILE_BYTE_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300);
+    pub const INIT_FILE_BYTE_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000);
+
+    pub const INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD: u32 = 2_000_000;
+    pub const INIT_FILE_KEYS_COUNT_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300);
+    pub const INIT_FILE_KEYS_COUNT_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000);
+
+    pub const INIT_FILE_BASE_FEE_INCREASE_THRESHOLD: u32 = 10;
+    pub const INIT_FILE_BASE_FEE_DECREASE_THRESHOLD: u32 = 30;
+    pub const INIT_FILE_BASE_FEE_INCREASE_RATIO: Perbill = Perbill::from_parts(3_300);
+    pub const INIT_FILE_BASE_FEE_DECREASE_RATIO: Perbill = Perbill::from_parts(3_000);
 
     // Use different settings in the test
     #[cfg(feature = "test")]

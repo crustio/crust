@@ -103,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 24,
+    spec_version: 25,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -761,6 +761,9 @@ parameter_types! {
     pub const FileReplica: u32 = 4;
     pub const InitFileByteFee: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const InitFileKeysCountFee: Balance = MILLICENTS / 10;
+    pub const InitMaxFileByteFee: Balance = MILLICENTS / 100;
+    pub const InitMaxFileKeysCountFee: Balance = MILLICENTS;
+    pub const InitMaxFileBaseFee: Balance = CENTS * 5;
     pub const StorageReferenceRatio: (u128, u128) = (50, 100); // 50/100 = 50%
     pub StorageIncreaseRatio: Perbill = Perbill::from_rational_approximation(33u64, 10000);
     pub StorageDecreaseRatio: Perbill = Perbill::from_rational_approximation(3u64, 1000);
@@ -783,6 +786,9 @@ impl market::Config for Runtime {
     type FileReplica = FileReplica;
     type InitFileByteFee = InitFileByteFee;
     type InitFileKeysCountFee = InitFileKeysCountFee;
+    type InitMaxFileByteFee =  InitMaxFileByteFee;
+    type InitMaxFileKeysCountFee = InitMaxFileKeysCountFee;
+    type InitMaxFileBaseFee = InitMaxFileBaseFee;
     type StorageReferenceRatio = StorageReferenceRatio;
     type StorageIncreaseRatio = StorageIncreaseRatio;
     type StorageDecreaseRatio = StorageDecreaseRatio;

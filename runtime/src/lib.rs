@@ -761,7 +761,7 @@ parameter_types! {
     pub const FileReplica: u32 = 4;
     pub const InitFileByteFee: Balance = MILLICENTS / 1000; // Need align with FileDuration and FileReplica
     pub const InitFileKeysCountFee: Balance = MILLICENTS / 10;
-    pub const InitMaxFileByteFee: Balance = MILLICENTS / 100;
+    pub const InitMaxFileByteFee: Balance = MILLICENTS / 10;
     pub const InitMaxFileKeysCountFee: Balance = MILLICENTS;
     pub const InitMaxFileBaseFee: Balance = CENTS * 5;
     pub const StorageReferenceRatio: (u128, u128) = (50, 100); // 50/100 = 50%

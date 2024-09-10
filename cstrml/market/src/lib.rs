@@ -36,7 +36,7 @@ mod tests;
 pub mod benchmarking;
 
 use primitives::{
-    constants::market::*, traits::{
+    constants::{market::*, swork::REPORT_SLOT}, traits::{
         BenefitInterface, MarketInterface, SworkerInterface, UsableCurrency
     }, BlockNumber, MerkleRoot, ReportSlot, SworkerAnchor
 };
@@ -213,6 +213,15 @@ pub trait Config: system::Config {
     /// Files Count Init Price.
     type InitFileKeysCountFee: Get<BalanceOf<Self>>;
 
+    /// Init Max File Byte Fee
+    type InitMaxFileByteFee:  Get<BalanceOf<Self>>;
+
+    /// Init Max File Keys Count Fee
+    type InitMaxFileKeysCountFee: Get<BalanceOf<Self>>;
+
+    /// Init Max File Base Fee
+    type InitMaxFileBaseFee: Get<BalanceOf<Self>>;
+
     /// Storage reference ratio. reported_files_size / total_capacity
     type StorageReferenceRatio: Get<(u128, u128)>;
 
@@ -244,11 +253,32 @@ decl_storage! {
         /// New orders count in the past one period(one hour), determinate the FileBaseFee
         OrdersCount get(fn orders_count): u32 = 0;
 
+        /// The file fee adjust interval, unit in number of slots.
+        pub FileFeeAdjustInterval get(fn file_fee_adjust_interval): u32 = FILE_FEE_ADJUST_INTERVAL;
+
+        /// The last file fee adjust block.
+        pub LastFileFeeAdjustBlock get(fn last_file_fee_adjust_block): BlockNumber = 0;
+
         /// The file base fee for each storage order.
         pub FileBaseFee get(fn file_base_fee): BalanceOf<T> = Zero::zero();
 
         /// The minimal file base fee for each storage order.
         pub MinFileBaseFee get(fn min_file_base_fee): BalanceOf<T> = Zero::zero();
+
+        /// The maximum file base fee for each storage order.
+        pub MaxFileBaseFee get(fn max_file_base_fee): BalanceOf<T> = T::InitMaxFileBaseFee::get();
+
+        /// The file base fee increase threshold. When the average replicas count is less than the threshold, the base fee will increase.
+        pub FileBaseFeeIncreaseThreshold get(fn file_base_fee_increase_threshold): u32 = INIT_FILE_BASE_FEE_INCREASE_THRESHOLD;
+
+        /// The file base fee decrease threshold. When the average replicas count is larger than the threshold, the base fee will decrease.
+        pub FileBaseFeeDecreaseThreshold get(fn file_base_fee_decrease_threshold): u32 = INIT_FILE_BASE_FEE_DECREASE_THRESHOLD;
+
+        /// The file base fee increase ratio.
+        pub FileBaseFeeIncreaseRatio get(fn file_base_fee_increase_ratio): Perbill = INIT_FILE_BASE_FEE_INCREASE_RATIO;
+
+        /// The file base fee decrease ratio.
+        pub FileBaseFeeDecreaseRatio get(fn file_base_fee_decrease_ratio): Perbill = INIT_FILE_BASE_FEE_DECREASE_RATIO;
 
         /// The file price per MB.
         /// It's dynamically adjusted and would change according to FilesSize, TotalCapacity and StorageReferenceRatio.
@@ -256,6 +286,15 @@ decl_storage! {
 
         /// The minimal file price per MB.
         pub MinFileByteFee get(fn min_file_byte_fee): BalanceOf<T> = Zero::zero();
+
+        // The maximum file price per MB.
+        pub MaxFileByteFee get(fn max_file_byte_fee): BalanceOf<T> = T::InitMaxFileByteFee::get();
+
+        /// The file byte fee increase ratio.
+        pub FileByteFeeIncreaseRatio get(fn file_byte_fee_increase_ratio): Perbill = INIT_FILE_BYTE_FEE_INCREASE_RATIO;
+
+        /// The file byte fee decrease ratio.
+        pub FileByteFeeDecreaseRatio get(fn file_byte_fee_decrease_ratio): Perbill = INIT_FILE_BYTE_FEE_DECREASE_RATIO;
 
         /// Files count, determinate the FileKeysCountFee
         pub FileKeysCount get(fn files_count): u32 = 0;
@@ -266,6 +305,18 @@ decl_storage! {
 
         /// The minimal file price by keys
         pub MinFileKeysCountFee get(fn min_file_keys_count_fee): BalanceOf<T> = Zero::zero();
+
+        /// The maximum file price by keys
+        pub MaxFileKeysCountFee get(fn max_file_keys_count_fee): BalanceOf<T> = T::InitMaxFileKeysCountFee::get();
+
+        /// The file keys count fee adjust threshold, unit in number of on-chain files.
+        pub FileKeysCountFeeAdjustThreshold get(fn file_keys_count_fee_adjust_threshold): u32 = INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD;
+
+        /// The file keys count fee increase ratio.
+        pub FileKeysCountFeeIncreaseRatio get(fn file_keys_count_fee_increase_ratio): Perbill = INIT_FILE_KEYS_COUNT_FEE_INCREASE_RATIO;
+
+        /// The file keys count fee decrease ratio.
+        pub FileKeysCountFeeDecreaseRatio get(fn file_keys_count_fee_decrease_ratio): Perbill = INIT_FILE_KEYS_COUNT_FEE_DECREASE_RATIO;
 
         /// File V2 information iterated by order id
         pub FilesV2 get(fn filesv2):
@@ -330,6 +381,12 @@ decl_error! {
         IllegalSpowerSuperior,
         /// The files count exceeds limit. Please calculate less files.
         ExceedCalculateSpowerFilesLimit,
+        /// The file fee adjust interval is invalid.
+        FileFeeAdjustIntervalInvalid,
+        /// The max fee should be greater than the min fee.
+        MaxFeeLessThanMinFee,
+        /// The file base fee increase threshold should be less than the decrease threshold.
+        BaseFeeIncreaseThresholdLargerThanDecreaseThreshold,
     }
 }
 
@@ -381,17 +438,22 @@ decl_module! {
             let mut add_db_reads_writes = |reads, writes| {
                 consumed_weight += T::DbWeight::get().reads_writes(reads, writes);
             };
-            if ((now + PRICE_UPDATE_OFFSET) % PRICE_UPDATE_SLOT).is_zero() && Self::has_new_order(){
+
+            let file_fee_adjust_interval = Self::file_fee_adjust_interval() * REPORT_SLOT as u32;
+            if ((now + PRICE_UPDATE_OFFSET) % file_fee_adjust_interval).is_zero() && Self::has_new_order(){
                 Self::update_file_byte_fee();
                 Self::update_file_keys_count_fee();
                 HasNewOrder::put(false);
-                add_db_reads_writes(8, 3);
+                LastFileFeeAdjustBlock::put(now);
+                add_db_reads_writes(13, 4);
             }
-            if ((now + BASE_FEE_UPDATE_OFFSET) % BASE_FEE_UPDATE_SLOT).is_zero() {
+            if ((now + BASE_FEE_UPDATE_OFFSET) % file_fee_adjust_interval).is_zero() {
                 Self::update_base_fee();
-                add_db_reads_writes(3, 3);
+                LastFileFeeAdjustBlock::put(now);
+                add_db_reads_writes(8, 4);
             }
-            add_db_reads_writes(1, 0);
+            add_db_reads_writes(2, 0);
+            
             consumed_weight
         }
 
@@ -721,6 +783,7 @@ decl_module! {
             #[compact] min_base_fee: BalanceOf<T>
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
+            ensure!(min_base_fee <= Self::max_file_base_fee(), Error::<T>::MaxFeeLessThanMinFee);
             <MinFileBaseFee<T>>::put(min_base_fee);
             Ok(())
         }
@@ -734,6 +797,7 @@ decl_module! {
             #[compact] min_byte_fee: BalanceOf<T>
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
+            ensure!(min_byte_fee <= Self::max_file_byte_fee(), Error::<T>::MaxFeeLessThanMinFee);
             <MinFileByteFee<T>>::put(min_byte_fee);
             Ok(())
         }
@@ -747,7 +811,176 @@ decl_module! {
             #[compact] min_key_count_fee: BalanceOf<T>
         ) -> DispatchResult {
             let _ = ensure_root(origin)?;
+            ensure!(min_key_count_fee <= Self::max_file_keys_count_fee(), Error::<T>::MaxFeeLessThanMinFee);
             <MinFileKeysCountFee<T>>::put(min_key_count_fee);
+            Ok(())
+        }
+
+        /// Set the maximum file base fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_max_base_fee(
+            origin,
+            #[compact] max_base_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            ensure!(max_base_fee >= Self::min_file_base_fee(), Error::<T>::MaxFeeLessThanMinFee);
+            <MaxFileBaseFee<T>>::put(max_base_fee);
+            Ok(())
+        }
+
+        /// Set the maximum file byte fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_max_byte_fee(
+            origin,
+            #[compact] max_byte_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            ensure!(max_byte_fee >= Self::min_file_byte_fee(), Error::<T>::MaxFeeLessThanMinFee);
+            <MaxFileByteFee<T>>::put(max_byte_fee);
+            Ok(())
+        }
+
+        /// Set the maximum file key count fee
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_max_key_count_fee(
+            origin,
+            #[compact] max_key_count_fee: BalanceOf<T>
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            ensure!(max_key_count_fee >= Self::min_file_keys_count_fee(), Error::<T>::MaxFeeLessThanMinFee);
+            <MaxFileKeysCountFee<T>>::put(max_key_count_fee);
+            Ok(())
+        }
+
+        /// Set the file fee adjust interval, unit in number of slots.
+        ///
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_fee_adjust_interval(
+            origin,
+            file_fee_adjust_interval: u32
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            ensure!(file_fee_adjust_interval > 0, Error::<T>::FileFeeAdjustIntervalInvalid);
+            FileFeeAdjustInterval::put(file_fee_adjust_interval);
+            Ok(())
+        }
+
+        /// Set the file base fee increase threshold. When the average replicas count is less than the threshold, the base fee will increase.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_base_fee_increase_threshold(
+            origin,
+            file_base_fee_increase_threshold: u32
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            ensure!(file_base_fee_increase_threshold < Self::file_base_fee_decrease_threshold(), 
+                    Error::<T>::BaseFeeIncreaseThresholdLargerThanDecreaseThreshold);
+            FileBaseFeeIncreaseThreshold::put(file_base_fee_increase_threshold);
+            Ok(())
+        }
+
+        /// Set the file base fee decrease threshold. When the average replicas count is larger than the threshold, the base fee will decrease.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_base_fee_decrease_threshold(
+            origin,
+            file_base_fee_decrease_threshold: u32
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            ensure!(file_base_fee_decrease_threshold > Self::file_base_fee_increase_threshold(), 
+                    Error::<T>::BaseFeeIncreaseThresholdLargerThanDecreaseThreshold);
+            FileBaseFeeDecreaseThreshold::put(file_base_fee_decrease_threshold);
+            Ok(())
+        }
+
+        /// Set the file base fee increase ratio.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_base_fee_increase_ratio(
+            origin,
+            file_base_fee_increase_ratio: Perbill
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            FileBaseFeeIncreaseRatio::put(file_base_fee_increase_ratio);
+            Ok(())
+        }
+
+        /// Set the file base fee decrease ratio.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_base_fee_decrease_ratio(
+            origin,
+            file_base_fee_decrease_ratio: Perbill
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            FileBaseFeeDecreaseRatio::put(file_base_fee_decrease_ratio);
+            Ok(())
+        }
+
+        /// Set the file byte fee increase ratio.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_byte_fee_increase_ratio(
+            origin,
+            file_byte_fee_increase_ratio: Perbill
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            FileByteFeeIncreaseRatio::put(file_byte_fee_increase_ratio);
+            Ok(())
+        }
+
+        /// Set the file byte fee decrease ratio.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_byte_fee_decrease_ratio(
+            origin,
+            file_byte_fee_decrease_ratio: Perbill
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            FileByteFeeDecreaseRatio::put(file_byte_fee_decrease_ratio);
+            Ok(())
+        }
+       
+        /// Set the file keys count fee adjust threshold, unit in number of on-chain files.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_keys_count_fee_adjust_threshold(
+            origin,
+            file_keys_count_fee_adjust_threshold: u32
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            FileKeysCountFeeAdjustThreshold::put(file_keys_count_fee_adjust_threshold);
+            Ok(())
+        }
+
+        /// Set the file keys count fee increase ratio.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_keys_count_fee_increase_ratio(
+            origin,
+            file_keys_count_fee_increase_ratio: Perbill
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            FileKeysCountFeeIncreaseRatio::put(file_keys_count_fee_increase_ratio);
+            Ok(())
+        }
+        
+        /// Set the file keys count fee decrease ratio.
+        /// The dispatch origin for this call must be _Root_.
+        #[weight = 1000]
+        pub fn set_file_keys_count_fee_decrease_ratio(
+            origin,
+            file_keys_count_fee_decrease_ratio: Perbill
+        ) -> DispatchResult {
+            let _ = ensure_root(origin)?;
+            FileKeysCountFeeDecreaseRatio::put(file_keys_count_fee_decrease_ratio);
             Ok(())
         }
     }
@@ -1210,16 +1443,17 @@ impl<T: Config> Module<T> {
         let total_capacity = files_size.saturating_add(free);
         let (numerator, denominator) = T::StorageReferenceRatio::get();
         let min_file_byte_fee = Self::min_file_byte_fee();
+        let max_file_byte_fee = Self::max_file_byte_fee();
         // Too much supply => decrease the price
         if files_size.saturating_mul(denominator) <= total_capacity.saturating_mul(numerator) {
             <FileByteFee<T>>::mutate(|file_byte_fee| {
-                let gap = T::StorageDecreaseRatio::get() * file_byte_fee.clone();
-                *file_byte_fee = file_byte_fee.saturating_sub(gap).max(min_file_byte_fee);
+                let gap = Self::file_byte_fee_decrease_ratio() * file_byte_fee.clone();
+                *file_byte_fee = file_byte_fee.saturating_sub(gap).max(min_file_byte_fee).min(max_file_byte_fee);
             });
         } else {
             <FileByteFee<T>>::mutate(|file_byte_fee| {
-                let gap = (T::StorageIncreaseRatio::get() * file_byte_fee.clone()).max(BalanceOf::<T>::saturated_from(1u32));
-                *file_byte_fee = file_byte_fee.saturating_add(gap).max(min_file_byte_fee);
+                let gap = (Self::file_byte_fee_increase_ratio() * file_byte_fee.clone()).max(BalanceOf::<T>::saturated_from(1u32));
+                *file_byte_fee = file_byte_fee.saturating_add(gap).max(min_file_byte_fee).min(max_file_byte_fee);
             });
         }
     }
@@ -1227,16 +1461,18 @@ impl<T: Config> Module<T> {
     pub fn update_file_keys_count_fee() {
         let files_count = Self::files_count();
         let min_file_keys_count_fee = Self::min_file_keys_count_fee();
-        if files_count > FILES_COUNT_REFERENCE {
+        let max_file_keys_count_fee = Self::max_file_keys_count_fee();
+        let keys_count_fee_adjust_threshold = Self::file_keys_count_fee_adjust_threshold();
+        if files_count > keys_count_fee_adjust_threshold {
             // TODO: Independent mechanism
             <FileKeysCountFee<T>>::mutate(|file_keys_count_fee| {
-                let gap = (T::StorageIncreaseRatio::get() * file_keys_count_fee.clone()).max(BalanceOf::<T>::saturated_from(1u32));
-                *file_keys_count_fee = file_keys_count_fee.saturating_add(gap).max(min_file_keys_count_fee);
+                let gap = (Self::file_keys_count_fee_increase_ratio() * file_keys_count_fee.clone()).max(BalanceOf::<T>::saturated_from(1u32));
+                *file_keys_count_fee = file_keys_count_fee.saturating_add(gap).max(min_file_keys_count_fee).min(max_file_keys_count_fee);
             })
         } else {
             <FileKeysCountFee<T>>::mutate(|file_keys_count_fee| {
-                let gap = T::StorageDecreaseRatio::get() * file_keys_count_fee.clone();
-                *file_keys_count_fee = file_keys_count_fee.saturating_sub(gap).max(min_file_keys_count_fee);
+                let gap = Self::file_keys_count_fee_decrease_ratio() * file_keys_count_fee.clone();
+                *file_keys_count_fee = file_keys_count_fee.saturating_sub(gap).max(min_file_keys_count_fee).min(max_file_keys_count_fee);
             })
         }
     }
@@ -1250,13 +1486,14 @@ impl<T: Config> Module<T> {
         // decide what to do
         let (is_to_decrease, ratio) = Self::base_fee_ratio(added_files_count.checked_div(orders_count));
         let min_file_base_fee = Self::min_file_base_fee();
+        let max_file_base_fee = Self::max_file_base_fee();
         // update the file base fee
         <FileBaseFee<T>>::mutate(|file_base_fee| {
             let gap = ratio * file_base_fee.clone();
             if is_to_decrease {
-                *file_base_fee = file_base_fee.saturating_sub(gap).max(min_file_base_fee);
+                *file_base_fee = file_base_fee.saturating_sub(gap).max(min_file_base_fee).min(max_file_base_fee);
             } else {
-                *file_base_fee = file_base_fee.saturating_add(gap).max(min_file_base_fee);
+                *file_base_fee = file_base_fee.saturating_add(gap).max(min_file_base_fee).min(max_file_base_fee);
             }
         })
     }
@@ -1264,26 +1501,23 @@ impl<T: Config> Module<T> {
     /// return (bool, ratio)
     /// true => decrease the price, false => increase the price
     pub fn base_fee_ratio(maybe_alpha: Option<u32>) -> (bool, Perbill) {
+        let base_fee_increase_threshold = Self::file_base_fee_increase_threshold();
+        let base_fee_increase_ratio = Self::file_base_fee_increase_ratio();
+        let base_fee_decrease_threshold = Self::file_base_fee_decrease_threshold();
+        let base_fee_decrease_ratio = Self::file_base_fee_decrease_ratio();
         match maybe_alpha {
             // New order => check the alpha
             Some(alpha) => {
-                match alpha {
-                    0 ..= 1 => (false,Perbill::from_percent(20)),
-                    2 => (false,Perbill::from_percent(18)),
-                    3 => (false,Perbill::from_percent(15)),
-                    4 => (false,Perbill::from_percent(12)),
-                    5 => (false,Perbill::from_percent(10)),
-                    6 => (false,Perbill::from_percent(8)),
-                    7 => (false,Perbill::from_percent(6)),
-                    8 => (false,Perbill::from_percent(4)),
-                    9 => (false,Perbill::from_percent(2)),
-                    10 ..= 30 => (false,Perbill::zero()),
-                    31 ..= 50 => (true,Perbill::from_percent(3)),
-                    _ => (true, Perbill::from_percent(5))
+                if alpha < base_fee_increase_threshold {
+                    (false, base_fee_increase_ratio)
+                } else if alpha >= base_fee_increase_threshold && alpha <= base_fee_decrease_threshold {
+                    (false, Perbill::zero())
+                } else {
+                    (true, base_fee_decrease_ratio)
                 }
             },
             // No new order => decrease the price
-            None => (true, Perbill::from_percent(5))
+            None => (true, base_fee_decrease_ratio)
         }
     }
 

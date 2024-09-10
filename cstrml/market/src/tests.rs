@@ -631,6 +631,11 @@ fn update_replicas_should_only_pay_the_groups() {
 #[test]
 fn update_file_byte_fee_should_work() {
     new_test_ext().execute_with(|| {
+
+        // Set proper ratio
+        assert_ok!(Market::set_file_byte_fee_increase_ratio(Origin::root(), Perbill::from_percent(1)));
+        assert_ok!(Market::set_file_byte_fee_decrease_ratio(Origin::root(), Perbill::from_percent(1)));
+
         // generate 50 blocks first
         // 0 / 0 => None => decrease
         Market::update_file_byte_fee();
@@ -675,6 +680,11 @@ fn update_base_fee_should_work() {
     new_test_ext().execute_with(|| {
         assert_eq!(Market::file_base_fee(), 1000);
 
+        assert_ok!(Market::set_file_base_fee_increase_threshold(Origin::root(), 10));
+        assert_ok!(Market::set_file_base_fee_decrease_threshold(Origin::root(), 30));
+        assert_ok!(Market::set_file_base_fee_increase_ratio(Origin::root(), Perbill::from_percent(5)));
+        assert_ok!(Market::set_file_base_fee_decrease_ratio(Origin::root(), Perbill::from_percent(5)));
+
         // orders count == 0 => decrease 5%
         <swork::AddedFilesCount>::put(500);
         OrdersCount::put(0);
@@ -691,19 +701,19 @@ fn update_base_fee_should_work() {
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
-        // alpha == 0 => increase 20%
+        // alpha == 0 => increase 5%
         <swork::AddedFilesCount>::put(0);
         OrdersCount::put(100);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1140);
+        assert_eq!(Market::file_base_fee(), 997);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
-        // alpha == 6 => increase 8%
+        // alpha == 6 => increase 5%
         <swork::AddedFilesCount>::put(60);
         OrdersCount::put(10);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1231);
+        assert_eq!(Market::file_base_fee(), 1047);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
@@ -711,7 +721,7 @@ fn update_base_fee_should_work() {
         <swork::AddedFilesCount>::put(1500);
         OrdersCount::put(10);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1169);
+        assert_eq!(Market::file_base_fee(), 995);
         assert_eq!(Swork::added_files_count(), 0);
         assert_eq!(Market::orders_count(), 0);
 
@@ -723,10 +733,11 @@ fn update_base_fee_should_work() {
         Market::update_base_fee();
         assert_eq!(Market::file_base_fee(), 1300);
 
+        // alpha == 6 => increase 5%
         <swork::AddedFilesCount>::put(60);
         OrdersCount::put(10);
         Market::update_base_fee();
-        assert_eq!(Market::file_base_fee(), 1404);
+        assert_eq!(Market::file_base_fee(), 1365);
     });
 }
 
@@ -738,6 +749,9 @@ fn update_file_byte_fee_per_blocks_should_work() {
             hex::decode("4e2883ddcbc77cf19979770d756fd332d0c8f815f9de646636169e460e6af6ff").unwrap();
         let file_size = 100; // should less than
         let _ = Balances::make_free_balance_be(&source, 20000);
+
+        assert_ok!(Market::set_file_byte_fee_increase_ratio(Origin::root(), Perbill::from_percent(1)));
+        assert_ok!(Market::set_file_byte_fee_decrease_ratio(Origin::root(), Perbill::from_percent(1)));
 
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
@@ -777,6 +791,9 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         let file_size = 100; // should less than
         let _ = Balances::make_free_balance_be(&source, 20000);
 
+        assert_ok!(Market::set_file_keys_count_fee_increase_ratio(Origin::root(), Perbill::from_percent(1)));
+        assert_ok!(Market::set_file_keys_count_fee_decrease_ratio(Origin::root(), Perbill::from_percent(1)));
+
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
@@ -814,7 +831,7 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         assert_eq!(Market::file_keys_count_fee(), 40);
 
         // price is 40 and will increase by 1
-        FileKeysCount::put(2_000_001);
+        FileKeysCount::put(INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD + 1);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
@@ -823,7 +840,7 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         assert_eq!(Market::file_keys_count_fee(), 41);
 
         <MinFileKeysCountFee<Test>>::put(80);
-        FileKeysCount::put(2_000_000);
+        FileKeysCount::put(INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]
@@ -832,7 +849,7 @@ fn update_file_keys_count_fee_per_blocks_should_work() {
         assert_eq!(Market::file_keys_count_fee(), 80);
 
         // price is 80 and will increase by 1
-        FileKeysCount::put(2_000_001);
+        FileKeysCount::put(INIT_FILE_KEYS_COUNT_FEE_ADJUST_THRESHOLD + 1);
         assert_ok!(Market::place_storage_order(
             Origin::signed(source.clone()), cid.clone(),
             file_size, 0, vec![]

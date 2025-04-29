@@ -66,6 +66,10 @@ pub mod pallet {
 	pub(super) type BridgeLimit<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
     #[pallet::storage]
+	#[pallet::getter(fn bridge_out_limit)]
+	pub(super) type BridgeOutLimit<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+    #[pallet::storage]
 	#[pallet::getter(fn superior)]
 	pub(super) type Superior<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
@@ -98,8 +102,10 @@ pub mod pallet {
         FeeUpdated(u8, BalanceOf<T>, u32),
         /// Someone be the new superior
         SuperiorChanged(T::AccountId),
-        /// Set limit successfully
+        /// Set bridge-in limit successfully
         SetLimitSuccess(BalanceOf<T>),
+        /// Set bridge-out limit successfully
+        SetOutLimitSuccess(BalanceOf<T>),
     }
 
     // Errors inform users that something went wrong.
@@ -113,7 +119,8 @@ pub mod pallet {
 		LessThanFee,
         /// Superior not exist, should set it first
         IllegalSuperior,
-        ExceedBridgeLimit
+        ExceedBridgeLimit,
+        ExceedBridgeOutLimit
     }
 
     // Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -163,6 +170,25 @@ pub mod pallet {
             Ok(())
         }
 
+        #[pallet::call_index(5)]
+		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
+        pub fn set_bridge_out_limit(origin: OriginFor<T>, limit: BalanceOf<T>) -> DispatchResult {
+            let signer = ensure_signed(origin)?;
+            let maybe_superior = Self::superior();
+
+            // 1. Check if superior exist
+            ensure!(maybe_superior.is_some(), Error::<T>::IllegalSuperior);
+
+            // 2. Check if signer is superior
+            ensure!(Some(&signer) == maybe_superior.as_ref(), Error::<T>::IllegalSuperior);
+
+            // 3. Set claim limit
+            BridgeOutLimit::<T>::put(limit);
+
+            Self::deposit_event(Event::SetOutLimitSuccess(limit));
+            Ok(())
+        }
+
 		/// Transfers some amount of the native token to some recipient on a (whitelisted) destination chain.
         #[pallet::call_index(1)]
 		#[pallet::weight(T::BridgeTransferWeightInfo::default_bridge_transfer_weight())]
@@ -170,6 +196,11 @@ pub mod pallet {
 			let source = ensure_signed(origin)?;
 			ensure!(<bridge::Pallet<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
 			ensure!(BridgeFee::<T>::contains_key(&dest_id), Error::<T>::FeeOptionsMissiing);
+
+            // Check bridge-out limit
+            ensure!(Self::bridge_out_limit() >= amount, Error::<T>::ExceedBridgeOutLimit);
+            BridgeOutLimit::<T>::mutate(|l| *l = l.saturating_sub(amount));
+
 			let (min_fee, fee_scale) = Self::bridge_fee(dest_id);
 			let fee_estimated = amount * fee_scale.into() / 1000u32.into();
 			let fee = if fee_estimated > min_fee {

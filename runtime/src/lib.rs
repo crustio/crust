@@ -103,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 25,
+    spec_version: 26,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -502,10 +502,10 @@ impl pallet_multisig::Config for Runtime {
 }
 
 parameter_types! {
-	pub const CandidacyBond: Balance = 10 * DOLLARS;
+	pub const CandidacyBond: Balance = 10000 * DOLLARS;
 	pub const VotingBondBase: Balance = 1 * DOLLARS;
 	pub const VotingBondFactor: Balance = 10 * CENTS;
-	pub const TermDuration: BlockNumber = 3 * DAYS;
+	pub const TermDuration: BlockNumber = 14 * DAYS;
 	pub const DesiredMembers: u32 = 13;
 	pub const DesiredRunnersUp: u32 = 20;
 	pub const ElectionsPhragmenModuleId: LockIdentifier = *b"phrelect";
@@ -611,15 +611,15 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 }
 
 parameter_types! {
-	pub const LaunchPeriod: BlockNumber = 3 * DAYS;
+	pub const LaunchPeriod: BlockNumber = 14 * DAYS;
 	pub const VotingPeriod: BlockNumber = 7 * DAYS;
 	pub const FastTrackVotingPeriod: BlockNumber = 3 * HOURS;
 	pub const InstantAllowed: bool = true;
-	pub const MinimumDeposit: Balance = 1 * DOLLARS;
+	pub const MinimumDeposit: Balance = 10000 * DOLLARS;
 	pub const EnactmentPeriod: BlockNumber = 7 * DAYS;
-	pub const CooloffPeriod: BlockNumber = 7 * DAYS;
+	pub const CooloffPeriod: BlockNumber = 28 * DAYS;
 	// One cent: $100 / MB
-	pub const PreimageByteDeposit: Balance = 10 * MILLICENTS;
+	pub const PreimageByteDeposit: Balance = 100 * MILLICENTS;
 	pub const MaxVotes: u32 = 100;
 	pub const MaxProposals: u32 = 100;
 }

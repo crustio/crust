@@ -1,8 +1,8 @@
 name: 'Submodules Sync'
 
 on:
-  schedule:
-  - cron: "0 0,6,12,18 * * *"
+  # schedule:
+  # - cron: "0 0,6,12,18 * * *"
   # Allows you to run this workflow manually from the Actions tab or through HTTP API
   workflow_dispatch:
 

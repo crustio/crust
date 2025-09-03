@@ -1528,12 +1528,12 @@ fn extra_reward_should_work() {
             <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(35) * Balances::total_issuance());
             assert_eq!(Staking::total_rewards_in_era(80128), Perbill::from_fraction(0.028) * Balances::total_issuance() / 17532);
 
-            // begin of year 5 and should have 8% extra reward
+            // begin of year 5 and should have no extra reward
             <ErasTotalStakes<Test>>::insert(0, 0);
-            assert_eq!(Staking::total_rewards_in_era(80128), Perbill::from_fraction(0.108) * Balances::total_issuance() / 17532);
+            assert_eq!(Staking::total_rewards_in_era(80128), Perbill::from_fraction(0.028) * Balances::total_issuance() / 17532);
 
             <ErasTotalStakes<Test>>::insert(0, Perbill::from_percent(15) * Balances::total_issuance());
-            assert_eq!(Staking::total_rewards_in_era(80128) / decimals, Perbill::from_fraction(0.068) * Balances::total_issuance() / 17532 / decimals);
+            assert_eq!(Staking::total_rewards_in_era(80128) / decimals, Perbill::from_fraction(0.028) * Balances::total_issuance() / 17532 / decimals);
         })
 }
 

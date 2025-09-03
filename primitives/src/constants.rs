@@ -58,7 +58,7 @@ pub mod staking {
     // The minimal reward ratio
     pub const MIN_REWARD_RATIO: (Balance, Balance) = (28, 1000);
     // The start year for extra reward
-    pub const EXTRA_REWARD_START_YEAR: u64 = 4;
+    pub const EXTRA_REWARD_START_YEAR: u64 = 100;
 }
 
 pub mod swork {

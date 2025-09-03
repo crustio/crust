@@ -268,7 +268,7 @@ macro_rules! decl_tests {
 					assert_eq!(Balances::total_balance(&2), 256 * 20);
 
 					assert_ok!(Balances::reserve(&2, 256 * 19 + 1)); // account 2 becomes mostly reserved
-					assert_eq!(Balances::free_balance(2), 255); // "free" account deleted."
+					assert_eq!(Balances::free_balance(2), 255); // "free" account deleted.
 					assert_eq!(Balances::total_balance(&2), 256 * 20); // reserve still exists.
 					assert_eq!(System::account_nonce(&2), 1);
 

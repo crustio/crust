@@ -111,6 +111,7 @@
 //!     // An attempt to log in with the right password succeeds.
 //!     assert!(db.verify_password("alice", "@74d7]404j|W}6u").is_ok());
 //! }
+//! ```
 
 use crate::{constant_time, digest, error, hmac, polyfill};
 use core::num::NonZeroU32;

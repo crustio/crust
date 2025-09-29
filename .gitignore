@@ -6,7 +6,7 @@
 **/*.rs.bk
 
 # Child folder's lock file should be ignored
-**/Cargo.lock
+# **/Cargo.lock
 
 ## ide
 .vscode

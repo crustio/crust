@@ -34,10 +34,11 @@ use sp_std::{vec::Vec};
 use sp_std::{
 	marker::PhantomData,
 };
-use xcm::latest::{
+use xcm::v5::{
 	AssetId as xcmAssetId, Error as XcmError, Fungibility,
-	MultiAsset, MultiLocation, XcmContext
+	Asset, Location, XcmContext
 };
+use xcm_executor::AssetsInHolding;
 use xcm_builder::TakeRevenue;
 use xcm_executor::traits::{MatchesFungibles, WeightTrader};
 use xcm_executor::traits::ConvertLocation;
@@ -148,11 +149,11 @@ pub struct XcmFeesToAccount<Assets, Matcher, AccountId, ReceiverAccount>(
 impl<
 		Assets: Mutate<AccountId>,
 		Matcher: MatchesFungibles<Assets::AssetId, Assets::Balance>,
-		AccountId: Clone,
+		AccountId: Clone + Eq,
 		ReceiverAccount: Get<AccountId>,
 	> TakeRevenue for XcmFeesToAccount<Assets, Matcher, AccountId, ReceiverAccount>
 {
-	fn take_revenue(revenue: MultiAsset) {
+	fn take_revenue(revenue: Asset) {
 		match Matcher::matches_fungibles(&revenue) {
 			Ok((asset_id, amount)) => {
 				if !amount.is_zero() {
@@ -176,17 +177,17 @@ impl<
 pub struct AsAssetType<AssetId, AssetType, AssetIdInfoGetter>(
 	PhantomData<(AssetId, AssetType, AssetIdInfoGetter)>,
 );
-impl<AssetId, AssetType, AssetIdInfoGetter> MaybeEquivalence<MultiLocation, AssetId>
+impl<AssetId, AssetType, AssetIdInfoGetter> MaybeEquivalence<Location, AssetId>
 	for AsAssetType<AssetId, AssetType, AssetIdInfoGetter>
 where
 	AssetId: Clone,
-	AssetType: From<MultiLocation> + Into<Option<MultiLocation>> + Clone,
+	AssetType: From<Location> + Into<Option<Location>> + Clone,
 	AssetIdInfoGetter: AssetTypeGetter<AssetId, AssetType>,
 {
-	fn convert(id: &MultiLocation) -> Option<AssetId> {
+	fn convert(id: &Location) -> Option<AssetId> {
 		AssetIdInfoGetter::get_asset_id(id.clone().into())
 	}
-	fn convert_back(what: &AssetId) -> Option<MultiLocation> {
+	fn convert_back(what: &AssetId) -> Option<Location> {
 		AssetIdInfoGetter::get_asset_type(what.clone()).and_then(Into::into)
 	}
 }
@@ -194,10 +195,10 @@ impl<AssetId, AssetType, AssetIdInfoGetter> ConvertLocation<AssetId>
 	for AsAssetType<AssetId, AssetType, AssetIdInfoGetter>
 where
 	AssetId: Clone,
-	AssetType: From<MultiLocation> + Into<Option<MultiLocation>> + Clone,
+	AssetType: From<Location> + Into<Option<Location>> + Clone,
 	AssetIdInfoGetter: AssetTypeGetter<AssetId, AssetType>,
 {
-	fn convert_location(id: &MultiLocation) -> Option<AssetId> {
+	fn convert_location(id: &Location) -> Option<AssetId> {
 		AssetIdInfoGetter::get_asset_id(id.clone().into())
 	}
 }
@@ -206,16 +207,16 @@ where
 // This takes the first fungible asset, and takes whatever UnitPerSecondGetter establishes
 // UnitsToWeightRatio trait, which needs to be implemented by AssetIdInfoGetter
 pub struct FirstAssetTrader<
-	AssetType: From<MultiLocation> + Clone,
+	AssetType: From<Location> + Clone,
 	AssetIdInfoGetter: UnitsToWeightRatio<AssetType>,
 	R: TakeRevenue,
 >(
 	Weight,
-	Option<(MultiLocation, u128, u128)>, // id, amount, units_per_second
+	Option<(Location, u128, u128)>, // id, amount, units_per_second
 	PhantomData<(AssetType, AssetIdInfoGetter, R)>,
 );
 impl<
-		AssetType: From<MultiLocation> + Clone,
+		AssetType: From<Location> + Clone,
 		AssetIdInfoGetter: UnitsToWeightRatio<AssetType>,
 		R: TakeRevenue,
 	> WeightTrader for FirstAssetTrader<AssetType, AssetIdInfoGetter, R>
@@ -226,9 +227,9 @@ impl<
 	fn buy_weight(
 		&mut self,
 		weight: Weight,
-		payment: xcm_executor::Assets,
+		payment: AssetsInHolding,
 		_context: &XcmContext,
-	) -> Result<xcm_executor::Assets, XcmError> {
+	) -> Result<AssetsInHolding, XcmError> {
 		// can only call one time
 		if self.1.is_some() {
 			// TODO: better error
@@ -244,8 +245,8 @@ impl<
 
 		// We are only going to check first asset for now. This should be sufficient for simple token
 		// transfers. We will see later if we change this.
-		match (first_asset.id, first_asset.fun) {
-			(xcmAssetId::Concrete(id), Fungibility::Fungible(_)) => {
+		match (first_asset.id.clone(), first_asset.fun) {
+			(xcmAssetId(id), Fungibility::Fungible(_)) => {
 				let asset_type: AssetType = id.clone().into();
 				// Shortcut if we know the asset is not supported
 				// This involves the same db read per block, mitigating any attack based on
@@ -266,9 +267,9 @@ impl<
 						return Ok(payment);
 					}
 
-					let required = MultiAsset {
+					let required = Asset {
 						fun: Fungibility::Fungible(amount),
-						id: xcmAssetId::Concrete(id.clone()),
+						id: xcmAssetId(id.clone()),
 					};
 					let unused = payment
 						.checked_sub(required)
@@ -287,7 +288,7 @@ impl<
 	}
 
 	// Refund weight. We will refund in whatever asset is stored in self.
-	fn refund_weight(&mut self, weight: Weight, _context: &XcmContext) -> Option<MultiAsset> {
+	fn refund_weight(&mut self, weight: Weight, _context: &XcmContext) -> Option<Asset> {
 		if let Some((id, prev_amount, units_per_second)) = self.1.clone() {
 			let weight = weight.min(self.0);
 			self.0 -= weight;
@@ -299,9 +300,9 @@ impl<
 				prev_amount.saturating_sub(amount),
 				units_per_second,
 			));
-			Some(MultiAsset {
+			Some(Asset {
 				fun: Fungibility::Fungible(amount),
-				id: xcmAssetId::Concrete(id.clone()),
+				id: xcmAssetId(id.clone()),
 			})
 		} else {
 			None
@@ -311,7 +312,7 @@ impl<
 
 /// Deal with spent fees, deposit them as dictated by R
 impl<
-		AssetType: From<MultiLocation> + Clone,
+		AssetType: From<Location> + Clone,
 		AssetIdInfoGetter: UnitsToWeightRatio<AssetType>,
 		R: TakeRevenue,
 	> Drop for FirstAssetTrader<AssetType, AssetIdInfoGetter, R>

@@ -11,17 +11,15 @@ pub mod pallet {
 	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::pallet_prelude::*;
 
-	use xcm::latest::prelude::*;
+	use xcm::v5::prelude::*;
 	use sp_std::convert::TryInto;
 	use sp_runtime::traits::{AccountIdConversion, Convert};
-	use xcm::latest::{XcmContext};
+	use xcm::v5::{XcmContext};
 
 	use xcm_executor::traits::TransactAsset;
 	use crate::weights::WeightInfo;
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
-	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
 	/// The AssetManagers's pallet id
@@ -39,13 +37,13 @@ pub mod pallet {
 		type AssetTransactor: TransactAsset;
 
 		/// Currency Id.
-		type CurrencyId: Parameter + Member + Clone;
+		type CurrencyId: Parameter + Member + Clone + MaxEncodedLen;
 
-		/// Convert `T::CurrencyId` to `MultiLocation`.
-		type CurrencyIdToMultiLocation: Convert<Self::CurrencyId, Option<MultiLocation>>;
+		/// Convert `T::CurrencyId` to `Location`.
+		type CurrencyIdToMultiLocation: Convert<Self::CurrencyId, Option<Location>>;
 
-		/// Convert `T::AccountId` to `MultiLocation`.
-		type AccountIdToMultiLocation: Convert<Self::AccountId, MultiLocation>;
+		/// Convert `T::AccountId` to `Location`.
+		type AccountIdToMultiLocation: Convert<Self::AccountId, Location>;
 
 		/// RuntimeOrigin that is allowed to create and modify storage fee information
 		type StorageFeeOwner: EnsureOrigin<Self::RuntimeOrigin>;
@@ -112,18 +110,18 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			let location: MultiLocation =
+			let location: Location =
 				T::CurrencyIdToMultiLocation::convert(currency_id.clone()).ok_or(Error::<T>::NotCrossChainTransferableCurrency)?;
 
 			let amount = StorageFeePerCurrency::<T>::get(&currency_id)
 			.ok_or(Error::<T>::NotSupportedCurrency)?;
 
-			let fee: MultiAsset = MultiAsset {
-				id: Concrete(location),
+			let fee: Asset = Asset {
+				id: AssetId(location),
 				fun: Fungible(amount),
 			};
 
-			// Convert origin to multilocation
+			// Convert origin to location
 			let origin_as_mult = T::AccountIdToMultiLocation::convert(who.clone());
 			let dest_as_mult = T::AccountIdToMultiLocation::convert(Self::account_id());
 			let ctx = XcmContext { origin: None, message_id: XcmHash::default(), topic: None };
@@ -149,7 +147,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			T::StorageFeeOwner::ensure_origin(origin)?;
 
-			let _: MultiLocation =
+			let _: Location =
 				T::CurrencyIdToMultiLocation::convert(currency_id.clone()).ok_or(Error::<T>::NotCrossChainTransferableCurrency)?;
 
 			<StorageFeePerCurrency<T>>::insert(currency_id.clone(), amount);
@@ -199,7 +197,7 @@ mod tests {
 			pub const RelayNetwork: NetworkId = NetworkId::Kusama;
 		}
 
-		let input = MultiLocation::new(1, X2(Parachain(1000), account20()));
+		let input = Location::new(1, X2(Parachain(1000), account20()));
 		let output = hex::encode(Account32Hash::<RelayNetwork, AccountId>::convert_ref(&input).unwrap().encode());
 		assert_eq!(output, "39391a315541eb4aa52c745b78e35aefcecf1a0ff1525e94e63b4dd006f81846");
 	}

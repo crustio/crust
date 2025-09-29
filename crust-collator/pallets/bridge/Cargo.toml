@@ -14,17 +14,20 @@ serde = { optional = true, version = "1.0.171" }
 scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
 
 # primitives
-sp-std = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-sp-io = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+sp-io = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
 
 # frame dependencies
-frame-support = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-frame-system = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
+frame-support = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+frame-system = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+
+# Benchmarks
+frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1", optional = true, default-features = false }
 
 [dev-dependencies]
-balances = { package = 'pallet-balances', git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503" }
+balances = { package = 'pallet-balances', git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503-1" }
 
 [features]
 default = ["std"]
@@ -38,3 +41,8 @@ std = [
 	"frame-support/std",
 	"frame-system/std"
 ]
+
+runtime-benchmarks = [
+	"frame-benchmarking",
+]
+try-runtime = [ "frame-support/try-runtime" ]

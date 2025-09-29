@@ -11,21 +11,21 @@ serde = { version = "1.0.171", optional = true, default-features = false, featur
 sha3 = { version = "0.8", default-features = false }
 
 # Substrate dependencies
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503" }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503-1" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503-1" }
 
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503", default-features = false }
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503", default-features = false }
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1", default-features = false }
 
 parity-scale-codec = { version = "3.0.0", default-features = false, features = [ "derive" ] }
 scale-info = { version = "2.9.0", default-features = false, features = [ "derive" ] }
 
 # Polkadot / XCM
-xcm = { package="staging-xcm", git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503", default-features = false }
-xcm-builder = { package="staging-xcm-builder", git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503", default-features = false }
-xcm-executor = { package="staging-xcm-executor", git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503", default-features = false }
+xcm = { package="staging-xcm", git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1", default-features = false }
+xcm-builder = { package="staging-xcm-builder", git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1", default-features = false }
+xcm-executor = { package="staging-xcm-executor", git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1", default-features = false }
 
-cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503", default-features = false }
+cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1", default-features = false }
 
 [features]
 default = [ "std" ]

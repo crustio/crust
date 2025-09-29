@@ -4,7 +4,7 @@
 //! Module to process claims from Ethereum addresses.
 #![cfg_attr(not(feature = "std"), no_std)]
 use sp_std::prelude::*;
-use codec::{Encode, Decode};
+use codec::{Encode, Decode, DecodeWithMemTracking, MaxEncodedLen};
 #[cfg(feature = "std")]
 use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
 
@@ -29,7 +29,7 @@ pub mod weights;
 /// An Ethereum address (i.e. 20 bytes, used to represent an Ethereum account).
 ///
 /// This gets serialized to the 0x-prefixed hex representation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, scale_info::TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Default, RuntimeDebug, scale_info::TypeInfo, MaxEncodedLen)]
 pub struct EthereumAddress([u8; 20]);
 
 #[cfg(feature = "std")]
@@ -58,7 +58,7 @@ impl<'de> Deserialize<'de> for EthereumAddress {
 }
 
 /// An Ethereum signature
-#[derive(Encode, Decode, Clone, scale_info::TypeInfo)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, scale_info::TypeInfo)]
 pub struct EcdsaSignature(pub [u8; 65]);
 
 impl PartialEq for EcdsaSignature {
@@ -73,7 +73,7 @@ impl sp_std::fmt::Debug for EcdsaSignature {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, Default, RuntimeDebug, scale_info::TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Default, RuntimeDebug, scale_info::TypeInfo, MaxEncodedLen)]
 pub struct EthereumTxHash([u8; 32]);
 
 #[cfg(feature = "std")]
@@ -138,7 +138,6 @@ pub mod pallet {
     
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 

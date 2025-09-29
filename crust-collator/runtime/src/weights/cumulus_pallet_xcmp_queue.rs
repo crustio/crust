@@ -51,25 +51,13 @@ impl<T: frame_system::Config> cumulus_pallet_xcmp_queue::WeightInfo for WeightIn
 	/// Storage: XcmpQueue QueueConfig (r:1 w:1)
 	/// Proof Skipped: XcmpQueue QueueConfig (max_values: Some(1), max_size: None, mode: Measured)
 	fn set_config_with_u32() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `76`
-		//  Estimated: `1561`
-		// Minimum execution time: 5_530_000 picoseconds.
-		Weight::from_parts(5_817_000, 0)
-			.saturating_add(Weight::from_parts(0, 1561))
-			.saturating_add(T::DbWeight::get().reads(1))
+		T::DbWeight::get().reads(1)
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 	/// Storage: XcmpQueue QueueConfig (r:1 w:1)
 	/// Proof Skipped: XcmpQueue QueueConfig (max_values: Some(1), max_size: None, mode: Measured)
 	fn set_config_with_weight() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `76`
-		//  Estimated: `1561`
-		// Minimum execution time: 5_715_000 picoseconds.
-		Weight::from_parts(5_893_000, 0)
-			.saturating_add(Weight::from_parts(0, 1561))
-			.saturating_add(T::DbWeight::get().reads(1))
+		T::DbWeight::get().reads(1)
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 }

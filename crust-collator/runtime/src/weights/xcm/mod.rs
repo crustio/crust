@@ -14,15 +14,29 @@
 // You should have received a copy of the GNU General Public License
 // along with Cumulus.  If not, see <http://www.gnu.org/licenses/>.
 
+use crate::MaxAssetsIntoHolding;
+
+use core::marker::PhantomData;
+use frame_support::traits::{Get, OnUnbalanced};
+use sp_std::result::Result;
+use xcm::v5::{
+	Asset as MultiAsset,
+	Assets as MultiAssets,
+	AssetFilter as MultiAssetFilter,
+	InteriorLocation as InteriorMultiLocation,
+	Location as MultiLocation,
+};
+use xcm::DoubleEncoded;
+use xcm_executor::traits::{WeightTrader, Properties};
+use xcm_builder::{TakeRevenue, UsingComponents};
+
 mod pallet_xcm_benchmarks_fungible;
 mod pallet_xcm_benchmarks_generic;
 
-use crate::{MaxAssetsIntoHolding, Runtime};
 use frame_support::weights::Weight;
 use pallet_xcm_benchmarks_fungible::WeightInfo as XcmFungibleWeight;
 use pallet_xcm_benchmarks_generic::WeightInfo as XcmGeneric;
 use sp_std::prelude::*;
-use xcm::{latest::prelude::*, DoubleEncoded};
 
 trait WeighMultiAssets {
 	fn weigh_multi_assets(&self, weight: Weight) -> Weight;
@@ -247,4 +261,47 @@ impl<Call> XcmWeightInfo<Call> for AssetHubKusamaXcmWeight<Call> {
 	fn unpaid_execution(_: &WeightLimit, _: &Option<MultiLocation>) -> Weight {
 		XcmGeneric::<Runtime>::unpaid_execution()
 	}
+}
+
+impl<
+	WeightToFee: frame_support::weights::WeightToFee<Balance = Currency::Balance>,
+	AssetIdValue: Get<MultiLocation>,
+	AccountId: Clone,
+	Currency: frame_support::traits::Currency<AccountId>,
+	OnUnbalanced: frame_support::traits::OnUnbalanced<Currency::NegativeImbalance>,
+> WeightTrader for UsingComponents<WeightToFee, AssetIdValue, AccountId, Currency, OnUnbalanced> {
+	fn new() -> Self {
+		Self(Default::default(), PhantomData, PhantomData)
+	}
+
+	// ...existing code...
+}
+
+// ...existing code...
+impl<
+	Waived: Contains<MultiLocation>,
+	HandleFee: TakeRevenue,
+> WeightTrader for FirstAssetTrader<Waived, HandleFee> {
+	fn new() -> Self {
+		Self {
+			weight: Weight::zero(),
+			consumed: Weight::zero(),
+			first_asset: None,
+			_marker: PhantomData,
+		}
+	}
+
+	fn buy_weight(
+		&mut self,
+		weight: Weight,
+		payment: xcm_executor::Assets,
+		context: &XcmContext,
+	) -> Result<xcm_executor::Assets, XcmError> {
+		log::trace!(target: "xcm::weight", "FirstAssetTrader::buy_weight weight: {:?}, payment: {:?}", weight, payment);
+		// ...existing code...
+		_call: &DoubleEncoded<Call>,
+		// ...existing code...
+	}
+
+	// ...existing code...
 }

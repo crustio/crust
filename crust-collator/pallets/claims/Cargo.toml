@@ -15,15 +15,15 @@ rustc-hex = { default-features = false, version = "2.0.1" }
 scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
 
 # substrate frame dependencies
-frame-support = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-frame-system = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
-sp-io = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503" }
+frame-support = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+frame-system = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
+sp-io = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2503-1" }
 
 [dev-dependencies]
-balances = { package = 'pallet-balances', git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503" }
+balances = { package = 'pallet-balances', git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2503-1" }
 hex-literal = "0.3.4"
 
 [features]

@@ -131,7 +131,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("polkadot-crust-parachain"),
 	impl_name: create_runtime_str!("polkadot-crust-parachain"),
 	authoring_version: 1,
-	spec_version: 7,
+	spec_version: 8,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -692,13 +692,13 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 }
 
 parameter_types! {
-    pub const CandidacyBond: Balance = 10000 * DOLLARS;
+    pub const CandidacyBond: Balance = 100 * DOLLARS;
     // 1 storage item created, key size is 32 bytes, value size is 16+16.
     pub const VotingBondBase: Balance = 1 * DOLLARS;
     // additional data per vote is 32 bytes (account id).
     pub const VotingBondFactor: Balance = 10 * CENTS;
     /// Daily council elections
-    pub const TermDuration: BlockNumber = 14 * DAYS;
+    pub const TermDuration: BlockNumber = 3 * DAYS;
     pub const DesiredMembers: u32 = 7;
     pub const DesiredRunnersUp: u32 = 6;
 	pub const MaxVoters: u32 = 10 * 1000;

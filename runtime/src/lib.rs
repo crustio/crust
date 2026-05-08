@@ -103,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("crust"),
     impl_name: create_runtime_str!("crustio-crust"),
     authoring_version: 1,
-    spec_version: 27,
+    spec_version: 28,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1
@@ -732,10 +732,10 @@ impl pallet_transaction_payment::Config for Runtime {
     TargetedFeeAdjustment<Self, TargetBlockFullness, AdjustmentVariable, MinimumMultiplier>;
 }
 
-// impl pallet_sudo::Config for Runtime {
-//     type Event = Event;
-//     type Call = Call;
-// }
+impl pallet_sudo::Config for Runtime {
+    type Event = Event;
+    type Call = Call;
+}
 
 parameter_types! {
     pub const PunishmentSlots: u32 = 8; // 8 report slot == 8 hours
@@ -914,6 +914,9 @@ construct_runtime! {
         // ChainBridge
         ChainBridge: bridge::{Module, Call, Storage, Event<T>},
         BridgeTransfer: bridge_transfer::{Module, Call, Event<T>, Storage},
+
+        // reopen Sudo
+        Sudo: pallet_sudo::{Module, Call, Storage, Config<T>, Event<T>},
     }
 }
 
@@ -941,6 +944,7 @@ pub type SignedExtra = (
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, SignedExtra>;
+
 /// Executive: handles dispatch to the various modules.
 pub type Executive = frame_executive::Executive<
     Runtime,
@@ -1110,6 +1114,23 @@ impl_runtime_apis! {
             encoded: Vec<u8>,
         ) -> Option<Vec<(Vec<u8>, sp_core::crypto::KeyTypeId)>> {
             SessionKeys::decode_into_raw_public_keys(&encoded)
+        }
+    }
+
+    #[cfg(feature = "try-runtime")]
+    impl frame_try_runtime::TryRuntime<Block> for Runtime {
+        fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
+            let weight = Executive::try_runtime_upgrade(checks).unwrap();
+            (weight, RuntimeBlockWeights::get().max_block)
+        }
+
+        fn execute_block(
+            block: Block,
+            state_root_check: bool,
+            signature_check: bool,
+            select: frame_try_runtime::TryStateSelect,
+        ) -> Weight {
+            Executive::try_execute_block(block, state_root_check, signature_check, select).unwrap()
         }
     }
 

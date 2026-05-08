@@ -1,0 +1,101 @@
+name: Runtime Build
+
+on:
+  push: 
+    branches:
+      - update
+  workflow_dispatch:
+    inputs:
+      try_runtime_uri:
+        description: "WebSocket endpoint used by try-runtime create-snapshot"
+        required: false
+        type: string
+
+jobs:
+  build_runtime:
+    name: Build Runtime Wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Cache cargo git index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-runtime-target-${{ hashFiles('**/Cargo.toml', 'Cargo.lock') }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake pkg-config libssl-dev git gcc build-essential clang protobuf-compiler
+
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-01-19-x86_64-unknown-linux-gnu
+          target: wasm32-unknown-unknown
+          override: true
+      - name: Check try-runtime upgrade
+        run: |
+          set -euo pipefail
+          echo "=== Checking Runtime Migration Via try-runtime ==="
+
+          TRY_RUNTIME_URI="wss://rpc.crustnetwork.xyz"
+
+          echo "Using try-runtime endpoint: $TRY_RUNTIME_URI"
+
+          cargo +stable install --locked --git https://github.com/paritytech/try-runtime-cli
+          try-runtime --version
+
+          CARGO_TARGET_DIR=target/try-runtime cargo +nightly-2021-01-19-x86_64-unknown-linux-gnu build --release -p crust-runtime --features try-runtime
+
+          TRY_RUNTIME_WASM="target/try-runtime/release/wbuild/crust-runtime/target/wasm32-unknown-unknown/release/crust_runtime.wasm"
+          if [ ! -f "$TRY_RUNTIME_WASM" ]; then
+            TRY_RUNTIME_WASM="target/try-runtime/release/wbuild/crust-runtime/crust_runtime.wasm"
+          fi
+
+          if [ ! -f "$TRY_RUNTIME_WASM" ]; then
+            echo "❌ ERROR: try-runtime wasm not found"
+            exit 1
+          fi
+
+          try-runtime create-snapshot --uri "$TRY_RUNTIME_URI" snapshot.raw
+
+          try-runtime \
+            --runtime "$TRY_RUNTIME_WASM" \
+            on-runtime-upgrade --disable-spec-version-check --checks=pre-and-post snap -p snapshot.raw
+
+          echo "=== try-runtime Check Passed ==="
+      - name: Build runtime
+        run: cargo +nightly-2021-01-19-x86_64-unknown-linux-gnu build --release -p crust-runtime
+
+      - name: Collect runtime artifacts
+        run: |
+          mkdir -p artifacts/runtime
+          if [ ! -d target/release/wbuild/crust-runtime ]; then
+            echo "Runtime output directory target/release/wbuild/crust-runtime not found"
+            exit 1
+          fi
+          find target/release/wbuild/crust-runtime -maxdepth 1 -type f -name "*.wasm" -exec cp {} artifacts/runtime/ \;
+          ls -lah artifacts/runtime
+
+      - name: Upload runtime artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: crust-runtime-${{ github.sha }}
+          path: artifacts/runtime/*
+          if-no-files-found: error
+          retention-days: 14

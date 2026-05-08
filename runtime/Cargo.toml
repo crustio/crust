@@ -58,6 +58,7 @@ pallet-sudo = { default-features = false, git = "https://github.com/crustio/subs
 frame-support = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 pallet-staking-reward-curve = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 frame-system = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
+frame-try-runtime = { default-features = false, optional = true, git = "https://github.com/crustio/substrate", rev = "033d4e86cc7eff0066cd376b9375f815761d653c" }
 pallet-timestamp = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 pallet-tips = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
 pallet-transaction-payment = { default-features = false, git = "https://github.com/crustio/substrate", rev = "3971a18dd746ff5190d2d274cfcdaf7dae5f8ce4" }
@@ -163,4 +164,12 @@ runtime-benchmarks = [
     "csm-locking/runtime-benchmarks",
     "locks/runtime-benchmarks",
     "bridge/runtime-benchmarks",
+]
+
+try-runtime = [
+    "frame-executive/try-runtime",
+    "frame-support/try-runtime",
+    "frame-system/try-runtime",
+    "sp-runtime/try-runtime",
+    "frame-try-runtime/try-runtime",
 ]
